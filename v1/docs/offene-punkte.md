@@ -554,6 +554,19 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Gerätebefund 16.10.2026, drei Punkte** — Patrick, wörtlich: „Die
+      Geräuschkulisse muss viel viel besser werden, aktuell höre ich beim
+      greifen eher ein summen, autos müssen holkörper werden. Und die
+      Challenges sind noch nicht ausgereift, pausieren"
+
+      | # | Punkt | Bezug |
+      |---|---|---|
+      | 1 | Geräuschkulisse insgesamt „viel viel besser" | E-121 hat nicht gereicht |
+      | 2 | Beim Greifen hört er ein **Summen** | E-121: Schalenfahrt als „Öl-Singen", Druck als „Stöhnen" — beides Oszillatoren |
+      | 3 | **Autos müssen Hohlkörper werden** — zum zweiten Mal gesagt | E-124/E-127 haben acht Kollider gebaut; das hat sein Bild offenbar nicht getroffen |
+      | 4 | Challenges sind nicht ausgereift — **pausieren** | E-125 |
+
+
 - [ ] **Elf Punkte aus einer Ansage, 06.10.2026** — Patrick, wörtlich:
       „Also, wir müssen uns um das Spiel als solches kümmern, geräusche beim
       greifen, schrott geräusche. Plätze für Mischschrott und Stahlschrott

@@ -14,6 +14,7 @@
  */
 import { CHALLENGES } from "../challenges/katalog";
 import { leseChallenges } from "../core/save";
+import { CHALLENGES_PAUSIERT } from "../core/spielart";
 import { sterneZeile } from "./abrechnung";
 
 export type Spielwahl = { art: "sandkasten" } | { art: "challenge"; id: string };
@@ -45,6 +46,8 @@ export function zumMenue(): void {
 
 /** Menü zeigen und auf die Wahl warten — oder gleich in eine Challenge. */
 export function waehleSpielart(): Promise<Spielwahl> {
+  // Pausiert (E-129): kein Menue, keine Challenge — direkt in den Sandkasten.
+  if (CHALLENGES_PAUSIERT) return Promise.resolve({ art: "sandkasten" });
   const stand = leseChallenges();
   const direkt = challengeAusAdresse() ?? (Object.keys(stand).length === 0 ? CHALLENGES[0]!.id : null);
   if (direkt) return Promise.resolve({ art: "challenge", id: direkt });

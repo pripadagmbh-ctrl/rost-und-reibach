@@ -32,6 +32,18 @@ export const SPIELART: Spielart = "simulator";
 export const BETRIEB = (SPIELART as Spielart) === "betrieb";
 
 /**
+ * DIE CHALLENGES SIND PAUSIERT (E-129). Patrick am Gerät, 16.10.2026: „Und die
+ * Challenges sind noch nicht ausgereift, pausieren".
+ *
+ * Pausiert heißt: nicht im Weg des Spielers, aber nichts gelöscht. Das Spiel
+ * führt beim ersten Start nicht mehr in Challenge 1 und zeigt kein Hauptmenü —
+ * mit nur noch einem Knopf (SANDKASTEN) wäre es ein Tipp ohne Wahl —, sondern
+ * startet direkt im Sandkasten. Rahmen, Katalog, Karte, Wertung und ihre
+ * Wächter bleiben (E-125); auf `false` gestellt ist alles wieder da.
+ */
+export const CHALLENGES_PAUSIERT = true;
+
+/**
  * Was auf der Seite (`index.html`) nur zu EINER Spielart gehört — `main.ts`
  * nimmt den Rest beim Start aus dem Bild. Kranz-Einträge werden entfernt
  * (der Kranz liest die Spans, nicht ihre Sichtbarkeit), alles andere wird

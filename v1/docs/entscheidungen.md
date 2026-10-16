@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-129 | 16.10.2026 | Die Challenges werden pausiert, das Spiel startet im Sandkasten | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-127 | 06.10.2026 | Greifer fragt alle Bleche, Türen bis zum Schweller, Spiegel am Auto | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-126 | 06.10.2026 | Einzelstück-Fuhre: ein Laster, ein Großteil, allein darf es höher sein | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-125 | 06.10.2026 | Das Spiel fängt mit einer Challenge an: ein Auto in die Presse | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -141,6 +142,9 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-129 — Die Challenges werden pausiert, das Spiel startet im Sandkasten**
+- Spiel öffnen: Startet es direkt im Sandkasten — ohne Menü, ohne die Karte „1/4 Greif das Wrack“?
 
 **E-127 — Greifer fragt alle Bleche, Türen bis zum Schweller, Spiegel am Auto**
 - **Spinne über die rechte vordere Tür, absenken, zudrücken** (zwei-, dreimal, jedes Mal loslassen). Geht die Tür jetzt bis unten zum Schweller ein, nicht nur im oberen Teil?
