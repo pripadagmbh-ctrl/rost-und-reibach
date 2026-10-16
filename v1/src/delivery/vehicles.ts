@@ -67,6 +67,12 @@ const VOLL_PRUEF_S = 0.25;
 const ABHOLER_CONTAINER_KG = 1800;
 /** Rueckwaertstempo beim Einparken (m/s) — Schrittgeschwindigkeit. */
 const PARK_RUECK_SPEED = 1.6;
+/**
+ * Wie weit hinter dem naechsten Punkt ein Ansteher auf die Anfahrt einfaedelt
+ * (E-131, SW: 6 m). Am naechsten Punkt selbst stuende er quer zur Spur und
+ * muesste im Zickzack einlenken; 6 m weiter faehrt er schraeg darauf zu.
+ */
+const ANSTEH_EINFAEDEL_M = 6;
 /*
  * Hier stand `LADUNG_UEBERSTAND = 0.35` als zweite Abschrift. Seit E-126 gibt
  * es zwei Hoehenregeln (Schuettgut, Einzelstueck); beide stehen an EINER
@@ -159,6 +165,7 @@ import {
   PARK_TIME_S,
   SPEED,
   FIRST_DELAY_S,
+  ANSTEH_ERSTER_S,
   NEXT_DELAY_S,
   BLOCK_RADIUS,
   BLOCKING_MASS_KG,
@@ -689,6 +696,57 @@ class DeliveryVehicle {
     }
   }
 
+  /**
+   * STEHT BELADEN AUF DEM WARTEPLATZ AN (E-131).
+   *
+   * Patrick, 16.10.2026: "Es sollen mehr LKWs kommen am Anfang". Beim Start
+   * des Sandkastens stehen drei Fuhren schon auf den Warteplaetzen —
+   * gewogen, beladen, und sie warten, bis der Abladeplatz frei ist. Der
+   * Warteplatz, die Phase `parked` und die Liste `parked` sind dieselben wie
+   * fuer die Kaffeepause nach dem Abladen; neu ist nur, dass dieser Wagen
+   * VORHER dort steht und auf seinen Ruf wartet statt auf seine Uhr.
+   */
+  stehtAn = false;
+
+  /** Gleich nach dem Bau: auf den Warteplatz stellen und dort beladen ansetzen. */
+  stelleAnstehendAuf(slot: [number, number]): void {
+    this.stehtAn = true;
+    this.parkSpot = slot;
+    this.kaffeeGehabt = true; // der Fahrer bleibt sitzen, er ist gleich dran
+    this.weighedIn = true; // gewogen ist er schon (er kam vor Spielbeginn)
+    // Dieselbe Endlage wie nach `parkRueck`: Heck zur Wand, Front zum Platz.
+    // Gesetzt, bevor der erste Physikschritt laeuft und bevor Ladung da ist —
+    // wie die Startpose im Konstruktor, nur an anderer Stelle (v2 E-058).
+    const r = routeParkRueck(slot);
+    this.placeAt(r, this.routeLength(r), true);
+    this.wendeFederungAn();
+    this.federLetztePos.copy(this.group.position);
+    this.snapBodiesToPose();
+  }
+
+  /**
+   * Vom Warteplatz an den Abladeplatz — wenn der Fuhrpark ruft.
+   *
+   * Kein neuer Weg: Der Wagen zieht aus der Bucht (`parkAnfahrt`, der Punkt,
+   * von dem er sonst rueckwaerts hineinsetzt) und faedelt auf die gewohnte
+   * Anfahrt von der Waage ein (`routeApproach`), `ANSTEH_EINFAEDEL_M` hinter
+   * dem Punkt, der der Bucht am naechsten liegt. Ab da ist er ein Anlieferer
+   * wie jeder andere; danach faehrt er vom Hof, nicht zurueck auf den Platz.
+   */
+  rueckeVor(): void {
+    const slot = this.parkSpot!;
+    this.stehtAn = false;
+    this.parkSpot = null;
+    this.legeAbladestelleFest();
+    const route = this.routeApproach;
+    const bucht = parkAnfahrt(slot);
+    const ab = Math.min(
+      this.nearestS(route, bucht[0], bucht[1]) + ANSTEH_EINFAEDEL_M,
+      this.routeLength(route)
+    );
+    this.starteAusfaedeln(route, "approach", ab, [bucht], ab);
+  }
+
   /** Steht das Fahrzeug auf dem Warteplatz und macht Pause? */
   get isParked(): boolean {
     return this.phase === "parked" || this.phase === "toPark" || this.phase === "parkRueck";
@@ -824,9 +882,11 @@ class DeliveryVehicle {
   }
 
   /** Bogenlänge des Routenpunkts, der der aktuellen Position am nächsten liegt. */
-  private nearestS(route: Array<[number, number]>): number {
-    const px = this.group.position.x;
-    const pz = this.group.position.z;
+  private nearestS(
+    route: Array<[number, number]>,
+    px = this.group.position.x,
+    pz = this.group.position.z
+  ): number {
     let best = 0;
     let bestD = Infinity;
     let s = 0;
@@ -899,7 +959,9 @@ class DeliveryVehicle {
     route: Array<[number, number]>,
     folge: Phase,
     altS: number,
-    vorpunkte: Array<[number, number]> = []
+    vorpunkte: Array<[number, number]> = [],
+    /** Wo auf der Strecke eingefaedelt wird; ohne Angabe der naechste Punkt. */
+    zielS: number = this.nearestS(route)
   ): void {
     this.phaseT = 0;
     if (!this.faedeltAus) {
@@ -911,7 +973,7 @@ class DeliveryVehicle {
     this.ausfaedelFolge = folge;
     this.ausfaedelWeg = [
       ...vorpunkte.map((p) => [p[0], p[1]] as [number, number]),
-      this.punktAuf(route, this.nearestS(route)),
+      this.punktAuf(route, zielS),
     ];
     this.ausfaedelPunkt = null;
     this.phase = "ausfaedeln";
@@ -2636,7 +2698,8 @@ class DeliveryVehicle {
         // warten, bis sich der Ladungsberg gesetzt hat (max. 4 s)
         if (this.isPickup || (this.phaseT > 1.2 && this.cargoAtRest()) || this.phaseT > 4) {
           this.lockAllCargo();
-          this.phase = "in";
+          // Wer schon auf dem Warteplatz ansteht (E-131), bleibt dort stehen.
+          this.phase = this.stehtAn ? "parked" : "in";
           this.phaseT = 0;
         }
         break;
@@ -2921,6 +2984,8 @@ class DeliveryVehicle {
         break;
       }
       case "parked":
+        // Ansteher (E-131): wartet beladen, bis der Fuhrpark ihn vorruft.
+        if (this.stehtAn) break;
         // Kaffeepause: Der Fahrer steigt aus und geht zu Janine hinueber.
         // Einmal pro Pause. Ohne diese Sperre stieg er sofort wieder aus,
         // sobald er drin war, und der LKW fuhr nie los.
@@ -3327,18 +3392,7 @@ export class VehicleManager {
     const k: DeliveryKind =
       kind ?? vehicleForCustomer(gezogen);
     const c = k === "abholer" ? null : gezogen;
-    this.active = new DeliveryVehicle(
-      k,
-      this.scene,
-      this.world,
-      this.blockedAt,
-      () => this.onHonk?.(),
-      (kg) => this.onWeighIn?.(kg),
-      (kg) => this.onWeighOut?.(kg),
-      c
-    );
-    this.active.itemQuelle = this.items;
-    this.active.platzinventar = this.platzinventar;
+    this.active = this.baueWagen(k, c);
     // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
     this.active.bestellung = k === "abholer" ? this.pickupOrder : null;
     /*
@@ -3368,9 +3422,7 @@ export class VehicleManager {
        * Name kommt aus dem Kundenprofil, das ohnehin schon am Wagen haengt;
        * eine zweite Liste von Sprechern gibt es nicht.
        */
-      const wagen = this.active;
-      wagen.onAnliefererlage = (lage) =>
-        this.onPickupFunk?.(wagen.customer?.name ?? "Fahrer", anliefererfunk(lage));
+      // (verdrahtet in `baueWagen`)
     }
     if (c) this.onCustomerArrived?.(c);
     // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
@@ -3387,6 +3439,27 @@ export class VehicleManager {
     }
     this.active.loadCargo(this.items, this.composites);
     if (k !== "abholer") this.deliveries++;
+  }
+
+  /** Ein Fahrzeug bauen und an den Fuhrpark anschliessen — fuer Tor und Warteplatz. */
+  private baueWagen(k: DeliveryKind, c: CustomerProfile | null): DeliveryVehicle {
+    const v = new DeliveryVehicle(
+      k,
+      this.scene,
+      this.world,
+      this.blockedAt,
+      () => this.onHonk?.(),
+      (kg) => this.onWeighIn?.(kg),
+      (kg) => this.onWeighOut?.(kg),
+      c
+    );
+    v.itemQuelle = this.items;
+    v.platzinventar = this.platzinventar;
+    // Der Anlieferer spricht (E-082) — hier, damit auch ein Ansteher spricht.
+    if (k !== "abholer") {
+      v.onAnliefererlage = (lage) => this.onPickupFunk?.(v.customer?.name ?? "Fahrer", anliefererfunk(lage));
+    }
+    return v;
   }
 
   /** Abholung anfordern bzw. wartenden Abhol-LKW abfahren lassen. */
@@ -3598,6 +3671,40 @@ export class VehicleManager {
       .sort((a, b) => b.kg - a.kg);
   }
 
+  /**
+   * Zum Start Fuhren auf die Warteplaetze stellen (E-131, nur Sandkasten).
+   *
+   * Je eine auf die ersten `anzahl` Warteplaetze, beladen wie vom Tor. Wer
+   * ins Lagersilo kippen wuerde, wird neu gewuerfelt: Die Fahrt vom
+   * Warteplatz in die Silo-Gasse ist nie abgetastet worden, die zum
+   * Abladeplatz schon (`test/anstehen.test.ts`, E-131). Der erste rollt
+   * nach `ANSTEH_ERSTER_S`, die naechsten im ueblichen Takt; erst wenn keiner
+   * mehr ansteht, kommt wieder einer durchs Tor.
+   */
+  stelleAnstehendeAuf(anzahl: number, kunden: CustomerProfile[] = []): void {
+    for (const [n, slot] of PARK_SLOTS.slice(0, anzahl).entries()) {
+      // `kunden`: fuer Pruefstaende, wie bei `spawnNow` — sonst wer kommt
+      let kunde = kunden[n] ?? rollAnlieferung();
+      // Hoechstens 20 Wuerfe (SW): Silo-Fuhren sind ein kleiner Teil der
+      // Kundschaft; bleibt es danach eine, kippt er eben ins Silo.
+      const insSilo = (c: CustomerProfile): boolean =>
+        faehrtInsSilo(vehicleForCustomer(c), lagerMuldeFuer(c.sortedMaterial ?? null));
+      for (let i = 0; i < 20 && !kunden[n] && insSilo(kunde); i++) kunde = rollAnlieferung();
+      const v = this.baueWagen(vehicleForCustomer(kunde), kunde);
+      v.stelleAnstehendAuf(slot);
+      v.loadCargo(this.items, this.composites);
+      this.deliveries++;
+      this.parked.push(v);
+    }
+    this.t = 0;
+    this.nextSpawnT = ANSTEH_ERSTER_S;
+  }
+
+  /** Wie viele stehen noch beladen auf einem Warteplatz an? */
+  get anstehend(): number {
+    return this.parked.filter((v) => v.stehtAn).length;
+  }
+
   update(dt: number): void {
     this.t += dt;
     // Wartende Fahrzeuge weiterlaufen lassen: Pause, dann Ausfahrt
@@ -3618,7 +3725,16 @@ export class VehicleManager {
         this.spawnNow("abholer");
         return;
       }
-      if (this.acceptDeliveries && this.t >= this.nextSpawnT) this.spawnNow();
+      if (this.acceptDeliveries && this.t >= this.nextSpawnT) {
+        // Wer auf dem Warteplatz ansteht, ist vor dem naechsten am Tor dran (E-131)
+        const i = this.parked.findIndex((v) => v.stehtAn);
+        if (i < 0) {
+          this.spawnNow();
+          return;
+        }
+        this.active = this.parked.splice(i, 1)[0]!;
+        this.active.rueckeVor();
+      }
       return;
     }
     this.active.update(dt);

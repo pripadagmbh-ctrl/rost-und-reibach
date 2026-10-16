@@ -16,6 +16,7 @@ import { CHALLENGES } from "../challenges/katalog";
 import { leseChallenges } from "../core/save";
 import { CHALLENGES_PAUSIERT } from "../core/spielart";
 import { sterneZeile } from "./abrechnung";
+import { FIRMA } from "../world/werbung";
 
 export type Spielwahl = { art: "sandkasten" } | { art: "challenge"; id: string };
 
@@ -53,6 +54,8 @@ export function waehleSpielart(): Promise<Spielwahl> {
   if (direkt) return Promise.resolve({ art: "challenge", id: direkt });
 
   const el = document.getElementById("hauptmenue")!;
+  // Der Name kommt von der einen Stelle, die auch die Tafel am Tor liest (E-131)
+  el.querySelector("h1")!.textContent = FIRMA;
   const liste = document.getElementById("hm-challenges")!;
   el.classList.add("open");
   return new Promise((fertig) => {

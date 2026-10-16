@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-131 | 16.10.2026 | Pripada.de statt Rust’n’Reibach, Werbeschilder, drei Laster stehen zum Start an | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-130 | 16.10.2026 | Echte Aufnahmen statt Summen, kein Greifklang bleibt stehen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-129 | 16.10.2026 | Die Challenges werden pausiert, das Spiel startet im Sandkasten | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-128 | 16.10.2026 | Das Wrack knautscht wie eine Blechdose, Presse dasselbe bis flach | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -144,6 +145,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-131 — Pripada.de, Werbeschilder, drei Laster zum Start** (iPad, Kabine)
+- SANDKASTEN starten: Stehen am Tor zwei beladene Laster und vor Halle 3 ein dritter? Rollt der erste nach rund 3 s los, und kommt der nächste erst, wenn der erste vom Hof ist?
+- Aus der Kabine nach vorn, nach rechts (Ostmauer) und nach links (Hallen): Kannst du „Pripada.de“, „ROLLMULDE“, „Imbiss zur Waage“, „KIES & KLINKER“ und die drei Hallenschilder lesen? Steht ein Schild im Weg oder verdeckt etwas?
+- Tafel am Tor: „Pripada.de“ mit dem P im Kreis — gefällt die (etwas sattere) Farbe?
+- iPhone mini: so flüssig wie vorher?
 
 **E-130 — Echte Aufnahmen statt Summen, kein Greifklang bleibt stehen** (Augen zu, iPad-Lautsprecher, dann mit Kopfhörer)
 - **Spinne auf ein Teil, zudrücken und zuhalten: Wird es nach dem Zupacken still?** (Nur der Motor bleibt.)

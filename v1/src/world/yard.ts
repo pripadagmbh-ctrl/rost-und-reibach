@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { reihenstuecke } from "./legoreihe";
+import { baueWerbeschilder } from "./werbung";
 
 /** Position der Brückenwaage in der Nordspur (SW) */
 /**
@@ -196,7 +197,8 @@ export function mauerLaeufe(): Mauerlauf[] {
 
 /* --------------------------------------------------- Das Firmenschild ---- */
 /**
- * Wo die Tafel „Rust’n’Reibach" steht — und warum genau dort.
+ * Wo die Firmentafel steht — und warum genau dort. Sie zeigte vom 12.09. bis
+ * 16.10.2026 „Rust’n’Reibach", seitdem wieder den Firmennamen (`werbung.FIRMA`, E-131).
  *
  * Befund 14.09.2026 (Patrick, auf dem Gerät): „Aktuell wird das Firmenschild
  * durch die Halle verdeckt." Nachgemessen aus der Startansicht (Orbitkamera
@@ -356,219 +358,8 @@ export class Yard {
     this.buildDeliveryLane(scene);
     this.buildWeighbridge(scene);
     this.buildLandscape(scene);
-    this.buildBillboard(scene, world);
-  }
-
-  /**
-   * Großes Firmenschild als Werbefläche neben der Einfahrt.
-   *
-   * Wortmarke „Rust’n’Reibach" (Ansage 12.09.2026) — Rost und Reibach, in der
-   * Schreibweise von Rock’n’Roll. Die beiden Zeichen um das n sind echte
-   * typografische Apostrophe (U+2019), keine geraden Schreibmaschinenstriche:
-   * Sie stehen für die weggelassenen Buchstaben von „and" beziehungsweise
-   * „und", also links und rechts vom n je einer. Das ist der ganze Witz der
-   * Schreibweise, und mit ' sieht er falsch aus.
-   *
-   * Die Tafel muss nicht sauber aussehen („kann leichte Rostspuren haben").
-   * Sie bekommt darum Rostfahnen unter den Schraubenlöchern, fleckige
-   * Verwitterung und angefressene Kanten. Alles mit festem Zufall gezeichnet,
-   * damit das Schild bei jedem Start gleich aussieht — ein Schild, das sich
-   * beim Neuladen verändert, fällt sofort auf.
-   */
-  private buildBillboard(scene: THREE.Scene, world: RAPIER.World): void {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1024;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d")!;
-
-    // Fester Zufall: dasselbe Schild bei jedem Start.
-    let saat = 20260912;
-    const zuf = (): number => {
-      saat = (saat * 1103515245 + 12345) % 2147483648;
-      return saat / 2147483648;
-    };
-
-    // --- Grundplatte: verwittertes Emailweiß, nicht Papierweiß
-    ctx.fillStyle = "#e8e4db";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // Fleckige Verwitterung
-    for (let i = 0; i < 90; i++) {
-      const r = 20 + zuf() * 90;
-      ctx.fillStyle = `rgba(150,142,126,${0.03 + zuf() * 0.06})`;
-      ctx.beginPath();
-      ctx.arc(zuf() * canvas.width, zuf() * canvas.height, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    const cxp = canvas.width / 2;
-
-    // --- Signet: ein Ring, kein „P" mehr. Der alte Bogen mit dem Steg war ein
-    // stilisiertes P und passt zu diesem Namen nicht mehr.
-    const cyp = 150;
-    ctx.strokeStyle = "#9a8f7c";
-    ctx.lineCap = "butt";
-    ctx.lineWidth = 26;
-    ctx.beginPath();
-    ctx.arc(cxp, cyp, 78, -Math.PI * 0.62, Math.PI * 1.28);
-    ctx.stroke();
-    ctx.lineWidth = 22;
-    ctx.beginPath();
-    ctx.arc(cxp, cyp, 40, Math.PI * 0.38, Math.PI * 2.28);
-    ctx.stroke();
-
-    // --- Wortmarke. Das n steht kleiner und tiefer zwischen den Apostrophen,
-    // so wie es bei Rock’n’Roll gesetzt wird.
-    const GROSS = "700 108px 'Segoe UI', Helvetica, Arial, sans-serif";
-    const KLEIN = "700 64px 'Segoe UI', Helvetica, Arial, sans-serif";
-    const AP = "\u2019"; // typografischer Apostroph
-    ctx.textAlign = "left";
-    ctx.letterSpacing = "2px";
-    const teile: Array<[string, string, number]> = [
-      ["Rust", GROSS, 0],
-      [AP + "n" + AP, KLEIN, 10],
-      ["Reibach", GROSS, 0],
-    ];
-    let breite = 0;
-    for (const [text, font] of teile) {
-      ctx.font = font;
-      breite += ctx.measureText(text).width;
-    }
-    let x = cxp - breite / 2;
-    const grund = 330;
-    for (const [text, font, tiefer] of teile) {
-      ctx.font = font;
-      // Schatten unter der Schrift: Die Farbe ist alt und hat Rand.
-      ctx.fillStyle = "rgba(30,26,22,0.25)";
-      ctx.fillText(text, x + 3, grund + tiefer + 3);
-      ctx.fillStyle = "#20262c";
-      ctx.fillText(text, x, grund + tiefer);
-      x += ctx.measureText(text).width;
-    }
-
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#7d7565";
-    ctx.font = "300 40px 'Segoe UI', Helvetica, Arial, sans-serif";
-    ctx.letterSpacing = "16px";
-    ctx.fillText("SCHROTT & METALLE", cxp, 400);
-    ctx.font = "300 30px 'Segoe UI', Helvetica, Arial, sans-serif";
-    ctx.letterSpacing = "10px";
-    ctx.fillText("ANKAUF \u00b7 ABHOLUNG \u00b7 CONTAINER", cxp, 445);
-
-    // --- Schraubenlöcher mit Rostfahne darunter. Von da läuft es herunter,
-    // wenn es regnet, und genau daran erkennt man ein altes Blechschild.
-    const loecher: Array<[number, number]> = [
-      [70, 60], [canvas.width - 70, 60], [70, canvas.height - 60],
-      [canvas.width - 70, canvas.height - 60], [cxp, 46],
-    ];
-    for (const [lx, ly] of loecher) {
-      const lang = 140 + zuf() * 240;
-      const fahne = ctx.createLinearGradient(0, ly, 0, ly + lang);
-      fahne.addColorStop(0, "rgba(104,50,22,0.75)");
-      fahne.addColorStop(0.3, "rgba(140,76,38,0.45)");
-      fahne.addColorStop(1, "rgba(150,84,44,0)");
-      ctx.fillStyle = fahne;
-      const w = 14 + zuf() * 14;
-      ctx.fillRect(lx - w / 2, ly, w, lang);
-      // dünnere Nebenrinnsale
-      for (let k = 0; k < 2; k++) {
-        const dx = (zuf() - 0.5) * 34;
-        ctx.fillRect(lx + dx - 2, ly + 8, 3 + zuf() * 3, lang * (0.4 + zuf() * 0.5));
-      }
-      ctx.fillStyle = "#4a4a46";
-      ctx.beginPath();
-      ctx.arc(lx, ly, 9, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // --- Angefressene Ränder: Rost frisst von der Kante nach innen.
-    //
-    // Mit achsenparallelen Rechtecken sah das aus wie Bildfehler, nicht wie
-    // Rost — gerade Kanten gibt es an angefressenem Blech nicht. Jetzt viele
-    // kleine, unregelmäßige Kleckse: Der Rost frisst sich in Flecken hinein,
-    // dicht an der Kante und immer dünner nach innen.
-    const rostTon = (a: number): string => {
-      const t = zuf();
-      const r = Math.round(120 + t * 50);
-      const g = Math.round(62 + t * 34);
-      const b2 = Math.round(28 + t * 20);
-      return `rgba(${r},${g},${b2},${a})`;
-    };
-    for (let i = 0; i < 900; i++) {
-      const kante = Math.floor(zuf() * 4);
-      const t = zuf();
-      // Tiefe nach innen: quadratisch verteilt, also meist ganz am Rand
-      const tief = Math.pow(zuf(), 2.2) * 120;
-      const r = 3 + zuf() * 13;
-      const deck = 0.5 * (1 - tief / 120) * (0.35 + zuf() * 0.65);
-      let px: number;
-      let py: number;
-      if (kante === 0) { px = t * canvas.width; py = tief; }
-      else if (kante === 1) { px = t * canvas.width; py = canvas.height - tief; }
-      else if (kante === 2) { px = tief; py = t * canvas.height; }
-      else { px = canvas.width - tief; py = t * canvas.height; }
-      ctx.fillStyle = rostTon(deck);
-      ctx.beginPath();
-      ctx.ellipse(px, py, r, r * (0.5 + zuf()), zuf() * Math.PI, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Ein paar Rostnester mitten auf der Fläche — dort, wo der Lack ab ist
-    for (let n = 0; n < 7; n++) {
-      const nx = 60 + zuf() * (canvas.width - 120);
-      const ny = 60 + zuf() * (canvas.height - 120);
-      const gross = 14 + zuf() * 26;
-      for (let i = 0; i < 45; i++) {
-        const w = zuf() * Math.PI * 2;
-        const d = Math.pow(zuf(), 0.6) * gross;
-        ctx.fillStyle = rostTon(0.5 * (1 - d / gross) * (0.4 + zuf() * 0.6));
-        ctx.beginPath();
-        ctx.ellipse(nx + Math.cos(w) * d, ny + Math.sin(w) * d, 2 + zuf() * 6,
-                    2 + zuf() * 6, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // und die Fahne, die davon herunterläuft
-      const lauf = ctx.createLinearGradient(0, ny, 0, ny + 70 + zuf() * 150);
-      lauf.addColorStop(0, "rgba(130,68,32,0.34)");
-      lauf.addColorStop(1, "rgba(150,84,44,0)");
-      ctx.fillStyle = lauf;
-      ctx.fillRect(nx - gross * 0.35, ny, gross * 0.7, 220);
-    }
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.anisotropy = 4;
-    const boardW = SCHILD_B;
-    const boardH = SCHILD_H;
-    const schildX = SCHILD_POS.x;
-    const z = SCHILD_POS.z;
-    const board = new THREE.Mesh(
-      new THREE.PlaneGeometry(boardW, boardH),
-      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, side: THREE.DoubleSide })
-    );
-    board.position.set(schildX, SCHILD_POS.y, z);
-    board.rotation.y = Math.PI;
-    scene.add(board);
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a4045, roughness: 0.8 });
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(boardW + 0.4, boardH + 0.4, 0.22), frameMat);
-    frame.position.set(schildX, SCHILD_POS.y, z + 0.2);
-    frame.castShadow = true;
-    scene.add(frame);
-    const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    // Pfeiler liegen hinter der Tafel, nicht davor: Sonst schneiden ihre
-    // Kanten in die Schrift. Die Schaufläche bleibt plan (Wunsch 02.09.2026).
-    const pfostenH = SCHILD_POS.y;
-    for (const px of [-boardW * 0.32, boardW * 0.32]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.45, pfostenH, 0.45), frameMat);
-      post.position.set(schildX + px, pfostenH / 2, z + 0.55);
-      post.castShadow = true;
-      scene.add(post);
-      world.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.225, pfostenH / 2, 0.225).setTranslation(
-          schildX + px,
-          pfostenH / 2,
-          z + 0.55
-        ),
-        body
-      );
-    }
+    // Firmentafel und Werbeschilder: ein Atlas, zwei Netze (E-131)
+    baueWerbeschilder(scene, world);
   }
 
   /**

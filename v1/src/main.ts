@@ -54,7 +54,7 @@ import { Account, PURCHASE_PRICE_PER_KG } from "./economy/account";
 import { getMaterial, ABFALL } from "./materials/catalog";
 import { StaffManager } from "./world/people";
 import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
-import { setBaggerOrt } from "./delivery/routes";
+import { setBaggerOrt, ANSTEH_START_ANZAHL } from "./delivery/routes";
 import { clearSave, merkeChallenge, readSave, speichereGreifer, storeSave, type SaveData } from "./core/save";
 import { Zwischenbild } from "./core/zwischenbild";
 import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SANDKASTEN, NUR_IM_SIMULATOR } from "./core/spielart";
@@ -1156,6 +1156,8 @@ async function main(): Promise<void> {
     // einen Schlag — der Muellcontainer leert sich nachts nicht mehr.
     vehicles.vollFaehrtLos = true;
     containers.nachtschichtAktiv = false;
+    // E-131: Zum Start stehen schon Fuhren an, die erste rollt gleich los
+    if (!challenge) vehicles.stelleAnstehendeAuf(ANSTEH_START_ANZAHL);
   }
   // Ein Abholer faehrt nie los, solange die Spinne etwas ueber ihm haelt (E-120)
   vehicles.gegriffen = () => grip.grippedBodies;

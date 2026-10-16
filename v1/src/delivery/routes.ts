@@ -806,6 +806,15 @@ export function routeParkRueck(slot: [number, number]): Array<[number, number]> 
 
 export const SPEED = 4.8; // m/s (SW) — zuegiger Umschlag
 export const FIRST_DELAY_S = 12; // (SW)
+/**
+ * DER START IM SANDKASTEN (E-131). Patrick, 16.10.2026: "Es sollen mehr LKWs
+ * kommen am Anfang". Drei Fuhren stehen beim Start schon beladen auf den
+ * drei Warteplaetzen (`PARK_SLOTS`), und die erste rollt nach 3 s statt nach
+ * `FIRST_DELAY_S`. Die Fahrt von jedem Platz an den Abladeplatz faehrt
+ * `test/anstehen.test.ts` mit jeder Fahrzeugart ab. Beide SW.
+ */
+export const ANSTEH_START_ANZAHL = 3;
+export const ANSTEH_ERSTER_S = 3;
 export const NEXT_DELAY_S: [number, number] = [7, 15]; // (SW) — dichter Umschlag
 /** Sicherheitsabstand zum Bagger: darunter wartet der Fahrer (Briefing Kap. 13) */
 export const BLOCK_RADIUS = 5.5;

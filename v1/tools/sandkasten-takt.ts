@@ -12,7 +12,14 @@
  * Aufruf: npx vite-node tools/sandkasten-takt.ts      (MIN=20 für 20 Minuten,
  *        KIPPER=1 für nur Kipper, EINZEL=1 für nur Einzelstück-Fuhren (E-126),
  *        ABLADEN=20: ein „Spieler" nimmt nach 20 s am Abladeplatz alles von
- *        der Fläche — so faehrt die Fuhre ab, statt ihre Standzeit auszustehen)
+ *        der Fläche — so faehrt die Fuhre ab, statt ihre Standzeit auszustehen,
+ *        ANSTEHEN=0: ohne die Fuhren, die seit E-131 beim Start auf den
+ *        Warteplätzen stehen — der Stand vor E-131)
+ *
+ * Seit E-131 wird zusätzlich jedes Bild gemessen, wie tief ein Wagen in ein
+ * Bauwerk der Hindernisliste ragt (`tiefsteDurchdringung`, derselbe Umriss
+ * wie `test/fahrumriss.test.ts`) — die Fahrt vom Warteplatz an den
+ * Abladeplatz steht in keiner Streckenliste, sie ist ein Ausfädeln.
  */
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -22,7 +29,9 @@ import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
 import { EventBus } from "../src/core/events";
 import { BAGGER_STAND } from "../src/world/baggerstand";
-import { setBaggerOrt } from "../src/delivery/routes";
+import { setBaggerOrt, ANSTEH_START_ANZAHL } from "../src/delivery/routes";
+import { tiefsteDurchdringung } from "../src/delivery/umriss";
+import { alleHindernisse } from "../src/world/obstacles";
 import { Shift } from "../src/economy/shift";
 import { rollEinzelstueck } from "../src/delivery/customers";
 
@@ -55,7 +64,10 @@ async function main(): Promise<void> {
       spawn(c.vehicle, c);
     };
   }
+  if (process.env.ANSTEHEN !== "0") m.stelleAnstehendeAuf(ANSTEH_START_ANZAHL);
   const abladenS = Number(process.env.ABLADEN ?? 0);
+  let tiefMax = 0;
+  let tiefWo = "";
   let amPlatz = 0;
 
   // Wie `measureLoose` in main.ts
@@ -104,9 +116,16 @@ async function main(): Promise<void> {
         amPlatz = 0;
       }
     }
+    const tief = tiefsteDurchdringung(m.fahrzeugBoxen(), alleHindernisse());
+    if (tief > tiefMax) {
+      tiefMax = tief;
+      tiefWo = `t ${t.toFixed(1)} s, ${(m as unknown as { active: { phaseName: string } | null }).active?.phaseName ?? "Warteplatz"}`;
+    }
     const jetzt = m.activeKind;
     if (jetzt !== vorher) {
-      const was = jetzt ? `kommt: ${jetzt}` : `weg: ${vorher} (${(t - seit).toFixed(0)} s)`;
+      const was = jetzt
+        ? `kommt: ${jetzt}${process.env.ANSTEHEN !== "0" && ankuenfte < ANSTEH_START_ANZAHL ? " (" + m.anstehend + " stehen an)" : ""}`
+        : `weg: ${vorher} (${(t - seit).toFixed(0)} s)`;
       if (jetzt) ankuenfte++;
       console.log(
         `${t.toFixed(1).padStart(8)}  ${was.padEnd(18)} ${looseKg.toFixed(0).padStart(7)}  ${m.intervalFactor
@@ -120,7 +139,9 @@ async function main(): Promise<void> {
   }
   console.log(
     `\n${ankuenfte} Ankünfte in ${(dauer / 60).toFixed(0)} min · längste Zeit eines Wagens auf dem Platz ${maxStand.toFixed(0)} s` +
-      ` · zuletzt lose ${looseKg.toFixed(0)} kg · Einfahrt ${shift.jammed ? "zu" : "offen"}`
+      ` · zuletzt lose ${looseKg.toFixed(0)} kg · Einfahrt ${shift.jammed ? "zu" : "offen"}` +
+      `
+tiefste Durchdringung eines Wagens in ein Bauwerk: ${tiefMax.toFixed(2)} m${tiefWo ? " (" + tiefWo + ")" : ""}`
   );
 }
 
