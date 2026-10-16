@@ -145,6 +145,17 @@ export interface GameEvents {
     y: number;
     z: number;
   };
+  /**
+   * Das Wrack knautscht (E-128 baut das Knautschen, E-130 haengt den Ton an).
+   *
+   * Gesendet von `CarComposite.knautschAnwenden()` in `dismantle/composites.ts`,
+   * und nur, wenn der mittlere Knautschgrad dabei gestiegen ist — ein Biss auf
+   * ein schon flaches Wrack meldet nichts. `handle` ist der Rapier-Handle der
+   * Karosse, `grad` der mittlere Knautschgrad 0 (heil) … 1 (flach), `zuwachs`
+   * um wie viel er bei diesem Ereignis gestiegen ist: ein voller Biss etwa
+   * 0,17, die Presse bis 1. `x/y/z` Ort der Karosse.
+   */
+  "wrack:geknautscht": { handle: number; grad: number; zuwachs: number; x: number; y: number; z: number };
 }
 
 type Handler<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;

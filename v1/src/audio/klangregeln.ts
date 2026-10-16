@@ -6,6 +6,12 @@
  * es in `audioManager.ts`. Getrennt, damit die Waechter pruefen koennen, dass
  * haerter auch lauter heisst, ohne einen Lautsprecher zu brauchen.
  *
+ * AUFNAHMEN (E-130, 16.10.2026): Seit Patricks Befund „beim greifen eher ein
+ * summen" klingt alles hier aus echten Aufnahmen (`public/ton/`, Herkunft in
+ * `public/ton/QUELLEN.md`, Schnitt in `tools/tonwerk/rezepte.mjs`). Die
+ * Teiltoene unten bleiben als Ersatz, solange die Dateien laden oder fehlen.
+ * Welche Aufnahme zu welcher Familie gehoert, steht in `proben`.
+ *
  * KLEINE LAUTSPRECHER: Ein iPhone-mini-Lautsprecher gibt unter etwa 300 Hz
  * praktisch nichts wieder, ein iPad unter etwa 150 Hz. Ein Stahlschlag, der
  * nur aus 90 Hz besteht, ist dort stumm. Deshalb hat jedes Rezept unten
@@ -34,6 +40,8 @@ export interface Schlag {
   scheppern: number;
   /** Rascheln (Kabel, Geroell): Grenzfrequenz, 0 = keins */
   rascheln: number;
+  /** Aufnahmen dieser Familie (Dateiname ohne .wav in public/ton/), zufaellig gewaehlt (E-130) */
+  proben: string[];
 }
 
 /*
@@ -54,6 +62,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.06,
     scheppern: 0,
     rascheln: 0,
+    proben: ["stahl_1", "stahl_2", "stahl_3"],
   },
   // Blech: viele hohe Teiltoene, und es klappert zweimal nach.
   blech: {
@@ -65,6 +74,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.08,
     scheppern: 2,
     rascheln: 0,
+    proben: ["blech_1", "blech_2", "blech_3"],
   },
   // Edelstahl: klar und lange nachklingend — aber kuerzer als der alte
   // Abwurfklang (1,25 s), sonst singt ein Haufen.
@@ -77,6 +87,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.03,
     scheppern: 0,
     rascheln: 0,
+    proben: ["va_1", "va_2"],
   },
   // Alu: leicht, hell, kurz, ein Nachklappern.
   alu: {
@@ -88,6 +99,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.05,
     scheppern: 1,
     rascheln: 0,
+    proben: ["alu_1", "alu_2"],
   },
   // Kupfer: hell, aber warm, mit tragendem Nachklang.
   kupfer: {
@@ -99,6 +111,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.04,
     scheppern: 0,
     rascheln: 0,
+    proben: ["kupfer_1", "kupfer_2"],
   },
   // Kabelbund: dumpf, mit Rascheln.
   kabel: {
@@ -110,6 +123,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.09,
     scheppern: 0,
     rascheln: 1600,
+    proben: ["kabel_1"],
   },
   // Akku, Kunststoffgehaeuse mit Blei: ein Klotz ohne Klang.
   klotz: {
@@ -121,6 +135,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.05,
     scheppern: 0,
     rascheln: 0,
+    proben: ["klotz_1"],
   },
   // Holz: kurzes Klopfen.
   holz: {
@@ -132,6 +147,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.06,
     scheppern: 0,
     rascheln: 0,
+    proben: ["holz_1", "holz_2"],
   },
   // Reifen: tiefer, weicher Plumps; der obere Teilton traegt ihn ueber kleine Lautsprecher.
   reifen: {
@@ -143,6 +159,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.05,
     scheppern: 0,
     rascheln: 0,
+    proben: ["reifen_1"],
   },
   // Kunststoff: hohles Klacken.
   kunststoff: {
@@ -154,6 +171,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.06,
     scheppern: 0,
     rascheln: 0,
+    proben: ["kunststoff_1", "kunststoff_2"],
   },
   // Bauschutt: Brocken und Geroell, kaum Ton.
   geroell: {
@@ -165,6 +183,7 @@ const FAMILIEN: Record<string, Schlag> = {
     streu: 0.1,
     scheppern: 0,
     rascheln: 2200,
+    proben: ["geroell_1", "geroell_2"],
   },
 };
 
@@ -229,6 +248,10 @@ export function aufprallPegel(wucht: number, massKg: number): number {
 /** Ein fertiges Aufprall-Rezept: das Teil selbst plus der Untergrund. */
 export interface AufprallRezept {
   pegel: number;
+  /** Abspieltempo der Aufnahme: groesser = tiefer (E-130), Messing heller, Zink dumpfer */
+  rate: number;
+  /** Anteil der Aufnahme, der ausklingen darf: Beton daempft (E-130) */
+  daempf: number;
   teil: Schlag;
   grund: Schlag;
 }
@@ -250,6 +273,7 @@ const GRUND: Record<Untergrund, Schlag> = {
     streu: 0.1,
     scheppern: 0,
     rascheln: 0,
+    proben: ["grund_beton"],
   },
   stahl: {
     teiltoene: [143, 231, 368, 590, 870],
@@ -260,6 +284,7 @@ const GRUND: Record<Untergrund, Schlag> = {
     streu: 0.03,
     scheppern: 0,
     rascheln: 0,
+    proben: ["grund_stahl_1", "grund_stahl_2"],
   },
   schrott: {
     teiltoene: [270, 430, 655, 980, 1460],
@@ -270,6 +295,7 @@ const GRUND: Record<Untergrund, Schlag> = {
     streu: 0.12,
     scheppern: 1,
     rascheln: 0,
+    proben: ["grund_schrott_1", "grund_schrott_2"],
   },
 };
 
@@ -297,6 +323,8 @@ export function aufprallKlang(e: {
   const daempf = e.untergrund === "beton" ? BETON_DAEMPFT : 1;
   return {
     pegel,
+    rate: hoehe,
+    daempf,
     teil: {
       ...fam,
       teiltoene: fam.teiltoene.map((f) => f * hoehe),
@@ -326,18 +354,136 @@ export function bissPegel(kraftKN: number): number {
 }
 
 /**
- * Das Hydraulik-Stoehnen beim Zudruecken, je Kraftanteil 0..1: lauter, hoeher
- * und heller, je haerter. Ab 85 % zischt das Druckbegrenzungsventil — das
- * hoert man an jeder echten Maschine, wenn der Zylinder am Ende ist. SW.
+ * Der Druckaufbau beim Zudruecken, je Kraftanteil 0..1: lauter, hoeher und
+ * heller, je haerter. Ab 85 % zischt das Druckbegrenzungsventil — das hoert
+ * man an jeder echten Maschine, wenn der Zylinder am Ende ist. SW.
+ *
+ * Seit E-130 auf einer Aufnahme (Pumpe unter Last, `hyd_druck`): `rate` ist
+ * das Abspieltempo (hoeher = die Pumpe singt hoeher), `filterHz` ein Tiefpass
+ * (leicht gedrueckt klingt dumpf, voll offen). Vorher zwei Saegezaehne —
+ * genau die klangen fuer Patrick nach Summen.
  */
-export function stoehnen(k01: number): { laut: number; hz: number; filterHz: number; zischen: number } {
+export function stoehnen(k01: number): { laut: number; rate: number; filterHz: number; zischen: number } {
   const k = Math.min(1, Math.max(0, k01));
   return {
-    laut: 0.1 * Math.pow(k, 0.8),
-    hz: 95 + 120 * k,
-    filterHz: 500 + 1500 * k,
-    zischen: k > 0.85 ? 0.05 * ((k - 0.85) / 0.15) : 0,
+    laut: 0.22 * Math.pow(k, 0.8), // SW: Aufnahme auf −3 dBFS geschnitten, darum hoeher als die alte 0,1
+    rate: 0.8 + 0.4 * k, // SW
+    filterHz: 900 + 5000 * k, // SW
+    zischen: k > 0.85 ? 0.1 * ((k - 0.85) / 0.15) : 0,
   };
+}
+
+/**
+ * KEIN GREIFKLANG BLEIBT STEHEN (E-130, Geraetebefund Patrick 16.10.2026:
+ * „beim greifen ein durchgängiger ton …, der sollte nie durchgängig sein wie in
+ * einem ufo oder spaceship wo der ton unendlich langgezogen wird").
+ *
+ * Bis E-130 hing der Druckklang am WERT der Schliesskraft — wer zuhielt, hoerte
+ * ihn endlos. Echte Hydraulik klingt nur, wenn sich etwas aendert: Der Druck
+ * baut auf, das Ventil spricht an. Haelt das Ventil, ist sie still.
+ *
+ * Darum haengt der Klang hier an der AENDERUNG der Kraft: Steigt sie, schwillt
+ * die Huelle an (voll bei `ANSTIEG_VOLL` je Sekunde); steht sie, faellt die
+ * Huelle mit `ABKLING_S`. Das Ventil zischt einmal, wenn die Kraft ueber 85 %
+ * steigt, und klingt mit `VENTIL_ABKLING_S` aus; erneut erst, wenn sie unter
+ * 80 % war. SW alle drei: 2/s (volle Kraft in einer halben Sekunde), 0,15 s
+ * (nach 0,7 s unter 1 %), 0,3 s.
+ */
+export const ANSTIEG_VOLL = 2;
+export const ABKLING_S = 0.15;
+export const VENTIL_ABKLING_S = 0.3;
+
+export class Druckaufbau {
+  private kraftAlt = 0;
+  private tAlt = -1;
+  private huelle = 0;
+  private ventil = 0;
+  private ventilScharf = true;
+
+  /** Ein Bild: Zeit `t` (s) und Kraftanteil 0..1. Liefert Pegel von Druck und Ventil. */
+  schritt(t: number, kraft01: number): { laut: number; rate: number; filterHz: number; zischen: number } {
+    const k = Math.min(1, Math.max(0, kraft01));
+    const dt = this.tAlt < 0 ? 0 : Math.min(0.1, Math.max(0, t - this.tAlt));
+    const s = stoehnen(k);
+    if (dt > 0) {
+      const ziel = Math.min(1, Math.max(0, k - this.kraftAlt) / dt / ANSTIEG_VOLL);
+      this.huelle = Math.max(ziel, this.huelle * Math.exp(-dt / ABKLING_S));
+      this.ventil *= Math.exp(-dt / VENTIL_ABKLING_S);
+    }
+    if (k > 0.85 && this.ventilScharf && k > this.kraftAlt) {
+      this.ventil = 1;
+      this.ventilScharf = false;
+    }
+    if (k < 0.8) this.ventilScharf = true;
+    this.kraftAlt = k;
+    this.tAlt = t;
+    return { laut: 0.22 * this.huelle * (0.4 + 0.6 * k), rate: s.rate, filterHz: s.filterHz, zischen: 0.1 * this.ventil };
+  }
+}
+
+/**
+ * Schalen und Arm in Bewegung: Oel stroemt (`hyd_fahrt`). `schalen` 0..1 ist
+ * das Schalentempo, `arm` 0..1 die Achsbewegung des Baggers — wer nur den Arm
+ * bewegt, hoert die Hydraulik leiser als beim Greifen. Eine Quelle fuer beides,
+ * damit nicht zwei Kopien derselben Aufnahme gegeneinander schweben. SW.
+ */
+export function oelFluss(schalen: number, arm: number): { laut: number; rate: number } {
+  // Unter 3 % ist es Messrauschen, keine Bewegung — sonst haenge ein Hauch Oel
+  // am Zuhalten (E-130). SW.
+  const s = schalen < 0.03 ? 0 : Math.min(1, schalen);
+  const a = arm < 0.03 ? 0 : Math.min(1, arm * 1.6);
+  return { laut: Math.max(0.14 * s, 0.06 * a), rate: 0.9 + 0.25 * Math.max(s, a) };
+}
+
+/* ---------------------------------------------------- Knautschen (E-130) -- */
+
+/**
+ * Das Wrack knautscht (`wrack:geknautscht`). `zuwachs` ist, um wie viel der
+ * mittlere Knautschgrad gestiegen ist: ein voller Biss etwa 0,17, die Presse
+ * bis 1. Groesser heisst lauter, laenger, tiefer und dichter — die Presse
+ * faltet das ganze Auto hoerbar auf einmal, ein Biss knirscht kurz. SW.
+ */
+export function knautschKlang(zuwachs: number): { pegel: number; dauer: number; rate: number; schlaege: number } {
+  const z = Math.min(1, Math.max(0, zuwachs));
+  return {
+    pegel: 0.35 + 0.65 * Math.sqrt(z),
+    dauer: 0.6 + 2.4 * z,
+    rate: 1.1 - 0.25 * z,
+    schlaege: Math.round(4 * z),
+  };
+}
+
+/* ----------------------------------------------- Aufnahmen-Liste (E-130) -- */
+
+/** Dauerklaenge: je eine Schleife aus `public/ton/`. */
+export const SCHLEIFEN = {
+  fahrt: "hyd_fahrt",
+  druck: "hyd_druck",
+  ventil: "ventil",
+  kehrBeton: "kehr_beton",
+  kehrStahl: "kehr_stahl",
+  rassel: "rassel",
+  motor: "motor",
+} as const;
+
+/** Einzelklaenge: mehrere Fassungen, zufaellig gewaehlt. */
+export const EINZEL = {
+  zupacken: ["zupacken"],
+  anschlag: ["anschlag_1", "anschlag_2"],
+  biss: ["biss_1", "biss_2", "biss_3"],
+  knautsch: ["knautsch_1", "knautsch_2"],
+  glas: ["glas_1", "glas_2"],
+} as const;
+
+/** Alle Aufnahmen, die das Spiel laedt — Familien, Untergruende, Schleifen, Einzelklaenge. */
+export function alleProben(): string[] {
+  const alle = [
+    ...Object.values(FAMILIEN).flatMap((f) => f.proben),
+    ...Object.values(GRUND).flatMap((g) => g.proben),
+    ...Object.values(SCHLEIFEN),
+    ...Object.values(EINZEL).flat(),
+  ];
+  return [...new Set(alle)];
 }
 
 /* -------------------------------------------------------------- Kehren -- */

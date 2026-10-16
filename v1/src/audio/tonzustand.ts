@@ -50,4 +50,10 @@ export interface Tondiagnose {
   hoerbar: boolean;
   /** Vergebliche Weckrufe seit dem letzten Mal, dass der Ton lief */
   weckversuche: number;
+  /**
+   * Die Aufnahmen (E-130): wie viele dekodiert sind, ms ab Seitenaufruf bis
+   * alles geholt bzw. dekodiert war (−1 = noch nicht), Dateigroesse und
+   * Speicher der dekodierten Puffer in kB.
+   */
+  aufnahmen?: { geladen: number; gesamt: number; holMs: number; dekodierMs: number; kB: number; speicherKB: number };
 }

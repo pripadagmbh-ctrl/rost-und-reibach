@@ -18,6 +18,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { AudioManager } from "../src/audio/audioManager";
 import { EventBus, type GameEvents } from "../src/core/events";
 import {
+  ABKLING_S,
+  alleProben,
+  Druckaufbau,
+  knautschKlang,
   aufprallKlang,
   aufprallPegel,
   bissPegel,
@@ -61,7 +65,10 @@ class FakeCtx {
   onstatechange: (() => void) | null = null;
   destination = {};
   quellen = 0;
+  oszillatoren = 0;
   gains: Param[] = [];
+  /** Alle Pufferquellen — welche Aufnahme sie spielen, steht in `buffer.name` (E-130) */
+  pufferQuellen: Array<{ buffer: { name?: string } | null }> = [];
 
   private knoten(quelle: boolean): Record<string, unknown> {
     if (quelle) this.quellen++;
@@ -90,8 +97,22 @@ class FakeCtx {
   createGain = (): unknown => this.knoten(false);
   createBiquadFilter = (): unknown => this.knoten(false);
   createDynamicsCompressor = (): unknown => this.knoten(false);
-  createOscillator = (): unknown => this.knoten(true);
-  createBufferSource = (): unknown => this.knoten(true);
+  createOscillator = (): unknown => {
+    this.oszillatoren++;
+    return this.knoten(true);
+  };
+  createBufferSource = (): unknown => {
+    const k = this.knoten(true);
+    this.pufferQuellen.push(k as { buffer: { name?: string } | null });
+    return k;
+  };
+  /** E-130: „dekodiert" eine Aufnahme — die Attrappe von fetch legt den Namen in die Bytes */
+  decodeAudioData = async (b: ArrayBuffer): Promise<unknown> => ({
+    name: new TextDecoder().decode(b),
+    duration: 0.5,
+    length: 0.5 * 48000,
+    numberOfChannels: 1,
+  });
   createBuffer = (_k: number, len: number): unknown => {
     const d = new Float32Array(len);
     return { getChannelData: () => d };
@@ -198,6 +219,9 @@ describe("Bestandstabelle: jedes Ereignis loest einen Klang aus", () => {
     expect(mit).toBeGreaterThan(ohne);
   });
 
+  // E-130: Der Druckklang haengt an der AENDERUNG der Kraft, nicht an ihrem
+  // Wert (Befund 16.10.2026: Dauerton beim Zuhalten). Darum laeuft zwischen den
+  // Bildern jetzt Zeit — ein Kraftsprung im selben Augenblick hat kein Tempo.
   it("Zudruecken und Schalenfahrt ziehen ihre Dauertoene hoch", () => {
     const { mgr } = starte();
     const m = mgr as unknown as {
@@ -207,10 +231,12 @@ describe("Bestandstabelle: jedes Ereignis loest einen Klang aus", () => {
     };
     mgr.setGreifer(0, 0);
     expect(m.stoehnGain.gain.ziel).toBe(0);
+    ctx.currentTime += 1 / 60;
     mgr.setGreifer(1, 0.5);
     expect(m.stoehnGain.gain.ziel).toBeGreaterThan(0);
     expect(m.schalenGain.gain.ziel).toBeGreaterThan(0);
     expect(m.ventilGain.gain.ziel).toBe(0);
+    ctx.currentTime += 1 / 60;
     mgr.setGreifer(0, 1);
     expect(m.ventilGain.gain.ziel).toBeGreaterThan(0); // Ventil zischt erst am Ende
   });
@@ -306,7 +332,8 @@ describe("Zudruecken: haerter = lauter", () => {
     const a = stoehnen(0.2);
     const b = stoehnen(0.8);
     expect(b.laut).toBeGreaterThan(a.laut);
-    expect(b.hz).toBeGreaterThan(a.hz);
+    // E-130: auf der Aufnahme heisst „hoeher" schnelleres Abspielen (vorher Oszillator-Hz)
+    expect(b.rate).toBeGreaterThan(a.rate);
     expect(stoehnen(0).laut).toBe(0);
   });
 });
@@ -423,5 +450,148 @@ describe("Rechenzeit: voller Haufen in Bewegung", () => {
     // 4 Schlaege/s plus laute: grosszuegige Obergrenze, damit ein Fehler im
     // Budget auffaellt (ohne Budget waeren es ueber 40 000 Knoten/s)
     expect(knotenJeS).toBeLessThan(1500);
+  });
+});
+
+// -------------------------------------------------- 6. Aufnahmen (E-130)
+
+/** fetch-Attrappe: jede Aufnahme ist da, ihr Name steckt in den Bytes. */
+async function starteMitAufnahmen(): Promise<{ mgr: AudioManager; bus: EventBus }> {
+  const alt = g.fetch;
+  g.fetch = async (url: string) => ({
+    ok: true,
+    arrayBuffer: async () => new TextEncoder().encode(String(url).replace(/^.*\/(.+)\.wav$/, "$1")).buffer,
+  });
+  const r = starte();
+  g.fetch = alt;
+  for (let i = 0; i < 10; i++) await new Promise((f) => setTimeout(f, 0));
+  return r;
+}
+
+/** Welche Aufnahmen hat `f` angestossen? */
+function gespielt(f: () => void): string[] {
+  const n0 = ctx.pufferQuellen.length;
+  f();
+  return ctx.pufferQuellen.slice(n0).map((q) => q.buffer?.name ?? "?");
+}
+
+describe("Aufnahmen statt Oszillatoren (E-130)", () => {
+  it("alle Aufnahmen werden geholt und dekodiert, die Dauerklaenge laufen danach ohne einen Oszillator", async () => {
+    const { mgr } = await starteMitAufnahmen();
+    expect(mgr.aufnahmenBericht.geladen).toBe(alleProben().length);
+    const o0 = ctx.oszillatoren;
+    (mgr as unknown as { baueDauertoene: () => void }).baueDauertoene();
+    expect(ctx.oszillatoren - o0).toBe(0);
+  });
+
+  it("ein Stahlteil auf der Ladeflaeche spielt eine Stahl-Aufnahme und das Wummern der Platte", async () => {
+    const { bus } = await starteMitAufnahmen();
+    ctx.currentTime += 2;
+    const namen = gespielt(() => bus.emit("schrott:aufprall", aufprall("steel", 5, "stahl", 300)));
+    expect(namen.some((n) => n.startsWith("stahl_"))).toBe(true);
+    expect(namen.some((n) => n.startsWith("grund_stahl"))).toBe(true);
+  });
+
+  it("Biss, Zupacken, Loslassen und Zuschnappen klingen aus Aufnahmen", async () => {
+    const { mgr, bus } = await starteMitAufnahmen();
+    ctx.currentTime += 1;
+    expect(gespielt(() => bus.emit("greifer:zugedrueckt", { handle: 1, kraftKN: 30, x: 0, y: 0, z: 0 }))[0]).toMatch(/^biss_/);
+    expect(gespielt(() => mgr.playGrab())).toContain("zupacken");
+    expect(gespielt(() => bus.emit("released", { count: 1 }))).toContain("ventil");
+    expect(gespielt(() => mgr.playClawSnap(1))[0]).toMatch(/^anschlag_/);
+  });
+});
+
+describe("Kein Greifklang bleibt stehen (E-130, Befund 16.10.2026)", () => {
+  /*
+   * Patrick: „beim greifen ein durchgängiger ton …, der sollte nie durchgängig
+   * sein wie in einem ufo oder spaceship". Probe: in 0,3 s auf 90 % zudruecken,
+   * dann 3 s zuhalten (Schalen stehen). Nach STUMM_NACH_S muss es still sein.
+   * 1 s: Der Druck klingt mit 0,15 s ab (nach 1 s bei 0,1 %), das Ventil mit
+   * 0,3 s (4 % von 0,1); dazu 0,05 s Glaettung im Manager. Was nach einer
+   * Sekunde Zuhalten noch klingt, ist ein Dauerton.
+   */
+  const STUMM_NACH_S = 1;
+  const STILL = 0.005; // Pegel: rund ein Zwanzigstel des Zupackens
+
+  /** Hoechster Pegel nach STUMM_NACH_S Zuhalten, fuer eine Rechnung (t, kraft) → Pegel. */
+  function zuhalten(pegel: (t: number, k: number) => number): number {
+    let letzter = 0;
+    for (let i = 0; i < 60 * 3.3; i++) {
+      const t = i / 60;
+      const p = pegel(t, Math.min(0.9, (t / 0.3) * 0.9));
+      if (t >= 0.3 + STUMM_NACH_S) letzter = Math.max(letzter, p);
+    }
+    return letzter;
+  }
+
+  it("die Rechnung: Druck und Ventil sind nach einer Sekunde Zuhalten still", () => {
+    const d = new Druckaufbau();
+    expect(zuhalten((t, k) => d.schritt(t, k).laut)).toBeLessThan(STILL);
+    const v = new Druckaufbau();
+    expect(zuhalten((t, k) => v.schritt(t, k).zischen)).toBeLessThan(STILL);
+    expect(ABKLING_S).toBeLessThan(STUMM_NACH_S / 4);
+  });
+
+  it("Gegenprobe: das alte Verhalten (Pegel am Wert der Kraft, E-121) faellt durch", () => {
+    expect(zuhalten((_t, k) => stoehnen(k).laut)).toBeGreaterThan(STILL);
+    expect(zuhalten((_t, k) => stoehnen(k).zischen)).toBeGreaterThan(STILL);
+  });
+
+  it("aber Zudruecken ist zu hoeren: waehrend die Kraft steigt, schwillt der Druck an", () => {
+    const d = new Druckaufbau();
+    let hoechst = 0;
+    for (let i = 0; i < 18; i++) hoechst = Math.max(hoechst, d.schritt(i / 60, (i / 18) * 0.9).laut);
+    expect(hoechst).toBeGreaterThan(0.05);
+  });
+
+  it("im Manager: Schalen zu, Kraft konstant → nach einer Sekunde ist jeder Greifkanal still", async () => {
+    for (const mitAufnahmen of [false, true]) {
+      const { mgr } = mitAufnahmen ? await starteMitAufnahmen() : starte();
+      const m = mgr as unknown as { stoehnGain: { gain: Param }; schalenGain: { gain: Param }; ventilGain: { gain: Param } };
+      const t0 = ctx.currentTime;
+      for (let i = 0; i < 60 * 3.3; i++) {
+        const t = i / 60;
+        ctx.currentTime = t0 + t;
+        mgr.setGreifer(t < 0.3 ? 1 : 0, Math.min(0.9, (t / 0.3) * 0.9)); // Schalen fahren zu, dann stehen sie
+        mgr.updateEngine(0, 0.3);
+      }
+      const name = mitAufnahmen ? "mit Aufnahmen" : "ohne";
+      expect(m.stoehnGain.gain.ziel, name).toBeLessThan(STILL);
+      expect(m.ventilGain.gain.ziel, name).toBeLessThan(STILL);
+      expect(m.schalenGain.gain.ziel, name).toBe(0);
+    }
+  });
+});
+
+describe("Knautschen (E-130)", () => {
+  it("mehr Zuwachs = lauter, laenger, tiefer, dichter", () => {
+    const biss = knautschKlang(0.17);
+    const presse = knautschKlang(1);
+    expect(presse.pegel).toBeGreaterThan(biss.pegel);
+    expect(presse.dauer).toBeGreaterThan(biss.dauer);
+    expect(presse.rate).toBeLessThan(biss.rate);
+    expect(presse.schlaege).toBeGreaterThan(biss.schlaege);
+  });
+
+  it("wrack:geknautscht klingt, und ein crushed im selben Moment knallt nicht noch einmal darueber", async () => {
+    for (const mitAufnahmen of [false, true]) {
+      const { mgr, bus } = mitAufnahmen ? await starteMitAufnahmen() : starte();
+      ctx.currentTime += 2;
+      expect(miss(() => bus.emit("wrack:geknautscht", { handle: 1, grad: 0.5, zuwachs: 0.5, x: 0, y: 0, z: 0 })).quellen).toBeGreaterThan(0);
+      expect(miss(() => mgr.playCrash(1)).quellen, "crushed direkt danach").toBe(0);
+      ctx.currentTime += 1;
+      expect(miss(() => mgr.playCrash(1)).quellen, "crushed allein").toBeGreaterThan(0);
+    }
+  });
+
+  it("die Presse (Zuwachs 1) schichtet mehr Metallschlaege als ein Biss", async () => {
+    const { mgr } = await starteMitAufnahmen();
+    ctx.currentTime += 2;
+    const biss = gespielt(() => mgr.playKnautsch(0.17));
+    ctx.currentTime += 2;
+    const presse = gespielt(() => mgr.playKnautsch(1));
+    expect(biss[0]).toMatch(/^knautsch_/);
+    expect(presse.length).toBeGreaterThan(biss.length);
   });
 });

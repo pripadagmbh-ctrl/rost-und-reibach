@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-130 | 16.10.2026 | Echte Aufnahmen statt Summen, kein Greifklang bleibt stehen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-129 | 16.10.2026 | Die Challenges werden pausiert, das Spiel startet im Sandkasten | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-128 | 16.10.2026 | Das Wrack knautscht wie eine Blechdose, Presse dasselbe bis flach | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-127 | 06.10.2026 | Greifer fragt alle Bleche, Türen bis zum Schweller, Spiegel am Auto | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -143,6 +144,15 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-130 — Echte Aufnahmen statt Summen, kein Greifklang bleibt stehen** (Augen zu, iPad-Lautsprecher, dann mit Kopfhörer)
+- **Spinne auf ein Teil, zudrücken und zuhalten: Wird es nach dem Zupacken still?** (Nur der Motor bleibt.)
+- Jemand öffnet und schließt die Spinne leer, dann drückt er sie auf ein Teil. Hörst du Hydraulik — oder summt noch etwas?
+- Jemand drückt erst leicht, dann voll zu. Hörst du, wann er voll zudrückt, und das kurze Zischen am Anschlag?
+- Ein Stahlträger fällt auf Beton, ein Blech in eine Mulde, ein Reifen auf den Platz. Hörst du, was es war und worauf es fiel?
+- Jemand beißt einmal in ein Wrack, dann kommt ein Wrack in die Presse. Hörst du den Unterschied — kurzes Knirschen gegen ganzes Auto?
+- Jemand zieht die Spinne über Beton, über eine Ladefläche und durch einen Schrotthaufen. Hörst du, welches was war?
+- (Augen auf) Klingt der Motor wie ein Diesel, und stört die Schleife (alle 3 s dieselbe Stelle)?
 
 **E-129 — Die Challenges werden pausiert, das Spiel startet im Sandkasten**
 - Spiel öffnen: Startet es direkt im Sandkasten — ohne Menü, ohne die Karte „1/4 Greif das Wrack“?

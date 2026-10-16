@@ -7,3 +7,6 @@ v2/tools/iphone-test-log.txt
 
 # Wird beim Veroeffentlichen erzeugt (tools/planmappe.mjs)
 v1/docs/index.html
+
+# Rohaufnahmen fuer den Ton (E-130): nur geschnittene Ausschnitte unter v1/public/ton/ werden eingecheckt
+v1/ton-roh/

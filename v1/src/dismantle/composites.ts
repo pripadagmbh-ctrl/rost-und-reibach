@@ -1184,11 +1184,26 @@ export class CarComposite {
     this.knautschAnwenden();
   }
 
+  /** Zuletzt per `wrack:geknautscht` gemeldeter Knautschgrad (E-130). */
+  private gemeldeterGrad = 0;
+
   /** Kollider, Haut und Quetschstufe dem Knautschfeld nachführen. */
   private knautschAnwenden(): void {
     if (!this.body.isValid()) return; // E-103: ein entfernter Körper zerstört sonst die Welt
     this.kolliderNachfuehren();
     this.hautNachfuehren();
+    /*
+     * E-130: Der Ton hört mit — aber nur, wenn das Wrack wirklich nachgegeben
+     * hat. Ein Biss auf ein schon flaches Wrack meldet nichts. Gesendet VOR
+     * der Quetschstufe, damit der Ton weiß, dass gleich `crushed` folgt.
+     */
+    const grad = this.knautschgrad;
+    const zuwachs = grad - this.gemeldeterGrad;
+    if (zuwachs > 1e-6) {
+      this.gemeldeterGrad = grad;
+      const p = this.body.translation();
+      this.bus.emit("wrack:geknautscht", { handle: this.body.handle, grad, zuwachs, x: p.x, y: p.y, z: p.z });
+    }
     /*
      * Die Quetschstufe folgt dem Knautschgrad: 1 ab der Hälfte (SW), 2 wenn
      * überall flach. An ihr hängen Presse, Spielstand, Challenge, Scheiben und
@@ -1291,6 +1306,7 @@ export class CarComposite {
       // Gespeichert wird nur die Stufe (Kap. 18); sie wird gleichmäßig wieder
       // zu dem Knautschgrad, ab dem sie gilt.
       this.feld.fill([0, 0.5, 1][s.crushStage] ?? 0);
+      this.gemeldeterGrad = this.knautschgrad; // E-130: Geladenes ist schon geknautscht, nicht neu
       this.kolliderNachfuehren();
       if (s.crushStage > 0) this.hautNachfuehren();
     } else if (s.crushStage > 0) {
