@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-132 | 16.10.2026 | Die Spinne pendelt frei, ein Wurf behält seinen Schwung | gebaut (Teil 2 offen) | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-131 | 16.10.2026 | Pripada.de statt Rust’n’Reibach, Werbeschilder, drei Laster stehen zum Start an | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-130 | 16.10.2026 | Echte Aufnahmen statt Summen, kein Greifklang bleibt stehen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-129 | 16.10.2026 | Die Challenges werden pausiert, das Spiel startet im Sandkasten | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -145,6 +146,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-132 — Die Spinne pendelt frei, ein Wurf behält seinen Schwung** (iPad)
+- Zügig schwenken und anhalten: Schwingt die Spinne sichtbar durch (bis knapp 40°), und ist sie nach rund 4 s ruhig genug zum Absetzen?
+- Träger greifen, voll schwenken, im Schwung loslassen: Fliegt er deutlich zur Seite? (Erst prüfbar, wenn der Vorschlag für `clampSpeeds` eingebaut ist.)
+- Träger vom Haufen greifen: Sitzt er ruhig wie vorher, ohne Zittern und ohne zu schweben?
 
 **E-131 — Pripada.de, Werbeschilder, drei Laster zum Start** (iPad, Kabine)
 - SANDKASTEN starten: Stehen am Tor zwei beladene Laster und vor Halle 3 ein dritter? Rollt der erste nach rund 3 s los, und kommt der nächste erst, wenn der erste vom Hof ist?

@@ -335,11 +335,14 @@ describe("Fahrkunst — Gegenprobe zu Regel 2", () => {
       const mit = greifzyklus(true);
       // Ziffer fuer Ziffer: toEqual vergleicht die Gleitkommazahlen exakt
       expect(mit.zahlen).toEqual(ohne.zahlen);
-      // Stand vor E-119 (tools/greifzyklus.ts, 06.10.2026)
+      // Greifen: Stand vor E-119 (tools/greifzyklus.ts, 06.10.2026) — darf
+      // sich nie aendern (Projektregel 2)
       expect((ohne.zahlen.griffweite * GRAD).toFixed(4)).toBe("54.5336");
       expect(ohne.zahlen.haltedauer).toBe(256);
-      expect(ohne.zahlen.wurf.toFixed(4)).toBe("3.6187");
-      expect((ohne.zahlen.pendel * GRAD).toFixed(4)).toBe("22.8533");
+      // Pendel und Wurf: absichtlich gewandert mit E-132 (16.10.2026,
+      // Daempfungsgrad 0,98 -> 0,4): 3,6187 -> 4,2764 m, 22,8533 -> 36,9631°
+      expect(ohne.zahlen.wurf.toFixed(4)).toBe("4.2764");
+      expect((ohne.zahlen.pendel * GRAD).toFixed(4)).toBe("36.9631");
 
       // Und die Messung hat den Zyklus gesehen — mit den Zahlen des Baggers
       expect(mit.zyklen).toHaveLength(1);

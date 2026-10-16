@@ -496,6 +496,8 @@ const ACC_GLAETTUNG_S = 0.09;
  * WAS DEN AUSSCHLAG JETZT NOCH BEGRENZT: nur `sin(Ausschlag)` in der
  * Schwerkraftrueckstellung und `PENDEL_DAEMPFUNG_*`. 30 s Dauerschwenk bleiben
  * damit unter 30 Grad — es gibt keinen Term, der mit dem Winkel waechst.
+ * (Stand 22.09.; seit E-132 ist die Daempfung von 0,98 auf 0,4 gesenkt, die
+ * Zahlen stehen bei `PENDEL_DAEMPFUNGSGRAD`.)
  *
  * DIE ZAHL BLEIBT ALS STELLSCHRAUBE STEHEN. Faellt das Nachpendeln auf dem
  * Geraet zu lang aus, ist der naechste Schritt 0,25 (Ausschlag dann rund
@@ -560,9 +562,50 @@ const NEIGUNG_TOTBAND = THREE.MathUtils.degToRad(0.5);
  * nicht anheben, und auf ebenem Beton aendern sie gar nichts.
  */
 const ANSCHLAG_FOLGT_PENDEL = false;
-/** Dämpfung des Pendels leer und bei Nennlast */
-const PENDEL_DAEMPFUNG_LEER = 5.0;
-const PENDEL_DAEMPFUNG_LAST = 4.0;
+/** Wirksame Pendellaenge Gelenk → Lastschwerpunkt (m). SW, seit dem Prototyp. */
+const PENDEL_L = 1.5;
+const PENDEL_G = 9.81;
+/** Eigenkreisfrequenz des Pendels sqrt(g/L) = 2,56 rad/s (Schwingdauer 2,46 s). */
+const PENDEL_OMEGA = Math.sqrt(PENDEL_G / PENDEL_L);
+/**
+ * Daempfungsgrad des Pendels (1 = kritisch: schwingt nie durch, 0 = ewig).
+ *
+ * BIS 16.10.2026 STANDEN HIER 5,0 / 4,0 je Sekunde — das ist ein
+ * Daempfungsgrad von 5,0 / (2 · 2,56) = 0,98, also KRITISCH GEDAEMPFT. Ein
+ * solches Pendel schwingt nie durch die Senkrechte; es kriecht in die Ruhelage
+ * zurueck. Genau das war die Winkelbegrenzung, die Patrick nach E-105 und
+ * E-115 weiter gespuert hat (16.10.2026: „die Winkelbegrenzung der Spinne
+ * raus"): keine Sperre, sondern eine Bremse. Gemessen
+ * (`npx vite-node tools/pendel-daempfung.ts`):
+ *
+ *   | Daempfungsgrad | Anfahren | Aufschaukeln* | Ruhe nach Stopp | v Korb |
+ *   |----------------|----------|---------------|-----------------|--------|
+ *   | 0,98 (vorher)  |  24,1°   |   42,8°       |  2,55 s         | 5,19   |
+ *   | 0,5            |  35,5°   |   73,8°       |  2,93 s         | 5,80   |
+ *   | **0,4**        |  39,3°   |   88,5°       |  4,00 s         | 6,06   |
+ *   | 0,3            |  43,9°   |  106,2°       |  5,17 s         | 6,43   |
+ *   | 0,2            |  49,6°   |  125,6°       |  8,53 s         | 6,97   |
+ *   | 0,1            |  60,6°   |  161,6°       | 17,15 s         | 7,77   |
+ *
+ *   * 15 s im Takt der Eigenschwingung hin und her geschwenkt — der
+ *     schlimmste Fall, den ein Spieler mit Absicht bauen kann.
+ *
+ * WARUM 0,4: das freieste Pendel, das sich auch mit Absicht nicht ueber die
+ * Waagerechte schaukeln laesst (88,5° < 90°). Mit weniger Daempfung steht der
+ * Korb beim Aufschaukeln ueber dem Gelenk — das sieht nach keinem haengenden
+ * Greifer mehr aus, und der Freigang zum Stiel ist schon bei 30° in 22 von 62
+ * Armstellungen weg (E-105, `tools/pendelfreigang.ts`). Ein Anschlag
+ * ist es trotzdem nicht: Die Daempfung nimmt Energie aus der Bewegung, sie
+ * setzt keine Wand an einen Winkel. Der Waechter dazu steht in
+ * `test/wurfweite.test.ts`.
+ *
+ * Leer und unter Last: dasselbe Verhaeltnis 4/5 wie vorher (schwere Last
+ * pendelt laenger nach, Prototyp 27.08.2026).
+ */
+const PENDEL_DAEMPFUNGSGRAD = 0.4;
+/** Dämpfung des Pendels leer und bei Nennlast (1/s) */
+const PENDEL_DAEMPFUNG_LEER = 2 * PENDEL_DAEMPFUNGSGRAD * PENDEL_OMEGA;
+const PENDEL_DAEMPFUNG_LAST = 0.8 * PENDEL_DAEMPFUNG_LEER;
 /*
  * KEINE WINKELSPERRE. Hier stand bis zum 17.09.2026 ein Deckel von 17 Grad je
  * Achse, und genau der ist auf Patricks Wort gefallen:
@@ -2920,8 +2963,8 @@ export class Excavator {
     this.tipAcc.x += (ax - this.tipAcc.x) * glatt;
     this.tipAcc.y += (az - this.tipAcc.y) * glatt;
 
-    const L = 1.5; // wirksame Pendellänge Gelenk→Lastschwerpunkt (SW)
-    const G = 9.81;
+    const L = PENDEL_L;
+    const G = PENDEL_G;
     /*
      * Rueckstellung: Schwerkraft **und** Gelenk.
      *

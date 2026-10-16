@@ -37,6 +37,7 @@ import { leinwandAttrappe } from "../tools/leinwand-attrappe";
 import { Excavator, CAB_MAX } from "../src/excavator/excavator";
 import { GripSystem } from "../src/physics/gripSystem";
 import { initPhysics } from "../src/physics/physicsWorld";
+import { ItemManager } from "../src/world/scrapItems";
 
 const DT = 1 / 60;
 /** Groesste waagerechte Ausladung des Korbes (m) — `tools/wurf.ts` Abschnitt 3 */
@@ -217,5 +218,105 @@ describe("Werfen durch Schwung", () => {
     const e = teil.translation();
     // es faellt hin, es fliegt nicht: unter einem halben Meter zur Seite
     expect(Math.hypot(e.x - start.x, e.z - start.z)).toBeLessThan(0.5);
+  });
+});
+
+/*
+ * E-132 (16.10.2026). Patrick: „ich will auch mehr schleudern koennen. Dafuer
+ * muss die Winkelbegrenzung der Spinne raus und ich muss in der Lage sein,
+ * Teile zur Seite zu schleudern."
+ *
+ * Die Bremse war die Daempfung des Pendels (Daempfungsgrad 0,98, kritisch);
+ * sie steht jetzt auf 0,4. Der Wert ist das freieste Pendel, das sich auch mit
+ * Absicht nicht ueber die Waagerechte schaukeln laesst — DAS bewacht der erste
+ * Fall. Wer die Daempfung weiter senkt, sieht ihn rot werden (0,3: 106°).
+ */
+describe("Pendel ohne Bremse (E-132)", () => {
+  const achse = new THREE.Vector3();
+  const ausschlag = (b: Excavator): number => {
+    achse.set(0, -1, 0).applyQuaternion(b.grappleGroup.quaternion);
+    return Math.acos(THREE.MathUtils.clamp(-achse.y, -1, 1)) * (180 / Math.PI);
+  };
+
+  it("Aufschaukeln im Eigentakt: nie ueber die Waagerechte, Korb nie schneller als die Maschine, danach Ruhe", () => {
+    const s = aufbau();
+    // halbe Schwingdauer des Pendels pi·sqrt(L/g), L = 1,5 m
+    const halbT = Math.round((Math.PI * Math.sqrt(1.5 / 9.81)) / DT);
+    let hoechster = 0;
+    let vKorb = 0;
+    const vor = new THREE.Vector3();
+    for (let i = 0; i < 900; i++) {
+      vor.copy(korb(s.bagger));
+      schritt(s, [Math.floor(i / halbT) % 2 === 0 ? "KeyQ" : "KeyE"]);
+      const k = korb(s.bagger);
+      vKorb = Math.max(vKorb, Math.hypot(k.x - vor.x, k.z - vor.z) / DT);
+      hoechster = Math.max(hoechster, ausschlag(s.bagger));
+    }
+    // gemessen 88,5° und 6,03 m/s (tools/pendel-daempfung.ts)
+    expect(hoechster).toBeGreaterThan(60); // das Pendel ist frei
+    expect(hoechster).toBeLessThan(90);
+    expect(vKorb).toBeLessThan(V_MAX);
+    // Ruhe: gemessen 4,07 s bis unter 1°
+    let ruhe = 0;
+    for (let i = 0; i < 600; i++) {
+      schritt(s, []);
+      if (ausschlag(s.bagger) > 1) ruhe = (i + 1) * DT;
+    }
+    expect(ruhe).toBeLessThan(5);
+    expect(ruhe).toBeGreaterThan(3); // und es schwingt wirklich nach
+  });
+});
+
+/*
+ * WURF IM SPIELTAKT (E-132). `main.ts` ruft nach jedem Physikschritt
+ * `items.clampSpeeds`; die Faelle oben lassen das aus. Dort wurde ein
+ * geworfenes Teil eine Bildzeit nach dem Loslassen auf `maxSpeedFor(m)`
+ * gedeckelt — 900 kg von 4,73 auf 0,73 m/s, Weite 0,55 statt 2,70 m.
+ */
+describe("Wurf im Spieltakt, mit clampSpeeds (E-132)", () => {
+  function wurfImTakt(massKg: number): { vAb: number; vFlug: number[] } {
+    const s = aufbau();
+    const items = new ItemManager(new THREE.Scene(), s.world);
+    const teil = haenge(s, massKg, 0);
+    items.register({ materialId: "steel", massKg, mesh: new THREE.Object3D(), body: teil });
+    for (let i = 0; i < 150; i++) {
+      schritt(s, ["KeyQ"]);
+      items.clampSpeeds(DT);
+    }
+    s.grip.releaseAll();
+    const v0 = teil.linvel();
+    const vAb = Math.hypot(v0.x, v0.z);
+    const vFlug: number[] = [];
+    // 20 Bilder: das Teil ist noch in der Luft (Abwurfhoehe gut 2 m)
+    for (let i = 0; i < 20; i++) {
+      s.bagger.carriedMassKg = 0;
+      s.bagger.grippedHandles.clear();
+      s.bagger.update(DT, s.tasten as never);
+      s.world.step();
+      items.clampSpeeds(DT);
+      const v = teil.linvel();
+      vFlug.push(Math.hypot(v.x, v.z));
+    }
+    return { vAb, vFlug };
+  }
+
+  it("kein Katapult: auch im Spieltakt nie schneller als beim Loslassen", () => {
+    for (const kg of [80, 900]) {
+      const { vAb, vFlug } = wurfImTakt(kg);
+      expect(vAb).toBeLessThan(V_MAX);
+      for (const v of vFlug) expect(v).toBeLessThanOrEqual(vAb + 0.35); // MAX_ZUWACHS
+    }
+  });
+
+  /*
+   * BEKANNTER FEHLER, NOCH NICHT BEHOBEN: Die Abhilfe gehoert in
+   * `src/world/scrapItems.ts` (`clampSpeeds`), und das ist nicht der Bereich
+   * des Baggers. Der Vorschlag steht in E-132. `it.fails` ist gruen, SOLANGE
+   * der Fehler besteht — sobald die Abhilfe eingebaut ist, wird dieser Fall
+   * rot und muss auf `it` umgestellt werden. So vergisst ihn niemand.
+   */
+  it.fails("ein geworfenes Teil behaelt im Flug seinen Schwung (900 kg)", () => {
+    const { vAb, vFlug } = wurfImTakt(900);
+    for (const v of vFlug) expect(v).toBeGreaterThan(0.9 * vAb);
   });
 });

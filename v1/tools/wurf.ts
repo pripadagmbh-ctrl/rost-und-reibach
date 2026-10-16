@@ -22,6 +22,7 @@ import { leinwandAttrappe } from "./leinwand-attrappe";
 import { Excavator, CAB_MAX } from "../src/excavator/excavator";
 import { GripSystem } from "../src/physics/gripSystem";
 import { initPhysics } from "../src/physics/physicsWorld";
+import { ItemManager } from "../src/world/scrapItems";
 
 const DT = 1 / 60;
 const GRAD = 180 / Math.PI;
@@ -251,6 +252,84 @@ function absetzen(massKg: number): number {
   return Math.hypot(v.x, v.z);
 }
 
+// ---------------------------------------- 5. Seitwurf im Spieltakt (E-132)
+
+interface Seitwurf {
+  vAb: number;
+  vNachTakt: number;
+  weite: number;
+  seitlich: number;
+  vorn: number;
+}
+
+/**
+ * Seitwurf so, wie das Spiel ihn rechnet — MIT `clampSpeeds`.
+ *
+ * Abschnitt 2 laesst `clampSpeeds` aus, `main.ts` ruft es aber nach jedem
+ * Physikschritt (E-132: genau dort verlor ein geworfenes Teil seinen Schwung).
+ * `seitlich` ist der Versatz QUER zur Armrichtung im Moment des Loslassens,
+ * `vorn` der Anteil laengs des Arms.
+ *
+ * `bester`: Der Korb schwingt im Schwenk ueber die Bahn des Gelenks hinaus
+ * und wieder zurueck. Gesucht wird das Bild, in dem das Teil am schnellsten
+ * ist — 2,5 s Schwenk und 2 s nach dem Anhalten. Ein erster Durchgang sucht,
+ * der zweite wirft dort (die Rechnung ist gleich, also auch das Bild).
+ * Ohne `bester` wird nach 2,5 s gleichmaessigem Schwenk geworfen.
+ */
+function seitwurf(massKg: number, bester: boolean, mitClamp: boolean, abBild = -1): Seitwurf & { bestBild: number } {
+  const s = aufbau();
+  einschwingen(s);
+  const items = new ItemManager(new THREE.Scene(), s.world);
+  const b = haenge(s, massKg, 0);
+  items.register({ materialId: "steel", massKg, mesh: new THREE.Object3D(), body: b });
+  const bilder = !bester ? 150 : abBild >= 0 ? abBild : 270;
+  let best = 0;
+  let bestBild = 0;
+  let prev = b.translation();
+  for (let i = 0; i < bilder; i++) {
+    schritt(s, i < 150 ? ["KeyQ"] : []);
+    if (mitClamp) items.clampSpeeds(DT);
+    const p = b.translation();
+    const v = Math.hypot(p.x - prev.x, p.z - prev.z) / DT;
+    prev = p;
+    if (v > best) {
+      best = v;
+      bestBild = i + 1;
+    }
+  }
+  const gp = s.bagger.grappleGroup.position;
+  const rp = s.bagger.root.position;
+  const rad = new THREE.Vector3(gp.x - rp.x, 0, gp.z - rp.z).normalize();
+  const tan = new THREE.Vector3(-rad.z, 0, rad.x);
+  const a = b.translation();
+  const start = new THREE.Vector3(a.x, a.y, a.z);
+  s.grip.releaseAll();
+  const v0 = b.linvel();
+  const vAb = Math.hypot(v0.x, v0.z);
+  let vNachTakt = 0;
+  for (let i = 0; i < 720; i++) {
+    s.bagger.carriedMassKg = 0;
+    s.bagger.grippedHandles.clear();
+    s.bagger.update(DT, s.tasten as never);
+    s.world.step();
+    if (mitClamp) items.clampSpeeds(DT);
+    if (i === 0) {
+      const v = b.linvel();
+      vNachTakt = Math.hypot(v.x, v.z);
+    }
+  }
+  const e = b.translation();
+  const d = new THREE.Vector3(e.x - start.x, 0, e.z - start.z);
+  return {
+    vAb,
+    vNachTakt,
+    weite: d.length(),
+    seitlich: Math.abs(d.dot(tan)),
+    vorn: d.dot(rad),
+    bestBild,
+  };
+}
+
 async function main(): Promise<void> {
   leinwandAttrappe();
   await initPhysics();
@@ -319,6 +398,24 @@ async function main(): Promise<void> {
   console.log("\n=== 4. Reines Absetzen (kein Schwenk) ===\n");
   for (const kg of [80, 900]) {
     console.log(`  ${String(kg).padStart(4)} kg: ${absetzen(kg).toFixed(3)} m/s waagerecht`);
+  }
+
+  console.log("\n=== 5. Seitwurf im Spieltakt (ein Teil, Korbmitte; mit/ohne clampSpeeds) ===\n");
+  console.log("  Wurf          | Stueck | Takt   | v Abwurf | v nach 1 Bild | Weite  | seitlich | laengs");
+  console.log("  --------------+--------+--------+----------+---------------+--------+----------+-------");
+  for (const [name, vor] of [["im Schwenk", false], ["bester Moment", true]] as const) {
+    for (const kg of [80, 900]) {
+      for (const clamp of [false, true]) {
+        const such = seitwurf(kg, vor, clamp);
+        const r = vor ? seitwurf(kg, vor, clamp, such.bestBild) : such;
+        console.log(
+          `  ${name.padEnd(13)} | ${String(kg).padStart(4)}kg | ${clamp ? "Spiel " : "Werkz."} | ` +
+            `${r.vAb.toFixed(2).padStart(5)} m/s | ${r.vNachTakt.toFixed(2).padStart(9)} m/s | ` +
+            `${r.weite.toFixed(2).padStart(5)} m | ${r.seitlich.toFixed(2).padStart(6)} m | ${r.vorn.toFixed(2).padStart(5)} m` +
+            (vor ? `   (Bild ${r.bestBild}, Stopp bei 150)` : "")
+        );
+      }
+    }
   }
 }
 

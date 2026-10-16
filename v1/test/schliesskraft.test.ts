@@ -18,6 +18,10 @@
  *
  *    Wer an der Kraft dreht und eine dieser Zahlen bewegt, hat das Greifen
  *    angefasst — und das darf nur auf ausdruecklichen Wunsch passieren.
+ *
+ *    Griffweite und Haltedauer gelten bis heute Ziffer fuer Ziffer. Wurfweite
+ *    und Pendelwinkel sind seither zweimal absichtlich gewandert (E-115, E-132);
+ *    die gueltigen Werte und ihre Herkunft stehen unten im Test.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import * as THREE from "three";
@@ -222,9 +226,18 @@ describe("Schliesskraft der Spinne", () => {
      * Die zwei DARUEBER sind unveraendert geblieben, Ziffer fuer Ziffer — und
      * genau das war der Zweck dieser Gegenprobe: Am GREIFEN wurde nichts
      * angefasst.
+     *
+     * UND NOCH EINMAL AM 16.10.2026 (E-132): Patrick will mehr schleudern,
+     * die Daempfung des Pendels ging von 0,98 (kritisch) auf 0,4. Gemessen mit
+     * `npx vite-node tools/greifzyklus.ts`, alte gegen neue excavator.ts:
+     *
+     *   Wurfweite     3,6187 m  ->  4,2764 m   (+18,2 %)
+     *   Pendelwinkel  22,8533°  ->  36,9631°
+     *   Griffweite    54,5336°  ->  54,5336°   (gleich, Greifen unberuehrt)
+     *   Haltedauer    256       ->  256        (gleich)
      */
-    expect(Math.hypot(liegt.x - losX, liegt.z - losZ)).toBeCloseTo(3.6187, 2);
-    expect(pendel * GRAD).toBeCloseTo(22.8533, 2);
+    expect(Math.hypot(liegt.x - losX, liegt.z - losZ)).toBeCloseTo(4.2764, 2);
+    expect(pendel * GRAD).toBeCloseTo(36.9631, 2);
     s.world.free();
   });
 });
