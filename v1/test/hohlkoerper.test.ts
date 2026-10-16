@@ -1,14 +1,20 @@
 /**
- * Waechter fuer den Hohlkoerper (E-124, 06.10.2026).
+ * Waechter fuer den Hohlkoerper (E-124) und das Knautschen (E-128).
  *
  * Patrick, 06.10.2026: „Autos müssen hole elemente werden, die man zerdrücken
- * kann." Ein Wrack der Fassung C ist seitdem kein Quader mehr, sondern acht
- * (`FORM_C.bleche`), und ein Biss drueckt das Blech ein, auf das die Spinne
- * zielt — nicht die ganze Karosse.
+ * kann." Darauf wurde das Wrack der Fassung C ein Verbund aus acht Quadern
+ * (`FORM_C.bleche`), und ein Biss drueckte EIN Blech ein (E-124).
  *
- * Gemessen wurde das mit `tools/wrackdruck.ts` am echten Bagger. Hier steht,
- * was davon ohne Bagger pruefbar ist: Bauart, Masse, Ort des Nachgebens, der
- * Kollider folgt, die Haut folgt.
+ * Patrick, 16.10.2026, zum zweiten Mal: „autos müssen holkörper werden" —
+ * gewaehlt: „Wie eine Blechdose knautschen — beim Zudrücken faltet und knickt
+ * das ganze Auto zusammen, Dach und Flanken klappen ein, statt dass nur
+ * einzelne Bleche eindellen." Seitdem (E-128) gibt es kein Eindruecken je
+ * Blech mehr, sondern EINE Knautschrechnung (`knautschPunkt`), gesteuert von
+ * einem Knautschfeld ueber dem Grundriss. Ein Biss knautscht vom Herd aus das
+ * ganze Auto, die Presse dasselbe ueberall bis flach.
+ *
+ * Gemessen am echten Bagger mit `tools/wrackdruck.ts`, ohne Bagger mit
+ * `tools/knautschreihe.ts`. Hier steht, was ohne Bagger pruefbar ist.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import * as THREE from "three";
@@ -16,11 +22,12 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager, CarComposite } from "../src/dismantle/composites";
 import { CAR_DEF } from "../src/dismantle/carDef";
-import { FORM_C } from "../src/dismantle/wrackformen";
+import { FORM_C, knautschHoehe, knautschWeg } from "../src/dismantle/wrackformen";
 import { EventBus } from "../src/core/events";
 
 /** Voller Biss auf ein Autowrack (E-112) — derselbe Wert wie in `greiferschaden`. */
 const KRAFT_WRACK = 15.7;
+const K = FORM_C.knautsch!;
 
 function werkbank(form: "c" | "bestand" = "c"): {
   world: RAPIER.World;
@@ -54,15 +61,45 @@ function spinneAuf(world: RAPIER.World, x: number, z: number, oberkante: number)
   world.createCollider(RAPIER.ColliderDesc.capsule(0.1, 0.09).setTranslation(0, oberkante - 3 + 0.05, 0), b);
 }
 
-function blech(car: CarComposite, name: string): number {
-  return car.eindrueckung.find((e) => e.name === name)!.m;
-}
-
 /** Der Biss, wie der Bagger ihn heute meldet: am URSPRUNG des Koerpers (E-112). */
 function biss(bus: EventBus, car: CarComposite, kraftKN = KRAFT_WRACK): void {
   const p = car.body.translation();
   bus.emit("greifer:zugedrueckt", { handle: car.body.handle, kraftKN, x: p.x, y: p.y, z: p.z });
 }
+
+/** Die Netze, die knautschen: Karosserie (beult), Scheiben und Anbauteile. */
+function knautschNetze(car: CarComposite): { mesh: THREE.Mesh; beult: boolean }[] {
+  return (car as unknown as { dentables: { mesh: THREE.Mesh; beult: boolean }[] }).dentables;
+}
+function karosse(car: CarComposite): THREE.Mesh {
+  return knautschNetze(car).find((d) => d.beult)!.mesh;
+}
+
+/** Wo liegt die Haut ueber diesem Punkt des Grundrisses? Strahl von oben, Wrack-lokal. */
+const strahl = new THREE.Raycaster();
+const pruefstoff = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+function hautBei(car: CarComposite, x: number, z: number): number {
+  const geo = karosse(car).geometry;
+  geo.computeBoundingSphere();
+  strahl.set(new THREE.Vector3(x, 5, z), new THREE.Vector3(0, -1, 0));
+  const t = strahl.intersectObject(new THREE.Mesh(geo, pruefstoff), false);
+  return t.length ? t[0]!.point.y : -Infinity;
+}
+
+/** Oberkante eines Kolliders, Wrack-lokal (nach einem Physikschritt; das Wrack steht ungedreht). */
+function kolliderOben(world: RAPIER.World, car: CarComposite, i: number): number {
+  world.step();
+  const c = car.body.collider(i);
+  return c.translation().y - car.body.translation().y + c.halfExtents().y;
+}
+
+/** Hoehe eines Rings (Ebene e, rechts) im Querschnitt s, dazu seine Breite. */
+function ring(car: CarComposite, s: number, e: number): { x: number; y: number } {
+  const a = karosse(car).geometry.getAttribute("position") as THREE.BufferAttribute;
+  const i = s * 2 * FORM_C.ebenen.length + e;
+  return { x: a.getX(i), y: a.getY(i) };
+}
+const SCHNITT = (name: string): number => FORM_C.schnitte.findIndex((s) => s.name === name);
 
 beforeAll(async () => {
   await RAPIER.init();
@@ -76,7 +113,6 @@ describe("Hohlkoerper (E-124)", () => {
     // Kollider 0 ist der Boden und traegt die Masse. Der Bagger fragt seit
     // E-127 in `krallenKontakte` alle Kollider, nicht mehr nur ihn.
     expect(FORM_C.bleche![0]!.name).toBe("Boden");
-    expect(FORM_C.bleche![0]!.max).toBe(0);
   });
 
   it("die Masse ist die des alten Quaders — Werfen und Fallen bleiben, wie sie waren", () => {
@@ -102,9 +138,49 @@ describe("Hohlkoerper (E-124)", () => {
     expect(car.body.mass()).toBeCloseTo(CAR_DEF.totalMassKg - 150, 3);
   });
 
-  it("gedrueckt wird, worauf die Spinne zielt: Dach, Kofferraum, Haube, rechte Tuer", () => {
+  it("die Bodenwanne endet am Schweller (0,32 m), und alles Uebrige steht lueckenlos darauf (E-127)", () => {
+    const [boden, ...rest] = FORM_C.bleche!;
+    const oben = boden!.mitte[1] + boden!.halb[1];
+    // Ebene 1 der Fassung C ist die Schwellerkante
+    expect(oben).toBeCloseTo(FORM_C.ebenen[1]!, 9);
+    for (const b of rest) {
+      if (b.name === "Dach") continue; // liegt auf dem Glashaus, nicht auf dem Boden
+      expect(b.mitte[1] - b.halb[1], `${b.name} steht auf dem Boden, ohne Spalt`).toBeCloseTo(oben, 9);
+    }
+  });
+});
+
+describe("Die Knautschrechnung (E-128)", () => {
+  it("die Zonen liegen lueckenlos uebereinander, jeder Knick auf einem Ring der Haut", () => {
+    for (let i = 1; i < K.zonen.length; i++) expect(K.zonen[i]!.von).toBeCloseTo(K.zonen[i - 1]!.bis, 9);
+    // Ueber dem Boden beginnt das Knautschen, darunter ist alles starr
+    expect(K.zonen[0]!.von).toBeCloseTo(FORM_C.bleche![0]!.mitte[1] + FORM_C.bleche![0]!.halb[1], 9);
+    for (const z of K.zonen) {
+      expect(FORM_C.ebenen, `${z.name}: kein Ring am Knick ${z.knick} — dort kann nichts falten`).toContain(z.knick);
+      expect(z.knick).toBeGreaterThan(z.von);
+      expect(z.knick).toBeLessThan(z.bis);
+    }
+  });
+
+  it("die Hoehe bleibt monoton: keine Ebene rutscht durch eine andere, bei keinem Knautschgrad", () => {
+    for (let h = 0; h <= 1.0001; h += 0.05) {
+      let vorher = -Infinity;
+      for (let y = 0; y <= 1.5; y += 0.01) {
+        const neu = knautschHoehe(K, y, h);
+        expect(neu, `h ${h.toFixed(2)}, y ${y.toFixed(2)}`).toBeGreaterThanOrEqual(vorher - 1e-12);
+        vorher = neu;
+      }
+      // der Boden ist starr
+      expect(knautschHoehe(K, 0.32, h)).toBeCloseTo(0.32, 12);
+    }
+    // ganz flach: Boden und Schweller plus drei Lagen Blech
+    expect(knautschHoehe(K, 1.42, 1)).toBeCloseTo(0.62, 9);
+    expect(knautschWeg(K)).toBeCloseTo(0.8, 9);
+  });
+
+  it("der Druck beginnt, wo die Spinne zielt: Dach, Kofferraum, Haube, rechte Tuer", () => {
     const faelle: Array<[string, number, number, number]> = [
-      // Blech, x, z der Spinne, Oberkante darunter (aus FORM_C.bleche)
+      // Stelle, x, z der Spinne, Oberkante darunter (aus FORM_C.bleche)
       ["Dach", 0, -0.05, 1.42],
       ["Heck", 0, -1.5, 0.97],
       ["Vorderwagen", 0, 1.6, 0.86],
@@ -118,106 +194,162 @@ describe("Hohlkoerper (E-124)", () => {
       world.step();
       comps.update();
       biss(bus, car);
-      const gedrueckt = car.eindrueckung.filter((e) => e.m > 0).map((e) => e.name);
-      expect(gedrueckt, `Spinne ueber ${name}`).toEqual([name]);
-      expect(car.crushStage, `ein Biss auf ${name} quetscht nicht das ganze Auto`).toBe(0);
+      const hier = car.knautschBei(x, z);
+      // Unter der Spinne (fast) voll: ein voller Biss sind 0,2 m von 0,80 m Weg = 0,25;
+      // zwischen zwei Rasterpunkten gemischt etwas weniger
+      expect(hier, `unter der Spinne ueber ${name}`).toBeGreaterThan(0.23);
+      expect(hier).toBeLessThanOrEqual(0.25 + 1e-6);
+      for (const [anderer, ax, az] of faelle) {
+        if (anderer === name) continue;
+        expect(car.knautschBei(ax, az), `${anderer} weniger als ${name}`).toBeLessThan(hier);
+      }
+      expect(car.crushStage, `ein Biss auf ${name} quetscht nicht das ganze Auto flach`).toBe(0);
     }
   });
 
-  it("ohne Spinne in der Naehe und mit dem Koerperursprung als Ort wird von oben gedrueckt (E-114)", () => {
+  it("ohne Spinne in der Naehe und mit dem Koerperursprung als Ort wird von oben gedrueckt (E-114): auf die Dachmitte", () => {
     const { bus, car } = werkbank("c");
     biss(bus, car);
-    expect(car.eindrueckung.filter((e) => e.m > 0).map((e) => e.name)).toEqual(["Dach"]);
+    expect(car.knautschBei(0, 0)).toBeCloseTo(0.25, 6);
+    expect(car.knautschBei(0, 1.9)).toBeLessThan(0.2);
+    expect(car.knautschBei(0, -1.9)).toBeLessThan(0.2);
   });
 
-  it("der Kollider folgt dem Blech: das Dach sinkt um genau den Eindruck, und nie tiefer als sein max", () => {
-    const { bus, car, world } = werkbank("c");
-    const dachKollider = (): RAPIER.Collider => car.body.collider(FORM_C.bleche!.findIndex((b) => b.name === "Dach"));
-    // Wrack-lokal: Rapier stellt die Weltlage eines umgeformten Kolliders erst im naechsten Schritt
-    const oben = (): number =>
-      dachKollider().translation().y - car.body.translation().y + dachKollider().halfExtents().y;
-    world.step();
-    const vorher = oben();
-    biss(bus, car);
-    world.step();
-    // 15,7 kN = 7 m/s → min(0,2; 0,035 · 7) = 0,2 m
-    expect(blech(car, "Dach")).toBeCloseTo(0.2, 6);
-    expect(vorher - oben()).toBeCloseTo(0.2, 3);
-    for (let i = 0; i < 5; i++) biss(bus, car);
-    expect(blech(car, "Dach")).toBeCloseTo(FORM_C.bleche!.find((b) => b.name === "Dach")!.max, 6);
-    expect(dachKollider().halfExtents().y * 2, "Mindestdicke").toBeGreaterThanOrEqual(0.12 * CAR_DEF.crushScales[car.crushStage] - 1e-6);
-  });
-
-  it("die Haut folgt dem Blech: die Dachkante geht mit, die Guertellinie bleibt", () => {
+  it("aber der Druck bleibt nicht unter dem Stiefel: auch das andere Ende des Autos gibt etwas nach", () => {
     const { bus, car } = werkbank("c");
-    const haut = car.group.getObjectByProperty("type", "Mesh") as THREE.Mesh | undefined;
-    // Die Karosserie ist das erste Netz im crushGroup
-    let karosse: THREE.Mesh | null = null;
-    car.group.traverse((o) => {
-      if (!karosse && (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry.getAttribute("color")) karosse = o as THREE.Mesh;
-    });
-    expect(karosse ?? haut).toBeTruthy();
-    const attr = (karosse as unknown as THREE.Mesh).geometry.getAttribute("position") as THREE.BufferAttribute;
-    const vorher = new Float32Array(attr.array as Float32Array);
     biss(bus, car);
-    let dachkante = 0;
-    let guertel = 0;
-    for (let i = 0; i < attr.count; i++) {
-      const y0 = vorher[i * 3 + 1]!;
-      const z0 = vorher[i * 3 + 2]!;
-      const dy = vorher[i * 3 + 1]! - attr.getY(i);
-      if (Math.abs(z0 + 0.06) <= 0.31 && y0 >= 1.29) dachkante = Math.max(dachkante, dy);
-      if (Math.abs(z0 + 0.06) <= 0.31 && Math.abs(y0 - 0.92) < 0.01) guertel = Math.max(guertel, Math.abs(dy));
-    }
-    expect(dachkante, "das Dach ist sichtbar eingedrueckt").toBeGreaterThan(0.15);
-    expect(guertel, "die Guertellinie unter dem Dach bleibt stehen").toBeLessThan(0.01);
+    expect(car.knautschBei(0, 1.9), "die Haube").toBeGreaterThan(0);
+    expect(car.knautschBei(-0.85, -1.9), "das Heck links").toBeGreaterThan(0);
   });
 
-  it("die Bodenwanne endet am Schweller (0,32 m), und alles Uebrige steht lueckenlos darauf (E-127)", () => {
-    const [boden, ...rest] = FORM_C.bleche!;
-    const oben = boden!.mitte[1] + boden!.halb[1];
-    // Ebene 1 der Fassung C ist die Schwellerkante
-    expect(oben).toBeCloseTo(FORM_C.ebenen[1]!, 9);
-    for (const b of rest) {
-      if (b.name === "Dach") continue; // liegt auf dem Glashaus, nicht auf dem Boden
-      expect(b.mitte[1] - b.halb[1], `${b.name} steht auf dem Boden, ohne Spalt`).toBeCloseTo(oben, 9);
+  it("schrittweise: jeder volle Biss knautscht weiter, die Stufe steigt nie um zwei, und flach ist flach", () => {
+    const { bus, car } = werkbank("c");
+    let grad = car.knautschgrad;
+    let dach = hautBei(car, 0, -0.05);
+    let stufe = car.crushStage;
+    let bisse = 0;
+    while (car.crushStage < 2) {
+      biss(bus, car);
+      bisse++;
+      expect(car.knautschgrad, `Biss ${bisse}: kein Fortschritt`).toBeGreaterThan(grad);
+      expect(car.crushStage - stufe, `Biss ${bisse}: zwei Stufen auf einmal`).toBeLessThanOrEqual(1);
+      expect(hautBei(car, 0, -0.05), `Biss ${bisse}: das Dach kommt nicht tiefer`).toBeLessThan(dach + 1e-6);
+      grad = car.knautschgrad;
+      dach = hautBei(car, 0, -0.05);
+      stufe = car.crushStage;
+      expect(bisse, "flach nach endlich vielen Bissen").toBeLessThan(10);
+    }
+    /*
+     * Gemessen 16.10.2026 (`tools/knautschreihe.ts`): sechs volle Bisse aufs
+     * Dach bis flach — vier, bis das Dach unten ist, zwei weitere fuer den
+     * Rest. Vorher (E-124) waren es fuenf: drei fuers Dach, zwei Stufen.
+     */
+    expect(bisse).toBe(6);
+    expect(car.knautschgrad).toBe(1);
+    const flach = new Float32Array(karosse(car).geometry.getAttribute("position").array as Float32Array);
+    biss(bus, car);
+    const danach = karosse(car).geometry.getAttribute("position").array as Float32Array;
+    expect(Array.from(danach), "flach ist flach: ein weiterer Biss aendert nichts").toEqual(Array.from(flach));
+  });
+
+  it("Spinne und Presse benutzen DIESELBE Verformung: flach gebissen ist Eckpunkt fuer Eckpunkt flach gepresst", () => {
+    const gebissen = werkbank("c");
+    while (gebissen.car.crushStage < 2) biss(gebissen.bus, gebissen.car);
+    const gepresst = werkbank("c").car;
+    gepresst.pressCrush();
+    const a = knautschNetze(gebissen.car);
+    const b = knautschNetze(gepresst);
+    expect(a.length).toBe(b.length);
+    let verglichen = 0;
+    for (let n = 0; n < a.length; n++) {
+      const pa = a[n]!.mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
+      const pb = b[n]!.mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let i = 0; i < pa.array.length; i++) expect(pa.array[i]).toBeCloseTo(pb.array[i]!, 5);
+      verglichen += pa.count;
+    }
+    expect(verglichen, "Karosserie, vier Scheiben, Anbauteile").toBeGreaterThan(500);
+    // und die Kollider sind dieselben
+    for (let i = 0; i < gebissen.car.kolliderZahl; i++) {
+      expect(gebissen.car.body.collider(i).halfExtents().y).toBeCloseTo(gepresst.body.collider(i).halfExtents().y, 6);
     }
   });
 
-  it("die Tuer gibt bis zum Schweller nach, nicht nur bis zur Sicke (E-127)", () => {
+  it("die Kollider folgen der Haut: halb geknautscht ist das Wrack fuer die Physik halb so hoch", () => {
+    /*
+     * In E-124 standen die Schalen 32 cm im Dach, weil Kollider und Haut
+     * verschiedene Hoehen hatten. Hier: ueber Dach, Haube und Kofferraum die
+     * Haut gegen die Oberkante des Kolliders darunter, an 15 Stellen je Blech;
+     * an den Tueren die Guertellinie (darueber ist Glas, und dort ist
+     * absichtlich kein Kollider). Gemessen 16.10.2026: hoechstens 8 cm
+     * Abstand, meist 0–6 (`tools/knautschreihe.ts`).
+     */
+    const zustaende: Array<[string, (w: ReturnType<typeof werkbank>) => void]> = [
+      ["heil", () => {}],
+      ["ein Biss", (w) => biss(w.bus, w.car)],
+      ["drei Bisse", (w) => { for (let i = 0; i < 3; i++) biss(w.bus, w.car); }],
+      ["halb", (w) => w.car.zusammendruecken(0.5)],
+      ["Presse", (w) => w.car.pressCrush()],
+    ];
+    for (const [name, mach] of zustaende) {
+      const w = werkbank("c");
+      mach(w);
+      FORM_C.bleche!.forEach((b, i) => {
+        if (i === 0) return;
+        const oben = kolliderOben(w.world, w.car, i);
+        if (b.name.startsWith("Tür")) {
+          const s = SCHNITT("B-Säule");
+          const g = ring(w.car, s, 5).y; // die Guertellinie rechts
+          expect(Math.abs(g - oben), `${name}: ${b.name}`).toBeLessThan(0.03);
+          return;
+        }
+        for (const fx of [-0.8, 0, 0.8]) {
+          for (const fz of [-0.8, -0.4, 0, 0.4, 0.8]) {
+            const haut = hautBei(w.car, b.mitte[0] + fx * b.halb[0], b.mitte[2] + fz * b.halb[2]);
+            expect(Math.abs(haut - oben), `${name}: ${b.name} bei ${fx}/${fz}`).toBeLessThan(0.1);
+          }
+        }
+      });
+    }
+    // halb so hoch, auch fuer die Physik
+    const halb = werkbank("c");
+    halb.car.zusammendruecken(0.5);
+    const dach = FORM_C.bleche!.findIndex((b) => b.name === "Dach");
+    expect(kolliderOben(halb.world, halb.car, dach)).toBeLessThan(1.42 - 0.4);
+  });
+
+  it("die Haut faltet wie eine Dose: Saeule heraus, Tuer hinein — und die Guertellinie haelt beim ersten Biss", () => {
+    const heil = werkbank("c").car;
+    const s = SCHNITT("B-Säule");
+    const { bus, car } = werkbank("c");
+    biss(bus, car);
+    expect(Math.abs(ring(car, s, 5).y - ring(heil, s, 5).y), "die Guertellinie bleibt beim ersten Biss").toBeLessThan(0.01);
+    biss(bus, car);
+    expect(ring(car, s, 6).x - ring(heil, s, 6).x, "die Saeule knickt heraus").toBeGreaterThan(0.05);
+    biss(bus, car);
+    biss(bus, car);
+    expect(ring(heil, s, 4).x - ring(car, s, 4).x, "die Tuer knickt hinein").toBeGreaterThan(0.03);
+    // Das Dach liegt in der Mitte tiefer als an der Kante: der Abdruck
+    const mitte = ring(car, s, 8).y;
+    const kante = ring(car, s, 7).y;
+    expect(mitte, "das Dach ist eingedellt, nicht nur gesenkt").toBeLessThan(kante + 0.12 - 0.02);
+  });
+
+  it("ein Biss von der Seite knautscht diese Seite zuerst: das Auto sackt nach rechts", () => {
     const { world, bus, comps, car } = werkbank("c");
-    let karosse: THREE.Mesh | null = null;
-    car.group.traverse((o) => {
-      if (!karosse && (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry.getAttribute("color")) karosse = o as THREE.Mesh;
-    });
-    const attr = (karosse as unknown as THREE.Mesh).geometry.getAttribute("position") as THREE.BufferAttribute;
-    const vorher = new Float32Array(attr.array as Float32Array);
     for (let i = 0; i < 30; i++) world.step();
     spinneAuf(world, 0.77, 0.34, 0.92);
     car.body.wakeUp();
     world.step();
     comps.update();
     biss(bus, car);
-    expect(blech(car, "Tür vorn rechts")).toBeCloseTo(0.2, 6);
-    // Wie weit geht die rechte Flanke unter der Tuer je Hoehe nach innen?
-    const nachInnen = (hoehe: number): number => {
-      let m = 0;
-      for (let i = 0; i < attr.count; i++) {
-        const [x0, y0, z0] = [vorher[i * 3]!, vorher[i * 3 + 1]!, vorher[i * 3 + 2]!];
-        if (x0 > 0.3 && Math.abs(y0 - hoehe) < 0.005 && z0 > 0 && z0 < 0.7) m = Math.max(m, x0 - attr.getX(i));
-      }
-      return m;
-    };
-    /*
-     * Gemessen 06.10.2026 bei 0,20 m Eindruck (Knitter ±20 %, dazu die Beule):
-     *   Hoehe        0,20   0,32   0,46   0,58
-     *   Boden 0,58   0,000  0,022  0,072  0,196   (E-124)
-     *   Boden 0,32   0,136  0,166  0,120  0,196   (E-127)
-     */
-    for (const h of [0.2, 0.32, 0.46]) expect(nachInnen(h), `Flanke auf ${h} m`).toBeGreaterThan(0.1);
+    biss(bus, car);
+    expect(car.knautschBei(0.85, 0.34)).toBeGreaterThan(car.knautschBei(-0.85, 0.34));
+    const s = SCHNITT("Dach vorn");
+    const links = ring(car, s, 2 * FORM_C.ebenen.length - 1 - 7).y;
+    expect(ring(car, s, 7).y, "die rechte Dachkante liegt tiefer").toBeLessThan(links);
   });
 
-  it("Eindruecken kostet keine Masse (E-114): nur herausgerissene Teile machen das Wrack leichter", () => {
+  it("Knautschen kostet keine Masse (E-114): nur herausgerissene Teile machen das Wrack leichter", () => {
     const { bus, car } = werkbank("c");
     const vorher = car.massKg;
     /*
@@ -226,7 +358,21 @@ describe("Hohlkoerper (E-124)", () => {
      * Gewalt als Sortierung) — das ist gewollt und steht in `greiferschaden`.
      */
     for (let i = 0; i < 3; i++) biss(bus, car, 10);
-    expect(blech(car, "Dach")).toBeGreaterThan(0);
+    expect(car.knautschgrad).toBeGreaterThan(0);
     expect(car.massKg).toBe(vorher);
+    car.pressCrush();
+    expect(car.massKg, "auch die Presse nimmt nichts weg — Raeder fallen heraus und liegen daneben").toBe(
+      CAR_DEF.totalMassKg - CAR_DEF.parts.filter((p) => p.kind === "wheel").slice(0, 2).reduce((s, p) => s + p.massKg, 0)
+    );
+  });
+
+  it("der Spielstand stellt die Stufe als gleichmaessigen Knautschgrad wieder her", () => {
+    const eins = werkbank("c").car;
+    eins.restoreState({ crushStage: 1, torn: [], brokenWindows: [] });
+    expect(eins.knautschgrad).toBeCloseTo(0.5, 6);
+    const zwei = werkbank("c").car;
+    zwei.restoreState({ crushStage: 2, torn: [], brokenWindows: [] });
+    expect(zwei.knautschgrad).toBe(1);
+    expect(hautBei(zwei, 0, -0.05)).toBeLessThan(0.7);
   });
 });

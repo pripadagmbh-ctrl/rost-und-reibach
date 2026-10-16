@@ -23,6 +23,7 @@
  *   npx vite-node tools/wrackdruck.ts                 drei Stellen ausfuehrlich
  *   (Umgebung) REIHE=1                                 sechs Stellen, je eine Zeile
  *   (Umgebung) VORHER=1                                dasselbe mit dem alten Quader
+ *   (Umgebung) KNAUTSCH=0.5                            das Wrack vorher halb zusammendruecken (E-128)
  * Unter PowerShell: `$env:REIHE=1; npx vite-node tools/wrackdruck.ts`
  */
 import * as THREE from "three";
@@ -190,6 +191,15 @@ function groessteBeule(car: CarComposite): { tief: number; ort: THREE.Vector3 } 
   return { tief, ort };
 }
 
+/** Wo liegt die Haut über diesem Punkt des Grundrisses (Wrack-lokal)? Strahl von oben auf die Karosserie. */
+function hautBei(car: CarComposite, x: number, z: number): number {
+  const d = beulen(car).find((b) => b.beult !== false)!;
+  d.mesh.geometry.computeBoundingSphere();
+  const strahl = new THREE.Raycaster(new THREE.Vector3(x, 5, z), new THREE.Vector3(0, -1, 0));
+  const t = strahl.intersectObject(new THREE.Mesh(d.mesh.geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })), false);
+  return t.length ? t[0]!.point.y : NaN;
+}
+
 const f2 = (v: number): string => v.toFixed(2);
 const vek = (v: { x: number; y: number; z: number }): string => `(${f2(v.x)}, ${f2(v.y)}, ${f2(v.z)})`;
 
@@ -241,6 +251,8 @@ function lauf(ansatz: Ansatz, korrektur: { x: number; z: number }, heben: boolea
   const car = s.composites.spawnCar(
     new THREE.Vector3(gp.x - ansatz.x - korrektur.x, 0.02, gp.z - ansatz.z - korrektur.z)
   );
+  // KNAUTSCH=0.5: vorher so weit zusammendruecken (E-128) — greift die Spinne auch ein geknautschtes Wrack?
+  if (process.env.KNAUTSCH) car.zusammendruecken(Number(process.env.KNAUTSCH));
   for (let i = 0; i < 120; i++) takt(s);
   const c0 = car.body.translation();
   const bisse: Array<{ kraftKN: number; x: number; y: number; z: number }> = [];
@@ -331,12 +343,15 @@ function lauf(ansatz: Ansatz, korrektur: { x: number; z: number }, heben: boolea
   s.tasten.down.clear();
   s.tasten.down.add("KeyF");
   let gelenk2 = Infinity;
+  let spitze2 = Infinity;
   for (let i = 0; i < 150; i++) {
     takt(s);
     gelenk2 = Math.min(gelenk2, s.bagger.grappleGroup.position.y);
+    spitze2 = Math.min(spitze2, tiefsteSpitze(s.bagger));
   }
   s.tasten.down.clear();
   const cJetzt = car.body.translation();
+  const gNach2 = s.bagger.grappleGroup.position.clone();
   zeilen.push(
     `  danach erneut abgesenkt: Gelenk tiefstens ${f2(gelenk2 - cJetzt.y)} m ueber Wrackboden (beim ersten Mal ${f2(gelenk - c0.y)} m)`
   );
@@ -349,14 +364,16 @@ function lauf(ansatz: Ansatz, korrektur: { x: number; z: number }, heben: boolea
   }
   zeilen.push(`  nach Biss 1: Stufe ${stufe1}, groesste Hautverschiebung ${f2(beule1.tief)} m bei ${vek(beule1.ort)}`);
   zeilen.push(`  am Ende: Stufe ${car.crushStage}, Teile heraus: ${teile.join(", ") || "-"}, Haut ${f2(beule.tief)} m bei ${vek(beule.ort)}`);
-  const bleche = car.eindrueckung.filter((e) => e.m > 0);
-  if (car.eindrueckung.length) {
-    zeilen.push(`  Bleche: ${bleche.map((e) => `${e.name} ${f2(e.m)}/${f2(e.max)}`).join(", ") || "keines eingedrueckt"}`);
-  }
+  // E-128: wie weit geknautscht, im Ganzen und unter der Spinne — und schwebt sie?
+  const unter = new THREE.Vector3(gNach2.x - cJetzt.x, 0, gNach2.z - cJetzt.z).applyQuaternion(
+    new THREE.Quaternion(car.body.rotation().x, car.body.rotation().y, car.body.rotation().z, car.body.rotation().w).invert()
+  );
+  const knautsch = `Grad ${f2(car.knautschgrad)}, unter der Spinne ${f2(car.knautschBei(unter.x, unter.z))}`;
+  zeilen.push(`  Knautschen: ${knautsch}; Schalenspitze beim erneuten Absenken ${f2(spitze2 - cJetzt.y)} m, Haut darunter ${f2(hautBei(car, unter.x, unter.z))} m`);
   zeilen.push(`  Wrack geschoben ${f2(schub)} m, hoechstens gekippt ${f2(maxKippen)}°`);
   const kurz =
     `Stufe ${car.crushStage} · Teile ${teile.length ? teile.join("+") : "-"} · ` +
-    (car.eindrueckung.length ? `Bleche ${bleche.map((e) => `${e.name} ${f2(e.m)}`).join(", ") || "-"} · ` : `Haut ${f2(beule.tief)} m bei ${vek(beule.ort)} · `) +
+    (process.env.VORHER === "1" ? `Haut ${f2(beule.tief)} m bei ${vek(beule.ort)} · ` : `Knautschen ${knautsch} · `) +
     `Schub ${f2(schub)} m · Kippen ${maxKippen.toFixed(0)}°`;
   s.world.free();
   return { versatz, zeilen, kurz };

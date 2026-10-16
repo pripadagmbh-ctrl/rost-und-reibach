@@ -125,35 +125,36 @@ describe("Schaden durch Zudruecken", () => {
     ).toBe(true);
   });
 
-  it("ohne Bauteil unter den Schalen trifft es die Karosse — erst die Stelle, dann das Ganze", () => {
+  it("ohne Bauteil unter den Schalen trifft es die Karosse — sie knautscht Biss fuer Biss bis flach", () => {
     const { bus, car } = werkbank();
     /*
      * Weit weg von jedem Anker, ueber dem Dach: Dann gibt es nichts
      * herauszudruecken, und der Druck geht ins Blech.
      *
-     * ANGEPASST MIT E-124 (06.10.2026). Bis dahin nahm jeder volle Biss die
-     * GANZE Karosse um eine Quetschstufe flacher, egal wo die Spinne sass —
-     * das Wrack war ein Klotz. Patrick: „Autos müssen hole elemente werden,
-     * die man zerdrücken kann." Seitdem gibt zuerst das Blech nach, auf das
-     * gedrueckt wird (hier das Dach, bis zu seinem `max`), und erst wenn die
-     * Stelle ganz eingedrueckt ist, nimmt jeder weitere Biss genau eine
-     * Stufe. Was bleibt wie vorher: eine Stufe je Biss, und bei zwei ist
-     * Schluss — damit ein Dauerdruck nicht in einem Bild durchquetscht.
+     * ANGEPASST MIT E-124 (06.10.2026): erst gab das Dach bis zu seinem `max`
+     * nach, dann nahm jeder Biss eine Quetschstufe.
+     *
+     * ANGEPASST MIT E-128 (16.10.2026). Patrick: „Wie eine Blechdose
+     * knautschen — beim Zudrücken faltet und knickt das ganze Auto zusammen
+     * … statt dass nur einzelne Bleche eindellen." Seitdem knautscht jeder
+     * Biss das ganze Auto ein Stueck weiter, vom Dach aus, und die
+     * Quetschstufe folgt dem Knautschgrad (1 ab der Haelfte, 2 wenn flach).
+     * Was bleibt wie vorher und hier bewacht wird: Der erste Biss macht das
+     * Auto nicht flach, keiner nimmt zwei Stufen auf einmal — damit ein
+     * Dauerdruck nicht in einem Bild durchquetscht —, und bei zwei ist Schluss.
      */
     const p = car.body.translation();
     const irgendwo = new THREE.Vector3(p.x, p.y + 2.5, p.z);
-    const dach = (): { m: number; max: number } => car.eindrueckung.find((e) => e.name === "Dach")!;
-    let bisse = 0;
-    while (dach().m < dach().max) {
+    beissen(bus, car.body.handle, KRAFT_WRACK, irgendwo);
+    expect(car.crushStage, "der erste Biss knautscht das Dach, nicht das ganze Auto flach").toBe(0);
+    let bisse = 1;
+    while (car.crushStage < 2) {
+      const vorher = car.crushStage;
       beissen(bus, car.body.handle, KRAFT_WRACK, irgendwo);
       bisse++;
-      expect(car.crushStage, "solange das Dach nachgibt, bleibt der Rest stehen").toBe(0);
-      expect(bisse, "das Dach gibt nach endlich vielen Bissen ganz nach").toBeLessThan(10);
+      expect(car.crushStage - vorher, "eine Stufe je Biss, nie zwei").toBeLessThanOrEqual(1);
+      expect(bisse, "flach nach endlich vielen Bissen").toBeLessThan(10);
     }
-    beissen(bus, car.body.handle, KRAFT_WRACK, irgendwo);
-    expect(car.crushStage, "ist die Stelle ganz unten, nimmt ein voller Biss eine Quetschstufe").toBe(1);
-    beissen(bus, car.body.handle, KRAFT_WRACK, irgendwo);
-    expect(car.crushStage, "der naechste die naechste").toBe(2);
     beissen(bus, car.body.handle, KRAFT_WRACK, irgendwo);
     expect(car.crushStage, "und dann ist Schluss, nicht tiefer").toBe(2);
   });

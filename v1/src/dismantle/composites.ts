@@ -9,8 +9,11 @@ import {
   WRACKFORMEN,
   aufDieFlanke,
   baueWrackform,
+  knautschHoehe,
+  knautschPunkt,
+  knautschWeg,
   type BlechDef,
-  type Druckrichtung,
+  type KnautschDef,
   type WrackformDef,
   type WrackformId,
 } from "./wrackformen";
@@ -55,37 +58,33 @@ const SETTLE_GRACE_STEPS = 90; // nach Spawn keine Aufprall-Events (Setzen des W
 /* DER HOHLKOERPER (E-124)                                                    */
 /* ------------------------------------------------------------------------- */
 
-/** Achse (0 x, 1 y, 2 z) und Vorzeichen einer Druckrichtung. */
-const ACHSE: Record<Druckrichtung, { k: 0 | 1 | 2; sg: 1 | -1 }> = {
-  "-y": { k: 1, sg: -1 },
-  "+x": { k: 0, sg: 1 },
-  "-x": { k: 0, sg: -1 },
-  "+z": { k: 2, sg: 1 },
-  "-z": { k: 2, sg: -1 },
-};
-
 /**
- * Duenner wird kein Blech, in m — darunter wandert es als Platte weiter.
- * Rapier-Lehre „Bleche mit Mindestdicke": Eine Schale ist eine Kapsel mit
+ * Duenner wird kein Blech-Kollider, in m: Ein flaches Dach bleibt eine Platte
+ * dieser Dicke, auch wenn die Haut darunter enger zusammengeht. Rapier-Lehre „Bleche mit Mindestdicke": Eine Schale ist eine Kapsel mit
  * 9 cm Radius; 12 cm Blech plus 18 cm Kapsel lassen ihr rund 30 cm, bevor sie
  * in einem Bild hindurchspringen koennte. // SW
  */
 const MIN_DICKE = 0.12;
 
-/**
- * Wie weit neben einem Blech die Haut noch mitgeht, in m: Ein eingedruecktes
- * Dach zieht den Rand der Windschutzscheibe ein Stueck mit, statt an einer
- * scharfen Kante abzureissen. // SW
+/*
+ * DAS KNAUTSCHFELD (E-128). Wie weit das Wrack an jeder Stelle seines
+ * Grundrisses zusammengedrueckt ist, 0 heil … 1 flach — auf einem Raster quer
+ * (links, Mitte, rechts) mal laengs (alle 25 cm). Die Haut liest es je
+ * Eckpunkt, die Kollider je Quader; die Presse setzt es ueberall auf 1.
  */
-const HAUT_RAND = 0.3;
+const FELD_X = [-0.85, 0, 0.85];
+const FELD_DZ = 0.25;
+const FELD_NZ = 17; // z = −2,00 … +2,00 m
 
 /**
- * Wie uneben ein eingedruecktes Blech wird: Jeder Eckpunkt geht um bis zu so
- * viel mehr oder weniger mit (Anteil). Fest je Eckpunkt statt gewuerfelt — die
- * Haut sieht nach jedem Biss gleich zerknittert aus, und am Zufallsstrom der
- * anderen Waechter aendert sich nichts. // SW
+ * Wie der Druck durchs Auto wandert. Ein Biss knautscht unter der Spinne um
+ * seinen vollen Weg, bis `KNAUTSCH_RADIUS` daneben auslaufend, und das ganze
+ * uebrige Auto um `KNAUTSCH_GRUND` davon mit — Blech ist verbunden, der Druck
+ * bleibt nicht unter dem Stiefel. Was an einer schon flachen Stelle nicht mehr
+ * unterkommt, geht in den Rest. // SW
  */
-const KNITTER = 0.2;
+const KNAUTSCH_RADIUS = 1.5;
+const KNAUTSCH_GRUND = 0.6;
 
 /**
  * Wie lange ein Schalenkontakt als Druckstelle gilt, in Physikschritten.
@@ -97,43 +96,11 @@ const KNITTER = 0.2;
  */
 const DRUCK_GEDAECHTNIS = 60;
 
-/** Fester Wert −1…1 je Eckpunkt (fuer `KNITTER`). */
-function rauschen(i: number): number {
-  let h = Math.imul(i + 1, 2654435761) >>> 0;
-  h ^= h >>> 15;
-  h = Math.imul(h, 2246822519) >>> 0;
-  h ^= h >>> 13;
-  return (h % 2001) / 1000 - 1;
-}
-
 /**
  * In welcher Hoehe eine Spinne, die NEBEN dem Wrack steht, seitlich
  * hineindrueckt (m) — mitten in den Tueren (0,58…0,92). // SW
  */
 const SEITEN_HOEHE = 0.75;
-
-/**
- * Abstand eines Punkts von einem Blech, wie es AB WERK sitzt (m).
- *
- * Gezielt wird auf die Stelle, nicht auf das, was davon noch uebrig ist: Ist
- * eine Tuer schon eingedrueckt, liegt sie weiter innen — wer erneut auf sie
- * zielt, soll trotzdem sie treffen und nicht die Bodenwanne darunter
- * (gemessen: sonst gab die Tuer beim zweiten Biss nicht mehr nach).
- */
-function abstand(p: [number, number, number], b: BlechDef): number {
-  let d2 = 0;
-  for (let j = 0; j < 3; j++) {
-    const d = Math.max(0, Math.abs(p[j] - b.mitte[j]!) - b.halb[j]!);
-    d2 += d * d;
-  }
-  return Math.sqrt(d2);
-}
-
-/** Wo gedrueckt wird: welches Blech und wo darauf (Wrack-lokal, ungequetscht). */
-interface Druckstelle {
-  blech: number;
-  ort: THREE.Vector3;
-}
 
 /**
  * WELCHEN LACK HAT DIESES WRACK?
@@ -421,16 +388,23 @@ export function wrackDaten(basis: CarDef, id: WrackformId): CarDef {
  * Möglich, weil der Lack an den Eckpunkten sitzt (E-105/E-111): Das Material
  * trägt keine wrackeigene Zahl mehr, also braucht kein Wrack ein eigenes. Zwei
  * Wracks derselben Fassung kann der Renderer damit hintereinander zeichnen.
+ *
+ * KANTIG (E-128): Ein geknautschtes Wrack bekommt dasselbe Material flach
+ * schattiert — EINES für alle geknautschten Wracks einer Fassung. Glatt
+ * schattiert rundet die Grafikkarte jeden Knick zu einer weichen Welle ab;
+ * gefaltetes Blech hat aber Kanten. Ein heiles Wrack bleibt, wie Patrick es
+ * gewählt hat (E-117, glatt mit Sicken).
  */
-const LACK_STOFF = new Map<WrackformId, THREE.MeshStandardMaterial>();
-function lackStoff(form: WrackformDef, id: WrackformId): THREE.MeshStandardMaterial {
-  let stoff = LACK_STOFF.get(id);
+const LACK_STOFF = new Map<string, THREE.MeshStandardMaterial>();
+function lackStoff(form: WrackformDef, id: WrackformId, kantig = false): THREE.MeshStandardMaterial {
+  const schluessel = kantig ? id + "-kantig" : id;
+  let stoff = LACK_STOFF.get(schluessel);
   if (!stoff) {
     // Dieselben Werte wie beim Bestand: Ein Lack, der zehn Jahre auf dem Hof
     // steht, glänzt nicht mehr (17.09.2026).
     stoff = farbstoff(0.74, 0.12);
-    stoff.flatShading = !form.glatt;
-    LACK_STOFF.set(id, stoff);
+    stoff.flatShading = kantig || !form.glatt;
+    LACK_STOFF.set(schluessel, stoff);
   }
   return stoff;
 }
@@ -448,11 +422,14 @@ export class CarComposite {
   private kollider: RAPIER.Collider[] = [];
   /** Der Hohlkoerper dieser Fassung; `null` = ein Quader wie bisher. */
   private bleche: BlechDef[] | null;
-  /** Wie weit jedes Blech eingedrueckt ist, in m (Index wie `bleche`). */
-  private eindruck: number[] = [];
+  /** Wie die Karosserie zusammenknautscht; `null` = Quader mit Quetschstufen (Bestand, A, B). */
+  private knautsch: KnautschDef | null;
+  /** Das Knautschfeld (E-128): laengs mal quer, 0 heil … 1 flach. */
+  private feld = new Float32Array(FELD_NZ * FELD_X.length);
+  private blechPunkt = new THREE.Vector3();
   /**
    * Wo die Spinne zuletzt am Wrack anlag: ihr Gelenk und ihre Achse
-   * (Wrack-lokal, ungequetscht), und wie viele Schritte das her ist.
+   * (Wrack-lokal), und wie viele Schritte das her ist.
    */
   private spinne: { ort: THREE.Vector3; achse: THREE.Vector3 } | null = null;
   private druckAlter = Infinity;
@@ -474,16 +451,16 @@ export class CarComposite {
   }
   /**
    * Netze, deren Eckpunkte sich bewegen: `base` die Form ab Werk, `stoss` die
-   * Beulen aus Aufprall und Biss (kumulativ, gedeckelt), `blech` was die
-   * eingedrueckten Bleche mitnehmen (E-124, aus `eindruck` neu gerechnet).
-   * `beult` = falsch fuer die Scheiben: Sie folgen den Blechen, damit sie auf
-   * dem Dach liegen bleiben, beulen aber nicht selbst.
+   * Beulen aus Aufprall und Biss (kumulativ, gedeckelt), `knautsch` was das
+   * Knautschen verschiebt (E-128, aus dem Knautschfeld neu gerechnet).
+   * `beult` = falsch fuer Scheiben und Anbauteile: Sie knautschen mit, damit
+   * sie am Blech bleiben, beulen aber nicht selbst.
    */
   private dentables: {
     mesh: THREE.Mesh;
     base: Float32Array;
     stoss: Float32Array;
-    blech: Float32Array;
+    knautsch: Float32Array;
     beult: boolean;
   }[] = [];
   /** Die Karosserieform dieses Wracks; `null` = Bestand, zwei Quader (E-116). */
@@ -500,8 +477,10 @@ export class CarComposite {
     readonly formId: WrackformId = VORGABE_FORM
   ) {
     this.form = wrackform(formId);
-    this.bleche = this.form?.bleche ?? null;
-    this.eindruck = (this.bleche ?? []).map(() => 0);
+    // Hohl ist nur, was auch knautschen kann: Die Quader folgen der Knautschrechnung.
+    const hohl = this.form?.bleche && this.form.knautsch ? this.form : null;
+    this.bleche = hohl?.bleche ?? null;
+    this.knautsch = hohl?.knautsch ?? null;
     this.def = def = wrackDaten(def, formId);
     this.currentMassKg = def.totalMassKg;
     this.buildMeshes(wrackLack(pos.x, pos.z));
@@ -537,19 +516,49 @@ export class CarComposite {
     return this.kollider.length;
   }
 
-  /** Wie weit jedes Blech eingedrueckt ist, mit Namen (fuer Messung und Waechter). */
-  get eindrueckung(): { name: string; m: number; max: number }[] {
-    return (this.bleche ?? []).map((b, i) => ({ name: b.name, m: this.eindruck[i]!, max: b.max }));
+  /**
+   * Wie weit das Wrack im Ganzen zusammengeknautscht ist, 0 heil … 1 flach
+   * (E-128): der Mittelwert des Knautschfelds. Beim Quader (Bestand, A, B)
+   * die Quetschstufe als Anteil.
+   */
+  get knautschgrad(): number {
+    if (!this.knautsch) return this.crushStage / 2;
+    let s = 0;
+    for (const h of this.feld) s += h;
+    return s / this.feld.length;
   }
 
+  /** Wie weit das Wrack an dieser Stelle zusammengeknautscht ist, 0…1 (Wrack-lokal, m). */
+  knautschBei(x: number, z: number): number {
+    const nx = FELD_X.length;
+    const fz = THREE.MathUtils.clamp((z + 2) / FELD_DZ, 0, FELD_NZ - 1);
+    const fx = THREE.MathUtils.clamp(((x - FELD_X[0]!) / (FELD_X[nx - 1]! - FELD_X[0]!)) * (nx - 1), 0, nx - 1);
+    const z0 = Math.min(Math.floor(fz), FELD_NZ - 2);
+    const x0 = Math.min(Math.floor(fx), nx - 2);
+    const tz = fz - z0;
+    const tx = fx - x0;
+    const h = (iz: number, ix: number): number => this.feld[iz * nx + ix]!;
+    return (
+      (h(z0, x0) * (1 - tx) + h(z0, x0 + 1) * tx) * (1 - tz) +
+      (h(z0 + 1, x0) * (1 - tx) + h(z0 + 1, x0 + 1) * tx) * tz
+    );
+  }
+
+  /**
+   * Wie hoch das Wrack im Ganzen noch ist, als Anteil — fuer Schwerpunkt und
+   * Traegheit. Beim Quader die Quetschstufe; beim Hohlkoerper die Hoehe des
+   * alten Quaders (`colliderHalf`) durch dieselbe Knautschrechnung.
+   */
   private get skala(): number {
-    return this.def.crushScales[this.crushStage];
+    if (!this.knautsch) return this.def.crushScales[this.crushStage];
+    const h0 = 2 * this.def.colliderHalf[1];
+    return knautschHoehe(this.knautsch, h0, this.knautschgrad) / h0;
   }
 
-  /** Kollider fuer die aktuelle Quetschstufe anlegen. */
+  /** Kollider fuer den aktuellen Zustand anlegen. */
   private legeKolliderAn(): void {
-    const s = this.skala;
     if (!this.bleche) {
+      const s = this.skala;
       const [hx, hy, hz] = this.def.colliderHalf;
       this.kollider = [
         this.world.createCollider(
@@ -564,8 +573,8 @@ export class CarComposite {
     this.kollider = this.bleche.map((_, i) => {
       const { mitte, halb } = this.blechQuader(i);
       return this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(halb[0]!, halb[1]! * s, halb[2]!)
-          .setTranslation(mitte[0]!, mitte[1]! * s, mitte[2]!)
+        RAPIER.ColliderDesc.cuboid(halb[0]!, halb[1]!, halb[2]!)
+          .setTranslation(mitte[0]!, mitte[1]!, mitte[2]!)
           .setDensity(0),
         this.body
       );
@@ -574,7 +583,7 @@ export class CarComposite {
   }
 
   /**
-   * Kollider an Quetschstufe und Eindrueckung anpassen.
+   * Kollider dem Zustand nachfuehren.
    *
    * Der Quader wird getauscht wie bisher. Die Bleche werden AN ORT UND STELLE
    * umgeformt statt neu angelegt: So bleibt Kollider 0 der Boden, und die
@@ -586,11 +595,10 @@ export class CarComposite {
       this.legeKolliderAn();
       return;
     }
-    const s = this.skala;
     this.kollider.forEach((c, i) => {
       const { mitte, halb } = this.blechQuader(i);
-      c.setHalfExtents({ x: halb[0]!, y: halb[1]! * s, z: halb[2]! });
-      c.setTranslationWrtParent({ x: mitte[0]!, y: mitte[1]! * s, z: mitte[2]! });
+      c.setHalfExtents({ x: halb[0]!, y: halb[1]!, z: halb[2]! });
+      c.setTranslationWrtParent({ x: mitte[0]!, y: mitte[1]!, z: mitte[2]! });
     });
     this.masseSetzen();
     this.body.wakeUp();
@@ -605,6 +613,7 @@ export class CarComposite {
    * genau die Masseeigenschaften des alten Quaders `colliderHalf`: Masse,
    * Schwerpunkt auf `colliderYOffset`, Traegheit m/12 · (b² + c²). Werfen und
    * Fallen bleiben, wie sie waren — hohl ist das Wrack nur fuer die Schalen.
+   * Knautscht es zusammen, sinkt der Schwerpunkt mit (`skala`).
    */
   private masseSetzen(): void {
     if (!this.bleche) {
@@ -619,105 +628,90 @@ export class CarComposite {
     const c = 2 * hz;
     this.kollider[0]!.setMassProperties(
       m,
-      // Schwerpunkt im Rahmen des Bodens, der selbst auf mitte[1] · s sitzt
-      { x: 0, y: (this.def.colliderYOffset - this.bleche[0]!.mitte[1]) * s, z: 0 },
+      // Schwerpunkt im Rahmen des Bodens; der Boden ist starr und sitzt auf mitte[1]
+      { x: 0, y: this.def.colliderYOffset * s - this.bleche[0]!.mitte[1], z: 0 },
       { x: (m / 12) * (b * b + c * c), y: (m / 12) * (a * a + c * c), z: (m / 12) * (a * a + b * b) },
       { x: 0, y: 0, z: 0, w: 1 }
     );
   }
 
   /**
-   * Ein Blech, wie es nach der Eindrueckung liegt (ungequetscht).
-   *
-   * Die Aussenflaeche wandert um `eindruck` nach innen. Die Innenflaeche
-   * bleibt stehen, bis das Blech `MIN_DICKE` hat — ein dicker Block wird also
-   * gestaucht, eine Platte wandert.
+   * Ein Blech, wie es nach dem Knautschen liegt (E-128): Grundriss wie ab
+   * Werk. Die Oberkante ist das Mittel aus 15 Punkten seiner Deckflaeche, jeder
+   * durch `knautschPunkt` geschickt — DIESELBE Rechnung wie die Haut, samt
+   * Mulde und Wellen. Die Unterkante geht durch `knautschHoehe`. Duenner als
+   * `MIN_DICKE` wird es nicht; dann ragt es nach unten in die Zelle.
    */
   private blechQuader(i: number): { mitte: number[]; halb: number[] } {
     const b = this.bleche![i]!;
-    const { k, sg } = ACHSE[b.nach];
-    const mitte = [...b.mitte];
-    const halb = [...b.halb];
-    const aussen = mitte[k]! - sg * halb[k]!;
-    const innen = mitte[k]! + sg * halb[k]!;
-    const aussenNeu = aussen + sg * this.eindruck[i]!;
-    const innenNeu =
-      sg > 0 ? Math.max(innen, aussenNeu + MIN_DICKE) : Math.min(innen, aussenNeu - MIN_DICKE);
-    mitte[k] = (aussenNeu + innenNeu) / 2;
-    halb[k] = Math.abs(innenNeu - aussenNeu) / 2;
-    return { mitte, halb };
+    const p = this.blechPunkt;
+    let h = 0;
+    let oben = 0;
+    for (const fx of [-1, 0, 1]) {
+      for (const fz of [-1, -0.5, 0, 0.5, 1]) {
+        const x = b.mitte[0] + fx * b.halb[0];
+        const z = b.mitte[2] + fz * b.halb[2];
+        const hier = this.knautschBei(x, z);
+        h += hier / 15;
+        oben += knautschPunkt(this.form!, x, b.mitte[1] + b.halb[1], z, hier, p).y / 15;
+      }
+    }
+    const unten = Math.min(knautschHoehe(this.knautsch!, b.mitte[1] - b.halb[1], h), oben - MIN_DICKE);
+    return {
+      mitte: [b.mitte[0], (oben + unten) / 2, b.mitte[2]],
+      halb: [b.halb[0], (oben - unten) / 2, b.halb[2]],
+    };
   }
 
   /**
-   * Wie stark ein Eckpunkt der Haut einem Blech folgt, 0…1.
-   *
-   * Quer zur Druckrichtung: voll ueber dem Blech, auslaufend bis `HAUT_RAND`
-   * daneben. In Druckrichtung: voll bis `voll` hinter der Aussenflaeche, dann
-   * auslaufend bis `fuss`. Beim Dach heisst das: Dachkante und Dach gehen
-   * ganz mit, der Scheibenrahmen zum Teil, die Guertellinie gar nicht.
+   * Haut, Scheiben und Anbauteile neu stellen: Form ab Werk + Knautschen
+   * (`knautschPunkt`, je Eckpunkt mit dem Knautschgrad an seiner Stelle) +
+   * Beulen aus Aufprall.
    */
-  private blechGewicht(i: number, x: number, y: number, z: number): number {
-    const b = this.bleche![i]!;
-    const { k, sg } = ACHSE[b.nach];
-    const v = [x, y, z];
-    const t = sg * (v[k]! - (b.mitte[k]! - sg * b.halb[k]!));
-    const wn = t <= b.voll ? 1 : t >= b.fuss ? 0 : (b.fuss - t) / (b.fuss - b.voll);
-    if (wn <= 0) return 0;
-    let quer = 0;
-    for (let j = 0; j < 3; j++) {
-      if (j === k) continue;
-      const d = Math.max(0, Math.abs(v[j]! - b.mitte[j]!) - b.halb[j]!);
-      quer += d * d;
-    }
-    return wn * Math.max(0, 1 - Math.sqrt(quer) / HAUT_RAND);
-  }
-
-  /** Haut und Scheiben neu stellen: Form ab Werk + Beulen + Bleche. */
   private hautNachfuehren(): void {
+    const form = this.form!;
+    const p = new THREE.Vector3();
     for (const d of this.dentables) {
       const attr = d.mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
-      d.blech.fill(0);
+      const m = d.mesh.position;
       for (let i = 0; i < attr.count; i++) {
         const bi = i * 3;
-        const x = d.base[bi]! + d.mesh.position.x;
-        const y = d.base[bi + 1]! + d.mesh.position.y;
-        const z = d.base[bi + 2]! + d.mesh.position.z;
-        for (let p = 0; p < this.eindruck.length; p++) {
-          const e = this.eindruck[p]!;
-          if (e <= 0) continue;
-          const w = this.blechGewicht(p, x, y, z);
-          if (w <= 0) continue;
-          const { k, sg } = ACHSE[this.bleche![p]!.nach];
-          d.blech[bi + k] += sg * e * w * (1 + KNITTER * rauschen(i));
-        }
+        const x = d.base[bi]! + m.x;
+        const y = d.base[bi + 1]! + m.y;
+        const z = d.base[bi + 2]! + m.z;
+        knautschPunkt(form, x, y, z, this.knautschBei(x, z), p);
+        d.knautsch[bi] = p.x - x;
+        d.knautsch[bi + 1] = p.y - y;
+        d.knautsch[bi + 2] = p.z - z;
         attr.setXYZ(
           i,
-          d.base[bi]! + d.stoss[bi]! + d.blech[bi]!,
-          d.base[bi + 1]! + d.stoss[bi + 1]! + d.blech[bi + 1]!,
-          d.base[bi + 2]! + d.stoss[bi + 2]! + d.blech[bi + 2]!
+          d.base[bi]! + d.stoss[bi]! + d.knautsch[bi]!,
+          d.base[bi + 1]! + d.stoss[bi + 1]! + d.knautsch[bi + 1]!,
+          d.base[bi + 2]! + d.stoss[bi + 2]! + d.knautsch[bi + 2]!
         );
       }
       attr.needsUpdate = true;
-      if (this.form?.glatt) d.mesh.geometry.computeVertexNormals();
+      // Die Karosserie wird kantig (siehe `lackStoff`), die Scheiben brauchen ihre Normalen.
+      if (d.beult) d.mesh.material = lackStoff(form, this.formId, true);
+      else d.mesh.geometry.computeVertexNormals();
     }
   }
 
-  /** Weltpunkt → Wrack-lokal, ungequetscht. */
+  /** Weltpunkt → Wrack-lokal. */
   private lokal(welt: { x: number; y: number; z: number }): THREE.Vector3 {
     const p = this.body.translation();
     const r = this.body.rotation();
-    const v = new THREE.Vector3(welt.x - p.x, welt.y - p.y, welt.z - p.z).applyQuaternion(
+    return new THREE.Vector3(welt.x - p.x, welt.y - p.y, welt.z - p.z).applyQuaternion(
       new THREE.Quaternion(r.x, r.y, r.z, r.w).invert()
     );
-    v.y /= this.skala;
-    return v;
   }
 
-  /** Wrack-lokal, ungequetscht → Weltpunkt. */
+  /** Wrack-lokal → Weltpunkt. */
   private welt(lokal: THREE.Vector3): THREE.Vector3 {
     const p = this.body.translation();
     const r = this.body.rotation();
-    return new THREE.Vector3(lokal.x, lokal.y * this.skala, lokal.z)
+    return lokal
+      .clone()
       .applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w))
       .add(new THREE.Vector3(p.x, p.y, p.z));
   }
@@ -771,17 +765,16 @@ export class CarComposite {
     const achse = new THREE.Vector3(0, -1, 0)
       .applyQuaternion(new THREE.Quaternion(r.x, r.y, r.z, r.w))
       .applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w).invert());
-    achse.y /= this.skala;
     this.spinne = { ort: this.lokal(s.translation()), achse: achse.normalize() };
     this.druckAlter = 0;
   }
 
   /**
-   * Wo trifft ein Strahl zuerst ein Blech? (Wrack-lokal, ungequetscht)
+   * Wo trifft ein Strahl zuerst ein Blech, wie es jetzt liegt? (Wrack-lokal)
    * Schlichter Quadertest je Blech — acht Quader, keine Abfrage an Rapier.
    */
-  private strahl(o: THREE.Vector3, d: THREE.Vector3): Druckstelle | null {
-    let best: Druckstelle | null = null;
+  private strahl(o: THREE.Vector3, d: THREE.Vector3): THREE.Vector3 | null {
+    let best: THREE.Vector3 | null = null;
     let tBest = Infinity;
     const po = [o.x, o.y, o.z];
     const pd = [d.x, d.y, d.z];
@@ -803,78 +796,48 @@ export class CarComposite {
       }
       if (t0 <= t1 && t0 < tBest) {
         tBest = t0;
-        best = { blech: i, ort: o.clone().addScaledVector(d, t0) };
+        best = o.clone().addScaledVector(d, t0);
       }
     });
     return best;
   }
 
   /**
-   * Welches Blech gibt an diesem Punkt nach? Das getroffene selbst — oder,
-   * wenn es nicht nachgibt (die Bodenwanne), das naechste nachgiebige bis
-   * `HAUT_RAND` daneben. Wer auf den Schweller drueckt, drueckt die Tuer
-   * darueber ein; wer durchs Seitenfenster in den Innenraum greift
-   * (gemessen: die Spinne kommt dort 37 cm tiefer), drueckt die Tuer daneben.
-   */
-  private nachgiebig(st: Druckstelle): Druckstelle {
-    if (this.bleche![st.blech]!.max > 0) return st;
-    const p: [number, number, number] = [st.ort.x, st.ort.y, st.ort.z];
-    let naechst = HAUT_RAND;
-    let bestes = st.blech;
-    this.bleche!.forEach((b, i) => {
-      if (b.max <= 0) return;
-      const d = abstand(p, b);
-      if (d <= naechst) {
-        naechst = d;
-        bestes = i;
-      }
-    });
-    return { blech: bestes, ort: st.ort };
-  }
-
-  /**
-   * Wo ein Biss ankommt.
+   * Wo ein Biss ankommt (Wrack-lokal) — der HERD, von dem aus das Knautschen
+   * durchs Auto laeuft (E-128).
    *
    * 1. Lag die Spinne eben noch am Wrack (oder haengt es in ihr): ihre Achse
    *    entlang, das erste Blech, das sie trifft — worauf der Spieler zielt.
    *    Steht sie neben dem Wrack, drueckt sie seitlich hinein, in
-   *    `SEITEN_HOEHE` auf die Wagenmitte zu.
-   * 2. Sonst der gemeldete Ort, und zwar das naechste Blech. Der Bagger meldet
-   *    dort heute den URSPRUNG DES GETROFFENEN KOERPERS (`greifer:zugedrueckt`,
-   *    E-112), die Mitte der Unterkante — dann wird von oben gedrueckt, wie
-   *    E-114 es fuer diesen Fall festgelegt hat: aufs Dach.
+   *    `SEITEN_HOEHE` (mitgeknautscht) auf die Wagenmitte zu.
+   * 2. Sonst der gemeldete Ort. Der Bagger meldet dort heute den URSPRUNG DES
+   *    GETROFFENEN KOERPERS (`greifer:zugedrueckt`, E-112), die Mitte der
+   *    Unterkante — dann wird von oben gedrueckt, wie E-114 es fuer diesen
+   *    Fall festgelegt hat: auf die Dachmitte.
    */
-  private druckstelle(at: THREE.Vector3): Druckstelle {
+  private druckort(at: THREE.Vector3): THREE.Vector3 {
     if (this.spinne && (this.druckAlter <= DRUCK_GEDAECHTNIS || this.body.isKinematic())) {
       const { ort, achse } = this.spinne;
       const vonOben = this.strahl(ort, achse);
-      if (vonOben) return this.nachgiebig(vonOben);
-      const t = Math.abs(achse.y) > 1e-3 ? (SEITEN_HOEHE - ort.y) / achse.y : 0;
+      if (vonOben) return vonOben;
+      const hoehe = knautschHoehe(this.knautsch!, SEITEN_HOEHE, this.knautschgrad);
+      const t = Math.abs(achse.y) > 1e-3 ? (hoehe - ort.y) / achse.y : 0;
       const seitlich = ort.clone().addScaledVector(achse, Math.max(0, t));
-      seitlich.y = SEITEN_HOEHE;
-      const hin = new THREE.Vector3(0, SEITEN_HOEHE, THREE.MathUtils.clamp(seitlich.z, -1.6, 1.6))
+      seitlich.y = hoehe;
+      const hin = new THREE.Vector3(0, hoehe, THREE.MathUtils.clamp(seitlich.z, -1.6, 1.6))
         .sub(seitlich)
         .normalize();
       const vonDerSeite = this.strahl(seitlich, hin);
-      if (vonDerSeite) return this.nachgiebig(vonDerSeite);
+      if (vonDerSeite) return vonDerSeite;
     }
     const p = this.body.translation();
-    let ort = this.lokal(at);
-    if (Math.hypot(at.x - p.x, at.y - p.y, at.z - p.z) < 1e-3) {
-      let oben = 0;
-      for (const b of this.bleche!) oben = Math.max(oben, b.mitte[1] + b.halb[1]);
-      ort = new THREE.Vector3(0, oben, 0);
-    }
-    let bestes = 0;
-    let naechst = Infinity;
-    this.bleche!.forEach((b, i) => {
-      const d = abstand([ort.x, ort.y, ort.z], b);
-      if (d < naechst) {
-        naechst = d;
-        bestes = i;
-      }
+    if (Math.hypot(at.x - p.x, at.y - p.y, at.z - p.z) >= 1e-3) return this.lokal(at);
+    let oben = 0;
+    this.bleche!.forEach((_, i) => {
+      const { mitte, halb } = this.blechQuader(i);
+      oben = Math.max(oben, mitte[1]! + halb[1]!);
     });
-    return this.nachgiebig({ blech: bestes, ort });
+    return new THREE.Vector3(0, oben, 0);
   }
 
   private buildMeshes(lack: number): void {
@@ -896,7 +859,10 @@ export class CarComposite {
     if (this.form) this.baueFassung(this.form, lack, glassMat);
     else this.baueBestand(lack, glassMat);
 
-    baueAnbauteile(this.crushGroup, this.def, lack, this.form ? !!this.form.radlaufBogen : true);
+    const anbau = baueAnbauteile(this.crushGroup, this.def, lack, this.form ? !!this.form.radlaufBogen : true);
+    // Spiegel, Leuchten, Stossstangen knautschen mit der Haut (E-128), statt
+    // ueber einem flachen Wrack in der Luft zu stehen.
+    if (this.knautsch) this.beulbar(anbau, false);
 
     // Parts (nicht quetschbar): Motor + Räder
     for (const p of this.def.parts) {
@@ -978,9 +944,9 @@ export class CarComposite {
     for (const s of bau.scheiben) {
       const pane = new THREE.Mesh(s.geo, glassMat);
       this.crushGroup.add(pane);
-      // Am Hohlkoerper folgen die Scheiben den Blechen (E-124) — sonst
+      // Am Hohlkoerper knautschen die Scheiben mit (E-124/E-128) — sonst
       // schwebte das Glas ueber einem eingedrueckten Dach.
-      if (form.bleche) this.beulbar(pane, false);
+      if (this.knautsch) this.beulbar(pane, false);
       // Der Ankerpunkt ist nur für den Splitter-Partikel da: die Mitte der
       // Scheibe, hier aus ihrer eigenen Geometrie statt aus einer Zahlenliste.
       s.geo.computeBoundingSphere();
@@ -1000,7 +966,7 @@ export class CarComposite {
       mesh,
       base: new Float32Array(pos.array as Float32Array),
       stoss: new Float32Array(n),
-      blech: new Float32Array(n),
+      knautsch: new Float32Array(n),
       beult,
     });
   }
@@ -1036,7 +1002,9 @@ export class CarComposite {
       this.shatterWindows(dv > this.def.glassImpactDv * 1.6 ? 2 : 1);
     }
     if (dv > this.def.crushImpactDv && this.crushStage < 2) {
-      this.crush();
+      // Ein harter Aufprall knautscht von der Mitte aus — derselbe Weg wie ein Biss.
+      if (this.knautsch) this.knautschen(new THREE.Vector3(), dv);
+      else this.crush();
     }
   }
 
@@ -1069,7 +1037,7 @@ export class CarComposite {
       const lz = contact.z - d.mesh.position.z;
       let touched = false;
       for (let i = 0; i < attr.count; i++) {
-        // Gebeult wird die Form ohne die Bleche (E-124); die kommen danach dazu.
+        // Gebeult wird die Form ohne das Knautschen (E-128); das kommt danach dazu.
         const vx = d.base[i * 3]! + d.stoss[i * 3]!;
         const vy = d.base[i * 3 + 1]! + d.stoss[i * 3 + 1]!;
         const vz = d.base[i * 3 + 2]! + d.stoss[i * 3 + 2]!;
@@ -1094,7 +1062,7 @@ export class CarComposite {
         d.stoss[bi] = nx - d.base[bi]!;
         d.stoss[bi + 1] = ny - d.base[bi + 1]!;
         d.stoss[bi + 2] = nz - d.base[bi + 2]!;
-        attr.setXYZ(i, nx + d.blech[bi]!, ny + d.blech[bi + 1]!, nz + d.blech[bi + 2]!);
+        attr.setXYZ(i, nx + d.knautsch[bi]!, ny + d.knautsch[bi + 1]!, nz + d.knautsch[bi + 2]!);
         touched = true;
       }
       if (!touched) continue;
@@ -1124,12 +1092,17 @@ export class CarComposite {
     }
   }
 
+  /** Quader (Bestand, A, B): eine Quetschstufe tiefer, als Höhenskalierung. */
   private crush(): void {
     this.crushStage++;
-    const s = this.def.crushScales[this.crushStage];
-    this.crushGroup.scale.y = s;
-    this.shatterWindows(4); // was noch heil ist, birst spätestens jetzt
+    this.crushGroup.scale.y = this.def.crushScales[this.crushStage];
     this.kolliderNachfuehren();
+    this.stufeErreicht();
+  }
+
+  /** Was beim Erreichen einer Quetschstufe passiert — für Quader und Hohlkörper gleich. */
+  private stufeErreicht(): void {
+    this.shatterWindows(4); // was noch heil ist, birst spätestens jetzt
     const p = this.body.translation();
     this.bus.emit("crushed", { stage: this.crushStage, x: p.x, y: p.y, z: p.z });
     // Stufe 2: der Schlag drückt bis zu 2 Räder aus der Aufhängung
@@ -1148,9 +1121,84 @@ export class CarComposite {
     }
   }
 
-  /** In der Presse: sofort auf Stufe 2 quetschen (inkl. Radauswurf, Events). */
+  /**
+   * In der Presse: sofort flach (inkl. Radauswurf, Events). Beim Hohlkörper
+   * DIESELBE Knautschrechnung wie der Biss der Spinne, nur überall bis 1 —
+   * nicht eine zweite Verformung daneben (E-128).
+   */
   pressCrush(): void {
-    while (this.crushStage < 2) this.crush();
+    if (this.knautsch) this.zusammendruecken(1);
+    else while (this.crushStage < 2) this.crush();
+  }
+
+  /**
+   * Das ganze Wrack mindestens bis `ziel` zusammendrücken, 0…1 (E-128) — die
+   * Presse mit 1, die Fotorezepte mit Zwischenstufen. Nur am Hohlkörper;
+   * Bestand, A und B kennen nur `pressCrush`.
+   */
+  zusammendruecken(ziel: number): void {
+    if (!this.knautsch) return;
+    for (let j = 0; j < this.feld.length; j++) this.feld[j] = Math.max(this.feld[j]!, Math.min(1, ziel));
+    this.knautschAnwenden();
+  }
+
+  /**
+   * EIN BISS KNAUTSCHT (E-128) — und zwar das ganze Auto, vom Herd aus.
+   *
+   * Der Weg ist derselbe wie bei `dent`, min(0,2 m; 0,035 · dv), gerechnet als
+   * Anteil dessen, was die Karosserie bis flach hergibt (`knautschWeg`, bei C
+   * 0,80 m): Ein voller Biss (15,7 kN = 7 m/s) sind 0,25. Unter dem Herd voll,
+   * bis `KNAUTSCH_RADIUS` daneben auslaufend, das übrige Auto mit
+   * `KNAUTSCH_GRUND` davon. Was an einer schon flachen Stelle nicht mehr
+   * unterkommt, geht gleichmäßig in den Rest: Drückt die Spinne weiter auf ein
+   * plattes Dach, geht das Auto drumherum zusammen.
+   */
+  private knautschen(herd: THREE.Vector3, dv: number): void {
+    const zuwachs = Math.min(0.2, 0.035 * dv) / knautschWeg(this.knautsch!);
+    const nx = FELD_X.length;
+    let ueber = 0;
+    for (let iz = 0; iz < FELD_NZ; iz++) {
+      for (let ix = 0; ix < nx; ix++) {
+        const d = Math.hypot(FELD_X[ix]! - herd.x, -2 + iz * FELD_DZ - herd.z);
+        const w = KNAUTSCH_GRUND + (1 - KNAUTSCH_GRUND) * Math.max(0, 1 - d / KNAUTSCH_RADIUS);
+        const j = iz * nx + ix;
+        const h = this.feld[j]! + zuwachs * w;
+        ueber += Math.max(0, h - 1);
+        this.feld[j] = Math.min(1, h);
+      }
+    }
+    // Was nicht unterkam, verteilt sich auf den Rest — drei Runden reichen
+    for (let r = 0; r < 3 && ueber > 1e-9; r++) {
+      let offen = 0;
+      for (const h of this.feld) if (h < 1) offen++;
+      if (!offen) break;
+      const je = ueber / offen;
+      ueber = 0;
+      for (let j = 0; j < this.feld.length; j++) {
+        if (this.feld[j]! >= 1) continue;
+        const h = this.feld[j]! + je;
+        ueber += Math.max(0, h - 1);
+        this.feld[j] = Math.min(1, h);
+      }
+    }
+    this.knautschAnwenden();
+  }
+
+  /** Kollider, Haut und Quetschstufe dem Knautschfeld nachführen. */
+  private knautschAnwenden(): void {
+    if (!this.body.isValid()) return; // E-103: ein entfernter Körper zerstört sonst die Welt
+    this.kolliderNachfuehren();
+    this.hautNachfuehren();
+    /*
+     * Die Quetschstufe folgt dem Knautschgrad: 1 ab der Hälfte (SW), 2 wenn
+     * überall flach. An ihr hängen Presse, Spielstand, Challenge, Scheiben und
+     * der Radauswurf — sie alle sehen weiter dieselben drei Stufen.
+     */
+    const ziel = this.feld.every((h) => h >= 1) ? 2 : this.knautschgrad >= 0.5 ? 1 : 0;
+    while (this.crushStage < ziel) {
+      this.crushStage++;
+      this.stufeErreicht();
+    }
   }
 
   /** Part lösen → eigenständiges ScrapItem; liefert den neuen Körper. */
@@ -1239,7 +1287,13 @@ export class CarComposite {
       this.currentMassKg = Math.max(this.def.hullMassKg, this.currentMassKg - part.def.massKg);
     }
     this.crushStage = s.crushStage;
-    if (s.crushStage > 0) {
+    if (this.knautsch) {
+      // Gespeichert wird nur die Stufe (Kap. 18); sie wird gleichmäßig wieder
+      // zu dem Knautschgrad, ab dem sie gilt.
+      this.feld.fill([0, 0.5, 1][s.crushStage] ?? 0);
+      this.kolliderNachfuehren();
+      if (s.crushStage > 0) this.hautNachfuehren();
+    } else if (s.crushStage > 0) {
       this.crushGroup.scale.y = this.def.crushScales[s.crushStage];
       this.kolliderNachfuehren();
     } else {
@@ -1337,49 +1391,36 @@ export class CarComposite {
   }
 
   /**
-   * DER BISS AM HOHLKOERPER (E-124) — oertlich statt im Ganzen.
+   * DER BISS AM HOHLKOERPER — er knautscht das ganze Auto (E-128).
    *
-   * Patrick, 06.10.2026: „Autos müssen hole elemente werden, die man
-   * zerdrücken kann." Dieselben drei Schwellen wie bisher, nur mit einem Ort
-   * (`druckstelle`: das Blech, auf das die Spinne zielt):
+   * Patrick, 16.10.2026, zum zweiten Mal: „autos müssen holkörper werden" —
+   * gewählt: „Wie eine Blechdose knautschen … statt dass nur einzelne Bleche
+   * eindellen." Bis E-127 schob ein Biss EIN Blech bis zu seinem `max` ein;
+   * danach nahmen Quetschstufen das Auto als Ganzes in der Höhe zusammen.
    *
-   *  - ab der Beulschwelle (3 m/s) gibt dieses Blech um `min(0,2; 0,035 · dv)`
-   *    nach — dieselbe Menge, um die `dent` die Haut eindrueckt. Der Kollider
-   *    wandert mit; die Schalen kommen beim naechsten Mal tiefer.
+   * Jetzt dieselben drei Schwellen wie bisher, mit einem Herd (`druckort`):
+   *
+   *  - ab der Beulschwelle (3 m/s) knautscht das Auto vom Herd aus
+   *    (`knautschen`) — Glashaus zuerst, dann die Türen, und der Druck läuft
+   *    durchs ganze Auto. Kollider und Haut gehen mit.
    *  - ab der Scheibenschwelle bersten Scheiben, wie bisher.
-   *  - ab der Quetschschwelle geht heraus, was unter der Druckstelle liegt
-   *    (`findPartNear`, wie bisher, jetzt am Zielpunkt statt am
-   *    Koerperursprung). Liegt dort nichts und hat das Blech nicht mehr
-   *    nachgegeben — die Stelle ist schon ganz eingedrueckt —, gibt die
-   *    Karosse als Ganzes eine Quetschstufe nach.
-   *
-   * Erst die Stelle, dann das Ganze: Ein voller Biss aufs Dach drueckt das
-   * Dach ein, nicht das ganze Auto um ein Viertel flach.
+   *  - ab der Quetschschwelle geht zusätzlich heraus, was unter dem Herd
+   *    liegt (`findPartNear`, wie bisher) — rohe Gewalt als Sortierung
+   *    (E-114).
    */
   private beissenHohl(dv: number, at: THREE.Vector3): void {
-    const st = this.druckstelle(at);
-    let nachgegeben = false;
-    if (dv > 3) {
-      const vorher = this.eindruck[st.blech]!;
-      this.eindruck[st.blech] = Math.min(this.bleche![st.blech]!.max, vorher + Math.min(0.2, 0.035 * dv));
-      nachgegeben = this.eindruck[st.blech]! > vorher;
-      if (nachgegeben) {
-        this.kolliderNachfuehren();
-        this.hautNachfuehren();
-      }
-    }
+    const herd = this.druckort(at);
+    if (dv > 3) this.knautschen(herd, dv);
     if (dv > this.def.glassImpactDv) {
       this.shatterWindows(dv > this.def.glassImpactDv * 1.6 ? 2 : 1);
     }
     if (dv < this.def.crushImpactDv) return;
-    const ort = this.welt(st.ort);
+    const ort = this.welt(herd);
     const ziel = this.findPartNear(ort);
     if (ziel) {
       const p = this.body.translation();
       const richtung = new THREE.Vector3(p.x - ort.x, p.y - ort.y, p.z - ort.z);
       ziel.tear().applyImpulse({ x: richtung.x * -40, y: 40, z: richtung.z * -40 }, true);
-    } else if (!nachgegeben && this.crushStage < 2) {
-      this.crush();
     }
   }
 

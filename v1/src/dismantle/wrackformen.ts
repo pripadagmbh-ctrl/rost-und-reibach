@@ -224,37 +224,255 @@ export interface WrackformDef {
    * EINES Klotzes. Fehlt die Liste, bleibt das Wrack der Quader aus
    * `CarDef.colliderHalf` (Bestand, A, B). Der ERSTE Eintrag ist der Boden: Er
    * trägt die Masse. Der Bagger fragt beim Zufassen alle Kollider (E-127).
+   * Eine Fassung mit `bleche` braucht `knautsch` — danach gehen die Quader in
+   * der Höhe mit (E-128).
    */
   bleche?: BlechDef[];
+  /** Wie die Karosserie zusammenknautscht (E-128). */
+  knautsch?: KnautschDef;
 }
 
-/** Achse und Richtung, in die ein Blech eingedrückt wird. */
-export type Druckrichtung = "-y" | "+x" | "-x" | "+z" | "-z";
-
 /**
- * EIN STÜCK HOHLKÖRPER (E-124) — ein Quader im Verbund, der dort nachgibt, wo
- * die Spinne drückt.
- *
- * Gedrückt wird immer die AUSSENFLÄCHE in Richtung `nach`. Ein dickes Stück
- * (Vorderwagen, Heck) wird dabei gestaucht, bis es `MIN_DICKE` hat; ein dünnes
- * (Dach, Tür) wandert als Platte nach innen. Die Haut folgt demselben Maß:
- * bis `voll` hinter der Außenfläche ganz, bis `fuss` auslaufend, dahinter gar
- * nicht — damit die Schalen genau dort anstehen, wo man das Blech sieht.
- *
- * Alle Maße in m, Wrack-lokal (Ursprung Mitte Unterkante, +z Schnauze), am
- * ungequetschten Wrack.
+ * EIN STÜCK HOHLKÖRPER (E-124) — ein Quader im Verbund. Seit E-128 gibt er
+ * nicht mehr einzeln nach, sondern folgt in der Höhe derselben Knautschrechnung
+ * wie die Haut (`knautschHoehe`). Maße in m, Wrack-lokal (Ursprung Mitte
+ * Unterkante, +z Schnauze), am heilen Wrack.
  */
 export interface BlechDef {
   name: string;
   mitte: [number, number, number];
   halb: [number, number, number];
-  nach: Druckrichtung;
-  /** Wie weit es höchstens nachgibt (0 = gar nicht, der Boden). */
-  max: number;
-  /** Bis zu dieser Tiefe hinter der Außenfläche geht die Haut voll mit. */
+}
+
+/**
+ * EINE KNAUTSCHZONE (E-128) — ein Höhenband der Karosserie, das als Ganzes
+ * zusammengeht und dabei EINE Falte wirft.
+ *
+ * Wie eine Blechdose unter dem Stiefel: Die Wand wird nicht gleichmäßig
+ * kürzer, sie knickt. Das Blech behält seine Länge; was in der Höhe fehlt,
+ * steht als Falte zur Seite heraus (`nach` +1) oder knickt hinein (−1), und
+ * zwar am Knick, an dem ein Ring der Haut liegt.
+ *
+ * `ab` und `voll` sagen, in welcher Reihenfolge die Zonen nachgeben: Der
+ * örtliche Knautschgrad h (0 heil … 1 flach) muss erst `ab` überschreiten,
+ * bevor diese Zone sich rührt, und bei `voll` ist sie auf `rest`
+ * zusammengelegt. Darunter (unter dem `von` der ersten Zone) ist alles starr.
+ */
+export interface KnautschZone {
+  name: string;
+  /** Unterkante und Oberkante des Bandes am heilen Wrack, m */
+  von: number;
+  bis: number;
+  /** Höhe, auf die das Band ganz zusammengelegt wird, m */
+  rest: number;
+  /** Knautschgrad, ab dem das Band nachgibt und bei dem es flach ist */
+  ab: number;
   voll: number;
-  /** Ab dieser Tiefe geht die Haut gar nicht mehr mit. */
-  fuss: number;
+  /** Höhe des Knicks, m — dort muss ein Ring der Haut liegen */
+  knick: number;
+  /** +1 die Falte steht nach außen, −1 sie knickt nach innen */
+  nach: 1 | -1;
+}
+
+export interface KnautschDef {
+  /** Von unten nach oben, lückenlos: `bis` einer Zone ist `von` der nächsten. */
+  zonen: KnautschZone[];
+}
+
+/**
+ * Wie weit eine Falte zur Seite steht, als Anteil dessen, was die Blechlänge
+ * erzwingen würde (½·√(L² − l²)). Ganz ausgeschöpft stünden die Säulen 24 cm
+ * heraus — über die Spiegel hinaus. // SW
+ */
+const FALTE = 0.75;
+/** Längs gesehen läuft eine Falte nicht gerade: ihre Tiefe schwankt mit dieser Wellenlänge, m. // SW */
+const FALTE_WELLE = 0.9;
+/** Haube, Dach und Klappe werfen beim Knautschen Wellen: so hoch, m … // SW */
+const DECKEL_HUB = 0.05;
+/** … in diesem Abstand, m. // SW */
+const DECKEL_WELLE = 0.7;
+/**
+ * Der Deckel gibt in der Mitte mehr nach als an den Kanten, wo die Säulen und
+ * Kotflügel ihn halten: so viel tiefer in der Mitte, m — der Abdruck des
+ * Stiefels. // SW
+ */
+const DECKEL_MULDE = 0.06;
+/** Was so weit unter der Oberkante seines Querschnitts liegt, gehört zum Deckel, m. // SW */
+const DECKEL_TIEFE = 0.15;
+/**
+ * Nur Flanken falten sich zur Seite, nicht die Mitte von Haube und Dach:
+ * voll ab diesem Anteil der halben Breite, gar nicht unter `SEITE_AB`. // SW
+ */
+const SEITE_AB = 0.53;
+const SEITE_VOLL = 0.88;
+/**
+ * Wie uneben eine Falte wird: Ihre Tiefe schwankt von Ort zu Ort um bis zu
+ * diesen Anteil. // SW
+ */
+const KNITTER = 0.5;
+/**
+ * Wie weit ein ganz zusammengelegtes Stück Blech in alle Richtungen
+ * zerknüllt, m. Ohne das liegen die Falten als gerade Linien da — wie
+ * gezogen, nicht wie gedrückt. // SW
+ */
+const KNUELL = 0.05;
+/** Wie groß eine Knülle ist, m — etwa der Abstand zweier Querschnitte. // SW */
+const KNUELL_ZELLE = 0.3;
+
+/**
+ * Ein glattes Rauschen über den ORT, −1…1, Kanal `k` (0, 1, 2).
+ *
+ * Über den Ort und nicht je Eckpunkt-Nummer, und das ist Absicht: Haut,
+ * Scheiben und Anbauteile sind drei Netze mit eigener Zählung. Liegen zwei
+ * ihrer Eckpunkte 12 mm auseinander (die Scheibe über dem Blech), bekommen sie
+ * so fast denselben Wert und knüllen zusammen, statt auseinanderzulaufen.
+ * Fest, nicht gewürfelt — am Zufallsstrom der anderen Wächter ändert sich
+ * nichts (Regel aus E-124).
+ */
+function rauschen(x: number, y: number, z: number, k: number): number {
+  const fx = x / KNUELL_ZELLE;
+  const fy = y / KNUELL_ZELLE;
+  const fz = z / KNUELL_ZELLE;
+  const ix = Math.floor(fx);
+  const iy = Math.floor(fy);
+  const iz = Math.floor(fz);
+  const tx = glatt(fx - ix);
+  const ty = glatt(fy - iy);
+  const tz = glatt(fz - iz);
+  return mische(
+    mische(mische(gitter(ix, iy, iz, k), gitter(ix + 1, iy, iz, k), tx), mische(gitter(ix, iy + 1, iz, k), gitter(ix + 1, iy + 1, iz, k), tx), ty),
+    mische(mische(gitter(ix, iy, iz + 1, k), gitter(ix + 1, iy, iz + 1, k), tx), mische(gitter(ix, iy + 1, iz + 1, k), gitter(ix + 1, iy + 1, iz + 1, k), tx), ty),
+    tz
+  );
+}
+const glatt = (t: number): number => t * t * (3 - 2 * t);
+const mische = (a: number, b: number, t: number): number => a + (b - a) * t;
+/** Fester Wert −1…1 je Gitterpunkt und Kanal. */
+function gitter(a: number, b: number, c: number, k: number): number {
+  let h = Math.imul(a, 374761393) ^ Math.imul(b, 668265263) ^ Math.imul(c, 2147483647) ^ Math.imul(k + 1, 2654435761);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 2147483647.5 - 1;
+}
+
+const zuEins = (v: number): number => Math.min(1, Math.max(0, v));
+
+/** Wie weit eine Zone bei Knautschgrad h zusammengelegt ist, 0…1. */
+function zonenGrad(z: KnautschZone, h: number): number {
+  return zuEins((h - z.ab) / (z.voll - z.ab));
+}
+
+/**
+ * DIE HÖHE NACH DEM KNAUTSCHEN — für Haut UND Kollider (E-128).
+ *
+ * Eine Stelle, die heil auf Höhe `y` liegt, liegt bei Knautschgrad `h` hier.
+ * Jede Zone wird für sich auf ihre neue Höhe gestaucht, und was darüber liegt,
+ * rückt um genau so viel nach unten. Damit ist die Rechnung monoton: Keine
+ * Ebene der Haut kann durch eine andere hindurchrutschen.
+ */
+export function knautschHoehe(k: KnautschDef, y: number, h: number): number {
+  let neu = k.zonen[0]!.von;
+  if (y <= neu) return y;
+  for (const z of k.zonen) {
+    const p = zonenGrad(z, h);
+    const hoehe = (z.bis - z.von) * (1 - p) + z.rest * p;
+    if (y <= z.bis) return neu + ((y - z.von) / (z.bis - z.von)) * hoehe;
+    neu += hoehe;
+  }
+  return neu + (y - k.zonen[k.zonen.length - 1]!.bis);
+}
+
+/** Wie weit die Oberkante herunterkommt, wenn alles flach ist, m — der Weg, den ein Biss zurücklegt. */
+export function knautschWeg(k: KnautschDef): number {
+  return k.zonen.reduce((s, z) => s + (z.bis - z.von - z.rest), 0);
+}
+
+/**
+ * Die Oberkante der Haut bei Längslage z (m, heil): die höchste Ebene der
+ * beiden Querschnitte daneben, dazwischen gemischt. Darunter liegt der
+ * „Deckel" — Haube, Dach, Klappe.
+ */
+export function oberkanteBei(form: WrackformDef, z: number): number {
+  let oben = OBERKANTEN.get(form);
+  if (!oben) OBERKANTEN.set(form, (oben = form.schnitte.map((s) => Math.max(...(s.y ?? form.ebenen)))));
+  const S = form.schnitte;
+  const hl = form.laenge / 2;
+  if (z >= S[0]!.z * hl) return oben[0]!;
+  for (let i = 0; i + 1 < S.length; i++) {
+    const a = S[i]!.z * hl;
+    const b = S[i + 1]!.z * hl;
+    if (z <= a && z >= b) {
+      const t = a === b ? 0 : (a - z) / (a - b);
+      return oben[i]! * (1 - t) + oben[i + 1]! * t;
+    }
+  }
+  return oben[S.length - 1]!;
+}
+/** Höchste Ebene je Querschnitt, einmal je Fassung gerechnet (wird je Eckpunkt und Biss gefragt). */
+const OBERKANTEN = new WeakMap<WrackformDef, number[]>();
+
+/**
+ * DIE KNAUTSCHFUNKTION (E-128) — EIN Punkt der Haut bei Knautschgrad h.
+ *
+ * Patrick, 16.10.2026: „autos müssen holkörper werden" — gewählt: „Wie eine
+ * Blechdose knautschen — beim Zudrücken faltet und knickt das ganze Auto
+ * zusammen, Dach und Flanken klappen ein, statt dass nur einzelne Bleche
+ * eindellen."
+ *
+ * Vier Bewegungen, alle aus derselben Zahl h:
+ *  1. die Höhe (`knautschHoehe`) — Glashaus zuerst, dann die Türen, zuletzt
+ *     Schweller und Sicke;
+ *  2. die Falte — in jeder Zone steht das Blech am Knick so weit zur Seite,
+ *     wie die verlorene Höhe es erzwingt: Säulen heraus, Türen hinein, Sicke
+ *     heraus; längs schwankt die Tiefe, damit es nach Blech aussieht und
+ *     nicht nach einer gezogenen Linie;
+ *  3. der Deckel — Haube, Dach und Klappe werfen Wellen quer zur Fahrtrichtung
+ *     und geben in der Mitte nach, zwischen den Kanten, die sie halten;
+ *  4. das Knüllen — was zusammengelegt ist, verrutscht ein Stück in alle
+ *     Richtungen, so weit, wie es schon zusammengelegt ist.
+ *
+ * Dieselbe Funktion gilt für Karosserie, Scheiben und Anbauteile, für den Biss
+ * der Spinne und für die Presse. Ergebnis nach `out`, Wrack-lokal.
+ */
+export function knautschPunkt(
+  form: WrackformDef,
+  x: number,
+  y: number,
+  z: number,
+  h: number,
+  out: THREE.Vector3
+): THREE.Vector3 {
+  const k = form.knautsch!;
+  out.set(x, knautschHoehe(k, y, h), z);
+  if (h <= 0) return out;
+  const i = k.zonen.findIndex((zo) => y > zo.von && y <= zo.bis);
+  if (i < 0) return out;
+  const zo = k.zonen[i]!;
+  const p = zonenGrad(zo, h);
+  if (p <= 0) return out;
+  const r0 = rauschen(x, y, z, 0);
+  const r1 = rauschen(x, y, z, 1);
+  const r2 = rauschen(x, y, z, 2);
+  const knitter = 1 + KNITTER * r0;
+  const seite = zuEins((Math.abs(x) / (form.breite / 2) - SEITE_AB) / (SEITE_VOLL - SEITE_AB));
+  if (seite > 0) {
+    const L = zo.bis - zo.von;
+    const l = L * (1 - p) + zo.rest * p;
+    const tiefe = 0.5 * Math.sqrt(L * L - l * l) * FALTE;
+    const amKnick = y < zo.knick ? (y - zo.von) / (zo.knick - zo.von) : (zo.bis - y) / (zo.bis - zo.knick);
+    const laengs = 0.6 + 0.4 * Math.sin((z * 2 * Math.PI) / FALTE_WELLE + i * 2.1);
+    out.x += Math.sign(x) * zo.nach * tiefe * amKnick * seite * laengs * knitter;
+  }
+  // Der Deckel wellt sich mit der Zone, in der er liegt
+  const deckel = zuEins(1 - (oberkanteBei(form, z) - y) / DECKEL_TIEFE);
+  if (deckel > 0) {
+    const quer = 1 - Math.min(1, (x / (form.breite / 2)) ** 2);
+    out.y += p * deckel * (DECKEL_HUB * Math.sin((z * 2 * Math.PI) / DECKEL_WELLE) * knitter - DECKEL_MULDE * quer);
+  }
+  // Knüllen: in der Höhe nur halb, sonst stäche ein Deckel über den Kollider
+  out.x += KNUELL * p * r1;
+  out.y += 0.5 * KNUELL * p * r2;
+  out.z += KNUELL * p * r0;
+  return out;
 }
 
 /**
@@ -533,7 +751,15 @@ export const FORM_B: WrackformDef = {
 /* ------------------------------------------------------------------------- */
 
 /**
- * SIEBEN Ebenen und siebzehn Querschnitte, glatt schattiert.
+ * NEUN Ebenen und achtzehn Querschnitte, glatt schattiert.
+ *
+ * Bis E-128 waren es sieben und siebzehn. Die zwei Ebenen „Türmitte" (0,75 m)
+ * und „Säule" (1,11 m) und der Querschnitt „B-Säule" liegen genau auf halbem
+ * Weg zwischen ihren Nachbarn — an der Form ändern sie nichts. Sie sind da,
+ * damit die Karosserie knicken kann: Gemessen lag zwischen Gürtellinie und
+ * Dachkante (38 cm) und auf der Tür über der Sicke (34 cm) kein einziger
+ * Eckpunkt, und das Dach hatte auf 60 cm Länge keinen Querschnitt. Wo kein
+ * Eckpunkt ist, kann kein Blech falten.
  *
  * Die zwei zusätzlichen Ebenen sind eine SICKE: Ebene 2 ist die breiteste
  * Stelle (0,46 m Höhe), Ebene 3 zieht sich 4 cm zurück (0,58 m), Ebene 4 ist
@@ -557,38 +783,39 @@ export const FORM_C: WrackformDef = {
     "Bauteilen, gewölbte Scheiben — so echt, wie das Netzbudget erlaubt.",
   breite: 1.7,
   laenge: 4.0,
-  ebenen: [0.2, 0.32, 0.46, 0.58, 0.92, 1.3, 1.42],
+  ebenen: [0.2, 0.32, 0.46, 0.58, 0.75, 0.92, 1.11, 1.3, 1.42],
   anbau: ANBAU_E116,
   glatt: true,
   fugeDunkel: 0.45,
   schnitte: [
-    { name: "Nase", z: 1.0, b: [0.56, 0.68, 0.76, 0.74, 0.72, 0.5, 0.25], y: [0.26, 0.36, 0.48, 0.58, 0.74, 0.76, 0.78] },
-    { name: "Stoßfänger", z: 0.945, b: [0.72, 0.84, 0.9, 0.88, 0.88, 0.64, 0.32], y: [0.22, 0.34, 0.46, 0.58, 0.8, 0.82, 0.83] },
-    { name: "Haube vorn", z: 0.88, b: [0.8, 0.92, 0.97, 0.94, 0.94, 0.7, 0.35], y: [0.2, 0.32, 0.46, 0.58, 0.84, 0.85, 0.86] },
-    { name: "Radlauf vorn, Kante", z: 0.8, b: [0.82, 0.94, 1.0, 0.96, 0.97, 0.72, 0.36], y: [0.3, 0.4, 0.5, 0.6, 0.86, 0.87, 0.87] },
-    // Reifenoberkante 0,66 m, der Bogen läuft 4 cm darüber; die vier unteren
-    // Ebenen steigen gemeinsam, damit der Querschnitt nicht umschlägt.
-    { name: "Radmitte vorn", z: 0.625, b: [0.82, 0.94, 1.0, 0.96, 0.98, 0.73, 0.36], y: [0.7, 0.74, 0.78, 0.82, 0.87, 0.88, 0.88] },
-    { name: "Radlauf vorn, hinten", z: 0.45, b: [0.82, 0.94, 1.0, 0.96, 0.98, 0.74, 0.37], y: [0.3, 0.4, 0.5, 0.6, 0.88, 0.89, 0.89] },
-    { name: "Fuge Haube, vorn", z: 0.4, b: [0.82, 0.94, 1.0, 0.96, 0.98, 0.74, 0.37], y: [0.2, 0.32, 0.46, 0.58, 0.88, 0.89, 0.89], fuge: true },
-    { name: "Fuge Haube, hinten", z: 0.385, b: [0.82, 0.94, 1.0, 0.96, 0.98, 0.74, 0.37], y: [0.2, 0.32, 0.46, 0.58, 0.89, 0.9, 0.9], fuge: true },
-    { name: "Windschutz Mitte", z: 0.27, b: [0.83, 0.95, 1.0, 0.96, 0.99, 0.76, 0.48], y: [0.2, 0.32, 0.46, 0.58, 0.9, 1.06, 1.14] },
-    { name: "Dach vorn", z: 0.12, b: [0.83, 0.95, 1.0, 0.96, 1.0, 0.79, 0.6], y: [0.2, 0.32, 0.46, 0.58, 0.92, 1.3, 1.42] },
-    { name: "Dach hinten", z: -0.18, b: [0.83, 0.95, 1.0, 0.96, 1.0, 0.79, 0.6], y: [0.2, 0.32, 0.46, 0.58, 0.92, 1.3, 1.42] },
-    { name: "Heckscheibe Mitte", z: -0.42, b: [0.82, 0.94, 1.0, 0.96, 0.99, 0.76, 0.52], y: [0.2, 0.32, 0.46, 0.58, 0.92, 1.14, 1.24] },
-    { name: "Fuge Klappe, vorn", z: -0.52, b: [0.82, 0.94, 0.99, 0.95, 0.98, 0.74, 0.4], y: [0.3, 0.4, 0.5, 0.6, 0.94, 0.99, 1.0], fuge: true },
-    { name: "Fuge Klappe, hinten", z: -0.535, b: [0.82, 0.94, 0.99, 0.95, 0.98, 0.74, 0.4], y: [0.3, 0.4, 0.5, 0.6, 0.94, 0.98, 0.99], fuge: true },
-    { name: "Radmitte hinten", z: -0.625, b: [0.82, 0.94, 0.99, 0.95, 0.98, 0.74, 0.39], y: [0.7, 0.74, 0.78, 0.82, 0.94, 0.97, 0.98] },
-    { name: "Radlauf hinten, Kante", z: -0.82, b: [0.8, 0.92, 0.97, 0.93, 0.96, 0.72, 0.37], y: [0.3, 0.4, 0.5, 0.6, 0.93, 0.95, 0.96] },
-    { name: "Heck", z: -1.0, b: [0.62, 0.74, 0.82, 0.8, 0.8, 0.56, 0.28], y: [0.26, 0.36, 0.48, 0.58, 0.88, 0.9, 0.9] },
+    // z           Schweller Flanke Sicke  Sicke  Türmitte Gürtel Säule  Dachkante Dachmitte
+    { name: "Nase", z: 1, b: [0.56, 0.68, 0.76, 0.74, 0.73, 0.72, 0.61, 0.5, 0.25], y: [0.26, 0.36, 0.48, 0.58, 0.66, 0.74, 0.75, 0.76, 0.78] },
+    { name: "Stoßfänger", z: 0.945, b: [0.72, 0.84, 0.9, 0.88, 0.88, 0.88, 0.76, 0.64, 0.32], y: [0.22, 0.34, 0.46, 0.58, 0.69, 0.8, 0.81, 0.82, 0.83] },
+    { name: "Haube vorn", z: 0.88, b: [0.8, 0.92, 0.97, 0.94, 0.94, 0.94, 0.82, 0.7, 0.35], y: [0.2, 0.32, 0.46, 0.58, 0.71, 0.84, 0.845, 0.85, 0.86] },
+    { name: "Radlauf vorn, Kante", z: 0.8, b: [0.82, 0.94, 1, 0.96, 0.965, 0.97, 0.845, 0.72, 0.36], y: [0.3, 0.4, 0.5, 0.6, 0.73, 0.86, 0.865, 0.87, 0.87] },
+    { name: "Radmitte vorn", z: 0.625, b: [0.82, 0.94, 1, 0.96, 0.97, 0.98, 0.855, 0.73, 0.36], y: [0.7, 0.74, 0.78, 0.82, 0.845, 0.87, 0.875, 0.88, 0.88] },
+    { name: "Radlauf vorn, hinten", z: 0.45, b: [0.82, 0.94, 1, 0.96, 0.97, 0.98, 0.86, 0.74, 0.37], y: [0.3, 0.4, 0.5, 0.6, 0.74, 0.88, 0.885, 0.89, 0.89] },
+    { name: "Fuge Haube, vorn", z: 0.4, b: [0.82, 0.94, 1, 0.96, 0.97, 0.98, 0.86, 0.74, 0.37], y: [0.2, 0.32, 0.46, 0.58, 0.73, 0.88, 0.885, 0.89, 0.89], fuge: true },
+    { name: "Fuge Haube, hinten", z: 0.385, b: [0.82, 0.94, 1, 0.96, 0.97, 0.98, 0.86, 0.74, 0.37], y: [0.2, 0.32, 0.46, 0.58, 0.735, 0.89, 0.895, 0.9, 0.9], fuge: true },
+    { name: "Windschutz Mitte", z: 0.27, b: [0.83, 0.95, 1, 0.96, 0.975, 0.99, 0.875, 0.76, 0.48], y: [0.2, 0.32, 0.46, 0.58, 0.74, 0.9, 0.98, 1.06, 1.14] },
+    { name: "Dach vorn", z: 0.12, b: [0.83, 0.95, 1, 0.96, 0.98, 1, 0.895, 0.79, 0.6], y: [0.2, 0.32, 0.46, 0.58, 0.75, 0.92, 1.11, 1.3, 1.42] },
+    { name: "B-Säule", z: -0.03, b: [0.83, 0.95, 1, 0.96, 0.98, 1, 0.895, 0.79, 0.6], y: [0.2, 0.32, 0.46, 0.58, 0.75, 0.92, 1.11, 1.3, 1.42] },
+    { name: "Dach hinten", z: -0.18, b: [0.83, 0.95, 1, 0.96, 0.98, 1, 0.895, 0.79, 0.6], y: [0.2, 0.32, 0.46, 0.58, 0.75, 0.92, 1.11, 1.3, 1.42] },
+    { name: "Heckscheibe Mitte", z: -0.42, b: [0.82, 0.94, 1, 0.96, 0.975, 0.99, 0.875, 0.76, 0.52], y: [0.2, 0.32, 0.46, 0.58, 0.75, 0.92, 1.03, 1.14, 1.24] },
+    { name: "Fuge Klappe, vorn", z: -0.52, b: [0.82, 0.94, 0.99, 0.95, 0.965, 0.98, 0.86, 0.74, 0.4], y: [0.3, 0.4, 0.5, 0.6, 0.77, 0.94, 0.965, 0.99, 1], fuge: true },
+    { name: "Fuge Klappe, hinten", z: -0.535, b: [0.82, 0.94, 0.99, 0.95, 0.965, 0.98, 0.86, 0.74, 0.4], y: [0.3, 0.4, 0.5, 0.6, 0.77, 0.94, 0.96, 0.98, 0.99], fuge: true },
+    { name: "Radmitte hinten", z: -0.625, b: [0.82, 0.94, 0.99, 0.95, 0.965, 0.98, 0.86, 0.74, 0.39], y: [0.7, 0.74, 0.78, 0.82, 0.88, 0.94, 0.955, 0.97, 0.98] },
+    { name: "Radlauf hinten, Kante", z: -0.82, b: [0.8, 0.92, 0.97, 0.93, 0.945, 0.96, 0.84, 0.72, 0.37], y: [0.3, 0.4, 0.5, 0.6, 0.765, 0.93, 0.94, 0.95, 0.96] },
+    { name: "Heck", z: -1, b: [0.62, 0.74, 0.82, 0.8, 0.8, 0.8, 0.68, 0.56, 0.28], y: [0.26, 0.36, 0.48, 0.58, 0.73, 0.88, 0.89, 0.9, 0.9] },
   ],
   scheiben: [
-    // Sieben Ebenen: r = 5 rechte Dachkante, 6 Dachmitte rechts, 7 Dachmitte
-    // links, 8 linke Dachkante; r = 4 ist die rechte, r = 9 die linke Gürtellinie.
-    { id: "front", vonSchnitt: 7, bisSchnitt: 9, vonRing: 5, bisRing: 8 },
-    { id: "rear", vonSchnitt: 10, bisSchnitt: 12, vonRing: 5, bisRing: 8 },
-    { id: "right", vonSchnitt: 9, bisSchnitt: 11, vonRing: 4, bisRing: 5 },
-    { id: "left", vonSchnitt: 9, bisSchnitt: 11, vonRing: 8, bisRing: 9 },
+    // Neun Ebenen (E-128): r = 5 rechte Gürtellinie, 6 rechte Säule, 7 rechte
+    // Dachkante, 8 Dachmitte rechts, 9 Dachmitte links, 10 linke Dachkante,
+    // 11 linke Säule, 12 linke Gürtellinie. Querschnitt 10 ist die B-Säule.
+    { id: "front", vonSchnitt: 7, bisSchnitt: 9, vonRing: 7, bisRing: 10 },
+    { id: "rear", vonSchnitt: 11, bisSchnitt: 13, vonRing: 7, bisRing: 10 },
+    { id: "right", vonSchnitt: 9, bisSchnitt: 12, vonRing: 5, bisRing: 7 },
+    { id: "left", vonSchnitt: 9, bisSchnitt: 12, vonRing: 10, bisRing: 12 },
   ],
   /*
    * DER HOHLKÖRPER (E-124). Acht Quader, abgelesen an der Tabelle oben
@@ -603,25 +830,44 @@ export const FORM_C: WrackformDef = {
    * Schale in den Innenraum.
    *
    * Bis E-127 reichte der Boden bis 0,58 m (Sicke), weil der Bagger beim
-   * Zufassen nur Kollider 0 fragte — mit 0,32 m war das Wrack an 0 von 4
-   * Stellen zu greifen. Seit er alle Kollider fragt, geben die Türen bis zum
-   * Schweller nach statt nur bis zur Sicke.
-   *
-   * Wie weit jedes Stück nachgibt (`max`), ist ein Startwert zum Austesten
-   * (SW): Dach bis knapp über die Gürtellinie (1,42 − 0,45 = 0,97), Haube
-   * 25 cm (der Motor oben bei 0,83 m schaut dann heraus), Heck 30 cm, Tür
-   * 35 cm (die Zelle bleibt zwischen zwei eingedrückten Türen 0,68 m breit).
+   * Zufassen nur Kollider 0 fragte. Seit E-128 gibt kein Quader mehr einzeln
+   * nach: Ober- und Unterkante jedes Quaders gehen durch `knautschHoehe`,
+   * dieselbe Rechnung wie die Haut.
    */
   bleche: [
-    { name: "Boden", mitte: [0, 0.16, 0], halb: [0.85, 0.16, 2.0], nach: "-y", max: 0, voll: 0, fuss: 0 },
-    { name: "Vorderwagen", mitte: [0, 0.59, 1.4], halb: [0.8, 0.27, 0.6], nach: "-y", max: 0.25, voll: 0, fuss: 0.28 },
-    { name: "Heck", mitte: [0, 0.645, -1.52], halb: [0.8, 0.325, 0.48], nach: "-y", max: 0.3, voll: 0, fuss: 0.39 },
-    { name: "Tür vorn rechts", mitte: [0.77, 0.62, 0.34], halb: [0.08, 0.3, 0.46], nach: "-x", max: 0.35, voll: 0.16, fuss: 0.5 },
-    { name: "Tür vorn links", mitte: [-0.77, 0.62, 0.34], halb: [0.08, 0.3, 0.46], nach: "+x", max: 0.35, voll: 0.16, fuss: 0.5 },
-    { name: "Tür hinten rechts", mitte: [0.77, 0.62, -0.58], halb: [0.08, 0.3, 0.46], nach: "-x", max: 0.35, voll: 0.16, fuss: 0.5 },
-    { name: "Tür hinten links", mitte: [-0.77, 0.62, -0.58], halb: [0.08, 0.3, 0.46], nach: "+x", max: 0.35, voll: 0.16, fuss: 0.5 },
-    { name: "Dach", mitte: [0, 1.36, -0.06], halb: [0.67, 0.06, 0.3], nach: "-y", max: 0.45, voll: 0.12, fuss: 0.5 },
+    { name: "Boden", mitte: [0, 0.16, 0], halb: [0.85, 0.16, 2.0] },
+    { name: "Vorderwagen", mitte: [0, 0.59, 1.4], halb: [0.8, 0.27, 0.6] },
+    { name: "Heck", mitte: [0, 0.645, -1.52], halb: [0.8, 0.325, 0.48] },
+    { name: "Tür vorn rechts", mitte: [0.77, 0.62, 0.34], halb: [0.08, 0.3, 0.46] },
+    { name: "Tür vorn links", mitte: [-0.77, 0.62, 0.34], halb: [0.08, 0.3, 0.46] },
+    { name: "Tür hinten rechts", mitte: [0.77, 0.62, -0.58], halb: [0.08, 0.3, 0.46] },
+    { name: "Tür hinten links", mitte: [-0.77, 0.62, -0.58], halb: [0.08, 0.3, 0.46] },
+    { name: "Dach", mitte: [0, 1.36, -0.06], halb: [0.67, 0.06, 0.3] },
   ],
+  /*
+   * WIE DIE FASSUNG C ZUSAMMENKNAUTSCHT (E-128) — drei Bänder über dem starren
+   * Boden, jedes mit einem Knick genau auf einem Ring der Haut.
+   *
+   * Reihenfolge wie bei einer Dose unter dem Stiefel: zuerst gibt das
+   * Schwächste nach, das Glashaus (Säulen, nur Glas dazwischen) — die Säulen
+   * knicken auf halber Höhe (1,11 m) HERAUS. Dann die Türen: Sie knicken auf
+   * halber Höhe (0,75 m) HINEIN. Zuletzt das steife Stück zwischen Schweller
+   * und Sicke, das auf der Sicke (0,46 m) wieder HERAUS knickt. Raus, rein,
+   * raus: eine Ziehharmonika wie an einer zertretenen Dose. (Erster Entwurf:
+   * Säulen hinein — im Riss verschwand die Falte unter dem sinkenden Dach.)
+   *
+   * Ganz flach: 0,32 + 0,12 + 0,10 + 0,08 = 0,62 m — ein gepresstes Auto vom
+   * Schrottplatz, Boden und Schweller plus drei Lagen gefaltetes Blech. Bis
+   * hierher machte die Presse das Wrack 0,55-mal so hoch (Dach 0,78 m).
+   * Alle Zahlen: SW, am Bild abzustimmen.
+   */
+  knautsch: {
+    zonen: [
+      { name: "Schweller bis Sicke", von: 0.32, bis: 0.58, rest: 0.12, ab: 0.55, voll: 1, knick: 0.46, nach: 1 },
+      { name: "Tür", von: 0.58, bis: 0.92, rest: 0.1, ab: 0.25, voll: 0.9, knick: 0.75, nach: -1 },
+      { name: "Glashaus", von: 0.92, bis: 1.42, rest: 0.08, ab: 0, voll: 0.6, knick: 1.11, nach: 1 },
+    ],
+  },
 };
 
 export const WRACKFORMEN: Record<Exclude<WrackformId, "bestand">, WrackformDef> = {

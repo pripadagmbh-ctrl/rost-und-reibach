@@ -202,14 +202,10 @@ describe("Was NICHT verschmolzen werden darf", () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     const comps = new CompositeManager(scene, world, new ItemManager(scene, world), new EventBus());
     const car = comps.spawnCar(new THREE.Vector3(0, 1, 0));
+    const raederVorher = netze(car.group).filter((m) => m.parent === car.group).length;
     car.pressCrush();
     expect(car.crushStage).toBe(2);
-    // Die Anbauteile werden mitgequetscht — sie hängen im crushGroup, dessen
-    // y-Maßstab auf die Quetschstufe geht.
-    const gequetscht = netze(car.group).filter(
-      (m) => m.parent !== car.group && m.parent!.scale.y === CAR_DEF.crushScales[2]
-    );
-    expect(gequetscht.length, "nichts hängt mehr im crushGroup").toBeGreaterThan(0);
+    expect(netze(car.group).filter((m) => m.parent === car.group).length, "zwei Raeder fliegen heraus").toBe(raederVorher - 2);
     /*
      * ALLES, was zur Karosserie gehoert, muss mitgequetscht werden — nicht nur
      * ein bestimmtes Netz. Bis E-117 suchte diese Zeile die Anbauteile an genau
@@ -217,10 +213,32 @@ describe("Was NICHT verschmolzen werden darf", () => {
      * Radlaeufe in die Haut geschnitten, die Zahl stimmt nicht mehr, die
      * Absicht schon. Zerlegbare Teile (Motor, Getriebe, Raeder) haengen direkt
      * an der Wrackgruppe und werden nicht gequetscht; alles andere schon.
+     *
+     * ANGEPASST MIT E-128 (16.10.2026). Bis dahin hiess „gequetscht": der
+     * crushGroup hat den y-Massstab der Stufe 2 (0,55). Seitdem knautscht die
+     * Fassung C Eckpunkt fuer Eckpunkt (Patrick: „wie eine Blechdose … statt
+     * dass nur einzelne Bleche eindellen"), und der Massstab bleibt 1. Die
+     * Absicht wird deshalb an der Hoehe geprueft, und strenger als vorher:
+     * KEIN Netz der Karosserie — Haut, Scheiben, Stossstangen, Leuchten,
+     * Spiegel — ragt hoeher als 10 cm ueber das flache Wrack (0,62 m). Mit der
+     * alten Skalierung stand das Dach auf 0,78 m.
      */
     const karosserie = netze(car.group).filter((m) => m.parent !== car.group);
-    const entkommen = karosserie.filter((m) => m.parent!.scale.y !== CAR_DEF.crushScales[2]);
+    expect(karosserie.length, "nichts hängt mehr im crushGroup").toBeGreaterThan(0);
+    const entkommen = karosserie.filter((m) => {
+      m.geometry.computeBoundingBox();
+      return m.geometry.boundingBox!.max.y * m.parent!.scale.y + m.position.y > 0.62 + 0.1;
+    });
     expect(entkommen.length, "ein Teil der Karosserie entkommt dem Quetschen").toBe(0);
+  });
+
+  it("der Bestand quetscht weiter mit dem Massstab seiner Stufe — Ziffer fuer Ziffer wie vor E-128", () => {
+    const scene = new THREE.Scene();
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    const car = new CarComposite(CAR_DEF, scene, world, new ItemManager(scene, world), new EventBus(), new THREE.Vector3(0, 1, 0), "bestand");
+    car.pressCrush();
+    const karosserie = netze(car.group).filter((m) => m.parent !== car.group);
+    expect(karosserie.filter((m) => m.parent!.scale.y !== CAR_DEF.crushScales[2]).length).toBe(0);
   });
 });
 

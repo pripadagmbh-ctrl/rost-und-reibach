@@ -11,6 +11,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
 | E-129 | 16.10.2026 | Die Challenges werden pausiert, das Spiel startet im Sandkasten | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-128 | 16.10.2026 | Das Wrack knautscht wie eine Blechdose, Presse dasselbe bis flach | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-127 | 06.10.2026 | Greifer fragt alle Bleche, Türen bis zum Schweller, Spiegel am Auto | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-126 | 06.10.2026 | Einzelstück-Fuhre: ein Laster, ein Großteil, allein darf es höher sein | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-125 | 06.10.2026 | Das Spiel fängt mit einer Challenge an: ein Auto in die Presse | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -145,6 +146,13 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 
 **E-129 — Die Challenges werden pausiert, das Spiel startet im Sandkasten**
 - Spiel öffnen: Startet es direkt im Sandkasten — ohne Menü, ohne die Karte „1/4 Greif das Wrack“?
+
+**E-128 — Das Wrack knautscht wie eine Blechdose, Presse dasselbe bis flach**
+- **Spinne mittig über das Dach, absenken, zudrücken, loslassen — sechsmal.** Sinkt erst das Dach, knicken die Säulen heraus, und geht danach das ganze Auto zusammen — wie eine zertretene Dose, nicht wie ein gestauchter Block? Sind sechs Bisse zu viele?
+- **Spinne über die rechte vordere Tür, zwei-, dreimal zudrücken.** Sackt diese Seite zuerst? Kippt das Wrack dabei zu stark weg?
+- **Ein halb geknautschtes Wrack greifen und heben** (an Tür oder Kofferraum). Geht es noch — und liegen die Schalen auf dem Blech, statt darüber zu schweben?
+- **Ein Wrack in die Presse.** Sieht es danach genauso geknautscht aus wie eines, das du mit der Spinne flach gedrückt hast? Ist 0,62 m flach genug?
+- **Heil gegen geknautscht ansehen.** Gefällt dir, dass ein geknautschtes Wrack kantig schattiert ist, das heile weiter glatt?
 
 **E-127 — Greifer fragt alle Bleche, Türen bis zum Schweller, Spiegel am Auto**
 - **Spinne über die rechte vordere Tür, absenken, zudrücken** (zwei-, dreimal, jedes Mal loslassen). Geht die Tür jetzt bis unten zum Schweller ein, nicht nur im oberen Teil?
