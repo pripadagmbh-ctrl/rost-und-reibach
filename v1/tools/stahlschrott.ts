@@ -67,7 +67,15 @@ function ausQuelltext(quelle: string, name: string): PileSpec[] {
     .split("\n")
     .filter((z) => !z.includes("...KATALOG"))
     .join("\n");
-  return new Function(`return [${rumpf}];`)() as PileSpec[];
+  /*
+   * Der Zeilenumbruch vor `];` ist Absicht (16.10.2026). Die Listen in
+   * `scrapItems.ts` enden mit einer Kommentarzeile („// Erweiterung
+   * 12.09.2026 …"). Ohne Umbruch stand `];` IN diesem Kommentar, und die Liste
+   * blieb offen. Bei Windows-Zeilenenden beendete das unsichtbare `\r` den
+   * Kommentar zufaellig — deshalb lief das Werkzeug nur auf einem Rechner,
+   * dessen Arbeitsbaum CRLF hatte, und auf jedem frischen Auschecken nicht.
+   */
+  return new Function(`return [${rumpf}\n];`)() as PileSpec[];
 }
 
 function lies(datei: string): string {
