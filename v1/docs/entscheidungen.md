@@ -149,7 +149,7 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 
 **E-132 — Die Spinne pendelt frei, ein Wurf behält seinen Schwung** (iPad)
 - Zügig schwenken und anhalten: Schwingt die Spinne sichtbar durch (bis knapp 40°), und ist sie nach rund 4 s ruhig genug zum Absetzen?
-- Träger greifen, voll schwenken, im Schwung loslassen: Fliegt er deutlich zur Seite? (Erst prüfbar, wenn der Vorschlag für `clampSpeeds` eingebaut ist.)
+- Träger greifen, voll schwenken, im Schwung loslassen: Fliegt er deutlich zur Seite?
 - Träger vom Haufen greifen: Sitzt er ruhig wie vorher, ohne Zittern und ohne zu schweben?
 
 **E-131 — Pripada.de, Werbeschilder, drei Laster zum Start** (iPad, Kabine)
