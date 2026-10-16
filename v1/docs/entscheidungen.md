@@ -10,7 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
-| E-132 | 16.10.2026 | Die Spinne pendelt frei, ein Wurf behält seinen Schwung | gebaut (Teil 2 offen) | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-132 | 16.10.2026 | Die Spinne pendelt frei, ein Wurf behält seinen Schwung | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-131 | 16.10.2026 | Pripada.de statt Rust’n’Reibach, Werbeschilder, drei Laster stehen zum Start an | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-130 | 16.10.2026 | Echte Aufnahmen statt Summen, kein Greifklang bleibt stehen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-129 | 16.10.2026 | Die Challenges werden pausiert, das Spiel startet im Sandkasten | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
