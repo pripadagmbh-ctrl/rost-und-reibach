@@ -1,0 +1,10 @@
+# Zeilenenden fest auf LF, auf jedem Rechner (16.10.2026, beim Pruefen von E-129).
+#
+# Mit core.autocrlf=true checkt Git unter Windows mit CRLF aus. Gespeichert
+# ist alles mit LF, und unsere Werkzeuge schreiben LF - also stimmte der
+# Arbeitsbaum, ein frisch ausgecheckter aber nicht. Waechter, die Quelltext
+# nach einem woertlichen "\n" durchsuchen (spielart, sandkasten-anlieferung),
+# waren dadurch nur hier gruen und auf jedem frischen Auschecken rot.
+#
+# text=auto laesst Bilder und Toene als Binaerdateien in Ruhe.
+* text=auto eol=lf
