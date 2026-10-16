@@ -52,6 +52,8 @@ describe("Aufnahmen (E-130)", () => {
     const q = readFileSync(resolve(ORDNER, "QUELLEN.md"), "utf8");
     for (const f of dateien) expect(q, f).toContain(`| ${f} |`);
     expect(q).toContain("CC0");
+    // H (Pixabay) ist nicht CC0: Lizenz und Herkunft muessen dabeistehen (E-130)
+    if (q.includes("| H/")) expect(q).toContain("Pixabay Content License");
   });
 
   it("Groesse und Speicher bleiben im Rahmen (iPhone mini)", () => {

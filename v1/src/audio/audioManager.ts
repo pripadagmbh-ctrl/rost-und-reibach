@@ -597,7 +597,7 @@ export class AudioManager {
     this.bettGain = stumm();
     rassel.connect(rasselAuf ? band(7000, 0.5, "lowpass") : band(1800, 0.6)).connect(this.bettGain);
 
-    // Druckaufbau beim Zudruecken: Pumpe unter Last (Aufnahme), ersatzweise Rauschen
+    // Druckaufbau beim Zudruecken: Greifkran unter Last (Aufnahme H), ersatzweise Rauschen
     const druck = auf(SCHLEIFEN.druck);
     this.stoehnFilter = band(900, 0.7, "lowpass");
     this.stoehnGain = stumm();
@@ -870,7 +870,7 @@ export class AudioManager {
   }
 
   playGrab(materialId?: string): void {
-    // E-130: schwerer Metallschlag mit Hydraulikzischen (Kenney + BigSoundBank #0914). SW: 0,5
+    // E-130: der Greifkran fasst Schrott (Pixabay „Grua recicladora“, H). SW: 0,5
     if (!this.spiele(EINZEL.zupacken, 0.5)) {
       // Ersatz: kurzer Rauschimpuls + tiefer Thump
       this.burst([70], 0.18, 0.35, "triangle");

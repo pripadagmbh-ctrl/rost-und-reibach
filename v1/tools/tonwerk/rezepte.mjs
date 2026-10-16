@@ -44,7 +44,16 @@ export const QUELLEN = {
     lizenz: "CC0 1.0",
     lizenzUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
   },
+  H: {
+    name: "Pixabay „Grua recicladora“ (Schrottplatz-Greifkran), Datei freesound_community-grua-recicladora-48744.mp3, von Patrick am 16.10.2026 selbst geladen. Original auf Freesound als CC0: Fhmediahmo #191965",
+    url: "https://pixabay.com/sound-effects/film-special-effects-grua-recicladora-48744/",
+    lizenz: "Pixabay Content License — Einbau ins Spiel erlaubt, Weitergabe der Datei für sich allein nicht",
+    lizenzUrl: "https://pixabay.com/service/license-summary/",
+  },
 };
+
+/** H: der echte Greifkran (Pixabay), relativ zu ton-roh/ */
+const H = "H/freesound_community-grua-recicladora-48744.mp3";
 
 const k = (n, mehr = {}) => ({ q: `A/x/Audio/${n}.ogg`, ...mehr });
 const o = (n, mehr = {}) => ({ q: `I/x/${n}.ogg`, ...mehr });
@@ -63,12 +72,14 @@ export const REZEPTE = [
   },
   {
     name: "hyd_druck",
-    wofuer: "Zudrücken: Pumpe unter Last, singt höher mit der Kraft (Schleife)",
+    wofuer: "Zudrücken: Greifkran-Hydraulik unter Last, höher mit der Kraft (Schleife)",
     art: "schleife",
     dauer: 2.5,
-    abtastrate: 16000, // SW: das Singen liegt unter 3 kHz
-    // D 108–111 s: Pumpen-Singen um 1,2 und 2,3 kHz ueber dem Maschinenrauschen
-    schichten: [{ q: "D/0914.ogg", von: 108.0, dauer: 3.0, hp: 300 }],
+    abtastrate: 16000, // SW: der Kran bringt ueber 8 kHz nichts Wesentliches
+    // H 13–16 s (E-130, H statt D 108 s): der Greifkran unter Last — breites
+    // Anschwellen 300 Hz–3 kHz ohne Schlaege. Echte Greifer-Hydraulik statt
+    // des Pumpen-Singens eines Baustellenkrans.
+    schichten: [{ q: H, von: 13.0, dauer: 3.0, hp: 250 }],
     spitze: 0.7,
   },
   {
@@ -81,25 +92,27 @@ export const REZEPTE = [
   },
   {
     name: "zupacken",
-    wofuer: "Spinne packt zu: schwerer Metallschlag, Hydraulik zischt nach",
+    wofuer: "Spinne packt zu: der Greifkran fasst Schrott",
     art: "einmal",
-    schichten: [
-      k("impactMetal_heavy_000"),
-      k("impactPlate_heavy_003", { gain: 0.5 }),
-      { q: "D/0914.ogg", von: 58.5, dauer: 0.45, hp: 2500, gain: 0.35, versatz: 0.03, ein: 0.02, aus: 0.3 },
-    ],
+    // H 26,95–27,7 s (E-130, ersetzt Kenney-Schlag + Platte + D-Zischen): der
+    // Kran packt Schrott — breiter Einsatz bis unter 100 Hz, Rauschen bis
+    // 10 kHz, das ausklingt. Genau der Vorgang, den die Schichten nachbauten.
+    schichten: [{ q: H, von: 26.95, dauer: 0.75, ein: 0.002, aus: 0.25 }],
   },
   {
     name: "anschlag_1",
     wofuer: "Zähne treffen leer aufeinander: Stahl auf Stahl",
     art: "einmal",
-    schichten: [o("metal_hit_01"), k("impactMetal_medium_001", { gain: 0.6 })],
+    // H 25,98–26,35 s (E-130, ersetzt OpenGameArt metal_hit_01): kurzer, heller
+    // Klack des Krangreifers, dazu der alte Schlag leise fuer den Stahlglanz
+    schichten: [{ q: H, von: 25.98, dauer: 0.37, ein: 0.002, aus: 0.15 }, o("metal_hit_01", { gain: 0.35 })],
   },
   {
     name: "anschlag_2",
     wofuer: "Zähne treffen leer aufeinander (zweite Fassung)",
     art: "einmal",
-    schichten: [o("metal_hit_04"), k("impactMetal_medium_004", { gain: 0.6 })],
+    // H 33,98–34,4 s (E-130, ersetzt OpenGameArt metal_hit_04): zweiter Klack des Krans
+    schichten: [{ q: H, von: 33.98, dauer: 0.42, ein: 0.002, aus: 0.15 }, o("metal_hit_04", { gain: 0.35 })],
   },
   {
     name: "biss_1",
@@ -124,7 +137,7 @@ export const REZEPTE = [
   /* ----------------------------------------------------- Blech knautschen -- */
   {
     name: "knautsch_1",
-    wofuer: "Blech wird zerdrückt (Presse, Quetschen, Knautschen): Dose tief + Metallschläge",
+    wofuer: "Blech wird zerdrückt (Presse, Quetschen, Knautschen): Dose tief + Metallschläge + Metall stöhnt",
     art: "einmal",
     dauer: 3.0,
     schichten: [
@@ -132,6 +145,9 @@ export const REZEPTE = [
       k("impactPlate_heavy_001", { gain: 0.8 }),
       k("impactMetal_heavy_001", { gain: 0.6, versatz: 0.35 }),
       k("impactMetal_heavy_003", { gain: 0.5, versatz: 1.1 }),
+      // H 61,3–62,9 s (E-130, neu): Metall stoehnt unter Last — gleitende Toene
+      // 300 Hz–2 kHz. Darunter faltet das Auto hoerbar, nicht nur die Dose.
+      { q: H, von: 61.3, dauer: 1.6, rate: 0.85, gain: 0.6, versatz: 0.2, ein: 0.05, aus: 0.4 },
     ],
   },
   {

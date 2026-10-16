@@ -15,21 +15,22 @@ Format: WAV, 16 bit, mono, 24000 Hz (wo in der Tabelle nicht anders angegeben). 
 | D | BigSoundBank #0914 Excavator (Cranes of site) | https://bigsoundbank.com/cranes-of-site-s0914.html | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | E | BigSoundBank #1771, #1776, #0235 (Stahlstangen fallen) | https://bigsoundbank.com/falling-sheet-steel-bar-1-s1771.html · https://bigsoundbank.com/fall-2-sheet-steel-bars-1-s1776.html · https://bigsoundbank.com/iron-bar-falls-2-s0235.html | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | F | BigSoundBank #0118, #0148, #0771 (Dose zerdrückt, Glas birst, Scherben) | https://bigsoundbank.com/can-that-are-crushed-s0118.html · https://bigsoundbank.com/glass-burst-s0148.html · https://bigsoundbank.com/broken-glass-s0771.html | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| H | Pixabay „Grua recicladora“ (Schrottplatz-Greifkran), Datei freesound_community-grua-recicladora-48744.mp3, von Patrick am 16.10.2026 selbst geladen. Original auf Freesound als CC0: Fhmediahmo #191965 | https://pixabay.com/sound-effects/film-special-effects-grua-recicladora-48744/ | [Pixabay Content License — Einbau ins Spiel erlaubt, Weitergabe der Datei für sich allein nicht](https://pixabay.com/service/license-summary/) |
 
 ## Ausschnitte
 
 | Datei | Dauer | Wofür | Herausgeschnitten aus |
 |---|---|---|---|
 | hyd_fahrt.wav | 2.50 s, 16 kHz | Schalen und Arm fahren: Öl strömt (Schleife) | D/0914.ogg ab 63.00 s, 3.00 s |
-| hyd_druck.wav | 2.50 s, 16 kHz | Zudrücken: Pumpe unter Last, singt höher mit der Kraft (Schleife) | D/0914.ogg ab 108.00 s, 3.00 s |
+| hyd_druck.wav | 2.50 s, 16 kHz | Zudrücken: Greifkran-Hydraulik unter Last, höher mit der Kraft (Schleife) | H/freesound_community-grua-recicladora-48744.mp3 ab 13.00 s, 3.00 s |
 | ventil.wav | 1.50 s | Druckbegrenzungsventil und Loslassen: Zischen (Schleife) | D/0914.ogg ab 58.50 s, 2.00 s |
-| zupacken.wav | 0.45 s | Spinne packt zu: schwerer Metallschlag, Hydraulik zischt nach | A/impactMetal_heavy_000.ogg ab 0.00 s, ganz; A/impactPlate_heavy_003.ogg ab 0.00 s, ganz; D/0914.ogg ab 58.50 s, 0.45 s |
-| anschlag_1.wav | 0.19 s | Zähne treffen leer aufeinander: Stahl auf Stahl | I/metal_hit_01.ogg ab 0.00 s, ganz; A/impactMetal_medium_001.ogg ab 0.00 s, ganz |
-| anschlag_2.wav | 0.29 s | Zähne treffen leer aufeinander (zweite Fassung) | I/metal_hit_04.ogg ab 0.00 s, ganz; A/impactMetal_medium_004.ogg ab 0.00 s, ganz |
+| zupacken.wav | 0.75 s | Spinne packt zu: der Greifkran fasst Schrott | H/freesound_community-grua-recicladora-48744.mp3 ab 26.95 s, 0.75 s |
+| anschlag_1.wav | 0.37 s | Zähne treffen leer aufeinander: Stahl auf Stahl | H/freesound_community-grua-recicladora-48744.mp3 ab 25.98 s, 0.37 s; I/metal_hit_01.ogg ab 0.00 s, ganz |
+| anschlag_2.wav | 0.42 s | Zähne treffen leer aufeinander (zweite Fassung) | H/freesound_community-grua-recicladora-48744.mp3 ab 33.98 s, 0.42 s; I/metal_hit_04.ogg ab 0.00 s, ganz |
 | biss_1.wav | 0.76 s | Zudrücken beißt ins Material: Knirschen | F/0118.ogg ab 0.38 s, 0.57 s, Tempo ×0.75; A/impactMetal_heavy_002.ogg ab 0.00 s, ganz |
 | biss_2.wav | 0.66 s | Zudrücken beißt ins Material (zweite Fassung) | F/0118.ogg ab 2.50 s, 0.50 s, Tempo ×0.75; A/impactMetal_heavy_004.ogg ab 0.00 s, ganz |
 | biss_3.wav | 0.73 s | Zudrücken beißt ins Material (dritte Fassung) | F/0118.ogg ab 6.35 s, 0.55 s, Tempo ×0.75; A/impactMetal_heavy_000.ogg ab 0.00 s, ganz |
-| knautsch_1.wav | 3.00 s | Blech wird zerdrückt (Presse, Quetschen, Knautschen): Dose tief + Metallschläge | F/0118.ogg ab 0.30 s, 2.70 s, Tempo ×0.6; A/impactPlate_heavy_001.ogg ab 0.00 s, ganz; A/impactMetal_heavy_001.ogg ab 0.00 s, ganz; A/impactMetal_heavy_003.ogg ab 0.00 s, ganz |
+| knautsch_1.wav | 3.00 s | Blech wird zerdrückt (Presse, Quetschen, Knautschen): Dose tief + Metallschläge + Metall stöhnt | F/0118.ogg ab 0.30 s, 2.70 s, Tempo ×0.6; A/impactPlate_heavy_001.ogg ab 0.00 s, ganz; A/impactMetal_heavy_001.ogg ab 0.00 s, ganz; A/impactMetal_heavy_003.ogg ab 0.00 s, ganz; H/freesound_community-grua-recicladora-48744.mp3 ab 61.30 s, 1.60 s, Tempo ×0.85 |
 | knautsch_2.wav | 2.40 s | Blech wird zerdrückt (zweite Fassung) | F/0118.ogg ab 5.15 s, 1.85 s, Tempo ×0.65; A/impactPlate_heavy_004.ogg ab 0.00 s, ganz; A/impactMetal_heavy_003.ogg ab 0.00 s, ganz |
 | glas_1.wav | 1.60 s | Scheibe birst | F/0148.ogg ab 0.00 s, 1.60 s |
 | glas_2.wav | 0.80 s | Scheibe birst (Scherben) | F/0771.ogg ab 1.70 s, 0.90 s |
@@ -64,4 +65,4 @@ Format: WAV, 16 bit, mono, 24000 Hz (wo in der Tabelle nicht anders angegeben). 
 | rassel.wav | 2.00 s | Schrott rutscht und klappert; Spinne über Schrott (Schleife) | Streuung aus A/impactTin_medium_000.ogg, A/impactTin_medium_001.ogg, A/impactTin_medium_002.ogg, A/impactTin_medium_003.ogg, A/impactTin_medium_004.ogg, A/impactMetal_light_000.ogg, A/impactMetal_light_001.ogg, A/impactMetal_light_004.ogg, A/impactPlate_light_000.ogg, A/impactPlate_light_002.ogg (48 Schläge) |
 | motor.wav | 3.00 s, 12 kHz | Dieselmotor im Stand (Schleife), Tempo folgt der Bedienung | C/2147.ogg ab 12.00 s, 3.50 s |
 
-Kürzel in der Spalte „Herausgeschnitten aus“: `A/…` Kenney Impact Sounds, `I/…` OpenGameArt 100 CC0 metal and wood SFX, `B/`–`F/` BigSoundBank (Nummer = Dateiname).
+Kürzel in der Spalte „Herausgeschnitten aus“: `A/…` Kenney Impact Sounds, `I/…` OpenGameArt 100 CC0 metal and wood SFX, `B/`–`F/` BigSoundBank (Nummer = Dateiname), `H/…` Pixabay-Greifkran (Pixabay Content License: Einbau ins Spiel erlaubt, die Datei für sich allein darf nicht weitergegeben werden — deshalb liegen hier nur Ausschnitte, gemischt mit anderen Klängen).
