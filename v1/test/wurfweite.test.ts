@@ -309,13 +309,14 @@ describe("Wurf im Spieltakt, mit clampSpeeds (E-132)", () => {
   });
 
   /*
-   * BEKANNTER FEHLER, NOCH NICHT BEHOBEN: Die Abhilfe gehoert in
-   * `src/world/scrapItems.ts` (`clampSpeeds`), und das ist nicht der Bereich
-   * des Baggers. Der Vorschlag steht in E-132. `it.fails` ist gruen, SOLANGE
-   * der Fehler besteht — sobald die Abhilfe eingebaut ist, wird dieser Fall
-   * rot und muss auf `it` umgestellt werden. So vergisst ihn niemand.
+   * BEHOBEN IN E-132 (16.10.2026): `clampSpeeds` in `src/world/scrapItems.ts`
+   * bremste jedes geworfene Teil ein Bild nach dem Loslassen auf die
+   * Schutzgrenze `maxSpeedFor` herunter — 900 kg von 4,73 auf 0,73 m/s. Ein
+   * Teil, das im letzten Bild getragen wurde, darf jetzt so schnell bleiben,
+   * wie es getragen wurde (plus `MAX_ZUWACHS`). Bis dahin stand hier
+   * `it.fails`; wird dieser Fall wieder rot, ist die Bremse zurueck.
    */
-  it.fails("ein geworfenes Teil behaelt im Flug seinen Schwung (900 kg)", () => {
+  it("ein geworfenes Teil behaelt im Flug seinen Schwung (900 kg)", () => {
     const { vAb, vFlug } = wurfImTakt(900);
     for (const v of vFlug) expect(v).toBeGreaterThan(0.9 * vAb);
   });

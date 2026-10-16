@@ -2339,6 +2339,23 @@ export class ItemManager {
   private letzterAufprall = new Map<number, number>();
   private aufprallUhr = 0;
   private gesamtVorher = new Map<number, number>();
+  /**
+   * WURF (E-132). Tempo, mit dem ein Teil gerade GETRAGEN wird (quer, nach
+   * oben), und der Schwung, den ein losgelassenes Teil behalten darf.
+   *
+   * `maxSpeedFor` bremst, was die Maschine ANSTOESST — dafuer ist es da. Ein
+   * geworfenes Teil wird aber nicht angestossen, es wird losgelassen: Sein
+   * Tempo hatte es schon, als es in der Spinne hing. Ohne diese Ausnahme fiel
+   * ein 900-kg-Teil eine Bildzeit nach dem Loslassen von 4,73 auf 0,73 m/s
+   * (Weite 0,55 statt 2,70 m, `tools/wurf.ts` Abschnitt 5).
+   *
+   * Die Grenze ist das Tempo, mit dem es zuletzt getragen wurde (plus die
+   * gewohnte Zuwachsgrenze) — mehr als die Bewegung von Arm und Pendel gibt
+   * es also nie. Sie kann nur fallen; sobald das Teil langsamer ist als
+   * `maxSpeedFor`, gilt wieder die gewohnte Regel.
+   */
+  private getragen = new Map<number, { quer: number; hoch: number }>();
+  private wurf = new Map<number, { quer: number; hoch: number }>();
 
   /**
    * Aufprall eines Teils (Wunsch 11.09.2026: Kollisionen mit Ladeflaeche,
@@ -2466,6 +2483,8 @@ export class ItemManager {
         this.byHandle.delete(h);
         this.tempoVorher.delete(h);
         this.gesamtVorher.delete(h);
+        this.getragen.delete(h);
+        this.wurf.delete(h);
         this.letzterAufprall.delete(h);
       }
       if (this.highlighted === item) this.highlighted = null;
@@ -2486,6 +2505,10 @@ export class ItemManager {
         // Schwung behalten, also faengt die Zuwachsregel bei ihnen neu an.
         this.tempoVorher.delete(item.body.handle);
         this.gesamtVorher.delete(item.body.handle);
+        // E-132: so schnell wird es getragen — das ist beim Loslassen der Wurf
+        const vt = item.body.linvel();
+        this.getragen.set(item.body.handle, { quer: Math.hypot(vt.x, vt.z), hoch: Math.max(vt.y, 0) });
+        this.wurf.delete(item.body.handle);
         continue;
       }
       // Trägheit nach Masse: Die Spinne ist ein kinematischer Körper und
@@ -2500,6 +2523,12 @@ export class ItemManager {
       // Frisch losgelassene Teile stehen noch nicht in der Liste — ihr Schwung
       // ist gewollt und geht ungebremst durch.
       const handle = item.body.handle;
+      // E-132: eben noch getragen, jetzt frei — losgelassen, also ein Wurf
+      const trug = this.getragen.get(handle);
+      if (trug) {
+        this.getragen.delete(handle);
+        this.wurf.set(handle, { quer: trug.quer + MAX_ZUWACHS, hoch: trug.hoch + MAX_ZUWACHS });
+      }
       /*
        * Nur QUER deckeln, nie senkrecht.
        *
@@ -2526,7 +2555,21 @@ export class ItemManager {
       // Quer und nach oben wird gedeckelt, nach unten nicht: Fallen ist
       // Schwerkraft und keine Uebertragung aus der Spinne.
       const quer = Math.hypot(v.x, v.z);
-      const f = quer > maxLinear ? maxLinear / quer : 1;
+      let grenzeQuer = maxLinear;
+      let grenzeHoch = Math.max(maxLinear * 0.55, 1.2);
+      const wurf = this.wurf.get(handle);
+      if (wurf) {
+        // nur fallend: Was es im Flug verliert, bekommt es nicht wieder
+        wurf.quer = Math.min(wurf.quer, Math.max(quer, maxLinear));
+        wurf.hoch = Math.min(wurf.hoch, Math.max(v.y, 0));
+        if (wurf.quer <= maxLinear) {
+          this.wurf.delete(handle);
+        } else {
+          grenzeQuer = wurf.quer;
+          grenzeHoch = Math.max(grenzeHoch, wurf.hoch);
+        }
+      }
+      const f = quer > grenzeQuer ? grenzeQuer / quer : 1;
       /*
        * Nach oben noch enger als quer. Ein geschobenes Teil rutscht und
        * kippt; es huepft nicht auf. Die Aufwaertsspitzen kamen fast alle aus
@@ -2542,7 +2585,7 @@ export class ItemManager {
        * Stoss nach oben; das war schon einmal ein Fehler (Befund 11.09.2026:
        * „Objekte verschwinden im Boden"). 1,2 m/s bleiben immer uebrig.
        */
-      const y = Math.min(Math.max(v.y, -FALL_MAX), Math.max(maxLinear * 0.55, 1.2));
+      const y = Math.min(Math.max(v.y, -FALL_MAX), grenzeHoch);
       if (f < 1 || y !== v.y) {
         item.body.setLinvel({ x: v.x * f, y, z: v.z * f }, true);
       }

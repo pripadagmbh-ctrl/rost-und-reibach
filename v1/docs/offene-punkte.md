@@ -554,6 +554,40 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Gerätebefund 16.10.2026: Dauerton beim Greifen** — Patrick,
+      wörtlich: „Ansonsten fällt mir beim greifen ein durchgängiger ton auf,
+      der sollte nie durchgängig sein wie in einem ufo oder spaceship wo der
+      ton unendlich langgezogen wird". Gehört zum Summen-Befund vom selben Tag
+      (E-121: `setGreifer` hält einen Ton, solange die Schließkraft hoch ist) —
+      Paket Ton.
+
+
+- [ ] **Ansage 16.10.2026: mehr schleudern** — Patrick, wörtlich: „ich will
+      auch mehr schleudern können. Dafür muss die Winkelbegrenzung der Spinne
+      raus und ich muss in der Lage sein, Teile zur Seite zu schleudern"
+
+      | # | Punkt | Bezug |
+      |---|---|---|
+      | 1 | Winkelbegrenzung der Spinne raus | E-105 nahm `PENDEL_MAX`, E-115 die Rückstellfeder; gemessen schwingt das Pendel bis 24° — er spürt weiter eine Grenze |
+      | 2 | Teile zur Seite schleudern können | E-115: Abwurf `v = v_Gelenk + ω × r`, Obergrenze aus der Maschine hergeleitet (10,45 m/s), gemessen 4,2–5,1 m/s |
+
+
+- [ ] **Ansage 16.10.2026, drei Punkte** — Patrick, wörtlich: „Baue mehr
+      Werbeschilder ein und mache anstelle von ROST&Reibach wieder Pripada.de
+      rein. Es sollen mehr LKWs kommen am ANfang"
+
+      | # | Punkt | Paket |
+      |---|---|---|
+      | 1 | Mehr Werbeschilder auf dem Platz | Platz und Marke |
+      | 2 | Pripada.de statt Rust'n'Reibach (überall, wo der Name steht) | Platz und Marke |
+      | 3 | Am Anfang mehr Laster | Platz und Marke |
+
+      Dazu am selben Tag freigegeben: acht Aufnahmen (Kenney Impact Sounds,
+      OpenGameArt 100 CC0 metal & wood, BigSoundBank #2148, #2147, #914,
+      #1771/#1776/#0235, #0118/#0148/#0771, Pixabay „Grua recicladora")
+      — Paket Ton.
+
+
 - [ ] **Gerätebefund 16.10.2026, drei Punkte** — Patrick, wörtlich: „Die
       Geräuschkulisse muss viel viel besser werden, aktuell höre ich beim
       greifen eher ein summen, autos müssen holkörper werden. Und die
