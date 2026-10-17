@@ -11,6 +11,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
 | E-143 | 17.10.2026 | Nur noch Pripada.de auf den Schildern, fremde Logos raus | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
+| E-142 | 17.10.2026 | Echte Arme, Arbeitshandschuhe umschließen die Joysticks | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-139 | 17.10.2026 | Keine Tonketten, Hämmern und Drücken hörbar, Lautstärke je Gruppe | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-136 | 17.10.2026 | Kamera dreht in jeder Ansicht, Tablet: Finger in der Bildmitte | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-135 | 17.10.2026 | Voller Start, LKW-Wrack an der Ostmauer, ab und zu ein Wohnwagen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -156,6 +157,11 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 **E-143 — Nur Pripada.de auf den Schildern**
 - Nord- und Ostmauer, drei Hallen: Steht überall Pripada.de, gut lesbar?
 - Abholer und grüne Mulden: Sitzt das Logo wie vorher?
+
+**E-142 — Echte Arme, Handschuhe um die Joysticks** (erst nach dem Einbau in excavator.ts sichtbar)
+- Kabinenansicht, Kopf leicht senken: Sehen die Handschuhe aus wie Hände, die den Griff umfassen — Finger vorn herum, Daumen oben?
+- Beide Sticks bewegen: Gehen Hände und Unterarme mit, ohne dass ein Arm abreißt oder durch den Körper fährt?
+- Außenansicht nah an der Kabine: Arm in einem Stück von der Schulter bis zur Hand, Ellbogen natürlich neben dem Körper?
 
 **E-139 — Keine Tonketten mehr, Hämmern und Drücken hörbar** (Augen zu, iPad-Lautsprecher)
 - Fünf Minuten Sandkasten, Funktionsrad drehen, Teile einsortieren: Hörst du irgendwo noch eine Tonfolge, ein Piepen oder eine Melodie?
