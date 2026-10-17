@@ -12,6 +12,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 |---|---|---|---|---|
 | E-135 | 17.10.2026 | Voller Start, LKW-Wrack an der Ostmauer, ab und zu ein Wohnwagen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-134 | 17.10.2026 | Gehaltener Schrott kracht, wenn die Spinne ihn aufschlägt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-133 | 17.10.2026 | Pripada an Waage und Arbeitsplatz, echte Firmenschilder, Pripada-Mulden, Abholer-Logo | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-132 | 16.10.2026 | Die Spinne pendelt frei, ein Wurf behält seinen Schwung | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-131 | 16.10.2026 | Pripada.de statt Rust’n’Reibach, Werbeschilder, drei Laster stehen zum Start an | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-130 | 16.10.2026 | Echte Aufnahmen statt Summen, kein Greifklang bleibt stehen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -161,6 +162,12 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Er setzt dasselbe Teil sachte ab. Bleibt es leise?
 - Er haut ein Teil in eine Mulde und eins auf einen Schrotthaufen. Hörst du, worauf es traf?
 
+**E-133 — Pripada an Waage und Arbeitsplatz, echte Firmenschilder, Pripada-Mulden, Abholer-Logo** (iPad, dann iPhone mini)
+- Aus der Kabine nach vorn: Liest du glasklar-mg.de, Rent4Ring, links an der Ostmauer led-profi.de, und oben rechts über dem Büro groß Pripada.de? Logos scharf und farbtreu?
+- Zur Waage schauen: Wirkt Pripada.de auf dem Bürodach „direkt an der Waage“, sitzt die Tafel sauber auf dem Dach?
+- Abholer rufen: Trägt Achims grüner Container auf beiden Seiten „Pripada.de“ mit dem P, lesbar und nicht spiegelverkehrt? Stören die Sicken im Logo?
+- Die vier grünen Mulden am Rand abgehen (Nordmauer Ost und Mitte, Ostmauer, Südwest-Ecke): wie das Vorlagebild? Fällt ein Wurf hinein? Fährt oder läuft niemand hindurch? iPhone mini so flüssig wie vorher?
+
 **E-132 — Die Spinne pendelt frei, ein Wurf behält seinen Schwung** (iPad)
 - Zügig schwenken und anhalten: Schwingt die Spinne sichtbar durch (bis knapp 40°), und ist sie nach rund 4 s ruhig genug zum Absetzen?
 - Träger greifen, voll schwenken, im Schwung loslassen: Fliegt er deutlich zur Seite?
@@ -168,7 +175,7 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 
 **E-131 — Pripada.de, Werbeschilder, drei Laster zum Start** (iPad, Kabine)
 - SANDKASTEN starten: Stehen am Tor zwei beladene Laster und vor Halle 3 ein dritter? Rollt der erste nach rund 3 s los, und kommt der nächste erst, wenn der erste vom Hof ist?
-- Aus der Kabine nach vorn, nach rechts (Ostmauer) und nach links (Hallen): Kannst du „Pripada.de“, „ROLLMULDE“, „Imbiss zur Waage“, „KIES & KLINKER“ und die drei Hallenschilder lesen? Steht ein Schild im Weg oder verdeckt etwas?
+- ~~Aus der Kabine: „ROLLMULDE“, „Imbiss zur Waage“, „KIES & KLINKER“ lesbar?~~ Entfällt — Schilder durch E-133 ersetzt; geprüft wird dort.
 - Tafel am Tor: „Pripada.de“ mit dem P im Kreis — gefällt die (etwas sattere) Farbe?
 - iPhone mini: so flüssig wie vorher?
 

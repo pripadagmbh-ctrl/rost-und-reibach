@@ -20,6 +20,7 @@ import {
 } from "./yard";
 import { officeFootprints, hallenWaende } from "./office";
 import { CONFIGS, muldenWaendeWelt, type ContainerConfig } from "./containers";
+import { firmenmuldenHindernisse } from "./firmenmulden";
 
 /**
  * Feste Bauten auf dem Platz — alles, wodurch niemand hindurchlaufen oder
@@ -388,6 +389,9 @@ export const STATIC_OBSTACLES: Obstacle[] = [
     top: 6.9,
     label: `Halle ${w.nr} ${w.teil}`,
   })),
+
+  // Die vier Pripada-Mulden am Platzrand (E-133): volle Grundfläche, Höhe = Oberkante
+  ...firmenmuldenHindernisse(),
 ];
 
 /**

@@ -3,6 +3,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import RAPIER from "@dimforge/rapier3d-compat";
 import { BED_HALF_W } from "./routes";
 import { ladeHoeheGrenze } from "./fuellgrad";
+import { werbeAtlas, atlasFeld, PRIPADA_GRUEN } from "../world/werbung";
 
 /**
  * Oberkante des Ladeflächen-KOLLIDERS in Flächenkoordinaten.
@@ -973,6 +974,50 @@ function leiterrahmen(laenge: number): THREE.BufferGeometry {
   return g;
 }
 
+/**
+ * DAS PRIPADA-ZEICHEN AM ABHOLER (E-133).
+ *
+ * Patrick, 17.10.2026: „abholer und eigene LKW sollen auch pripada Logo
+ * tragen". Achims Abrollkipper ist der einzige Laster, der dem Hof gehört —
+ * Anlieferer sind Kunden und bekommen nichts. Die beiden Seitenwände bekommen
+ * statt des einfarbigen Grüns den gemeinsamen Atlas (`werbung.werbeAtlas`):
+ * außen das Signet, sonst überall dasselbe Grün. Die Netzzahl bleibt (E-108).
+ *
+ * EIN Material je Programmlauf, nicht je Wagen: Jedes neue three-Objekt zieht
+ * Zufallszahlen für seine UUID und verschöbe damit die gewürfelten Fuhren.
+ * `null`, solange es keinen Atlas gibt (Vitest ohne Leinwand) — dann bleibt
+ * alles wie bisher.
+ */
+let logoStoff: THREE.MeshStandardMaterial | null = null;
+function pripadaLogoStoff(): THREE.MeshStandardMaterial | null {
+  if (logoStoff) return logoStoff;
+  const atlas = werbeAtlas();
+  if (!atlas) return null;
+  // Weiß × Atlasgrün = das Grün von `sideMat`; Rauheit und Metall wie dort
+  logoStoff = new THREE.MeshStandardMaterial({ color: 0xffffff, map: atlas, roughness: 0.75, metalness: 0.35 });
+  return logoStoff;
+}
+
+/**
+ * Die Seitenwand als Quader mit Atlas-Koordinaten: Die Außenfläche (links
+ * −x, rechts +x) zeigt das Signet im Seitenverhältnis der Wand, alle anderen
+ * Flächen das reine Grün. `BoxGeometry` legt die Flächen in der Reihenfolge
+ * +x, −x, +y, −y, +z, −z an, je vier Ecken, und richtet jede so aus, dass sie
+ * von außen ungespiegelt liest.
+ */
+function logoWand(wallH: number, bedLen: number, dir: -1 | 1): THREE.BoxGeometry {
+  const geo = new THREE.BoxGeometry(0.08, wallH, bedLen);
+  const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
+  const aussen = dir > 0 ? 0 : 1;
+  const logo = atlasFeld("pripadaGruen", bedLen / wallH);
+  const gruen = atlasFeld("pripadaGruenRand");
+  for (let i = 0; i < uv.count; i++) {
+    const f = Math.floor(i / 4) === aussen ? logo : gruen;
+    uv.setXY(i, f.u0 + uv.getX(i) * (f.u1 - f.u0), f.v0 + uv.getY(i) * (f.v1 - f.v0));
+  }
+  return geo;
+}
+
 export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const paint = new THREE.MeshStandardMaterial({ color: lackFuer(v.halter), roughness: 0.62 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8 });
@@ -1105,7 +1150,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const aufbau = v.bodyStyle ?? "flach";
   const wallH = wandHoehe(v.kind, v.bodyStyle);
   const sideMat = isContainer
-    ? new THREE.MeshStandardMaterial({ color: 0x2f7a4f, roughness: 0.75, metalness: 0.35 })
+    ? new THREE.MeshStandardMaterial({ color: PRIPADA_GRUEN, roughness: 0.75, metalness: 0.35 })
     : aufbau === "koffer"
       ? new THREE.MeshStandardMaterial({ color: 0x53585d, roughness: 0.8, metalness: 0.3 })
       : bedMat;
@@ -1115,7 +1160,11 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
     const hinge = new THREE.Group();
     hinge.name = BAUGRUPPE.bordwand;
     hinge.position.set(dir * (BED_HALF_W + 0.05), 0.02, v.bedLen / 2);
-    const side = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallH, v.bedLen), sideMat);
+    const logo = isContainer ? pripadaLogoStoff() : null;
+    const side = new THREE.Mesh(
+      logo ? logoWand(wallH, v.bedLen, dir) : new THREE.BoxGeometry(0.08, wallH, v.bedLen),
+      logo ?? sideMat
+    );
     side.position.y = wallH / 2;
     side.castShadow = true;
     hinge.add(side);

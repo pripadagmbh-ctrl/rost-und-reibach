@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { SCHILD_POS, SCHILD_B, SCHILD_H, YARD_D, YARD_MAX_X } from "./yard";
-import { HALLEN_X, HALLEN_Z, HALLE_TIEFE } from "./office";
+import { SCHILD_POS, SCHILD_B, SCHILD_H, YARD_D, YARD_MAX_X, BUCHT_Z, TRENNSTEIN_X } from "./yard";
+import { HALLEN_X, HALLEN_Z, HALLE_TIEFE, OFFICE_X, OFFICE_Z } from "./office";
 
 /**
  * DER FIRMENNAME — die eine Stelle (E-131).
@@ -17,28 +17,56 @@ export const FIRMA = "Pripada.de";
 
 /* ------------------------------------------------------------ Bildinhalt -- */
 
+/**
+ * Das Grün der Pripada-Behälter: der Abrollcontainer des Abholers
+ * (`vehicleModel.ts`, seit jeher 0x2f7a4f) und die Firmenmulden
+ * (`firmenmulden.ts`, E-133). Eine Zahl, damit Lack und Aufkleber nicht
+ * auseinanderlaufen.
+ */
+export const PRIPADA_GRUEN = "#2f7a4f";
+
+/** Ein fremdes Logo als Bilddatei unter `public/logos/`. */
+interface Logo {
+  datei: string;
+  /** Ausschnitt in Bildpixeln [x, y, b, h] — ohne Angabe das ganze Bild */
+  aus?: [number, number, number, number];
+  /** Höchstens so viel der Zellbreite bzw. -höhe (seitentreu eingepasst) */
+  b: number;
+  h: number;
+  /**
+   * Die Datei darf fehlen: Dann bleibt der gesetzte Name stehen. Fehlt sie
+   * nicht, ersetzt das Bild die Schrift.
+   */
+  freiwillig?: boolean;
+}
+
 /** Was auf einer Tafel steht und in welchen Farben. */
 interface Bild {
-  /** Plattenfarbe — verwittert, nie reinweiß */
+  /** Plattenfarbe — verwittert, nie reinweiß (außer unter fremden Logos) */
   grund: string;
   /** Farbe der Hauptzeile */
   schrift: string;
   /** Farbe der Nebenzeilen */
   neben: string;
-  /** Die große Zeile */
+  /** Die große Zeile — bei Logotafeln der Firmenname, wie er im Logo steht */
   name: string;
   /** Kleinere Zeilen darunter (höchstens zwei) */
   zeilen: string[];
   /** Das P-Signet über dem Namen — nur bei Pripada */
   signet?: boolean;
+  /** Rost und Flecken — nur Pripadas eigene Tafeln; fremde Logos bleiben sauber */
+  verwittert: boolean;
+  /** Fremdes Logo statt Schrift; ohne `freiwillig` wird der Name nicht gemalt */
+  logo?: Logo;
 }
 
 /*
- * ERFUNDENE BETRIEBE (Auftrag 16.10.2026: „Pripada.de und erfundene örtliche
- * Betriebe … keine echten fremden Marken"). Die Namen sind Wortspiele aus dem
- * Gewerbe, keine Familiennamen — ein gewöhnlicher Nachname mit Gewerbe gibt es
- * irgendwo in Deutschland bestimmt wirklich. Milieu aus Beruf und Geschäft
- * (Ton-Leitplanke, CLAUDE.md Regel 7). Gegen kein Register geprüft.
+ * ECHTE FIRMEN (E-133). Patrick, 17.10.2026, wörtlich: „Pripada prominent
+ * direkt an der waage und da wo gearbeitet wird. Ansonsten Schilder von
+ * Rent4ring, glasklar-mg.de, MecLight bzw. led.profi.de." Die erfundenen
+ * Betriebe aus E-131 sind damit weg. Logos unverfälscht: nur seitentreu
+ * skaliert, keine Farbe, kein Zuschnitt ins Logo, kein Rost darüber.
+ * „MecLight" steht nirgends als Text — dafür kam kein Logo (offene Frage).
  */
 const PRIPADA: Bild = {
   grund: "#e8e4db",
@@ -47,27 +75,7 @@ const PRIPADA: Bild = {
   name: FIRMA,
   zeilen: ["SCHROTT & METALLE", "ANKAUF · ABHOLUNG · CONTAINER"],
   signet: true,
-};
-const CONTAINER: Bild = {
-  grund: "#e3b62c",
-  schrift: "#1c1c1c",
-  neben: "#3a3326",
-  name: "ROLLMULDE",
-  zeilen: ["CONTAINERDIENST", "ABSETZMULDEN 3–10 m³ · ABROLLER"],
-};
-const IMBISS: Bild = {
-  grund: "#b7322a",
-  schrift: "#f4efe4",
-  neben: "#f1d9a8",
-  name: "Imbiss zur Waage",
-  zeilen: ["CURRYWURST · POMMES · FRIKADELLE", "200 m HINTER DEM TOR"],
-};
-const BAUSTOFFE: Bild = {
-  grund: "#2c4f7a",
-  schrift: "#f2f0ea",
-  neben: "#c8d3df",
-  name: "KIES & KLINKER",
-  zeilen: ["BAUSTOFFE", "SAND · SPLITT · PFLASTER · LIEFERUNG"],
+  verwittert: true,
 };
 const PRIPADA_HALLE: Bild = {
   grund: "#e8e4db",
@@ -75,21 +83,32 @@ const PRIPADA_HALLE: Bild = {
   neben: "#7d7565",
   name: FIRMA,
   zeilen: ["SORTIERHALLE"],
+  verwittert: true,
 };
-const WERKSTATT: Bild = {
-  grund: "#33383d",
-  schrift: "#f08a24",
-  neben: "#d8d8d2",
-  name: "SCHRAUBHALLE",
-  zeilen: ["KFZ-MEISTERBETRIEB · HU/AU"],
-};
-const REIFEN: Bild = {
-  grund: "#1e1e1e",
-  schrift: "#f2c230",
-  neben: "#e6e6e0",
-  name: "REIFEN-ECKE",
-  zeilen: ["REIFEN · FELGEN · EINLAGERUNG"],
-};
+/** Reinweiß wie der Grund der gelieferten Logos — sonst sähe man deren Kante. */
+const LOGO_PLATTE = "#ffffff";
+const logoTafel = (name: string, logo: Logo): Bild => ({
+  grund: LOGO_PLATTE, schrift: "#1d2a36", neben: "#1d2a36", name, zeilen: [], verwittert: false, logo,
+});
+/*
+ * `rent4ring.webp` ist 670 × 670, das Logo selbst steht in x 41…627,
+ * y 231…436 (gemessen 17.10.2026 mit Pixel-Scan, Schwelle < 235 je Kanal).
+ * `led-profi.jpg` ist 1109 × 197 und wird ganz verwendet — sein weißer Rand
+ * passt zur weißen Platte. Anteile 85 / 90 % der Zellbreite: Vorgabe Bauleiter.
+ */
+const RENT4RING_AUS: [number, number, number, number] = [41, 231, 587, 206];
+const RENT4RING = logoTafel("Rent4Ring", { datei: "rent4ring.webp", aus: RENT4RING_AUS, b: 0.85, h: 0.85 });
+/*
+ * Von glasklar-mg.de gibt es noch kein Logo und wir wissen nicht, was die
+ * Firma macht — also nur der Name, keine erfundene Zusatzzeile. Liegt eines
+ * Tages `public/logos/glasklar-mg.webp` im Ordner, ersetzt es die Schrift
+ * von allein; „Logo nachreichen" ist dann wirklich nur eine Datei.
+ */
+const GLASKLAR = logoTafel("glasklar-mg.de", { datei: "glasklar-mg.webp", b: 0.85, h: 0.8, freiwillig: true });
+const LED_PROFI = logoTafel("led-profi.de", { datei: "led-profi.jpg", b: 0.9, h: 0.9 });
+/* Hallenblenden 4 : 1 — seitentreu mit Rand (SW: 88 % × 78 % der Zelle). */
+const LED_PROFI_FLACH = logoTafel("led-profi.de", { datei: "led-profi.jpg", b: 0.88, h: 0.78 });
+const RENT4RING_FLACH = logoTafel("Rent4Ring", { datei: "rent4ring.webp", aus: RENT4RING_AUS, b: 0.88, h: 0.78 });
 
 /* ------------------------------------------------------------- Der Atlas -- */
 
@@ -105,7 +124,8 @@ const REIFEN: Bild = {
  * Eine große Zelle ist 1024 × 512 Pixel — dieselbe Dichte, mit der die
  * Firmentafel seit dem 12.09.2026 auf dem Gerät gelesen wird. Eine Hallenzelle
  * ist 1024 × 256 (4 : 1 wie die Blende über dem Tor). 2048 × 1536 fasst vier
- * große und vier flache Zellen; die achte flache bleibt frei.
+ * große und vier flache Zellen. Die vierte flache ist seit E-133 keine Tafel,
+ * sondern das grüne Pripada-Feld für Abholer und Firmenmulden (`atlasFeld`).
  */
 const ATLAS_B = 2048;
 const ATLAS_H = 1536;
@@ -123,13 +143,44 @@ const flach = (i: number): Zelle => ({ x: (i % 2) * 1024, y: 1024 + Math.floor(i
 /** Jedes Bild einmal im Atlas — zwei Tafeln mit demselben Bild teilen sich die Zelle. */
 const ZELLEN: Array<[Bild, Zelle]> = [
   [PRIPADA, gross(0)],
-  [CONTAINER, gross(1)],
-  [IMBISS, gross(2)],
-  [BAUSTOFFE, gross(3)],
+  [RENT4RING, gross(1)],
+  [GLASKLAR, gross(2)],
+  [LED_PROFI, gross(3)],
   [PRIPADA_HALLE, flach(0)],
-  [WERKSTATT, flach(1)],
-  [REIFEN, flach(2)],
+  [LED_PROFI_FLACH, flach(1)],
+  [RENT4RING_FLACH, flach(2)],
 ];
+/** Das grüne Feld: ganze Zelle Grün, Signet und Name nur im mittleren 512 × 256. */
+const GRUEN = flach(3);
+const GRUEN_MITTE_B = 512;
+
+/** Rechteck im Atlas als Texturkoordinaten (v nach oben, wie three es liest). */
+export interface AtlasFeld {
+  u0: number;
+  v0: number;
+  u1: number;
+  v1: number;
+}
+
+/**
+ * Wo im Atlas das grüne Pripada-Feld liegt.
+ *
+ * „pripadaGruen": zentrierter Ausschnitt der grünen Zelle mit dem gewünschten
+ * Seitenverhältnis (Breite/Höhe), Höhe = volle Zellhöhe; das Signet steht in
+ * der Mitte. Breiter als die Zelle (4 : 1) geht nicht — dann bleibt es 4 : 1.
+ * „pripadaGruenRand": ein kleines Feld nur Grün am linken Zellrand, für
+ * Flächen, die einfarbig grün sein sollen. 64 px Abstand zu den Nachbarzellen,
+ * damit die Mipmaps kein Weiß hereinziehen (SW).
+ */
+export function atlasFeld(feld: "pripadaGruen" | "pripadaGruenRand", seitenverhaeltnis = 2): AtlasFeld {
+  const px = (x0: number, y0: number, x1: number, y1: number): AtlasFeld => ({
+    u0: x0 / ATLAS_B, u1: x1 / ATLAS_B, v0: 1 - y1 / ATLAS_H, v1: 1 - y0 / ATLAS_H,
+  });
+  if (feld === "pripadaGruenRand") return px(GRUEN.x + 64, GRUEN.y + 64, GRUEN.x + 192, GRUEN.y + GRUEN.h - 64);
+  const b = Math.min(GRUEN.h * seitenverhaeltnis, GRUEN.b);
+  const mx = GRUEN.x + GRUEN.b / 2;
+  return px(mx - b / 2, GRUEN.y, mx + b / 2, GRUEN.y + GRUEN.h);
+}
 
 /* ------------------------------------------------------------ Die Tafeln -- */
 
@@ -150,6 +201,8 @@ export interface Werbeschild {
   pfosten: boolean;
   /** Pfosten mit Kollider — nur die Firmentafel am Tor (Bestand) */
   kollider?: boolean;
+  /** Unterkante der Pfosten (m) — 0 am Boden, > 0 auf einem Dach */
+  fuss?: number;
 }
 
 /** Schaut nach −z (von der Nordmauer auf den Platz) */
@@ -158,6 +211,8 @@ const NACH_SUEDEN = Math.PI;
 const NACH_WESTEN = -Math.PI / 2;
 /** Schaut nach +x (Hallenfront, `office.TOR_RICHTUNG`) */
 const NACH_OSTEN = Math.PI / 2;
+/** Schaut nach +z (von hinter der Bucht auf den Platz) */
+const NACH_NORDEN = 0;
 
 /**
  * Die freistehenden Tafeln stehen HINTER der Mauer, 1,5 m hinter ihrer Achse
@@ -197,6 +252,41 @@ const BLENDE_Y = 4.475 + BLENDE_H / 2;
 const BLENDE_X = HALLEN_X + HALLE_TIEFE / 2 + 0.18 + 0.03;
 
 /**
+ * PRIPADA AUF DEM BÜRODACH, DIREKT AN DER WAAGE (E-133).
+ *
+ * Patrick, 17.10.2026: „Pripada prominent direkt an der waage". Ein
+ * Dachaufsteller auf dem Büro, Schaufläche nach Osten zur Waage und auf den
+ * Platz. 7,0 × 3,5 m = 2 : 1 wie die Zelle (Vorgabe Bauleiter). Mitte 2,5 m
+ * östlich der Gebäudemitte, also über der Ostfront-Hälfte (SW), wo man sie von
+ * der Waage aus über die Traufe hinweg sieht.
+ *
+ * Höhen aus `office.ts`: Traufe 6,2 m (2 Geschosse à 3,1), First 1,7 m darüber
+ * auf 7,9 m, halbe Gebäudebreite 3,1 m, First läuft in x. Die Unterkante liegt
+ * 0,2 m über dem First (SW) auf 8,1 m. Die Pfosten (bei ±0,32 · 7,0 = ±2,24 m)
+ * stehen auf der Dachfläche: Dort liegt die Mittelebene der Deckung auf
+ * 6,2 + 1,7 · (1 − 2,24/3,1) = 6,67 m, ihre Oberseite 0,09 m höher (Platte
+ * 0,16 m, 29° geneigt). Ein Pfosten ist 0,45 m tief; seine talseitige Kante
+ * liegt 0,12 m tiefer als die Mitte. 6,6 m lässt alle Kanten im Dach stecken
+ * statt darüber zu schweben.
+ */
+const DACH_B = 7.0;
+const DACH_H = 3.5;
+const DACH_UNTERKANTE = 7.9 + 0.2;
+const DACH_FUSS = 6.6;
+
+/**
+ * PRIPADA HINTER DER BUCHT (E-133): „da wo gearbeitet wird". Wer an den Halden
+ * greift, schaut nach Süden auf die Buchtrückwand (`SUED_HOCH` = 4,8 m). Die
+ * Tafel steht `HINTER_MAUER` dahinter, Unterkante 5,0 m — knapp über der Wand
+ * (SW). Mitte x 0,5 = über der Fuge zwischen den Halden (`TRENNSTEIN_X`).
+ * Nachgerechnet mit dem festen Zufall aus `buildLandscape`: Kein Baum steht
+ * zwischen Tafel und Bucht; der nächste (6,1 | −40,4) steht 3,4 m dahinter,
+ * seine Krone (Radius 2,1 m) endet 1,3 m hinter der Tafel und 1,8 m unter
+ * ihrer Oberkante.
+ */
+const BUCHT_UNTERKANTE = 5.0;
+
+/**
  * Alle Tafeln des Platzes. Gerechnet beim Aufruf, nicht beim Laden: `yard.ts`
  * baut sie, und diese Datei liest Zahlen aus `yard.ts` — so entsteht kein
  * Ringschluss beim Laden der Module.
@@ -223,19 +313,29 @@ export function werbeschilder(): Werbeschild[] {
      * (x −22 ± 1,55). 1,0 … 10,0 lässt den Flutlichtmast auf x 0
      * (`daylight.einmauern`) in der Lücke stehen.
      */
-    frei("Containerdienst, Nordmauer am Tor", CONTAINER, -13.0, nord, NACH_SUEDEN),
-    frei("Imbiss, Nordmauer Ost", IMBISS, 5.5, nord, NACH_SUEDEN),
+    frei("Rent4Ring, Nordmauer am Tor", RENT4RING, -13.0, nord, NACH_SUEDEN),
+    frei("glasklar-mg.de, Nordmauer Ost", GLASKLAR, 5.5, nord, NACH_SUEDEN),
     /*
      * Ostmauer: z −20 … −11 steht hinter dem Abladeplatz, rechts vom Sitz —
-     * dorthin schaut, wer einen Laster leer macht. z 11,5 … 20,5 lässt die
-     * Masten auf z 8 und z 26 frei.
+     * dorthin schaut, wer einen Laster leer macht; seit E-133 Pripada („da wo
+     * gearbeitet wird"). z 11,5 … 20,5 lässt die Masten auf z 8 und z 26 frei.
      */
-    frei("Baustoffe, Ostmauer am Abladeplatz", BAUSTOFFE, ost, -15.5, NACH_WESTEN),
-    frei("Pripada, Ostmauer Nord", PRIPADA, ost, 16.0, NACH_WESTEN),
+    frei("Pripada, Ostmauer am Abladeplatz", PRIPADA, ost, -15.5, NACH_WESTEN),
+    frei("led-profi.de, Ostmauer Nord", LED_PROFI, ost, 16.0, NACH_WESTEN),
+    {
+      name: "Pripada, Dach Büro an der Waage", bild: PRIPADA,
+      x: OFFICE_X + 2.5, y: DACH_UNTERKANTE + DACH_H / 2, z: OFFICE_Z, b: DACH_B, h: DACH_H,
+      rot: NACH_OSTEN, pfosten: true, fuss: DACH_FUSS,
+    },
+    {
+      name: "Pripada, hinter der Bucht", bild: PRIPADA,
+      x: TRENNSTEIN_X, y: BUCHT_UNTERKANTE + FREI_H / 2, z: BUCHT_Z - HINTER_MAUER, b: FREI_B, h: FREI_H,
+      rot: NACH_NORDEN, pfosten: true,
+    },
     // Die drei Hallen: Blende über dem Tor, auf den Platz hin.
     blende("Halle 1", PRIPADA_HALLE, 0),
-    blende("Halle 2", WERKSTATT, 1),
-    blende("Halle 3", REIFEN, 2),
+    blende("Halle 2", LED_PROFI_FLACH, 1),
+    blende("Halle 3", RENT4RING_FLACH, 2),
   ];
 }
 
@@ -278,7 +378,12 @@ function maleTafel(ctx: CanvasRenderingContext2D, bild: Bild, z: Zelle, saat: nu
 
   ctx.fillStyle = bild.grund;
   ctx.fillRect(0, 0, z.b, z.h);
-  for (let i = 0; i < 90 * k; i++) {
+  // Logotafel: weiße Platte, das Bild kommt beim Laden (`ladeLogo`)
+  if (bild.logo && !bild.logo.freiwillig) {
+    ctx.restore();
+    return;
+  }
+  for (let i = 0; bild.verwittert && i < 90 * k; i++) {
     const r = (20 + zuf() * 90) * k;
     ctx.fillStyle = `rgba(150,142,126,${0.03 + zuf() * 0.06})`;
     ctx.beginPath();
@@ -289,13 +394,16 @@ function maleTafel(ctx: CanvasRenderingContext2D, bild: Bild, z: Zelle, saat: nu
   const mx = z.b / 2;
   const breitMax = z.b - 140 * Math.max(k, 0.6);
   ctx.textAlign = "center";
+  // Schlagschatten nur auf den verwitterten Blechtafeln; die saubere Platte bleibt sauber
+  const schatten = bild.verwittert ? "rgba(30,26,22,0.25)" : "rgba(0,0,0,0)";
   if (k >= 1) {
     // Große Tafel: Signet (falls), Name, zwei Zeilen — Satz der Firmentafel
     if (bild.signet) maleSignet(ctx, mx, 150);
-    ctx.fillStyle = "rgba(30,26,22,0.25)";
+    ctx.fillStyle = schatten;
     ctx.letterSpacing = "2px";
     setzeSchrift(ctx, 700, bild.signet ? 108 : 150, bild.name, breitMax);
-    const grund = bild.signet ? 330 : 250;
+    // Ohne Zeilen steht der Name in der Mitte: Grundlinie 0,7 × 150 / 2 unter der Zellmitte
+    const grund = bild.signet ? 330 : bild.zeilen.length > 0 ? 250 : 256 + 52;
     ctx.fillText(bild.name, mx + 3, grund + 3);
     ctx.fillStyle = bild.schrift;
     ctx.fillText(bild.name, mx, grund);
@@ -314,7 +422,7 @@ function maleTafel(ctx: CanvasRenderingContext2D, bild: Bild, z: Zelle, saat: nu
     // Hallenblende: Name groß, eine Zeile darunter
     ctx.letterSpacing = "2px";
     setzeSchrift(ctx, 700, 112, bild.name, breitMax);
-    ctx.fillStyle = "rgba(30,26,22,0.25)";
+    ctx.fillStyle = schatten;
     ctx.fillText(bild.name, mx + 3, 128 + 3);
     ctx.fillStyle = bild.schrift;
     ctx.fillText(bild.name, mx, 128);
@@ -327,7 +435,36 @@ function maleTafel(ctx: CanvasRenderingContext2D, bild: Bild, z: Zelle, saat: nu
   }
   ctx.letterSpacing = "0px";
 
-  verwittere(ctx, z, k, zuf);
+  if (bild.verwittert) verwittere(ctx, z, k, zuf);
+  ctx.restore();
+}
+
+/** Heller Ton für Signet und Namen auf Grün (SW: gebrochenes Weiß wie die Tafelplatte). */
+const GRUEN_SCHRIFT = "#f2efe6";
+
+/**
+ * Die grüne Zelle: überall `PRIPADA_GRUEN`, im mittleren 512 × 256-Feld das
+ * Signet über „Pripada.de". Links und rechts davon je 256 px reines Grün —
+ * dort tastet `atlasFeld("pripadaGruenRand")` die Flächenfarbe ab. Keine
+ * Verwitterung: Das ist Lack auf einem Behälter, kein Blechschild.
+ */
+function maleGruen(ctx: CanvasRenderingContext2D, z: Zelle): void {
+  ctx.save();
+  ctx.fillStyle = PRIPADA_GRUEN;
+  ctx.fillRect(z.x, z.y, z.b, z.h);
+  const mx = z.x + z.b / 2;
+  // Signet auf 55 % (gut 100 px hoch), darunter der Name — Satz wie die große Tafel
+  ctx.save();
+  ctx.translate(mx, z.y + 72);
+  ctx.scale(0.55, 0.55);
+  maleSignet(ctx, 0, 0, GRUEN_SCHRIFT);
+  ctx.restore();
+  ctx.fillStyle = GRUEN_SCHRIFT;
+  ctx.textAlign = "center";
+  ctx.letterSpacing = "2px";
+  setzeSchrift(ctx, 700, 90, FIRMA, GRUEN_MITTE_B - 52);
+  ctx.fillText(FIRMA, mx, z.y + 222);
+  ctx.letterSpacing = "0px";
   ctx.restore();
 }
 
@@ -336,9 +473,9 @@ function maleTafel(ctx: CanvasRenderingContext2D, bild: Bild, z: Zelle, saat: nu
  * a6cc90f), auf 71 % verkleinert (Radius 110 → 78), damit es über der
  * Wortmarke Platz hat wie der Ring der Rust’n’Reibach-Tafel.
  */
-function maleSignet(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
-  ctx.strokeStyle = "#9a8f7c";
-  ctx.fillStyle = "#9a8f7c";
+function maleSignet(ctx: CanvasRenderingContext2D, cx: number, cy: number, farbe = "#9a8f7c"): void {
+  ctx.strokeStyle = farbe;
+  ctx.fillStyle = farbe;
   ctx.lineCap = "butt";
   ctx.lineWidth = 24;
   ctx.beginPath();
@@ -427,23 +564,72 @@ function verwittere(ctx: CanvasRenderingContext2D, z: Zelle, k: number, zuf: () 
 const RAHMEN_FARBE = 0x3a4045;
 
 /**
- * Alle Tafeln bauen: ein Netz für die Schauflächen, eins für Rahmen und
- * Pfosten. Die Firmentafel behält ihre beiden Pfosten-Kollider (Bestand);
- * die neuen Tafeln stehen hinter der Mauer bzw. an der Hallenwand und
- * brauchen keinen — dorthin fährt und greift niemand.
+ * Ein Logo in seine Zelle malen, sobald die Datei geladen ist.
+ *
+ * Eigener Ordner, kein fremder Server: `BASE_URL` ist `"./"` und läuft so
+ * unter `/v1/` und in Safari (WebP ab iOS 14). Ohne `Image` (Vitest/Node)
+ * bleibt die Platte weiß. Fehlt eine freiwillige Datei, bleibt die Schrift.
  */
-export function baueWerbeschilder(scene: THREE.Scene, world: RAPIER.World): void {
-  const schilder = werbeschilder();
+function ladeLogo(ctx: CanvasRenderingContext2D, tex: THREE.Texture, bild: Bild, z: Zelle): void {
+  const logo = bild.logo;
+  if (!logo || typeof Image === "undefined") return;
+  const img = new Image();
+  img.onload = (): void => {
+    const [sx, sy, sb, sh] = logo.aus ?? [0, 0, img.naturalWidth, img.naturalHeight];
+    // Seitentreu: der kleinere der beiden Maßstäbe gewinnt
+    const s = Math.min((z.b * logo.b) / sb, (z.h * logo.h) / sh);
+    const b = sb * s;
+    const h = sh * s;
+    ctx.fillStyle = bild.grund;
+    ctx.fillRect(z.x, z.y, z.b, z.h);
+    ctx.drawImage(img, sx, sy, sb, sh, z.x + (z.b - b) / 2, z.y + (z.h - h) / 2, b, h);
+    tex.needsUpdate = true;
+  };
+  img.src = `${import.meta.env?.BASE_URL ?? "./"}logos/${logo.datei}`;
+}
 
+/** Der eine Atlas für Tafeln, Abholer und Firmenmulden. */
+let atlas: THREE.CanvasTexture | null = null;
+
+/**
+ * DER GEMEINSAME ATLAS (E-133): einmal angelegt, von allen benutzt — Tafeln,
+ * Abholer-Container, Firmenmulden. `null`, solange es kein `document` gibt
+ * (Vitest ohne Leinwand-Attrappe); dann wird beim nächsten Aufruf neu gefragt.
+ */
+export function werbeAtlas(): THREE.CanvasTexture | null {
+  if (atlas) return atlas;
+  if (typeof document === "undefined") return null;
   const canvas = document.createElement("canvas");
   canvas.width = ATLAS_B;
   canvas.height = ATLAS_H;
   const ctx = canvas.getContext("2d")!;
+  /*
+   * Kopflose Attrappen, die Zeichenbefehle nur schlucken (`leinwandAttrappe`,
+   * die in `containerrueckgabe.test.ts`), liefern keinen Farbverlauf — damit
+   * lässt sich keine Tafel malen. Dort gibt es keinen Atlas, und Abholer und
+   * Mulden bleiben, wie sie ohne Leinwand sind. Ein Browser hat immer einen.
+   */
+  if (typeof ctx.createLinearGradient(0, 0, 0, 1)?.addColorStop !== "function") return null;
   // Dieselbe Saat wie die Firmentafel vom 12.09.2026, je Zelle weitergezählt
   ZELLEN.forEach(([bild, zelle], i) => maleTafel(ctx, bild, zelle, 20260912 + i));
+  maleGruen(ctx, GRUEN);
   const tex = new THREE.CanvasTexture(canvas);
   tex.anisotropy = 4;
   tex.colorSpace = THREE.SRGBColorSpace;
+  for (const [bild, zelle] of ZELLEN) ladeLogo(ctx, tex, bild, zelle);
+  atlas = tex;
+  return tex;
+}
+
+/**
+ * Alle Tafeln bauen: ein Netz für die Schauflächen, eins für Rahmen und
+ * Pfosten. Die Firmentafel behält ihre beiden Pfosten-Kollider (Bestand);
+ * die anderen stehen hinter der Mauer, auf dem Bürodach bzw. an der
+ * Hallenwand und brauchen keinen — dorthin fährt und greift niemand.
+ */
+export function baueWerbeschilder(scene: THREE.Scene, world: RAPIER.World): void {
+  const schilder = werbeschilder();
+  const tex = werbeAtlas()!;
 
   const tafeln: THREE.BufferGeometry[] = [];
   const rahmen: THREE.BufferGeometry[] = [];
@@ -480,13 +666,14 @@ export function baueWerbeschilder(scene: THREE.Scene, world: RAPIER.World): void
     if (!s.pfosten) continue;
     // Pfosten hinter der Tafel, nicht davor: sonst schneiden ihre Kanten in
     // die Schrift. Die Schaufläche bleibt plan (Wunsch 02.09.2026).
-    const pfostenH = s.y;
+    const fuss = s.fuss ?? 0;
+    const pfostenH = s.y - fuss;
     for (const px of [-s.b * 0.32, s.b * 0.32]) {
       const p = new THREE.BoxGeometry(0.45, pfostenH, 0.45);
-      p.applyMatrix4(m.makeTranslation(px, pfostenH / 2 - s.y, -0.55));
+      p.applyMatrix4(m.makeTranslation(px, fuss + pfostenH / 2 - s.y, -0.55));
       rahmen.push(p.applyMatrix4(lage));
       if (!s.kollider) continue;
-      const w = new THREE.Vector3(px, pfostenH / 2, -0.55).applyAxisAngle(achse, s.rot);
+      const w = new THREE.Vector3(px, fuss + pfostenH / 2, -0.55).applyAxisAngle(achse, s.rot);
       world.createCollider(
         RAPIER.ColliderDesc.cuboid(0.225, pfostenH / 2, 0.225).setTranslation(s.x + w.x, w.y, s.z + w.z),
         pfostenBody

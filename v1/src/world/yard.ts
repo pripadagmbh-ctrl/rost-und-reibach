@@ -2,6 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { reihenstuecke } from "./legoreihe";
 import { baueWerbeschilder } from "./werbung";
+import { baueFirmenmulden } from "./firmenmulden";
 
 /** Position der Brückenwaage in der Nordspur (SW) */
 /**
@@ -360,6 +361,8 @@ export class Yard {
     this.buildLandscape(scene);
     // Firmentafel und Werbeschilder: ein Atlas, zwei Netze (E-131)
     baueWerbeschilder(scene, world);
+    // Vier grüne Pripada-Mulden am Rand: zwei Netze, ein fester Körper (E-133)
+    baueFirmenmulden(scene, world);
   }
 
   /**

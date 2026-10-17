@@ -1,0 +1,155 @@
+/**
+ * E-133 — Patrick, 17.10.2026: „Baue auch container auf dem schrottplatz mit
+ * ein, aber mit pripada drauf", „ne, die mulden bleiben", „nur paar container
+ * am rand verteilen".
+ *
+ *  1. Ein paar einzelne Mulden, am Rand, innerhalb der Mauern.
+ *  2. Keine steht einem Bauwerk, dem Bagger oder einem Verladeplatz im Weg.
+ *     Ob Laster, Lambert und Streife durchfahren, beweisen die Fahrweg-Wächter
+ *     (`fahrumriss`, `durchfahrt`, `anstehen`, `engstellen`, `lambert*`,
+ *     `police`): Sie fahren gegen dieselbe Hindernisliste.
+ *  3. Zwei Netze für alle vier, fünf Kollider je Mulde, und was hineinfällt,
+ *     landet auf dem Boden statt auf einem Deckel.
+ */
+import { describe, it, expect, beforeAll } from "vitest";
+import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
+import { initPhysics } from "../src/physics/physicsWorld";
+import { FIRMENMULDEN, firmenmuldenHindernisse, baueFirmenmulden } from "../src/world/firmenmulden";
+import { alleHindernisse } from "../src/world/obstacles";
+import { YARD_D, YARD_MIN_X, YARD_MAX_X } from "../src/world/yard";
+import { BAGGER_STAND, VERLADE_STAND, SCHWENK_AUSSEN } from "../src/world/baggerstand";
+import { alleAbholPlaetze } from "../src/delivery/routes";
+import { CONFIGS } from "../src/world/containers";
+import { leinwandMitVerlauf } from "../tools/engstellen-kern";
+
+const HZ = YARD_D / 2;
+/** Halbe Mauerdicke (drei Reihen à 0,6 m, `obstacles.WALL_T`) */
+const MAUER = 0.3;
+const hindernisse = firmenmuldenHindernisse();
+const ecken = (o: (typeof hindernisse)[number]): Array<[number, number]> => [
+  [o.x - o.hw, o.z - o.hd],
+  [o.x + o.hw, o.z - o.hd],
+  [o.x - o.hw, o.z + o.hd],
+  [o.x + o.hw, o.z + o.hd],
+];
+
+describe("Firmenmulden am Rand (E-133)", () => {
+  it("ein paar einzelne, keine Reihe", () => {
+    expect(FIRMENMULDEN.length).toBeGreaterThanOrEqual(3);
+    expect(FIRMENMULDEN.length).toBeLessThanOrEqual(5);
+    // Einzeln: keine zwei näher als 5 m (SW) — sonst wäre es eine Reihe
+    for (const a of FIRMENMULDEN) {
+      for (const b of FIRMENMULDEN) {
+        if (a !== b) expect(Math.hypot(a.x - b.x, a.z - b.z), `${a.name}/${b.name}`).toBeGreaterThan(5);
+      }
+    }
+  });
+
+  it("jede innerhalb der Mauern", () => {
+    for (const o of hindernisse) {
+      for (const [x, z] of ecken(o)) {
+        expect(x, o.label).toBeGreaterThan(YARD_MIN_X + MAUER);
+        expect(x, o.label).toBeLessThan(YARD_MAX_X - MAUER);
+        expect(z, o.label).toBeGreaterThan(-HZ + MAUER);
+        expect(z, o.label).toBeLessThan(HZ - MAUER);
+      }
+    }
+  });
+
+  it("jede steht in der Hindernisliste, und keine überlappt ein anderes Bauwerk (≥ 0,1 m Luft)", () => {
+    const alle = alleHindernisse();
+    for (const m of hindernisse) {
+      expect(alle.some((o) => o.label === m.label), m.label).toBe(true);
+      for (const o of alle) {
+        if (o.label.startsWith("Firmenmulde")) continue;
+        const luft = Math.max(Math.abs(m.x - o.x) - (m.hw + o.hw), Math.abs(m.z - o.z) - (m.hd + o.hd));
+        expect(luft, `${m.label} an ${o.label}`).toBeGreaterThanOrEqual(0.1);
+      }
+    }
+  });
+
+  it("keine Ecke im Schwenkbereich eines Baggerstands oder Verladeplatzes", () => {
+    const staende = [BAGGER_STAND, VERLADE_STAND, ...alleAbholPlaetze().map((p) => p.stand)];
+    for (const o of hindernisse) {
+      for (const [x, z] of ecken(o)) {
+        for (const st of staende) {
+          expect(Math.hypot(x - st.x, z - st.z), `${o.label} von (${st.x} | ${st.z})`).toBeGreaterThan(SCHWENK_AUSSEN);
+        }
+      }
+    }
+  });
+
+  it("weiter als 10 m vom MÜLL-Container", () => {
+    const muell = CONFIGS.find((c) => c.label === "MUELL")!;
+    expect(muell).toBeDefined();
+    for (const o of hindernisse) {
+      for (const [x, z] of ecken(o)) {
+        expect(Math.hypot(x - muell.x, z - muell.z), o.label).toBeGreaterThan(10);
+      }
+    }
+  });
+});
+
+describe("Firmenmulden bauen (E-133)", () => {
+  beforeAll(async () => {
+    await initPhysics();
+  });
+
+  const bauen = (): { scene: THREE.Scene; world: RAPIER.World } => {
+    const scene = new THREE.Scene();
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    baueFirmenmulden(scene, world);
+    return { scene, world };
+  };
+  const netze = (s: THREE.Scene): THREE.Mesh[] => s.children.filter((o) => (o as THREE.Mesh).isMesh) as THREE.Mesh[];
+
+  it("ohne Leinwand: ein Netz, keine Aufkleber", () => {
+    expect(typeof (globalThis as Record<string, unknown>).document).toBe("undefined");
+    expect(netze(bauen().scene).length).toBe(1);
+  });
+
+  it("mit Atlas: zwei Netze für alle Mulden, fünf Kollider je Mulde", () => {
+    leinwandMitVerlauf();
+    const { scene, world } = bauen();
+    const n = netze(scene);
+    expect(n.map((m) => m.name)).toEqual(["Firmenmulden", "Firmenmulden Aufkleber"]);
+    expect((n[1]!.material as THREE.MeshStandardMaterial).map).not.toBeNull();
+    // Zwei Aufkleber je Mulde, je 4 Ecken
+    expect(n[1]!.geometry.getAttribute("position").count).toBe(FIRMENMULDEN.length * 2 * 4);
+    let kollider = 0;
+    world.forEachCollider(() => kollider++);
+    expect(kollider).toBe(FIRMENMULDEN.length * 5);
+  });
+
+  it("offener Trog: von oben trifft man den Boden, nicht einen Deckel", () => {
+    const { world } = bauen();
+    world.step();
+    for (const m of FIRMENMULDEN) {
+      const treffer = world.castRay(new RAPIER.Ray({ x: m.x, y: 5, z: m.z }, { x: 0, y: -1, z: 0 }), 10, true);
+      expect(treffer, m.name).not.toBeNull();
+      // Bodenoberkante: Kufe 0,08 + Blech 0,04
+      expect(5 - treffer!.timeOfImpact, m.name).toBeCloseTo(0.12, 3);
+    }
+  });
+
+  it("die Grundfläche des Baus passt zur Hindernisliste", () => {
+    const { scene } = bauen();
+    const box = new THREE.Box3().setFromObject(netze(scene)[0]!);
+    const ausdehnung = hindernisse.reduce(
+      (b, o) => ({
+        x0: Math.min(b.x0, o.x - o.hw), x1: Math.max(b.x1, o.x + o.hw),
+        z0: Math.min(b.z0, o.z - o.hd), z1: Math.max(b.z1, o.z + o.hd),
+      }),
+      { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity }
+    );
+    // Nichts Gebautes ragt über die verzeichnete Grundfläche hinaus (1 cm Rundung)
+    expect(box.min.x).toBeGreaterThanOrEqual(ausdehnung.x0 - 0.01);
+    expect(box.max.x).toBeLessThanOrEqual(ausdehnung.x1 + 0.01);
+    expect(box.min.z).toBeGreaterThanOrEqual(ausdehnung.z0 - 0.01);
+    expect(box.max.z).toBeLessThanOrEqual(ausdehnung.z1 + 0.01);
+    expect(box.min.y).toBeGreaterThanOrEqual(-1e-6);
+    // Die schräge Stirnwand ragt mit ihrer Blechkante 7 mm über die Oberkante
+    expect(box.max.y).toBeLessThanOrEqual(Math.max(...hindernisse.map((o) => o.top)) + 0.01);
+  });
+});
