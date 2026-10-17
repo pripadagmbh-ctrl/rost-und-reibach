@@ -170,16 +170,19 @@ describe("Echte Firmen statt erfundener (E-133)", () => {
     }
   });
 
-  it("je eine große Tafel Rent4Ring, glasklar-mg.de und led-profi.de", () => {
-    for (const name of ["Rent4Ring", "glasklar-mg.de", "led-profi.de"]) {
-      expect(schilder.filter((s) => s.bild.name === name && s.pfosten).length, name).toBe(1);
-    }
+  /*
+   * E-143 — Patrick, 17.10.2026: „nimm rent4ring und ledprofi raus. Mach nur
+   * pripada.de rein", auf Nachfrage glasklar-mg.de ebenso.
+   */
+  it("jede Tafel zeigt Pripada.de, keine fremde Firma (E-143)", () => {
+    expect(schilder.length).toBeGreaterThan(0);
+    for (const s of schilder) expect(s.bild.name, s.name).toBe(FIRMA);
+    const texte = schilder.flatMap((s) => [s.bild.name, ...s.bild.zeilen]).join(" | ");
+    for (const alt of ["Rent4Ring", "glasklar", "led-profi", "MecLight"]) expect(texte).not.toContain(alt);
   });
 
-  it("die Logodateien liegen in public/logos/ (glasklar darf fehlen)", () => {
-    const dateien = new Set(schilder.flatMap((s) => (s.bild.logo && !s.bild.logo.freiwillig ? [s.bild.logo.datei] : [])));
-    expect([...dateien].sort()).toEqual(["led-profi.jpg", "rent4ring.webp"]);
-    for (const d of dateien) expect(existsSync(join(wurzel, "public/logos", d)), d).toBe(true);
+  it("keine Logodateien fremder Firmen mehr im Spiel (E-143)", () => {
+    expect(existsSync(join(wurzel, "public/logos"))).toBe(false);
   });
 
   it("Pripada steht höchstens 10 m von der Waage", () => {
@@ -223,22 +226,24 @@ describe("Der gemeinsame Atlas (E-133)", () => {
     leinwandMitVerlauf();
   });
 
-  it("gibt es einmal, und das grüne Feld liegt in der vierten flachen Zelle", () => {
+  it("gibt es einmal, 1024 × 1024 (E-143), das grüne Feld unten", () => {
     const a = werbeAtlas();
     expect(a).not.toBeNull();
     expect(werbeAtlas()).toBe(a);
     const f = atlasFeld("pripadaGruen", 2);
-    // Zelle x 1024…2048, y 1280…1536 auf 2048 × 1536 (v nach oben)
-    expect(f.u0).toBeCloseTo(0.625, 6);
-    expect(f.u1).toBeCloseTo(0.875, 6);
+    // Zelle x 0…1024, y 768…1024 auf 1024 × 1024 (v nach oben)
+    expect(a!.image.width).toBe(1024);
+    expect(a!.image.height).toBe(1024);
+    expect(f.u0).toBeCloseTo(0.25, 6);
+    expect(f.u1).toBeCloseTo(0.75, 6);
     expect(f.v0).toBeCloseTo(0, 6);
-    expect(f.v1).toBeCloseTo(256 / 1536, 6);
+    expect(f.v1).toBeCloseTo(0.25, 6);
     const r = atlasFeld("pripadaGruenRand");
-    expect(r.u0).toBeGreaterThan(0.5);
+    expect(r.u0).toBeGreaterThan(0);
     expect(r.u1).toBeLessThan(f.u0);
     // Breiter als die Zelle geht nicht
     const breit = atlasFeld("pripadaGruen", 10);
-    expect(breit.u1 - breit.u0).toBeCloseTo(0.5, 6);
+    expect(breit.u1 - breit.u0).toBeCloseTo(1, 6);
     expect(PRIPADA_GRUEN).toBe("#2f7a4f");
   });
 });

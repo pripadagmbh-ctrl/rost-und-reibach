@@ -25,48 +25,29 @@ export const FIRMA = "Pripada.de";
  */
 export const PRIPADA_GRUEN = "#2f7a4f";
 
-/** Ein fremdes Logo als Bilddatei unter `public/logos/`. */
-interface Logo {
-  datei: string;
-  /** Ausschnitt in Bildpixeln [x, y, b, h] — ohne Angabe das ganze Bild */
-  aus?: [number, number, number, number];
-  /** Höchstens so viel der Zellbreite bzw. -höhe (seitentreu eingepasst) */
-  b: number;
-  h: number;
-  /**
-   * Die Datei darf fehlen: Dann bleibt der gesetzte Name stehen. Fehlt sie
-   * nicht, ersetzt das Bild die Schrift.
-   */
-  freiwillig?: boolean;
-}
-
 /** Was auf einer Tafel steht und in welchen Farben. */
 interface Bild {
-  /** Plattenfarbe — verwittert, nie reinweiß (außer unter fremden Logos) */
+  /** Plattenfarbe — verwittert, nie reinweiß */
   grund: string;
   /** Farbe der Hauptzeile */
   schrift: string;
   /** Farbe der Nebenzeilen */
   neben: string;
-  /** Die große Zeile — bei Logotafeln der Firmenname, wie er im Logo steht */
+  /** Die große Zeile */
   name: string;
   /** Kleinere Zeilen darunter (höchstens zwei) */
   zeilen: string[];
   /** Das P-Signet über dem Namen — nur bei Pripada */
   signet?: boolean;
-  /** Rost und Flecken — nur Pripadas eigene Tafeln; fremde Logos bleiben sauber */
+  /** Rost und Flecken */
   verwittert: boolean;
-  /** Fremdes Logo statt Schrift; ohne `freiwillig` wird der Name nicht gemalt */
-  logo?: Logo;
 }
 
 /*
- * ECHTE FIRMEN (E-133). Patrick, 17.10.2026, wörtlich: „Pripada prominent
- * direkt an der waage und da wo gearbeitet wird. Ansonsten Schilder von
- * Rent4ring, glasklar-mg.de, MecLight bzw. led.profi.de." Die erfundenen
- * Betriebe aus E-131 sind damit weg. Logos unverfälscht: nur seitentreu
- * skaliert, keine Farbe, kein Zuschnitt ins Logo, kein Rost darüber.
- * „MecLight" steht nirgends als Text — dafür kam kein Logo (offene Frage).
+ * NUR PRIPADA.DE (E-143). Patrick, 17.10.2026, nachdem er die Firmenschilder
+ * aus E-133 am Gerät gesehen hatte: „alles gut lesbar, aber nimm rent4ring und
+ * ledprofi raus. Mach nur pripada.de rein" — und auf Nachfrage glasklar-mg.de
+ * ebenso. Jede Tafel des Platzes zeigt Pripada.de; die Logodateien sind weg.
  */
 const PRIPADA: Bild = {
   grund: "#e8e4db",
@@ -85,31 +66,6 @@ const PRIPADA_HALLE: Bild = {
   zeilen: ["SORTIERHALLE"],
   verwittert: true,
 };
-/** Reinweiß wie der Grund der gelieferten Logos — sonst sähe man deren Kante. */
-const LOGO_PLATTE = "#ffffff";
-const logoTafel = (name: string, logo: Logo): Bild => ({
-  grund: LOGO_PLATTE, schrift: "#1d2a36", neben: "#1d2a36", name, zeilen: [], verwittert: false, logo,
-});
-/*
- * `rent4ring.webp` ist 670 × 670, das Logo selbst steht in x 41…627,
- * y 231…436 (gemessen 17.10.2026 mit Pixel-Scan, Schwelle < 235 je Kanal).
- * `led-profi.jpg` ist 1109 × 197 und wird ganz verwendet — sein weißer Rand
- * passt zur weißen Platte. Anteile 85 / 90 % der Zellbreite: Vorgabe Bauleiter.
- */
-const RENT4RING_AUS: [number, number, number, number] = [41, 231, 587, 206];
-const RENT4RING = logoTafel("Rent4Ring", { datei: "rent4ring.webp", aus: RENT4RING_AUS, b: 0.85, h: 0.85 });
-/*
- * Von glasklar-mg.de gibt es noch kein Logo und wir wissen nicht, was die
- * Firma macht — also nur der Name, keine erfundene Zusatzzeile. Liegt eines
- * Tages `public/logos/glasklar-mg.webp` im Ordner, ersetzt es die Schrift
- * von allein; „Logo nachreichen" ist dann wirklich nur eine Datei.
- */
-const GLASKLAR = logoTafel("glasklar-mg.de", { datei: "glasklar-mg.webp", b: 0.85, h: 0.8, freiwillig: true });
-const LED_PROFI = logoTafel("led-profi.de", { datei: "led-profi.jpg", b: 0.9, h: 0.9 });
-/* Hallenblenden 4 : 1 — seitentreu mit Rand (SW: 88 % × 78 % der Zelle). */
-const LED_PROFI_FLACH = logoTafel("led-profi.de", { datei: "led-profi.jpg", b: 0.88, h: 0.78 });
-const RENT4RING_FLACH = logoTafel("Rent4Ring", { datei: "rent4ring.webp", aus: RENT4RING_AUS, b: 0.88, h: 0.78 });
-
 /* ------------------------------------------------------------- Der Atlas -- */
 
 /**
@@ -124,11 +80,16 @@ const RENT4RING_FLACH = logoTafel("Rent4Ring", { datei: "rent4ring.webp", aus: R
  * Eine große Zelle ist 1024 × 512 Pixel — dieselbe Dichte, mit der die
  * Firmentafel seit dem 12.09.2026 auf dem Gerät gelesen wird. Eine Hallenzelle
  * ist 1024 × 256 (4 : 1 wie die Blende über dem Tor). 2048 × 1536 fasst vier
- * große und vier flache Zellen. Die vierte flache ist seit E-133 keine Tafel,
- * sondern das grüne Pripada-Feld für Abholer und Firmenmulden (`atlasFeld`).
+ * große und vier flache Zellen.
+ *
+ * SEIT E-143 NUR NOCH 1024 × 1024. Mit den fremden Logos sind fünf Zellen
+ * weggefallen; übrig sind die große Pripada-Tafel (oben), die Hallenblende
+ * und das grüne Pripada-Feld für Abholer und Firmenmulden (`atlasFeld`).
+ * Ein Viertel der Fläche heißt rund 5,6 statt 16 MB Grafikspeicher mit
+ * Mipmaps — die Sorge um das iPhone mini aus E-131.
  */
-const ATLAS_B = 2048;
-const ATLAS_H = 1536;
+const ATLAS_B = 1024;
+const ATLAS_H = 1024;
 
 /** Pixelrechteck einer Zelle im Atlas. */
 interface Zelle {
@@ -137,21 +98,16 @@ interface Zelle {
   b: number;
   h: number;
 }
-const gross = (i: number): Zelle => ({ x: (i % 2) * 1024, y: Math.floor(i / 2) * 512, b: 1024, h: 512 });
-const flach = (i: number): Zelle => ({ x: (i % 2) * 1024, y: 1024 + Math.floor(i / 2) * 256, b: 1024, h: 256 });
+const gross = (): Zelle => ({ x: 0, y: 0, b: 1024, h: 512 });
+const flach = (i: number): Zelle => ({ x: 0, y: 512 + i * 256, b: 1024, h: 256 });
 
 /** Jedes Bild einmal im Atlas — zwei Tafeln mit demselben Bild teilen sich die Zelle. */
 const ZELLEN: Array<[Bild, Zelle]> = [
-  [PRIPADA, gross(0)],
-  [RENT4RING, gross(1)],
-  [GLASKLAR, gross(2)],
-  [LED_PROFI, gross(3)],
+  [PRIPADA, gross()],
   [PRIPADA_HALLE, flach(0)],
-  [LED_PROFI_FLACH, flach(1)],
-  [RENT4RING_FLACH, flach(2)],
 ];
 /** Das grüne Feld: ganze Zelle Grün, Signet und Name nur im mittleren 512 × 256. */
-const GRUEN = flach(3);
+const GRUEN = flach(1);
 const GRUEN_MITTE_B = 512;
 
 /** Rechteck im Atlas als Texturkoordinaten (v nach oben, wie three es liest). */
@@ -313,15 +269,15 @@ export function werbeschilder(): Werbeschild[] {
      * (x −22 ± 1,55). 1,0 … 10,0 lässt den Flutlichtmast auf x 0
      * (`daylight.einmauern`) in der Lücke stehen.
      */
-    frei("Rent4Ring, Nordmauer am Tor", RENT4RING, -13.0, nord, NACH_SUEDEN),
-    frei("glasklar-mg.de, Nordmauer Ost", GLASKLAR, 5.5, nord, NACH_SUEDEN),
+    frei("Pripada, Nordmauer am Tor", PRIPADA, -13.0, nord, NACH_SUEDEN),
+    frei("Pripada, Nordmauer Ost", PRIPADA, 5.5, nord, NACH_SUEDEN),
     /*
      * Ostmauer: z −20 … −11 steht hinter dem Abladeplatz, rechts vom Sitz —
      * dorthin schaut, wer einen Laster leer macht; seit E-133 Pripada („da wo
      * gearbeitet wird"). z 11,5 … 20,5 lässt die Masten auf z 8 und z 26 frei.
      */
     frei("Pripada, Ostmauer am Abladeplatz", PRIPADA, ost, -15.5, NACH_WESTEN),
-    frei("led-profi.de, Ostmauer Nord", LED_PROFI, ost, 16.0, NACH_WESTEN),
+    frei("Pripada, Ostmauer Nord", PRIPADA, ost, 16.0, NACH_WESTEN),
     {
       name: "Pripada, Dach Büro an der Waage", bild: PRIPADA,
       x: OFFICE_X + 2.5, y: DACH_UNTERKANTE + DACH_H / 2, z: OFFICE_Z, b: DACH_B, h: DACH_H,
@@ -334,8 +290,8 @@ export function werbeschilder(): Werbeschild[] {
     },
     // Die drei Hallen: Blende über dem Tor, auf den Platz hin.
     blende("Halle 1", PRIPADA_HALLE, 0),
-    blende("Halle 2", LED_PROFI_FLACH, 1),
-    blende("Halle 3", RENT4RING_FLACH, 2),
+    blende("Halle 2", PRIPADA_HALLE, 1),
+    blende("Halle 3", PRIPADA_HALLE, 2),
   ];
 }
 
@@ -378,11 +334,6 @@ function maleTafel(ctx: CanvasRenderingContext2D, bild: Bild, z: Zelle, saat: nu
 
   ctx.fillStyle = bild.grund;
   ctx.fillRect(0, 0, z.b, z.h);
-  // Logotafel: weiße Platte, das Bild kommt beim Laden (`ladeLogo`)
-  if (bild.logo && !bild.logo.freiwillig) {
-    ctx.restore();
-    return;
-  }
   for (let i = 0; bild.verwittert && i < 90 * k; i++) {
     const r = (20 + zuf() * 90) * k;
     ctx.fillStyle = `rgba(150,142,126,${0.03 + zuf() * 0.06})`;
@@ -563,31 +514,6 @@ function verwittere(ctx: CanvasRenderingContext2D, z: Zelle, k: number, zuf: () 
 /** Rahmen- und Pfostenfarbe der Firmentafel (seit 02.09.2026). */
 const RAHMEN_FARBE = 0x3a4045;
 
-/**
- * Ein Logo in seine Zelle malen, sobald die Datei geladen ist.
- *
- * Eigener Ordner, kein fremder Server: `BASE_URL` ist `"./"` und läuft so
- * unter `/v1/` und in Safari (WebP ab iOS 14). Ohne `Image` (Vitest/Node)
- * bleibt die Platte weiß. Fehlt eine freiwillige Datei, bleibt die Schrift.
- */
-function ladeLogo(ctx: CanvasRenderingContext2D, tex: THREE.Texture, bild: Bild, z: Zelle): void {
-  const logo = bild.logo;
-  if (!logo || typeof Image === "undefined") return;
-  const img = new Image();
-  img.onload = (): void => {
-    const [sx, sy, sb, sh] = logo.aus ?? [0, 0, img.naturalWidth, img.naturalHeight];
-    // Seitentreu: der kleinere der beiden Maßstäbe gewinnt
-    const s = Math.min((z.b * logo.b) / sb, (z.h * logo.h) / sh);
-    const b = sb * s;
-    const h = sh * s;
-    ctx.fillStyle = bild.grund;
-    ctx.fillRect(z.x, z.y, z.b, z.h);
-    ctx.drawImage(img, sx, sy, sb, sh, z.x + (z.b - b) / 2, z.y + (z.h - h) / 2, b, h);
-    tex.needsUpdate = true;
-  };
-  img.src = `${import.meta.env?.BASE_URL ?? "./"}logos/${logo.datei}`;
-}
-
 /** Der eine Atlas für Tafeln, Abholer und Firmenmulden. */
 let atlas: THREE.CanvasTexture | null = null;
 
@@ -616,7 +542,6 @@ export function werbeAtlas(): THREE.CanvasTexture | null {
   const tex = new THREE.CanvasTexture(canvas);
   tex.anisotropy = 4;
   tex.colorSpace = THREE.SRGBColorSpace;
-  for (const [bild, zelle] of ZELLEN) ladeLogo(ctx, tex, bild, zelle);
   atlas = tex;
   return tex;
 }

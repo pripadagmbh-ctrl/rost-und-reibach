@@ -554,6 +554,55 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 17.10.2026, Schilder und Lautstärke** — Patrick, wörtlich: „alles
+      gut lesbar, aber nimm rent4ring und ledprofi raus. Mach nur pripada.de
+      rein" (auf Nachfrage: glasklar-mg.de auch) und „lautstärke
+      knfigurationen für bagger, metall und musik im menü"
+
+      | # | Punkt |
+      |---|---|
+      | 17a | Rent4Ring raus (Nordmauer, Halle 3) |
+      | 17b | led-profi.de raus (Ostmauer, Halle 2) |
+      | 17c | glasklar-mg.de raus |
+      | 17d | Überall nur Pripada.de |
+      | 18a | Lautstärke Bagger im Menü einstellbar |
+      | 18b | Lautstärke Metall im Menü einstellbar |
+      | 18c | Lautstärke Musik im Menü einstellbar |
+
+- [ ] **Gerätebefund 17.10.2026, Fahrer** — Patrick, wörtlich: „Ansonsten fällt
+      mir noch ein, die arme des baggerfarers sind verformt. es sollen wie echte
+      ände anmuten die die joysticks umschliessen."
+
+      | # | Punkt |
+      |---|---|
+      | 15a | Arme des Baggerfahrers sind verformt |
+      | 15b | Echte Hände, die die Joysticks umschließen |
+
+- [ ] **Ansage 17.10.2026, Fahrzeuge, Absetzkipper, Späne, Magnet** — Patrick,
+      wörtlich: „eine sache noch, lkws drehen sich unrealistisch um ihrne
+      mittelpunkt. allerdings sollten die LKws und auch anhänger lenkende
+      Achsen habenund die bewegeung aus der lenkbewegeung der achsen kommen.
+      Wie bei echten fahrzeugen.Auch die Achse bei anhängern berücksichtigen.
+      Auhc sollen LKWs mit kleinen absetzcontainern kommen. die durhc ketten
+      gekippt oder eben nur abgesetzt werden, damit ich sie leer mache.
+      Spähne ins spiel inegrieren und auch magnet als greifer"
+
+      | # | Punkt |
+      |---|---|
+      | 11a | LKW drehen sich unrealistisch auf der Stelle um ihre Mitte |
+      | 11b | LKW mit lenkenden Achsen, Bewegung entsteht aus dem Lenkeinschlag |
+      | 11c | Anhänger: Achse mitrechnen, Anhänger läuft nach |
+      | 12a | LKW kommen mit kleinen Absetzcontainern |
+      | 12b | Container werden an Ketten gekippt oder nur abgesetzt |
+      | 12c | Abgesetzte Container macht der Spieler leer |
+      | 13 | Späne ins Spiel |
+      | 14 | Magnet als Greifer |
+
+      Seine Antworten (17.10.2026): Späne als **lose Haufen aus Knäueln**, im
+      Absetzcontainer angeliefert; sie gelten als **Mischschrott** (keine eigene
+      Mulde). Magnet **wie echt**: nur Eisen und Stahl, Kupfer, Aluminium und
+      VA fallen ab. Gewechselt wird **im Pausenmenü** als dritter Greifer.
+
 - [ ] **Gerätebefund 17.10.2026, zehn Punkte** — Patrick, wörtlich:
       „1. Baue eine möglichkeit ein, die perspektive zu wechseln oder die
       Kamera zu drehen, ohne zwischen den Ansichten switchen zu müssen.

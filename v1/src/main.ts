@@ -169,7 +169,7 @@ async function main(): Promise<void> {
     if (el.closest(".hidden-actions")) el.remove();
     else el.style.setProperty("display", "none", "important");
   }
-  const touch = new TouchControls(renderer.domElement);
+  const touch = new TouchControls(renderer.domElement, input);
   // Der Platz baut sich selbst; ein Handle brauchen wir nicht mehr, seit die
   // Schrottberge nur noch Kulisse ausserhalb der Mauer sind.
   new Yard(scene, physics.world);

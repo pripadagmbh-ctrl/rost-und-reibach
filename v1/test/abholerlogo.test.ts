@@ -82,11 +82,12 @@ describe("Pripada-Zeichen am Abholer (E-133)", () => {
       const du = uv.getX(a + 1) - uv.getX(a);
       const dz = pos.getZ(a + 1) - pos.getZ(a);
       expect(Math.sign(du) * Math.sign(dz), `Wand ${w.dir} gespiegelt`).toBe(rechts);
-      // Alle anderen Flächen sind schmal: das reine Grün
+      // Alle anderen Flächen sind schmal: das reine Grün (128 px auf dem
+      // 1024 breiten Atlas seit E-143 = 0,125)
       for (let f = 0; f < 6; f++) {
         if (f === aussen) continue;
         const u = [0, 1, 2, 3].map((k) => uv.getX(f * 4 + k));
-        expect(Math.max(...u) - Math.min(...u)).toBeLessThan(0.1);
+        expect(Math.max(...u) - Math.min(...u)).toBeLessThan(0.15);
       }
     }
   });
