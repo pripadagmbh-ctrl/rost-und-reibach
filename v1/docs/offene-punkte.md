@@ -554,6 +554,14 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Antworten 17.10.2026 zu Ton und Kabine** — Radio: „Aus beim Start".
+      Hupe: „Echte Hupe holen". Feierabend: „Werkssirene oder Glocke".
+      Hebelseiten: „Tauschen" (E-144). Freigegebene Downloads (CC0,
+      BigSoundBank): Truck Horn #2721, Industrial Doorbell #1269, National
+      alert signal end #3260 — geladen nach `ton-roh/J`, `K`, `L` (E-148).
+      Kipper-Wächter „Brücke frei" rot (45 % bleiben liegen) — echter Fehler,
+      Kipper soll rütteln wie der Absetzkipper (E-149).
+
 - [ ] **Ansage 17.10.2026, Schilder und Lautstärke** — Patrick, wörtlich: „alles
       gut lesbar, aber nimm rent4ring und ledprofi raus. Mach nur pripada.de
       rein" (auf Nachfrage: glasklar-mg.de auch) und „lautstärke
