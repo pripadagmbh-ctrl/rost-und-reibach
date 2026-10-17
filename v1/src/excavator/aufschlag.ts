@@ -28,6 +28,28 @@ export const AUFSCHLAG_AB_MS = 0.8;
  */
 export const AUFSCHLAG_FREI_S = 0.15;
 
+/*
+ * E-137: DIE LEERE SPINNE HAEMMERT UND DRUECKT. Derselbe Melder, eine zweite
+ * Instanz am Bagger (`Excavator.meldeSpinne`): Kontakt ist dort der
+ * Bodenanschlag oder ein Rapier-Kontakt der Schalen mit einem losen Koerper.
+ */
+/**
+ * Bei diesem Senktempo (m/s) ist die Wucht 1. Gemessen in E-134
+ * (`tools/lastaufschlag.ts`): Ausleger und Stiel voll, beim Anschlag 3,15 m/s.
+ */
+export const SPINNE_WUCHT_VOLL_MS = 3.15;
+/** Ab diesem Senkbefehl (0..1) drueckt der Spieler. SW 0,1: unter dem Totband jedes Sticks */
+export const DRUECK_AB = 0.1;
+/** Hoechstens so oft eine Drueck-Meldung (s) — Vertrag mit dem Ton (E-139) */
+export const DRUECK_PAUSE_S = 0.25;
+/**
+ * So weit (m) muss das Material seit der letzten Meldung nachgegeben haben —
+ * Spitze gesunken oder Teil gewandert —, damit „sich etwas tut". SW 0,01:
+ * groesser als das Rauschen eines liegenden Teils (unter 1 mm je Bild),
+ * kleiner als ein Bild Senken (Stiel voll: rund 5 cm).
+ */
+export const DRUECK_WEG_M = 0.01;
+
 export class Aufschlagmelder {
   private kontaktAlt = true; // wer im Kontakt startet, hat nicht aufgeschlagen
   private freiS = 0;

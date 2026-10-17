@@ -94,10 +94,8 @@ describe("Fahrer Daniel", () => {
      * hätte der Fahrer keine Hände an den Hebeln.
      */
     for (const s of ["R", "L"]) {
-      // E-142: die Arme heißen `06_FAHRER_ARM_*`, sobald `excavator.ts` sie baut.
-      // ponytail: die Ausweichsuche nach `_HAND_` fällt mit diesem Einbau weg.
-      const arm =
-        scene.getObjectByName(`06_FAHRER_ARM_${s}`) ?? scene.getObjectByName(`06_FAHRER_HAND_${s}`)!;
+      // E-142: die Arme heißen `06_FAHRER_ARM_*` und kommen aus `driver.fahrerArme`.
+      const arm = scene.getObjectByName(`06_FAHRER_ARM_${s}`)!;
       expect(arm.visible, `Hand ${s} verschwunden`).toBe(true);
     }
     bagger.setFirstPerson(false);

@@ -40,6 +40,8 @@ export interface CollisionContext {
    */
   getHeading: () => number;
   grappleGroup: THREE.Object3D;
+  /** Koerper der Spinne (Korb und Schalen) — seine Kontakte entscheiden beim Pfluegen (E-137) */
+  grappleBody: () => RAPIER.RigidBody;
   armShapes: ArmShape[];
   /** Körper des Fahrzeugs auf dem Platz */
   obstacleBodies: Set<number>;
@@ -112,8 +114,11 @@ const PROBE_R = 0.62;
 /**
  * Radius, in dem die Spinne Material verdrängt. Größer als die Prüfkugel:
  * Beim Pflügen durch einen Haufen schiebt sie auch, was sie nur streift.
+ * Seit E-137 zaehlt die Kugel erst, wenn die Spinne wirklich anstoesst.
  */
 const PLOW_R = 1.15;
+/** Ab diesem Abstand (m) gilt ein Rapier-Kontaktpunkt als Beruehrung — wie E-134 */
+const PLOW_KONTAKT = 0.01;
 /**
  * Masse, bei der die Achsen auf die Hälfte einbrechen. Am Bild abgestimmt:
  * Bei 750 kg war der Unterschied kaum zu merken, weil die Spinne beim
@@ -183,8 +188,29 @@ export class ExcavatorCollision {
    * ja ein kinematischer Körper und wird von der Physik nicht gebremst.
    */
   plowMassKg(): number {
-    plowProbe ??= new RAPIER.Ball(PLOW_R);
+    /*
+     * E-137: ERST WENN DIE SPINNE WIRKLICH ANSTOESST, UND NUR IN FAHRTRICHTUNG.
+     *
+     * Gezaehlt wurde immer alles, was in einer Kugel von 1,15 m um die
+     * Korbmitte liegt — auch wenn die Schalen es noch gar nicht erreicht
+     * hatten. Gemessen (`tools/haemmern.ts`): Ueber einem 1,3-t-Minibagger fiel
+     * der Faktor auf 0,28, BEVOR eine Schale ihn traf, und die Spinne kam mit
+     * 0,5–0,7 statt 2,3 m/s an. Das war Patricks „die spinne bremst beim
+     * hämmern ab. Bremsen kann nur das material oder den boden die spinne."
+     *
+     * Die Kugel bleibt das Mass dafuer, WIE VIEL Material sich staut — damit
+     * bleibt das Pfluegen durch den Haufen so zaeh, wie es am 11.09. abgestimmt
+     * wurde. Neu ist das Tor davor (`stoesstAn`): Sie zaehlt erst, wenn Korb
+     * oder Schalen einen losen Koerper beruehren und sich in ihn hineinbewegen.
+     * Wer frei faellt oder aus dem Haufen heraushebt, wird nicht gebremst.
+     */
     this.ctx.grappleGroup.getWorldPosition(this.pos);
+    const vx = this.pos.x - this.lastGrapple.x;
+    const vy = this.pos.y - this.lastGrapple.y;
+    const vz = this.pos.z - this.lastGrapple.z;
+    this.lastGrapple.copy(this.pos);
+    if (!this.beruehrt(vx, vy, vz)) return 0;
+    plowProbe ??= new RAPIER.Ball(PLOW_R);
     this.pos.y -= 1.35;
     let masse = 0;
     this.ctx.world.intersectionsWithShape(this.pos, IDENT_QUAT, plowProbe, (collider) => {
@@ -197,6 +223,36 @@ export class ExcavatorCollision {
       return true;
     });
     return masse;
+  }
+  private lastGrapple = new THREE.Vector3();
+
+  /**
+   * E-137: Welchen losen Koerper beruehrt die Spinne (Korb oder eine Schale)
+   * gerade? Mit `v` (Bewegung des Gelenks) nur einen, in den sie sich
+   * hineinbewegt; ohne irgendeinen. Gelesen werden die Kontakte, die Rapier im
+   * letzten Schritt ohnehin berechnet hat — nur lesend (v2 E-044). Auch vom
+   * Haemmern und Druecken benutzt (`Excavator.meldeSpinne`).
+   */
+  beruehrt(vx = 0, vy = 0, vz = 0, nurInRichtung = true): RAPIER.RigidBody | null {
+    const g = this.ctx.grappleBody();
+    const world = this.ctx.world;
+    let ja: RAPIER.RigidBody | null = null;
+    for (let i = 0; i < g.numColliders() && !ja; i++) {
+      const c = g.collider(i);
+      if (!c.isEnabled()) continue;
+      world.contactPairsWith(c, (o) => {
+        const b = o.parent();
+        if (ja || !b || !b.isDynamic() || this.ctx.grippedHandles.has(b.handle)) return;
+        world.contactPair(c, o, (m, flipped) => {
+          let beruehrt = false;
+          for (let k = 0; k < m.numContacts(); k++) if (m.contactDist(k) < PLOW_KONTAKT) beruehrt = true;
+          // Die Normale zeigt vom ersten Kollider zum zweiten
+          const n = m.normal();
+          if (beruehrt && (!nurInRichtung || (n.x * vx + n.y * vy + n.z * vz) * (flipped ? -1 : 1) > 0)) ja = b;
+        });
+      });
+    }
+    return ja;
   }
 
   /**

@@ -267,7 +267,32 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
     }
     /* 142,3 → 137,6 mm mit E-069 — sie treffen sich naeher, nicht weiter. */
     /* 137,6 → 142,3 mm mit E-090: der breitere Saum schiebt sie wieder auseinander. */
-    expect(weit * 1000, "Spitzenabstand von der Achse, geschlossen (mm)").toBeCloseTo(142.3, 1);
+    /*
+     * 142,3 → 175,4 mm mit E-137 — und das ist der MESSPUNKT, nicht die Spitze.
+     * Die letzten fuenf Punkte sind seit dem Umbau auf eigene Flaechenpunkte
+     * nicht mehr der Spitzenring, sondern das Ende des letzten Seitenstreifens
+     * (vier von fuenf liegen auf den beiden Stationen VOR dem Ende). E-137 macht
+     * den Zahn dort breiter und legt eine Station dazwischen; damit wandert der
+     * Streifen. Der wirkliche Spitzenring (Punkte 5–9, siehe `baueGreiferspitze`)
+     * steht vorher und nachher auf 193,55 mm — der Waechter darunter.
+     */
+    expect(weit * 1000, "Spitzenabstand von der Achse, geschlossen (mm)").toBeCloseTo(175.4, 1);
+  });
+
+  it("E-137: der wirkliche Spitzenring steht, wo er stand — 193,55 mm", () => {
+    g.setOeffnung(0);
+    g.wurzel.updateMatrixWorld(true);
+    let weit = 0;
+    for (const zahn of zaehne(g)) {
+      zahn.updateWorldMatrix(true, false);
+      const pos = zahn.geometry.getAttribute("position") as THREE.BufferAttribute;
+      const mitte = new THREE.Vector3();
+      const v = new THREE.Vector3();
+      // Punkte 5–9: die Stirnflaeche an der Spitze (die ersten fuenf sind der Sitz)
+      for (let i = 5; i < 10; i++) mitte.add(v.fromBufferAttribute(pos, i).applyMatrix4(zahn.matrixWorld));
+      weit = Math.max(weit, Math.hypot(mitte.x / 5, mitte.z / 5));
+    }
+    expect(weit * 1000, "Spitzenring von der Achse, geschlossen (mm)").toBeCloseTo(193.55, 1);
   });
 
   it("nutzt 26,34° seines 36°-Sektors", () => {
@@ -350,7 +375,8 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
      * (+10,1 %) und KEIN einziges Netz — die Zeile "58 Netze" unten steht
      * unveraendert da. Dreiecke sind nicht der Engpass, Netze sind es (E-025).
      */
-    expect(m.dreiecke, "Dreiecke").toBe(16524);
+    /* 16.524 → 16.574 mit E-137: eine Zahnstation mehr, 10 Dreiecke je Zahn. */
+    expect(m.dreiecke, "Dreiecke").toBe(16574);
   }, 120000);
 });
 

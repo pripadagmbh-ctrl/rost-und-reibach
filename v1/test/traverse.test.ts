@@ -202,7 +202,8 @@ describe("Traversenblatt — die harten Bedingungen", () => {
     /* 2,190 → 2,1906 m mit E-090: 0,6 mm breiter geschlossen — der breitere Saum. */
     expect(gemessen[0]!.breiteZu).toBeCloseTo(2.1906, 3);
     /* 137,6 → 142,3 mm mit E-090: der breitere Saum schiebt die Spitzen auseinander. */
-    expect(gemessen[0]!.spitzenAufAchse * 1000).toBeCloseTo(142.3, 1);
+    /* 142,3 → 175,4 mm mit E-137: derselbe Messpunkt wie in `verschmelzen` (Ende des letzten Seitenstreifens), der wirkliche Spitzenring steht unveraendert. */
+    expect(gemessen[0]!.spitzenAufAchse * 1000).toBeCloseTo(175.4, 1);
     /* 26,34 → 26,52 Grad mit E-090 — weiterhin weit unter der Grenze von 36. */
     expect(gemessen[0]!.sektor).toBeCloseTo(26.52, 2);
   });

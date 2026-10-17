@@ -156,6 +156,38 @@ export interface GameEvents {
    * 0,17, die Presse bis 1. `x/y/z` Ort der Karosse.
    */
   "wrack:geknautscht": { handle: number; grad: number; zuwachs: number; x: number; y: number; z: number };
+  /**
+   * Die LEERE Spinne (offen oder zu) schlaegt auf — Haemmern (E-137, Vertrag
+   * mit dem Ton aus E-139). Einmal je Schlag, nicht je Bild: Gemeldet wird der
+   * Uebergang frei → Kontakt bei mindestens 0,8 m/s Senktempo, ein neuer
+   * Schlag erst nach 0,15 s frei (`excavator/aufschlag.ts`, wie E-134). Mit
+   * Last meldet weiter `schrott:aufprall`. `wucht` 0..1 (1 = Ausleger und
+   * Stiel voll, 3,15 m/s); `untergrund`: worauf — tragender Grund (Beton,
+   * Stahl wie Ladeflaeche/Mulde), loses Teil (schrott) oder Karosse (wrack).
+   * `x/y/z`: Krallenspitze.
+   */
+  "spinne:aufschlag": {
+    wucht: number;
+    untergrund: "beton" | "stahl" | "schrott" | "wrack";
+    x: number;
+    y: number;
+    z: number;
+  };
+  /**
+   * Die leere Spinne drueckt auf etwas (E-137, Vertrag mit dem Ton aus
+   * E-139). Hoechstens alle 0,25 s, solange gedrueckt wird — und nur, wenn
+   * sich etwas tut: beim Ansetzen einmal, danach nur, wenn das Material
+   * nachgibt (die Spitze sinkt oder das Teil bewegt sich). Wer auf Beton
+   * drueckt, hoert nichts — kein Dauerton. `staerke` 0..1 = wie weit der
+   * Spieler nach unten drueckt.
+   */
+  "spinne:druecken": {
+    staerke: number;
+    untergrund: "beton" | "stahl" | "schrott" | "wrack";
+    x: number;
+    y: number;
+    z: number;
+  };
 }
 
 type Handler<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;

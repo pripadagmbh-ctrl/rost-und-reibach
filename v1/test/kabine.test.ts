@@ -37,7 +37,8 @@ function finde(name: string): THREE.Object3D {
 function kabinenNetze(): string[] {
   const k = finde("06_KABINE");
   const raus: string[] = [];
-  for (const kind of k.children) if (kind instanceof THREE.Mesh) raus.push(kind.name);
+  // E-142: die Fahrerarme (`06_FAHRER_ARM_*`) haengen als SkinnedMesh direkt am Schlitten — eigene Waechter in `fahrerarme.test.ts`
+  for (const kind of k.children) if (kind instanceof THREE.Mesh && !(kind instanceof THREE.SkinnedMesh)) raus.push(kind.name);
   return raus.sort();
 }
 
@@ -83,10 +84,8 @@ describe("Kabine", () => {
     for (const seite of ["R", "L"]) {
       const j = finde(`06_JOYSTICK_${seite}`);
       const namen = j.children.filter((o) => o instanceof THREE.Mesh).map((o) => o.name);
-      expect(namen.sort(), `Joystick ${seite} — vorher sieben plus drei`).toEqual([
-        `06_FAHRER_HAND_${seite}`,
-        `06_JOYSTICK_${seite}_HEBEL`,
-      ]);
+      // E-142: die Hand ist kein eigenes Netz am Hebel mehr, sie gehoert zum Fahrerarm (Knochen am Hebel)
+      expect(namen.sort(), `Joystick ${seite} — vorher sieben plus drei`).toEqual([`06_JOYSTICK_${seite}_HEBEL`]);
     }
   });
 

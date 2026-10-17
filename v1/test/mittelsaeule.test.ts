@@ -63,7 +63,8 @@ describe("Blatt 1 — der Zahn, vorher gegen nachher (E-069)", () => {
     for (const t of [0, 1]) {
       const weg = zahnspitze(a, t).distanceTo(zahnspitze(b, t));
       expect(weg, `Öffnung ${t}`).toBeGreaterThan(0.035);
-      expect(weg, `Öffnung ${t}`).toBeLessThan(0.047);
+      /* 0,047 → 0,050 mit E-137: Der breitere Zahn verschiebt den Messpunkt (Ende des letzten Seitenstreifens), gemessen 40,6 → 48,2 mm. */
+      expect(weg, `Öffnung ${t}`).toBeLessThan(0.05);
     }
     /*
      * GEGENPROBE: Dieselbe Form gegen sich selbst muss NULL ergeben. Ohne sie

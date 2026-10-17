@@ -1947,12 +1947,24 @@ const ZAHN_R = 0.7;
  *
  * Steht seit dem 14.09.2026 hier oben statt im Bauteil, weil `zahnEigenwinkel`
  * dieselben Zahlen braucht: Die Anstellung des Zahns folgt aus seiner eigenen
- * Biegung, und die steckt in diesen vier Zeilen.
+ * Biegung, und die steckt in diesen Zeilen.
+ *
+ * E-137 (17.10.2026), Patrick: „die Zacken bei dem greifer sind zu spitz.
+ * entweder aufweichen oder entfernen." Aufgeweicht, nicht entfernt: Die BREITE
+ * bleibt bis kurz vor dem Ende fast voll (0,97 / 0,92 / 0,84 statt 0,90 /
+ * 0,76) und rundet erst auf den letzten 25 mm auf das alte Ende ab — von vorn
+ * eine stumpfe, runde Nase statt eines Keils. Die DICKE und das Ende
+ * (0,62 × 0,52) bleiben Ziffer fuer Ziffer, die Zwischenstation bei 0,225 m
+ * liegt auf der alten Linie (0,577). Darum wandern Grabtiefe (2,7439 m),
+ * Bodenanschlag (20,44 cm), Sensorkugel und Eigenwinkel (12,15°) nicht: Sie
+ * haengen an der Unterkante und an den Stirnflaechen, nicht an der Breite
+ * (gemessen, `greiferF5`, `greiferachse`, `zahnkontur`). SW: die drei Breiten.
  */
-const ZAHN_STATIONEN: Array<[number, number, number]> = [
+export const ZAHN_STATIONEN: Array<[number, number, number]> = [
   [0, 1, 1],
-  [0.09, 0.9, 0.86],
-  [0.18, 0.76, 0.68],
+  [0.09, 0.97, 0.86],
+  [0.18, 0.92, 0.68],
+  [0.225, 0.84, 0.577], // 0,577 = alte Dicke auf dieser Hoehe (0,68 → 0,52 linear)
   [0.25, 0.62, 0.52],
 ];
 

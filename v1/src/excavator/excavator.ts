@@ -3,10 +3,10 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { findeBox, type Box } from "../world/boxen";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Input } from "../core/input";
-import { Aufschlagmelder } from "./aufschlag";
+import { Aufschlagmelder, SPINNE_WUCHT_VOLL_MS, DRUECK_AB, DRUECK_PAUSE_S, DRUECK_WEG_M } from "./aufschlag";
 import { ExcavatorCollision, type ArmShape } from "./collision";
 import { InstrumentPanel, type InstrumentReadout } from "./instruments";
-import { buildDriver } from "./driver";
+import { buildDriver, fahrerArme } from "./driver";
 import { baueRad, radGeometrien, radStoffe, RAD_R } from "./wheelParts";
 import { baueZylinder, type ZylinderMasse } from "./zylinderParts";
 import {
@@ -22,7 +22,6 @@ import { oberwagenLack, oberwagenLeuchten, oberwagenStahl } from "./oberwagenPar
 import { pratzeFuss, pratzeStempel, schildKoerper, schildSchneide } from "./schildParts";
 import { farbstoff } from "./bauteile";
 import {
-  fahrerhand,
   joystick,
   kabineGlas,
   kabineLack,
@@ -454,6 +453,12 @@ const EINDRING_SCHWER_KG = 350;
 const BODEN_TOLERANZ = 0.012;
 /** So lange haelt die Abwaertssperre nach dem letzten Kontakt (s) */
 const BODEN_SPERRE_S = 0.2;
+/**
+ * E-137: So weit (m) ueber der letzten Auflage ist die Spinne abgehoben, und
+ * die Sperre faellt sofort. Dieselbe Grenze wie „liegt auf" (`resting`, 0,04)
+ * im Bodenanschlag — darunter gilt sie als aufliegend, darueber als frei.
+ */
+const BODEN_FREI_M = 0.04;
 /** So lange haelt eine einmal gefundene Sperre, statt neu zu regeln (s) */
 const EINDRING_HALT_S = 0.35;
 /** Wie weit die Schalen beim Anschlag zurueckfedern (rad) */
@@ -783,6 +788,8 @@ export class Excavator {
   private greifer = new Map<GreiferId, Greiferbau>();
   private joyLeft!: THREE.Group;
   private joyRight!: THREE.Group;
+  /** Arme des Fahrers nachführen, wenn die Hebel kippen (E-142). */
+  private armeFolgen: () => void = () => {};
   private cabinEye = new THREE.Object3D();
   /** Hubschlitten der Fahrerkabine (Taste X) */
   private cabLiftGroup = new THREE.Group();
@@ -854,6 +861,31 @@ export class Excavator {
    * `onClawSnap`: Der Bagger kennt keinen Bus, main.ts macht das Ereignis.
    */
   onAufschlag: ((tempo: number, aufSchrott: boolean) => void) | null = null;
+  /**
+   * E-137: Die LEERE Spinne (offen oder zu) schlaegt auf — Haemmern. Einmal je
+   * Schlag (`Aufschlagmelder`, dieselbe Regel wie E-134). `wucht` 0..1,
+   * `handle` der beruehrte lose Koerper oder null fuer tragenden Grund,
+   * `p` die Krallenspitze. Worauf genau (Wrack, Schrott, Beton, Stahl),
+   * entscheidet main.ts — der Bagger kennt weder Platz noch Wracks.
+   */
+  onSpinneAufschlag: ((wucht: number, handle: number | null, p: THREE.Vector3) => void) | null = null;
+  /**
+   * E-137: Die leere Spinne drueckt auf etwas. Hoechstens alle
+   * `DRUECK_PAUSE_S`, und nur, wenn sich etwas tut: beim Ansetzen auf ein
+   * loses Teil einmal, danach nur, wenn die Spitze sinkt oder das Teil sich
+   * bewegt. Auf Beton bleibt es still. `staerke` 0..1 = Senkbefehl.
+   */
+  onSpinneDruecken: ((staerke: number, handle: number | null, p: THREE.Vector3) => void) | null = null;
+  private readonly spinnenSchlag = new Aufschlagmelder();
+  /** Wie weit der Spieler gerade nach unten befiehlt (0..1), vor jeder Sperre */
+  private senkBefehl = 0;
+  private drueckt = false;
+  private drueckPauseS = 0;
+  private drueckRefY = 0;
+  /** Worauf zuletzt gedrueckt wurde; `undefined` = noch nichts angesetzt */
+  private drueckRefHandle: number | null | undefined = undefined;
+  private readonly drueckRefPos = new THREE.Vector3();
+  private readonly spinnenOrt = new THREE.Vector3();
 
   /**
    * Körper, in die der Arm nicht eintauchen darf (LKW). Sie sind kinematisch,
@@ -1492,7 +1524,6 @@ export class Excavator {
      */
     const joyGeo = joystick();
     const joyStoff = farbstoff(0.6);
-    const armStoff = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
     for (const side of [-1, 1] as const) {
       const seite = side > 0 ? "L" : "R";
       const pivot = new THREE.Group();
@@ -1502,18 +1533,13 @@ export class Excavator {
       hebel.castShadow = true;
       hebel.name = `06_JOYSTICK_${seite}_HEBEL`;
       pivot.add(hebel);
-      // Unterarm, Faust und Daumen hängen am Hebel und kippen mit ihm mit.
-      // Sie bleiben in der Kabinenansicht sichtbar.
-      const hand = new THREE.Mesh(fahrerhand(side), armStoff);
-      hand.castShadow = true;
-      hand.name = `06_FAHRER_HAND_${seite}`;
-      pivot.add(hand);
       this.cabLiftGroup.add(pivot);
       if (side < 0) this.joyLeft = pivot;
       else this.joyRight = pivot;
     }
 
     this.driverBody = buildDriver(this.cabLiftGroup, cx, cz);
+    this.armeFolgen = fahrerArme(this.cabLiftGroup, cx, cz, [this.joyLeft, this.joyRight]);
     this.buildNamePlate(cx, cz);
 
     // Augpunkt der Kabinenkamera: Kopf an der Lehne, Konsolen liegen im Blickfeld
@@ -1739,6 +1765,7 @@ export class Excavator {
       position: this.position,
       getHeading: () => this.heading,
       grappleGroup: this.grappleGroup,
+      grappleBody: () => this.grappleBody,
       armShapes: this.armShapes,
       obstacleBodies: this.obstacleBodies,
       grippedHandles: this.grippedHandles,
@@ -1972,6 +1999,11 @@ export class Excavator {
     const dStickTip = STICK_LEN * Math.cos(gesamtWinkel);
     let boomEingabe = this.inBoom;
     let stickEingabe = this.inStick;
+    // E-137: fuers Druecken — wie weit nach unten befohlen wird, vor der Sperre
+    this.senkBefehl = Math.max(
+      boomEingabe * dBoomTip < 0 ? Math.abs(boomEingabe) : 0,
+      stickEingabe * dStickTip < 0 ? Math.abs(stickEingabe) : 0
+    );
     if (this.bodenSperre) {
       if (boomEingabe * dBoomTip < 0) boomEingabe = 0;
       if (stickEingabe * dStickTip < 0) stickEingabe = 0;
@@ -2722,6 +2754,8 @@ export class Excavator {
   /** Liegt die Spinne auf? Dann sperrt die Abwaertsrichtung im naechsten Schritt. */
   private bodenSperre = false;
   private bodenSperreS = 0;
+  /** E-137: Hoehe der Spitze, als sie zuletzt auflag */
+  private sperreY = -Infinity;
   /** Festgehaltener Anschlag gegen Brocken und seine Restzeit */
   private eindringGrenze = 0;
   private eindringHaltS = 0;
@@ -2776,15 +2810,29 @@ export class Excavator {
       BOOM_PIVOT.y +
       BOOM_LEN * Math.sin(this.boomAngle) +
       STICK_LEN * Math.sin(this.boomAngle + this.stickAngle);
+    /*
+     * E-137: ANHALTEN, NICHT ANHEBEN. Hier stand `tipYJetzt + (tief -
+     * EINDRING_OK)`: Der Arm wurde um die Eindringtiefe HOCHGESETZT, alle
+     * 0,35 s neu. `tief` ist aber der Abstand zur NAECHSTEN Flaeche der Huelle
+     * — oft eine Seitenwand, die das Anheben nicht naeher bringt —, und die
+     * kinematischen Krallen lupfen das Teil dabei mit. Gemessen
+     * (`tools/grossteil-greifen.ts`, Rumpfsegment 800 kg): Grenze 3,01 → 3,08
+     * → 3,12 → 3,22 → 3,36 → 3,43 → 3,51 m, Spinne +1,53 m, waehrend der
+     * Spieler den Ausleger SENKTE — die Sperre liess ihn nicht. Jetzt haelt
+     * der Brocken die Spinne dort an, wo sie ihn trifft; hoeher setzt er sie
+     * nie.
+     */
+    let eindringStopp = false;
     if (this.eindringHaltS > 0) {
       this.eindringHaltS -= 1 / 60;
       minTipY = Math.max(minTipY, this.eindringGrenze);
     } else {
       const tief = this.eindringtiefe(splay);
       if (tief > EINDRING_OK) {
-        this.eindringGrenze = tipYJetzt + (tief - EINDRING_OK);
+        this.eindringGrenze = tipYJetzt;
         this.eindringHaltS = EINDRING_HALT_S;
         minTipY = Math.max(minTipY, this.eindringGrenze);
+        eindringStopp = true;
       }
     }
     const tipY = () =>
@@ -2830,10 +2878,23 @@ export class Excavator {
      */
     // Die Sperre haelt kurz nach, damit sie nicht im Sekundentakt auf- und
     // zugeht, wenn der Messstrahl mal danebentrifft.
-    if (clamped || tipY() < minTipY + BODEN_TOLERANZ) this.bodenSperreS = BODEN_SPERRE_S;
-    else this.bodenSperreS = Math.max(0, this.bodenSperreS - 1 / 60);
+    if (clamped || tipY() < minTipY + BODEN_TOLERANZ) {
+      this.bodenSperreS = BODEN_SPERRE_S;
+      this.sperreY = tipY();
+    } else this.bodenSperreS = Math.max(0, this.bodenSperreS - 1 / 60);
+    /*
+     * E-137: WER WIRKLICH ABGEHOBEN HAT, DARF SOFORT WIEDER SENKEN. Die
+     * Nachhaltezeit gilt dem Messstrahl, der mal danebentrifft — dabei steht
+     * die Spitze still. Ist sie dagegen `BODEN_FREI_M` ueber der Stelle, an
+     * der sie zuletzt auflag, liegt nichts mehr auf. Gemessen
+     * (`tools/haemmern.ts 8`, 8 Bilder heben je Schlag): 32 Bilder war das
+     * Senken in der Luft gesperrt — Patricks „die spinne bremst beim
+     * hämmern ab". Dasselbe fuer den festgehaltenen Brocken-Anschlag.
+     */
+    if (tipY() > this.sperreY + BODEN_FREI_M) this.bodenSperreS = 0;
+    if (this.eindringHaltS > 0 && tipY() > this.eindringGrenze + BODEN_FREI_M) this.eindringHaltS = 0;
     this.bodenSperre = this.bodenSperreS > 0;
-    if (clamped) {
+    if (clamped || eindringStopp) {
       // abwärts gerichtete Achsgeschwindigkeiten hart stoppen
       const total = this.boomAngle + this.stickAngle;
       const dBoom = BOOM_LEN * Math.cos(this.boomAngle) + STICK_LEN * Math.cos(total);
@@ -2855,6 +2916,58 @@ export class Excavator {
     const aufSchrott = traegt && !this.groundContact.active && this.ladungAufSchrott();
     const tempo = this.aufschlag.schritt(1 / 60, traegt && (this.groundContact.active || aufSchrott), this.spitzeAbwaerts);
     if (tempo !== null) this.onAufschlag?.(tempo, aufSchrott);
+    if (!traegt) this.meldeSpinne(tipDepth);
+  }
+
+  /**
+   * E-137: Haemmern und Druecken mit der leeren Spinne melden. Liest nur —
+   * Kontakt ist der Bodenanschlag (tragender Grund) oder ein Rapier-Kontakt
+   * der Schalen mit einem losen Koerper (`collision.beruehrt`).
+   */
+  private meldeSpinne(tipDepth: number): void {
+    const dt = 1 / 60;
+    const koerper = this.groundContact.active ? null : this.collision.beruehrt(0, 0, 0, false);
+    const kontakt = this.groundContact.active || koerper !== null;
+    const g = this.grappleGroup.position;
+    const ort = this.spinnenOrt.set(g.x, g.y - tipDepth, g.z);
+    const tempo = this.spinnenSchlag.schritt(dt, kontakt, this.spitzeAbwaerts);
+    if (tempo !== null) {
+      this.onSpinneAufschlag?.(Math.min(tempo / SPINNE_WUCHT_VOLL_MS, 1), koerper?.handle ?? null, ort);
+    }
+    this.drueckPauseS = Math.max(0, this.drueckPauseS - dt);
+    // Gedrueckt wird auf lose Teile; tragender Grund gibt nicht nach — dort bleibt es still
+    if (koerper === null || this.senkBefehl < DRUECK_AB) {
+      this.drueckt = false;
+      this.drueckRefHandle = undefined;
+      return;
+    }
+    const h = koerper?.handle ?? null;
+    let melden = false;
+    if (!this.drueckt) {
+      // Ansetzen: auf ein loses Teil einmal — nicht im selben Bild wie ein
+      // Schlag (der knallt schon) —, auf tragendem Grund nie
+      this.drueckt = true;
+      melden = h !== null && tempo === null && this.drueckPauseS <= 0;
+      if (tempo !== null) this.drueckPauseS = DRUECK_PAUSE_S;
+    } else if (this.drueckPauseS <= 0) {
+      // Danach nur, wenn das Material nachgibt: die Spitze sinkt, das Teil
+      // wandert oder die Spinne liegt jetzt auf einem anderen
+      const t = koerper?.translation();
+      melden =
+        this.drueckRefY - ort.y > DRUECK_WEG_M ||
+        h !== this.drueckRefHandle ||
+        (!!t && Math.hypot(t.x - this.drueckRefPos.x, t.y - this.drueckRefPos.y, t.z - this.drueckRefPos.z) > DRUECK_WEG_M);
+    } else return;
+    if (!melden && this.drueckRefHandle !== undefined) return;
+    // Bezug fuer „gibt nach": hier und jetzt
+    this.drueckRefY = ort.y;
+    this.drueckRefHandle = h;
+    const t = koerper?.translation();
+    if (t) this.drueckRefPos.set(t.x, t.y, t.z);
+    if (melden) {
+      this.drueckPauseS = DRUECK_PAUSE_S;
+      this.onSpinneDruecken?.(Math.min(this.senkBefehl, 1), h, ort);
+    }
   }
 
   /**
@@ -2972,6 +3085,7 @@ export class Excavator {
       this.joyLeft.rotation.z = this.inCab * tilt; // rechts = Oberwagen rechts
       this.joyRight.rotation.x = this.inStick * tilt;
       this.joyRight.rotation.z = this.inGrapple * tilt; // rechts = schließen
+      this.armeFolgen();
     }
   }
 

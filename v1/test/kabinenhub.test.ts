@@ -245,6 +245,8 @@ describe("Kabinenhub — nichts läuft durch die Kabine", () => {
     schlitten.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
       if (o.name === "08_NAMENSSCHILD") return; // hängt außen an der Tür
+      // E-142: Fahrerarme sind SkinnedMesh — ihre Ecken liegen im Raum der Knochen, die Huellbox des Netzes sagt nichts
+      if (o instanceof THREE.SkinnedMesh) return;
       const g = o.geometry as THREE.BufferGeometry;
       g.computeBoundingBox();
       box.union(

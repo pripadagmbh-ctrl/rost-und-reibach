@@ -339,33 +339,3 @@ export function joystick(): THREE.BufferGeometry {
   return verschmelzeBunt(teile, "Joystick");
 }
 
-/**
- * Unterarm, Faust und Daumen einer Fahrerhand als EIN Netz.
- *
- * Sie hängen am Joystick und kippen mit ihm — deshalb ein eigenes Netz je
- * Seite, aber eben EINES statt drei. Sie bleiben in der Kabinenansicht
- * sichtbar; nur Kopf und Rumpf werden dort ausgeblendet.
- *
- * Alle Maße unverändert (nach Fotoreferenz: „Unterarm läuft schräg von
- * hinten-unten heran, die Faust liegt oben auf dem Griff").
- *
- * @param side −1 = rechte Seite (−X), +1 = linke
- */
-export function fahrerhand(side: -1 | 1): THREE.BufferGeometry {
-  const teile: THREE.BufferGeometry[] = [];
-  const unterarm = new THREE.CapsuleGeometry(0.054, 0.34, 3, 8);
-  unterarm.rotateZ(side * 0.18);
-  unterarm.rotateX(1.28);
-  unterarm.translate(side * 0.06, 0.28, -0.28);
-  teile.push(unterarm);
-  const faust = new THREE.CapsuleGeometry(0.052, 0.075, 3, 8);
-  faust.rotateX(Math.PI / 2);
-  faust.translate(0, 0.315, -0.01);
-  teile.push(faust);
-  const daumen = new THREE.CapsuleGeometry(0.02, 0.055, 3, 6);
-  daumen.rotateZ(side * 0.35);
-  daumen.rotateX(1.35);
-  daumen.translate(-side * 0.042, 0.318, 0.035);
-  teile.push(daumen);
-  return verschmelze(teile, "Fahrerhand");
-}

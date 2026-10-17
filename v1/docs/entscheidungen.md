@@ -14,6 +14,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | E-142 | 17.10.2026 | Echte Arme, Arbeitshandschuhe umschließen die Joysticks | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-139 | 17.10.2026 | Keine Tonketten, Hämmern und Drücken hörbar, Lautstärke je Gruppe | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-138 | 17.10.2026 | Hohle Fahrgastzelle, Minibagger Stahl, größere Schere, blaue MÜLL-Mulde, dichte Presswände | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-137 | 17.10.2026 | Spinne steigt nicht von selbst, runde Zacken, Hämmern ungebremst und hörbar | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-136 | 17.10.2026 | Kamera dreht in jeder Ansicht, Tablet: Finger in der Bildmitte | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-135 | 17.10.2026 | Voller Start, LKW-Wrack an der Ostmauer, ab und zu ein Wohnwagen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-134 | 17.10.2026 | Gehaltener Schrott kracht, wenn die Spinne ihn aufschlägt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -177,6 +178,13 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Auto quer zur Pressrichtung in die Schere, SCHERE: Bleibt es ganz in der Kammer, nichts in Wand oder Boden? Wirkt die Schere größer?
 - MÜLL-Container in die Schere ziehen, SCHERE: Läuft sie nicht los?
 - Minibagger greifen: Zeigt die Griffanzeige Stahlschrott?
+
+**E-137 — Großteile, runde Zacken, Hämmern und Drücken** (iPad)
+- Spinne auf einen Container oder Kleinbus setzen, Ausleger weiter senken: Bleibt sie stehen, wo sie aufsitzt, und steigt nie von selbst?
+- Baustellencontainer und Rumpfsegment greifen: Geht es beim ersten oder zweiten Versuch?
+- Fünfschalengreifer von vorn und unten: Wirken die Zacken stumpf und rund statt spitz?
+- Leere Spinne schnell auf Beton und auf ein Großteil hauen: Ungebremst, jeder Schlag genau einmal zu hören, Aufdrücken auf Beton still?
+- Durch einen Haufen schwenken: Noch zäh genug, oder zu leicht?
 
 **E-136 — Kamera drehen ohne Ansichtswechsel** (iPad quer, dann iPhone mini quer)
 - Einen Finger in die Bildmitte und langsam ziehen: Dreht die Kamera um den Bagger, ohne dass Arm oder Spinne zucken? Tempo angenehm, zu schnell, zu träge?
