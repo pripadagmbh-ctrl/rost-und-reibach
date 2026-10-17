@@ -47,17 +47,6 @@ import type { EventBus, GameEvents } from "../core/events";
 import { ladeLautstaerken, speichereLautstaerken, type Lautgruppe, type Lautstaerken } from "./lautstaerke";
 
 /**
- * Vertrag E-139 mit dem Bagger-Bereich. Solange die beiden Ereignisse noch
- * nicht in core/events.ts stehen, hier getippt; danach ist der Umweg harmlos
- * und kann weg (dann direkt `bus.on("spinne:aufschlag", …)`).
- */
-interface SpinnenEreignisse {
-  "spinne:aufschlag": { wucht: number; untergrund: SpinnenGrund; x: number; y: number; z: number };
-  "spinne:druecken": { staerke: number; untergrund: SpinnenGrund; x: number; y: number; z: number };
-}
-type SpinnenBus = { on<K extends keyof SpinnenEreignisse>(e: K, h: (p: SpinnenEreignisse[K]) => void): void };
-
-/**
  * Wo die Aufnahmen liegen (E-130). `BASE_URL` ist im Build "./" (vite.config:
  * base "./"), damit es unter /v1/ und in Capacitor gleich funktioniert.
  */
@@ -172,9 +161,8 @@ export class AudioManager {
       bus.on("released", () => this.playLoslassen());
       bus.on("wrack:geknautscht", (e) => this.playKnautsch(e.zuwachs));
       // E-139: Hämmern und Drücken mit der Spinne
-      const sb = bus as unknown as SpinnenBus;
-      sb.on("spinne:aufschlag", (e) => this.playSpinnenAufschlag(e.wucht, e.untergrund));
-      sb.on("spinne:druecken", (e) => this.playSpinnenDruecken(e.staerke, e.untergrund));
+      bus.on("spinne:aufschlag", (e) => this.playSpinnenAufschlag(e.wucht, e.untergrund));
+      bus.on("spinne:druecken", (e) => this.playSpinnenDruecken(e.staerke, e.untergrund));
     }
     this.holeProben();
     const start = (): void => this.ensureStarted();

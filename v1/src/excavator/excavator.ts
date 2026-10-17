@@ -1534,7 +1534,9 @@ export class Excavator {
       hebel.name = `06_JOYSTICK_${seite}_HEBEL`;
       pivot.add(hebel);
       this.cabLiftGroup.add(pivot);
-      if (side < 0) this.joyLeft = pivot;
+      // Linker Stick bewegt den linken Hebel (E-144, Patrick 17.10.2026: „Tauschen"). Seit
+      // dem Prototyp war es umgekehrt: side < 0 ist die rechte Hand des Fahrers.
+      if (side > 0) this.joyLeft = pivot;
       else this.joyRight = pivot;
     }
 

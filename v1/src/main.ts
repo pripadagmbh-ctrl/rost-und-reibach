@@ -724,6 +724,15 @@ async function main(): Promise<void> {
       z: p.z,
     });
   };
+  // Haemmern und Druecken mit der LEEREN Spinne (E-137, Ton E-139). Mit Last meldet onAufschlag oben.
+  const spinnenGrund = (h: number | null, p: THREE.Vector3): "beton" | "stahl" | "schrott" | "wrack" =>
+    h === null
+      ? stahlGrund(p.x, p.y, p.z) ? "stahl" : "beton"
+      : composites.cars.some((c) => c.body.handle === h) ? "wrack" : "schrott";
+  excavator.onSpinneAufschlag = (wucht, h, p) =>
+    bus.emit("spinne:aufschlag", { wucht, untergrund: spinnenGrund(h, p), x: p.x, y: p.y, z: p.z });
+  excavator.onSpinneDruecken = (staerke, h, p) =>
+    bus.emit("spinne:druecken", { staerke, untergrund: spinnenGrund(h, p), x: p.x, y: p.y, z: p.z });
   /*
    * Zudruecken richtet Schaden an (E-112 baut die Kraft, E-114 die Wirkung).
    * Der Bagger kennt keinen Bus, deshalb ein Haken wie `onClawSnap`; wer
@@ -1465,7 +1474,7 @@ async function main(): Promise<void> {
       // Challenge: erst pressen, wenn das Wrack losgelassen in der Kammer ist (E-125)
       if (challenge && !challenge.pressenErlaubt()) {
         hud.toast("Erst das Wrack in die Kammer legen und loslassen — dann SCHERE.");
-      } else if (!press.start()) hud.toast("Presse läuft bereits …");
+      } else if (!press.start()) hud.toast(press.sperrgrund ?? "Presse läuft bereits …");
     }
     if (input.wasPressed("KeyL")) {
       location.reload(); // Boot lädt den letzten Stand
