@@ -223,15 +223,9 @@ export const REZEPTE = [
     wofuer: "Spinne schleift über Ladefläche/Mulde: Kreischen (Schleife)",
     art: "schleife",
     dauer: 2.0,
-    // D 9,6–12,1 s: gleitendes Quietschen um 1–1,5 kHz und 3–5 kHz
+    // D 9,6–12,1 s: gleitendes Quietschen um 1–1,5 kHz und 3–5 kHz.
+    // E-153: ohne die 14 darueber gestreuten Kenney-Schlaege — nur die Aufnahme.
     schichten: [{ q: "D/0914.ogg", von: 9.6, dauer: 2.5, hp: 700 }],
-    streu: {
-      quellen: [0, 1, 2, 4].map((i) => k(`impactMetal_light_00${i}`)),
-      anzahl: 14,
-      gain: [0.15, 0.35],
-      rate: [1.0, 1.4],
-      samen: 5,
-    },
     spitze: 0.7,
   },
   {
@@ -239,17 +233,12 @@ export const REZEPTE = [
     wofuer: "Schrott rutscht und klappert; Spinne über Schrott (Schleife)",
     art: "schleife",
     dauer: 2.0,
-    streu: {
-      quellen: [
-        ...[0, 1, 2, 3, 4].map((i) => k(`impactTin_medium_00${i}`)),
-        ...[0, 1, 4].map((i) => k(`impactMetal_light_00${i}`)),
-        ...[0, 2].map((i) => k(`impactPlate_light_00${i}`)),
-      ],
-      anzahl: 48, // SW: dicht genug, dass keine hoerbare Luecke je Runde bleibt
-      gain: [0.2, 0.8],
-      rate: [0.8, 1.3],
-      samen: 9,
-    },
+    // E-153: H 141,5–144 s statt 48 gestreuter Kenney-Dosenschlaege. Der echte
+    // Greifkran im Schrott: dichtes Klappern und Knirschen bis 10 kHz,
+    // Schwerpunkt 2,1 kHz, keine Einzelschlaege, die als Muster auffallen.
+    // Das Brummen des Krans (unter 200 Hz) faellt raus.
+    schichten: [{ q: H, von: 141.5, dauer: 2.5, hp: 200 }],
+    spitze: 0.8,
   },
 
   /* ------------------------------------------------- Signale (E-148) -- */

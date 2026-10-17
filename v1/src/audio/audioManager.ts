@@ -1,9 +1,11 @@
 /**
- * Kern-Sounds M1 (Briefing Kap. 15) — per WebAudio; Greifen, Aufprall, Kehren, Knautschen und
- * Motor seit E-130 aus geschnittenen Aufnahmen (public/ton/, Herkunft in QUELLEN.md), der Rest prozedural.
- * Audio ist der primäre Belohnungskanal: jeder Abwurf klingt nach seinem Material,
- * richtig = Funk-Knacken, falsch = stumpfer Schlag. Seit E-139 keine Tonfolge mehr:
- * kein Klang hier spielt eine Melodie oder einen Piepton (Waechter in geraeusche.test.ts).
+ * Kern-Sounds M1 (Briefing Kap. 15) — per WebAudio, und seit E-153 NUR aus
+ * geschnittenen Aufnahmen (public/ton/, Herkunft in QUELLEN.md): kein
+ * Oszillator, kein gerechnetes Rauschen, auch nicht als Ersatz, solange die
+ * Aufnahmen laden — dann ist es still (Patrick 17.10.: „möglichst nur
+ * realistische töne"). Einzige Ausnahme ist das Radio (`music.ts`, beim Start
+ * aus). Waechter in geraeusche.test.ts.
+ * Jeder Abwurf klingt nach seinem Material, falsch = stumpfer Schlag.
  * Startet erst nach der ersten echten Nutzereingabe (Browser-Autoplay-Policy).
  *
  * Tonwaechter (Befund 14.09.2026, iPad): Der Tonkanal faellt auf iOS in den
@@ -104,15 +106,14 @@ export class AudioManager {
    * Stueck auf, statt kurz das falsche anzuspielen.
    */
   private songWanted: string = STANDARD_SENDER;
-  private engineOsc: OscillatorNode | null = null;
   private engineGain: GainNode | null = null;
-  /** Motor als Aufnahme (E-130); solange sie fehlt, laeuft `engineOsc` */
+  /** Motor als Aufnahme (E-130); solange sie fehlt, schweigt er (E-153) */
   private motorQuelle: AudioBufferSourceNode | null = null;
   /**
    * AUFNAHMEN (E-130). Die Bytes werden schon beim Seitenaufruf geholt — dafuer
    * braucht es keine Geste —, dekodiert wird, sobald der Tonkanal steht. Ein
    * AudioBuffer gehoert keinem Kanal, darum ueberlebt `proben` auch einen
-   * Neuaufbau. Fehlt eine Datei, klingt an ihrer Stelle die alte Synthese.
+   * Neuaufbau. Fehlt eine Datei, bleibt ihr Klang still (E-153).
    */
   private readonly rohbytes = new Map<string, ArrayBuffer>();
   private readonly proben = new Map<string, AudioBuffer>();
@@ -120,8 +121,6 @@ export class AudioManager {
   /** Ladebericht fuer Overlay und Messung: ms bis alles geholt bzw. dekodiert ist */
   private holMs = -1;
   private dekodierMs = -1;
-  /** Kehren laeuft ueber Aufnahmen (dann Tiefpass statt enger Baender) */
-  private kehrAufnahme = false;
   private druckQuelle: AudioBufferSourceNode | null = null;
   private fahrtQuelle: AudioBufferSourceNode | null = null;
   /** Letzte Achsbewegung und Schalentempo: beide speisen das Oelstroemen */
@@ -273,7 +272,7 @@ export class AudioManager {
 
   /**
    * Alle Aufnahmen holen (E-130). Laeuft beim Seitenaufruf an und blockiert
-   * nichts: Bis eine Datei da ist, klingt an ihrer Stelle die alte Synthese.
+   * nichts: Bis eine Datei da ist, bleibt ihr Klang still (E-153).
    * Die Bytes bleiben im Speicher (zusammen gut 1,7 MB), weil
    * `decodeAudioData` sie verbraucht und ein Neuaufbau des Kanals sie sonst
    * neu holen muesste.
@@ -295,7 +294,7 @@ export class AudioManager {
           }
         })
         .catch(() => {
-          /* fehlt: dann klingt die Synthese */
+          /* fehlt: dann bleibt es still */
         })
         .finally(eine);
     }
@@ -324,7 +323,7 @@ export class AudioManager {
         }
       })
       .catch(() => {
-        /* nicht dekodierbar: Synthese bleibt */
+        /* nicht dekodierbar: bleibt still */
       });
   }
 
@@ -342,8 +341,8 @@ export class AudioManager {
 
   /**
    * Eine Aufnahme spielen (E-130). `namen` sind Fassungen, eine wird zufaellig
-   * gewaehlt. Liefert false, wenn sie (noch) nicht da ist — dann spielt der
-   * Aufrufer die Synthese. `anteil` < 1 blendet frueher aus (Beton daempft),
+   * gewaehlt. Liefert false, wenn sie (noch) nicht da ist — dann bleibt der
+   * Klang still (E-153). `anteil` < 1 blendet frueher aus (Beton daempft),
    * `dauer` schneidet nach Sekunden ab, `tp` legt einen Tiefpass darueber.
    */
   private spiele(
@@ -381,10 +380,10 @@ export class AudioManager {
     return true;
   }
 
-  /** Ein Schlag aus der Familie als Aufnahme, sonst als Teiltoene (alter Weg). */
+  /** Ein Schlag aus der Familie als Aufnahme; laedt sie noch, bleibt es still (E-153). */
   private schlagAufnahme(s: Schlag, pegel: number, rate = 1, anteil = 1): void {
     const streu = 1 + (Math.random() - 0.5) * s.streu;
-    if (!this.spiele(s.proben, AUFNAHME_LAUT * s.laut * pegel, { rate: rate * streu, anteil })) this.schlag(s, pegel);
+    this.spiele(s.proben, AUFNAHME_LAUT * s.laut * pegel, { rate: rate * streu, anteil });
   }
 
   /**
@@ -437,8 +436,7 @@ export class AudioManager {
 
   /**
    * Der Kanal ist (wieder) offen. Nach einer Unterbrechung werden die
-   * Dauerquellen ersetzt: Auf iOS gelten Oszillatoren und Rauschschleifen
-   * danach zwar weiter als laufend, geben aber nichts mehr aus.
+   * Dauerquellen ersetzt: Auf iOS gelten Schleifen danach zwar weiter als laufend, geben aber nichts mehr aus.
    */
   private laeuftWieder(): void {
     this.weckversuche = 0;
@@ -462,9 +460,6 @@ export class AudioManager {
     this.music = null;
     this.ctx = null;
     this.master = null;
-    // Die Rauschpuffer gehoeren zum alten Kanal und waeren im neuen unbrauchbar
-    this.cachedNoise = null;
-    this.puffer.clear();
     this.sfx = null;
     this.gruppen = null;
     this.weckversuche = 0;
@@ -545,34 +540,24 @@ export class AudioManager {
     this.engineGain = ctx.createGain();
     this.engineGain.gain.value = 0.05;
     this.engineGain.connect(this.baggerBus);
+    // E-130: Diesel im Stand als Aufnahme (BigSoundBank #2147), Tempo folgt der Bedienung.
+    // E-153: Solange sie laedt, schweigt der Motor — vorher sprang ein Saegezahn ein.
     const motor = this.proben.get(SCHLEIFEN.motor);
-    let motorQuelle: AudioScheduledSourceNode;
+    const motorQuellen: AudioScheduledSourceNode[] = [];
     if (motor) {
-      // E-130: Diesel im Stand als Aufnahme (BigSoundBank #2147), Tempo folgt der Bedienung
       this.motorQuelle = ctx.createBufferSource();
       this.motorQuelle.buffer = motor;
       this.motorQuelle.loop = true;
       this.motorQuelle.connect(this.engineGain);
       this.motorQuelle.start();
-      motorQuelle = this.motorQuelle;
-    } else {
-      // Ersatz, bis die Aufnahme da ist: tiefer Saegezahn + Tiefpass
-      this.engineOsc = ctx.createOscillator();
-      this.engineOsc.type = "sawtooth";
-      this.engineOsc.frequency.value = 48;
-      const engineFilter = ctx.createBiquadFilter();
-      engineFilter.type = "lowpass";
-      engineFilter.frequency.value = 220;
-      this.engineOsc.connect(engineFilter).connect(this.engineGain);
-      this.engineOsc.start();
-      motorQuelle = this.engineOsc;
+      motorQuellen.push(this.motorQuelle);
     }
     /*
      * Der Pumpenton (Dreieck 118 Hz, Wunsch 29.08.2026) ist mit E-130 entfallen:
      * Er war einer der Summtoene. Die Hydraulik beim Bewegen kommt jetzt aus
      * derselben Aufnahme wie die Schalenfahrt (`oelFluss`).
      */
-    this.dauerquellen = [motorQuelle, ...this.baueMaterialschicht(ctx)];
+    this.dauerquellen = [...motorQuellen, ...this.baueMaterialschicht(ctx)];
   }
 
   /**
@@ -580,9 +565,8 @@ export class AudioManager {
    * die Setter und Ereignisse hochziehen. Liefert die Quellen fuer den
    * Unterbrechungs-Ersatz.
    *
-   * Seit E-130 spielt jeder Weg eine Aufnahme in Schleife (`SCHLEIFEN`).
-   * Solange sie fehlt, laeuft er auf Rauschen oder Knisterpuffern (E-121) —
-   * nie auf einem Oszillator, damit nichts summt.
+   * Jeder Weg spielt eine Aufnahme in Schleife (`SCHLEIFEN`). Solange sie
+   * laedt, bleibt er stumm (E-153; vorher Rauschen und Knisterpuffer).
    */
   private baueMaterialschicht(ctx: AudioContext): AudioScheduledSourceNode[] {
     const sfx = this.sfx!;
@@ -609,55 +593,46 @@ export class AudioManager {
       return g;
     };
     const auf = (n: string): AudioBuffer | undefined => this.proben.get(n);
-    let weissQ: AudioBufferSourceNode | null = null;
-    const weiss = (): AudioBufferSourceNode => (weissQ ??= loop(this.noiseBuffer()));
-    // Eigene Rauschquelle fuer die Hydraulik: eine Quelle gehoert genau einer Lautstaerkegruppe (E-139)
-    let weissB: AudioBufferSourceNode | null = null;
-    const weissBagger = (): AudioBufferSourceNode => (weissB ??= loop(this.noiseBuffer()));
+    /** Eine Aufnahme als Schleife in `ziel` — fehlt sie (laedt noch), bleibt der Weg stumm (E-153). */
+    const schleife = (n: string, ziel: AudioNode): AudioBufferSourceNode | null => {
+      const b = auf(n);
+      if (!b) return null;
+      const q = loop(b);
+      q.connect(ziel);
+      return q;
+    };
 
-    // Kehren. Mit Aufnahme ein weicher Tiefpass (die Aufnahme bringt ihren
-    // Klang mit) statt der engen Baender aus E-121.
-    const betonAuf = auf(SCHLEIFEN.kehrBeton);
-    const rasselAuf = auf(SCHLEIFEN.rassel);
-    const stahlAuf = auf(SCHLEIFEN.kehrStahl);
-    this.kehrAufnahme = !!(betonAuf && rasselAuf && stahlAuf);
-    // SW: Koernung 220 Koerner/s à 6 ms, Geroell 35 Schlaege/s à 25 ms
-    const korn = loop(betonAuf ?? this.knisterPuffer("korn", 220, 0.006));
-    const rassel = loop(rasselAuf ?? this.knisterPuffer("rassel", 35, 0.025));
-    this.kornQuelle = korn;
-    this.rasselQuelle = rassel;
-    const beton = { gain: stumm(), filter: betonAuf ? band(4000, 0.5, "lowpass") : band(1100, 0.9) };
-    korn.connect(beton.filter).connect(beton.gain);
-    if (!betonAuf) {
-      const betonRausch = ctx.createGain();
-      betonRausch.gain.value = 0.35; // SW
-      weiss().connect(betonRausch).connect(beton.filter);
-    }
-    const stahl = { gain: stumm(), filter: stahlAuf ? band(9000, 0.5, "lowpass") : band(2400, 8) };
-    (stahlAuf ? loop(stahlAuf) : weiss()).connect(stahl.filter).connect(stahl.gain);
-    const schrott = { gain: stumm(), filter: rasselAuf ? band(6000, 0.5, "lowpass") : band(1500, 0.8) };
-    rassel.connect(schrott.filter).connect(schrott.gain);
+    // Kehren: je Untergrund eine Aufnahme hinter einem weichen Tiefpass
+    const beton = { gain: stumm(), filter: band(4000, 0.5, "lowpass") };
+    const stahl = { gain: stumm(), filter: band(9000, 0.5, "lowpass") };
+    const schrott = { gain: stumm(), filter: band(6000, 0.5, "lowpass") };
+    beton.filter.connect(beton.gain);
+    stahl.filter.connect(stahl.gain);
+    schrott.filter.connect(schrott.gain);
+    this.kornQuelle = schleife(SCHLEIFEN.kehrBeton, beton.filter);
+    schleife(SCHLEIFEN.kehrStahl, stahl.filter);
+    this.rasselQuelle = schleife(SCHLEIFEN.rassel, schrott.filter);
     this.kehr = { beton, stahl, schrott };
 
-    // Rasselbett: was keinen eigenen Schlag bekommt, rasselt hier
+    // Rasselbett: was keinen eigenen Schlag bekommt, rasselt hier (dieselbe Aufnahme)
     this.bettGain = stumm();
-    rassel.connect(rasselAuf ? band(7000, 0.5, "lowpass") : band(1800, 0.6)).connect(this.bettGain);
+    this.rasselQuelle?.connect(band(7000, 0.5, "lowpass")).connect(this.bettGain);
 
-    // Druckaufbau beim Zudruecken: Greifkran unter Last (Aufnahme H), ersatzweise Rauschen
-    const druck = auf(SCHLEIFEN.druck);
+    // Druckaufbau beim Zudruecken: Greifkran unter Last (Aufnahme H)
     this.stoehnFilter = band(900, 0.7, "lowpass");
     this.stoehnGain = stumm(this.baggerBus);
-    this.druckQuelle = druck ? loop(druck) : null;
-    (this.druckQuelle ?? weissBagger()).connect(this.stoehnFilter).connect(this.stoehnGain);
+    this.stoehnFilter.connect(this.stoehnGain);
+    this.druckQuelle = schleife(SCHLEIFEN.druck, this.stoehnFilter);
     // Druckbegrenzungsventil: Zischen, wenn die Spinne am Ende ist
-    const ventil = auf(SCHLEIFEN.ventil);
     this.ventilGain = stumm(this.baggerBus);
-    (ventil ? loop(ventil) : weissBagger()).connect(band(3500, 0.7, "highpass")).connect(this.ventilGain);
+    const ventilFilter = band(3500, 0.7, "highpass");
+    ventilFilter.connect(this.ventilGain);
+    schleife(SCHLEIFEN.ventil, ventilFilter);
     // Schalen und Arm in Bewegung: Oel stroemt
-    const fahrt = auf(SCHLEIFEN.fahrt);
     this.schalenGain = stumm(this.baggerBus);
-    this.fahrtQuelle = fahrt ? loop(fahrt) : null;
-    (this.fahrtQuelle ?? weissBagger()).connect(band(fahrt ? 8000 : 900, 0.7, "lowpass")).connect(this.schalenGain);
+    const fahrtFilter = band(8000, 0.7, "lowpass");
+    fahrtFilter.connect(this.schalenGain);
+    this.fahrtQuelle = schleife(SCHLEIFEN.fahrt, fahrtFilter);
 
     return quellen;
   }
@@ -677,7 +652,6 @@ export class AudioManager {
       }
     }
     this.dauerquellen = [];
-    this.engineOsc = null;
     this.engineGain = null;
     this.motorQuelle = null;
     this.kehr = null;
@@ -702,10 +676,6 @@ export class AudioManager {
       const gen = this.magnetAn ? 1 : 0;
       this.motorQuelle.playbackRate.setTargetAtTime(0.9 + 0.3 * activity + 0.1 * load + MAGNET_DREHZAHL * gen, t, 0.15);
       this.engineGain.gain.setTargetAtTime(0.06 + 0.07 * activity + 0.02 * load + MAGNET_LAUT * gen, t, 0.15);
-    } else if (this.engineOsc) {
-      // Beim Bedienen geht der Motor spürbar hoch — das trägt das Feedback
-      this.engineOsc.frequency.setTargetAtTime(46 * (1 + 0.55 * activity + 0.22 * load), t, 0.12);
-      this.engineGain.gain.setTargetAtTime(0.05 + 0.085 * activity + 0.02 * load, t, 0.15);
     }
     this.arm = activity;
     this.oelAktualisieren(t);
@@ -729,7 +699,7 @@ export class AudioManager {
     const t = this.ctx.currentTime;
     const k = kehrKlang(intensity, untergrund);
     // Mit Aufnahme ein Tiefpass beim Vierfachen: schneller = heller (E-130, SW)
-    const hz = this.kehrAufnahme ? k.hz * 4 : k.hz;
+    const hz = k.hz * 4;
     for (const g of ["beton", "stahl", "schrott"] as const) {
       const weg = this.kehr[g];
       weg.gain.gain.setTargetAtTime(g === untergrund ? k.laut : 0, t, g === untergrund ? 0.06 : 0.08);
@@ -814,12 +784,7 @@ export class AudioManager {
     if (!this.ctx || !(zuwachs > 0)) return;
     const k = knautschKlang(zuwachs);
     this.letzterKnautsch = this.ctx.currentTime;
-    if (!this.spiele(EINZEL.knautsch, 0.75 * k.pegel, { rate: k.rate, dauer: k.dauer })) {
-      // Ersatz ohne Aufnahme: der alte Crash, nach Staerke
-      this.burst([52, 78], 0.7, 0.2 + 0.4 * k.pegel, "sine");
-      this.noiseBurst(2500, 0.18, 0.3 * k.pegel);
-      return;
-    }
+    if (!this.spiele(EINZEL.knautsch, 0.75 * k.pegel, { rate: k.rate, dauer: k.dauer })) return;
     // Metallschlaege ueber die Dauer verteilt: je mehr Zuwachs, desto dichter
     const stahl = aufprallKlang({ materialId: "steel", massKg: 300, wucht: 6, blech: false, untergrund: "beton" })!;
     for (let i = 0; i < k.schlaege; i++) {
@@ -842,17 +807,7 @@ export class AudioManager {
     // E-130: Dose zerdrueckt (BigSoundBank #0118), tiefer gelegt, mit Metallschlag.
     // Haerter = lauter und etwas tiefer. SW: Pegel 0,55, Tempo 1,05 → 0,9
     const k = Math.min(1, kraftKN / VOLLE_KRAFT_KN);
-    if (this.spiele(EINZEL.biss, 0.55 * p, { rate: 1.05 - 0.15 * k })) return;
-    // Ersatz: drei kurze, tiefe Knirscher, dazu das Anriss-Rauschen
-    const teile = [180, 290, 460, 720, 1150];
-    const abkling = [0.12, 0.1, 0.08, 0.06, 0.05];
-    for (const [i, d] of [0, 0.03, 0.07].entries()) {
-      this.metalHit(teile, abkling, 0.28 * p * Math.pow(0.6, i), {
-        transient: 2500,
-        transientGain: 0.25 * p * Math.pow(0.6, i),
-        spread: 0.1,
-      }, d);
-    }
+    this.spiele(EINZEL.biss, 0.55 * p, { rate: 1.05 - 0.15 * k });
   }
 
   /**
@@ -864,9 +819,11 @@ export class AudioManager {
     const ctx = this.ctx;
     const t = ctx.currentTime;
     // E-130: das Zischen aus der Ventil-Aufnahme, der Klack als Metallanschlag
+    this.spiele(EINZEL.anschlag, 0.12, { rate: 1.25, delay: 0.02, tp: 3000, bagger: true });
     const ventil = this.proben.get(SCHLEIFEN.ventil);
+    if (!ventil) return; // E-153: laedt noch — dann nur der Klack, kein Rauschen
     const src = ctx.createBufferSource();
-    src.buffer = ventil ?? this.noiseBuffer();
+    src.buffer = ventil;
     const f = ctx.createBiquadFilter();
     f.type = "bandpass";
     f.Q.value = 1.2;
@@ -874,28 +831,11 @@ export class AudioManager {
     f.frequency.setValueAtTime(3200, t);
     f.frequency.exponentialRampToValueAtTime(1200, t + 0.35);
     const g = ctx.createGain();
-    g.gain.setValueAtTime(ventil ? 0.3 : 0.07, t); // SW: die Aufnahme ist schmalbandiger als weisses Rauschen
+    g.gain.setValueAtTime(0.3, t); // SW
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
     src.connect(f).connect(g).connect(this.baggerBus);
     src.start(t);
     src.stop(t + 0.42);
-    this.spiele(EINZEL.anschlag, 0.12, { rate: 1.25, delay: 0.02, tp: 3000, bagger: true });
-  }
-
-  /** Ein Schlag nach Rezept, mit Nachklappern und Rascheln. */
-  private schlag(s: Schlag, pegel: number): void {
-    for (let i = 0; i <= s.scheppern; i++) {
-      const d = i === 0 ? 0 : 0.045 * i * (1 + Math.random() * 0.3); // SW: 45 ms Abstand
-      const f = Math.pow(0.5, i);
-      this.metalHit(
-        i === 0 ? s.teiltoene : s.teiltoene.slice(1),
-        i === 0 ? s.abkling : s.abkling.slice(1).map((x) => x * 0.6),
-        s.laut * pegel * f,
-        { transient: s.anriss, transientGain: s.anrissLaut * pegel * f, spread: s.streu * (1 + i) },
-        d
-      );
-    }
-    if (s.rascheln > 0) this.noiseBurst(s.rascheln, 0.2, 0.16 * pegel);
   }
 
   /**
@@ -909,21 +849,12 @@ export class AudioManager {
   playClawSnap(haerte = 1, _typ?: string): void {
     const h = Math.max(0.15, Math.min(haerte, 1));
     // E-130: Stahl auf Stahl als Aufnahme; weich gedaempft = leiser, tiefer, dumpfer (SW)
-    if (this.spiele(EINZEL.anschlag, 0.2 + 0.35 * h, { rate: 0.85 + 0.2 * h, tp: 1500 + 8000 * h })) return;
-    this.metalHit([620, 940, 1380, 1970], [0.34 * h, 0.26 * h, 0.18 * h, 0.12 * h], 0.1 + 0.12 * h, {
-      transient: 1500,
-      transientGain: 0.3 * h,
-      spread: 0.012,
-    });
+    this.spiele(EINZEL.anschlag, 0.2 + 0.35 * h, { rate: 0.85 + 0.2 * h, tp: 1500 + 8000 * h });
   }
 
   playGrab(materialId?: string): void {
     // E-130: der Greifkran fasst Schrott (Pixabay „Grua recicladora“, H). SW: 0,5
-    if (!this.spiele(EINZEL.zupacken, 0.5, { bagger: true })) {
-      // Ersatz: kurzer Rauschimpuls + tiefer Thump
-      this.burst([70], 0.18, 0.35, "triangle");
-      this.noiseBurst(500, 0.08, 0.25);
-    }
+    this.spiele(EINZEL.zupacken, 0.5, { bagger: true });
     // E-121: dazu das Material, leise — man hoert, WAS man gefasst hat.
     // SW: wie ein Aufprall mit 4 m/s, auf Pegel 0,35 gedeckelt.
     if (!materialId) return;
@@ -932,118 +863,13 @@ export class AudioManager {
   }
 
   /**
-   * Abwurfklang je Material (Kap. 15). Metall klingt nicht harmonisch wie ein
-   * Instrument, sondern über INHARMONISCHE Teiltöne mit unterschiedlich langem
-   * Abklingen — genau das bildet metalHit nach. Dazu ein kurzer Aufprall-
-   * Transient, der Masse und Härte vermittelt.
+   * Abwurfklang je Material (Kap. 15): dieselbe Aufnahme wie der Aufprall des
+   * Materials (80 kg, 5 m/s, auf Stahl). E-153: ohne die gerechneten Teiltoene.
    */
   playDrop(materialId: string): void {
-    // E-130: dieselbe Aufnahme wie der Aufprall des Materials (80 kg, 5 m/s)
     const r = aufprallKlang({ materialId, massKg: 80, wucht: 5, blech: false, untergrund: "stahl" });
-    if (r && this.spiele(r.teil.proben, AUFNAHME_LAUT * r.teil.laut * 0.7, { rate: r.rate })) return;
-    switch (materialId) {
-      case "steel":
-        // schwerer Stahl: tiefer Anschlag, langes metallisches Nachklingen
-        this.metalHit([214, 331, 487, 712, 1043], [0.9, 0.7, 0.5, 0.34, 0.22], 0.26, {
-          transient: 1600,
-          transientGain: 0.3,
-          spread: 0.05,
-        });
-        break;
-      case "va":
-        // Edelstahl: heller und klarer, klingt am längsten nach
-        this.metalHit([392, 611, 913, 1327, 1904], [1.25, 0.95, 0.7, 0.45, 0.3], 0.2, {
-          transient: 3400,
-          transientGain: 0.2,
-          spread: 0.03,
-        });
-        break;
-      case "alu":
-        // Aluminium: leicht, hell, kurzer Nachhall
-        this.metalHit([523, 807, 1188, 1673], [0.5, 0.36, 0.24, 0.16], 0.19, {
-          transient: 4200,
-          transientGain: 0.22,
-          spread: 0.04,
-        });
-        break;
-      case "copper":
-        // Kupfer/Messing: weicher, dunkler Klang mit tragendem Sustain
-        this.metalHit([297, 449, 668, 951], [1.0, 0.8, 0.55, 0.35], 0.22, {
-          transient: 1100,
-          transientGain: 0.18,
-          spread: 0.06,
-        });
-        break;
-      case "cable":
-        // Kabelbund: fast tonlos, dumpfes Poltern mit Raschelanteil
-        this.metalHit([132, 189], [0.24, 0.18], 0.2, {
-          transient: 900,
-          transientGain: 0.3,
-          spread: 0.09,
-        });
-        this.noiseBurst(1600, 0.22, 0.16);
-        break;
-      default:
-        // Störstoff (Holz, Beton, Kunststoff): Schlag ohne metallisches Klingen
-        this.metalHit([96, 143], [0.14, 0.1], 0.3, {
-          transient: 420,
-          transientGain: 0.26,
-          spread: 0.02,
-        });
-    }
+    if (r) this.spiele(r.teil.proben, AUFNAHME_LAUT * r.teil.laut * 0.7, { rate: r.rate });
   }
-
-  /**
-   * Ein Metallschlag: kurzer Aufprall-Transient plus inharmonische Partialtöne,
-   * die unterschiedlich schnell verklingen.
-   * @param partials Teiltonfrequenzen (bewusst nicht harmonisch)
-   * @param decays Abklingzeit je Teilton in Sekunden
-   * @param gain Grundlautstärke
-   */
-  private metalHit(
-    partials: number[],
-    decays: number[],
-    gain: number,
-    opts: { transient: number; transientGain: number; spread: number },
-    delay = 0
-  ): void {
-    if (!this.ctx || !this.master) return;
-    const t = this.ctx.currentTime + delay;
-    const ziel = this.ausgang;
-    // Aufprall: sehr kurzer, gefilterter Rauschimpuls
-    this.noiseBurst(opts.transient, 0.045, opts.transientGain, delay);
-    partials.forEach((f, i) => {
-      const osc = this.ctx!.createOscillator();
-      // leichte Verstimmung je Anschlag — kein Ton klingt exakt wie der vorige
-      osc.frequency.value = f * (1 + (Math.random() - 0.5) * opts.spread);
-      osc.type = i === 0 ? "triangle" : "sine";
-      const g = this.ctx!.createGain();
-      const amp = (gain / (i + 1.4)) * (0.85 + Math.random() * 0.3);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(Math.max(amp, 0.0002), t + 0.006); // harter Anschlag
-      g.gain.exponentialRampToValueAtTime(0.0001, t + decays[i]);
-      osc.connect(g).connect(ziel);
-      osc.start(t);
-      osc.stop(t + decays[i] + 0.05);
-    });
-  }
-
-  /*
-   * ------------------------------------------------------------------
-   * Stumm gestellt, nicht geloescht (Ansage 12.09.2026: "erst Ton fixen,
-   * auf Stand von gestern frueh gehen, und Toene einzeln testen spaeter").
-   *
-   * Die Klangwelt steht wieder auf dem Stand vom 11.09. mittags — vor der
-   * gesamten Tonueberarbeitung. Drei Dinge sind seither im Spiel dazugekommen
-   * und rufen hier an: Aufschlaege von Teilen, der Rueckfahrwarner und der
-   * Taktgeber der Platzkulisse. Sie bleiben als leere Einsprungstellen
-   * stehen, damit das Spiel unveraendert laeuft und jeder Klang spaeter
-   * EINZELN wieder eingeschaltet und beurteilt werden kann — genau so, wie
-   * es diesmal haette laufen muessen.
-   *
-   * Was daraus geworden ist, steht in docs/tonkonzept.md.
-   * ------------------------------------------------------------------
-   */
 
   /**
    * Alter Direktaufruf aus main.ts — bleibt stumm. Seit E-121 klingt der
@@ -1064,9 +890,8 @@ export class AudioManager {
    * ein Laser-„Piu", kein Metall.
    */
   playTear(): void {
-    const kreisch = this.spiele([SCHLEIFEN.kehrStahl], 0.35, { rate: 0.7 + Math.random() * 0.1, dauer: 0.45 });
-    const blech = this.spiele(FAMILIE_BLECH, 0.5, { rate: 0.85 + Math.random() * 0.1, delay: 0.05 });
-    if (!kreisch && !blech) this.noiseBurst(1800, 0.35, 0.3); // Ersatz, bis die Aufnahmen da sind
+    this.spiele([SCHLEIFEN.kehrStahl], 0.35, { rate: 0.7 + Math.random() * 0.1, dauer: 0.45 });
+    this.spiele(FAMILIE_BLECH, 0.5, { rate: 0.85 + Math.random() * 0.1, delay: 0.05 });
   }
 
   /** Schwerer Blech-Crash (Quetschstufe). */
@@ -1077,24 +902,18 @@ export class AudioManager {
      * kennt die Staerke. Sonst knallten zwei volle Crashs uebereinander.
      */
     if (this.ctx && this.ctx.currentTime - this.letzterKnautsch < KNAUTSCH_SPERRE_S) return;
-    if (this.spiele(EINZEL.knautsch, 0.35 + 0.4 * strength, { dauer: 1 + 1.5 * strength })) return;
-    this.burst([52, 78], 0.7, 0.35 + 0.25 * strength, "sine");
-    this.burst([161, 214, 289], 0.5, 0.32, "triangle");
-    this.noiseBurst(2500, 0.18, 0.3);
+    this.spiele(EINZEL.knautsch, 0.35 + 0.4 * strength, { dauer: 1 + 1.5 * strength });
   }
 
   /** Scheibe birst. */
   playGlass(): void {
-    if (this.spiele(EINZEL.glas, 0.45)) return; // E-130: BigSoundBank #0148/#0771. SW
-    this.burst([1900, 2600, 3400], 0.28, 0.2);
-    this.noiseBurst(7000, 0.14, 0.22);
+    this.spiele(EINZEL.glas, 0.45); // E-130: BigSoundBank #0148/#0771. SW
   }
 
   /** Zaunfeld reißt aus der Verankerung: es scheppert und rasselt (E-139: Aufnahmen statt Dreieckston). */
   playRattle(): void {
-    const blech = this.spiele(FAMILIE_BLECH, 0.6);
-    const rassel = this.spiele([SCHLEIFEN.rassel], 0.5, { dauer: 0.5 });
-    if (!blech && !rassel) this.noiseBurst(900, 0.35, 0.3);
+    this.spiele(FAMILIE_BLECH, 0.6);
+    this.spiele([SCHLEIFEN.rassel], 0.5, { dauer: 0.5 });
   }
 
   /**
@@ -1186,14 +1005,12 @@ export class AudioManager {
   }
 
   /**
-   * Richtig sortiert, Challenge-Schritt geschafft. E-139: statt „Kaching"
-   * (zwei Sinustöne) das Knacken eines Funkgeräts, wenn jemand die Taste
-   * loslässt — „verstanden". Gefiltertes Rauschen, keine Tonhöhe.
+   * Richtig sortiert, Challenge-Schritt geschafft. E-153: still. Das
+   * Funk-Knacken aus E-139 war gerechnetes Rauschen; eine echte Funk-Aufnahme
+   * gibt es im Bestand nicht (offen für Patrick). Was richtig landet, hört man
+   * am Aufprall in der Mulde.
    */
-  playCorrect(): void {
-    this.funkKnacken(0, 0.18); // SW
-    this.funkKnacken(0.07, 0.12); // SW
-  }
+  playCorrect(): void {}
 
   /**
    * Rastklick des Funktionsrädchens und jedes Antippens: ein trockenes
@@ -1209,7 +1026,7 @@ export class AudioManager {
    * Eine Hupe gibt es im Bestand nicht (offen für Patrick).
    */
   playWrong(): void {
-    if (!this.spiele(GRUND_STAHL, 0.9, { rate: 0.6, tp: 700 })) this.noiseBurst(300, 0.25, 0.3); // SW
+    this.spiele(GRUND_STAHL, 0.9, { rate: 0.6, tp: 700 }); // SW
   }
 
   private letzterHieb = -1;
@@ -1243,63 +1060,6 @@ export class AudioManager {
     this.spiele(s.proben, AUFNAHME_LAUT * 0.3 * s.pegel, { rate: s.rate, dauer: s.dauer, tp: s.tp });
   }
 
-  /** Ein Knacken wie aus dem Funkgerät: 25 ms Rauschen im Sprachband. */
-  private funkKnacken(delay: number, gain: number): void {
-    if (!this.ctx || !this.master) return;
-    const t = this.ctx.currentTime + delay;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.noiseBuffer();
-    const f = this.ctx.createBiquadFilter();
-    f.type = "bandpass";
-    f.frequency.value = 1800; // SW: Mitte des Funk-Sprachbands
-    f.Q.value = 1.2;
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(gain, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.025);
-    src.connect(f).connect(g).connect(this.baggerBus);
-    src.start(t, Math.random() * 0.5);
-    src.stop(t + 0.04);
-  }
-
-  // ---------- Synthese-Helfer ----------
-
-  private burst(freqs: number[], dur: number, gain: number, type: OscillatorType = "sine"): void {
-    if (!this.ctx || !this.master) return;
-    const t = this.ctx.currentTime;
-    for (const f of freqs) {
-      const osc = this.ctx.createOscillator();
-      osc.type = type;
-      osc.frequency.value = f * (0.98 + Math.random() * 0.04); // leichte Verstimmung
-      const g = this.ctx.createGain();
-      g.gain.setValueAtTime(gain / freqs.length, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      osc.connect(g).connect(this.ausgang);
-      osc.start(t);
-      osc.stop(t + dur + 0.05);
-    }
-  }
-
-  private noiseBurst(cutoff: number, dur: number, gain: number, delay = 0): void {
-    if (!this.ctx || !this.master) return;
-    const t = this.ctx.currentTime + delay;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.noiseBuffer();
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = cutoff;
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(gain, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(filter).connect(g).connect(this.ausgang);
-    src.start(t);
-    src.stop(t + dur + 0.05);
-  }
-
-  /** Wohin Ereignisklaenge gehen: Schlag-Bus mit Begrenzer (Gruppe Metall), sonst direkt. */
-  private get ausgang(): AudioNode {
-    return this.sfx ?? this.master!;
-  }
-
   /** Gruppe Bagger: Motor, Hydraulik, Greifer-Mechanik, Kabine (E-139). */
   private get baggerBus(): AudioNode {
     return this.gruppen?.bagger ?? this.master!;
@@ -1317,43 +1077,5 @@ export class AudioManager {
     const n = this.gruppen?.[g];
     if (n && this.ctx) n.gain.setTargetAtTime(v, this.ctx.currentTime, 0.03); // SW: 30 ms, knackfrei
     speichereLautstaerken(this.laut);
-  }
-
-  /**
-   * Knisterpuffer (E-121): eine Sekunde einzelner, kurz abklingender Koerner
-   * in zufaelligem Abstand — Grundstoff fuer Schaben und Geroell. Einmal je
-   * Kanal gerechnet, danach in Schleife gespielt.
-   * @param dichte Koerner je Sekunde
-   * @param abkling Abklingzeit eines Korns (s)
-   */
-  private puffer = new Map<string, AudioBuffer>();
-  private knisterPuffer(name: string, dichte: number, abkling: number): AudioBuffer {
-    const da = this.puffer.get(name);
-    if (da) return da;
-    const ctx = this.ctx!;
-    const len = ctx.sampleRate;
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    const p = dichte / len;
-    const fall = Math.exp(-1 / (abkling * len));
-    let huell = 0;
-    for (let i = 0; i < len; i++) {
-      if (Math.random() < p) huell = Math.max(huell, 0.3 + 0.7 * Math.random() ** 2);
-      data[i] = huell * (Math.random() * 2 - 1);
-      huell *= fall;
-    }
-    this.puffer.set(name, buf);
-    return buf;
-  }
-
-  private cachedNoise: AudioBuffer | null = null;
-  private noiseBuffer(): AudioBuffer {
-    if (this.cachedNoise) return this.cachedNoise;
-    const len = this.ctx!.sampleRate;
-    const buf = this.ctx!.createBuffer(1, len, this.ctx!.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-    this.cachedNoise = buf;
-    return buf;
   }
 }

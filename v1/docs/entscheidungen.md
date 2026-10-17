@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-153 | 17.10.2026 | Nur echte Aufnahmen, kein gerechneter Klang, auch nicht beim Laden | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-149 | 17.10.2026 | Kipper leert seine Brücke: 65° und oben abrütteln | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-150 | 17.10.2026 | Verzinkt ist kein Buntmetall: Gerüste und Gitterroste sind Stahl | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-147 | 17.10.2026 | Späneknäuel: Spänemulde im Absetzkipper, Mischschrott, magnetisch | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -165,6 +166,13 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-153 — Nur echte Aufnahmen** (iPad, dann iPhone mini)
+- Seite frisch laden (iPhone mini, mobiles Netz), sofort spielen: Summen, Piepen oder Glöckchen in den ersten Sekunden? (Richtig: Stille, bis die Klänge einsetzen.)
+- Spinne durch einen Schrotthaufen ziehen, Haufen rutschen lassen: echter Schrott statt gestreuter Dosen?
+- iPhone mini: Reifen, Bauschutt, Kabelbündel fallen lassen — überhaupt hörbar?
+- Spinne über Beton: Metall auf Beton oder Schritte?
+- Richtig einsortieren: Fehlt eine Rückmeldung?
 
 **E-149 — Kipper leert seine Brücke** (iPad, gemischter Kipper am Abladeplatz)
 - Hebt er steiler als bisher und rüttelt die Brücke oben sichtbar ab — sieht das nach einem Fahrer aus oder nach einem Fehler?

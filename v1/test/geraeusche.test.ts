@@ -15,6 +15,8 @@
  * Knoten entstehen und welche Pegel gesetzt werden.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { AudioManager } from "../src/audio/audioManager";
 import { EventBus, type GameEvents } from "../src/core/events";
 import {
@@ -128,7 +130,10 @@ class FakeCtx {
     length: 0.5 * 48000,
     numberOfChannels: 1,
   });
+  /** E-153: wie oft ein Puffer GERECHNET statt dekodiert wurde (Rauschen, Knistern) */
+  gerechnet = 0;
   createBuffer = (_k: number, len: number): unknown => {
+    this.gerechnet++;
     const d = new Float32Array(len);
     return { getChannelData: () => d };
   };
@@ -164,10 +169,19 @@ afterEach(() => {
   g.AudioContext = echt.AudioContext;
 });
 
-/** Manager mit Bus, nach der ersten Geste. Musik aus, damit sie nicht mitzaehlt. */
-function starte(): { mgr: AudioManager; bus: EventBus } {
+/**
+ * Manager mit Bus, nach der ersten Geste. Musik aus, damit sie nicht mitzaehlt.
+ * E-153: Seit es keine Ersatz-Synthese mehr gibt, schweigt der Manager ohne
+ * Aufnahmen. Darum liegen sie hier (als Attrappen) schon vor der ersten Geste
+ * bereit — ausser `mitAufnahmen` ist false.
+ */
+function starte(mitAufnahmen = true): { mgr: AudioManager; bus: EventBus } {
   const bus = new EventBus();
   const mgr = new AudioManager(bus);
+  if (mitAufnahmen) {
+    const proben = (mgr as unknown as { proben: Map<string, unknown> }).proben;
+    for (const n of alleProben()) proben.set(n, { name: n, duration: 0.5, length: 24000, numberOfChannels: 1 });
+  }
   if (mgr.musicOn) mgr.toggleMusic(); // E-139: startet ohnehin aus
   (g as { _geste: () => void })._geste();
   return { mgr, bus };
@@ -399,27 +413,20 @@ describe("Aufprall-Regeln", () => {
     expect(aufprallPegel(5, 800)).toBeGreaterThan(aufprallPegel(5, 8));
   });
 
-  it("Stahl dumpf, Blech scheppert, Alu und Kupfer heller", () => {
-    const grund = (m: string, kg = 200, blech = false): number =>
-      aufprallKlang({ materialId: m, massKg: kg, wucht: 5, blech, untergrund: "stahl" })!.teil.teiltoene[0]!;
+  // E-153: geprueft an den Aufnahmen, die spielen (vorher an gerechneten Teiltoenen).
+  // Der Anteil ueber 300 Hz wird an den Dateien selbst gemessen: test/tonaufnahmen.test.ts.
+  it("Stahl dumpf, Blech scheppert, Alu und Kupfer heller — je eigene Aufnahmen", () => {
+    const r = (m: string, kg = 200, blech = false) =>
+      aufprallKlang({ materialId: m, massKg: kg, wucht: 5, blech, untergrund: "stahl" })!;
     expect(familieVon("steel", 200, false)).toBe("stahl");
     expect(familieVon("steel", 200, true)).toBe("blech");
     expect(familieVon("steel", 10, false)).toBe("blech");
-    expect(grund("steel")).toBeLessThan(grund("steel", 200, true));
-    expect(grund("alu")).toBeGreaterThan(grund("steel"));
-    expect(grund("copper")).toBeGreaterThan(grund("steel"));
-    const blech = aufprallKlang({ materialId: "steel", massKg: 20, wucht: 5, blech: true, untergrund: "beton" })!;
-    expect(blech.teil.scheppern).toBeGreaterThan(0);
-  });
-
-  it("jeder Klang hat Anteile ueber 300 Hz — sonst stumm auf dem iPhone-Lautsprecher", () => {
-    for (const m of ["steel", "va", "alu", "copper", "cable", "battery", "wood", "tires", "rubble", "plastic"]) {
-      for (const u of ["beton", "stahl", "schrott"] as const) {
-        const r = aufprallKlang({ materialId: m, massKg: 500, wucht: 5, blech: false, untergrund: u })!;
-        expect(Math.max(...r.teil.teiltoene), m).toBeGreaterThan(300);
-        expect(Math.max(...r.grund.teiltoene), u).toBeGreaterThan(300);
-      }
-    }
+    expect(r("steel").teil.proben[0]).toMatch(/^stahl_/);
+    expect(r("steel", 200, true).teil.proben[0]).toMatch(/^blech_/);
+    expect(r("alu").teil.proben[0]).toMatch(/^alu_/);
+    expect(r("copper").teil.proben[0]).toMatch(/^kupfer_/);
+    expect(r("brass").rate).toBeGreaterThan(r("zinc").rate); // Messing heller, Zink dumpfer
+    expect(r("steel", 800).rate).toBeLessThan(r("steel", 20).rate); // schwerer = tiefer
   });
 });
 
@@ -477,7 +484,7 @@ async function starteMitAufnahmen(): Promise<{ mgr: AudioManager; bus: EventBus 
     ok: true,
     arrayBuffer: async () => new TextEncoder().encode(String(url).replace(/^.*\/(.+)\.wav$/, "$1")).buffer,
   });
-  const r = starte();
+  const r = starte(false); // die Aufnahmen kommen hier ueber fetch und decodeAudioData
   g.fetch = alt;
   for (let i = 0; i < 10; i++) await new Promise((f) => setTimeout(f, 0));
   return r;
@@ -926,5 +933,84 @@ describe("Lasthebemagnet: Klacken, Klonk, kein Brummen (E-151)", () => {
       if (gespielt(() => bus.emit("magnet:haftet", { massKg: 30 })).length) klonks++;
     }
     expect(klonks).toBeLessThanOrEqual(Math.ceil(0.2 / KLONK_ABSTAND_S));
+  });
+});
+
+// --------------------------------------------- 11. Nur echte Toene (E-153)
+
+describe("Nur Aufnahmen, nichts Gerechnetes (E-153, Patrick 17.10.2026)", () => {
+  /*
+   * Patrick: „möglichst nur realistische töne verwenden und so wenig wie
+   * möglich selbst komponierte". Gerechnet heisst: ein Oszillator (Ton) oder
+   * ein Puffer, der im Spiel erzeugt wird (Rauschen, Knistern). Beides darf im
+   * Spielbetrieb nicht mehr entstehen — auch nicht als Ersatz, solange die
+   * Aufnahmen laden. Einzige namentliche Ausnahme: das Radio (music.ts),
+   * beim Start aus und hier nicht eingeschaltet.
+   */
+  const allesSpielen = (mgr: AudioManager, bus: EventBus): void => {
+    for (const u of ["beton", "stahl", "schrott"] as const) bus.emit("schrott:aufprall", aufprall("steel", 6, u, 300));
+    bus.emit("greifer:zugedrueckt", { handle: 1, kraftKN: 30, x: 0, y: 0, z: 0 });
+    bus.emit("released", { count: 1 });
+    bus.emit("wrack:geknautscht", { handle: 1, grad: 0.5, zuwachs: 0.5, x: 0, y: 0, z: 0 });
+    bus.emit("magnet:an", {});
+    bus.emit("magnet:haftet", { massKg: 100 });
+    bus.emit("magnet:aus", {});
+    hieb(bus, 1, "wrack");
+    druck(bus, 1, "stahl");
+    for (const f of [
+      () => mgr.playGrab("alu"),
+      () => mgr.playClawSnap(1),
+      () => mgr.playDrop("copper"),
+      () => mgr.playCrash(1),
+      () => mgr.playGlass(),
+      () => mgr.playRattle(),
+      () => mgr.playTear(),
+      () => mgr.playSale(),
+      () => mgr.playCorrect(),
+      () => mgr.playWrong(),
+      () => mgr.playTick(),
+      () => mgr.playSterne(3),
+      () => mgr.playFeierabend(),
+      () => mgr.playHupe(),
+    ]) {
+      ctx.currentTime += 0.5;
+      f();
+    }
+    for (let i = 0; i < 30; i++) {
+      ctx.currentTime += 1 / 60;
+      mgr.setGreifer(0.5, i / 30);
+      mgr.setScrape(0.7, (["beton", "stahl", "schrott"] as const)[i % 3]);
+      mgr.updateEngine(0.5, 0.3);
+    }
+  };
+
+  it("mit Aufnahmen: kein Oszillator, kein gerechneter Puffer — jede Quelle spielt eine Aufnahme", () => {
+    const { mgr, bus } = starte();
+    allesSpielen(mgr, bus);
+    expect(ctx.oszillatoren).toBe(0);
+    expect(ctx.gerechnet).toBe(0);
+    const ohneAufnahme = ctx.pufferQuellen.filter((q) => !q.buffer?.name);
+    expect(ohneAufnahme).toHaveLength(0);
+    expect(ctx.pufferQuellen.length).toBeGreaterThan(30);
+  });
+
+  it("solange die Aufnahmen laden: Stille statt Ersatz-Synthese", () => {
+    const { mgr, bus } = starte(false);
+    allesSpielen(mgr, bus);
+    expect(ctx.oszillatoren).toBe(0);
+    expect(ctx.gerechnet).toBe(0);
+    expect(ctx.quellen).toBe(0);
+  });
+
+  it("sind sie da, laufen die Dauerklaenge an — ohne neue Geste", async () => {
+    const { mgr } = await starteMitAufnahmen();
+    expect(mgr.aufnahmenBericht.geladen).toBe(alleProben().length);
+    const namen = ctx.pufferQuellen.filter((q) => (q as { loop?: boolean }).loop).map((q) => q.buffer?.name);
+    expect(namen).toEqual(expect.arrayContaining(["motor", "hyd_druck", "hyd_fahrt", "ventil", "rassel", "kehr_beton", "kehr_stahl"]));
+  });
+
+  it("im Quelltext: kein Oszillator und kein gerechneter Puffer im Ton (ausser dem Radio)", () => {
+    const q = fs.readFileSync(path.resolve(__dirname, "../src/audio/audioManager.ts"), "utf8");
+    expect(q).not.toMatch(/createOscillator|createBuffer\(|Math\.random\(\) \* 2 - 1/);
   });
 });

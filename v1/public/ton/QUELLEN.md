@@ -64,8 +64,8 @@ Format: WAV, 16 bit, mono, 24000 Hz (wo in der Tabelle nicht anders angegeben). 
 | grund_schrott_1.wav | 0.15 s | Untergrund Schrott: klappert | A/impactTin_medium_000.ogg ab 0.00 s, ganz |
 | grund_schrott_2.wav | 0.21 s | Untergrund Schrott (2) | A/impactTin_medium_003.ogg ab 0.00 s, ganz |
 | kehr_beton.wav | 2.00 s | Spinne schleift über Beton: raues Schaben (Schleife) | Streuung aus A/footstep_concrete_000.ogg, A/footstep_concrete_001.ogg, A/footstep_concrete_002.ogg, A/footstep_concrete_003.ogg, A/footstep_concrete_004.ogg (95 Schläge) |
-| kehr_stahl.wav | 2.00 s | Spinne schleift über Ladefläche/Mulde: Kreischen (Schleife) | D/0914.ogg ab 9.60 s, 2.50 s; Streuung aus A/impactMetal_light_000.ogg, A/impactMetal_light_001.ogg, A/impactMetal_light_002.ogg, A/impactMetal_light_004.ogg (14 Schläge) |
-| rassel.wav | 2.00 s | Schrott rutscht und klappert; Spinne über Schrott (Schleife) | Streuung aus A/impactTin_medium_000.ogg, A/impactTin_medium_001.ogg, A/impactTin_medium_002.ogg, A/impactTin_medium_003.ogg, A/impactTin_medium_004.ogg, A/impactMetal_light_000.ogg, A/impactMetal_light_001.ogg, A/impactMetal_light_004.ogg, A/impactPlate_light_000.ogg, A/impactPlate_light_002.ogg (48 Schläge) |
+| kehr_stahl.wav | 2.00 s | Spinne schleift über Ladefläche/Mulde: Kreischen (Schleife) | D/0914.ogg ab 9.60 s, 2.50 s |
+| rassel.wav | 2.00 s | Schrott rutscht und klappert; Spinne über Schrott (Schleife) | H/freesound_community-grua-recicladora-48744.mp3 ab 141.50 s, 2.50 s |
 | hupe.wav | 1.23 s, 16 kHz | LKW-Drucklufthupe: der Fahrer hupt (im Spiel einmal oder doppelt) | J/2721.ogg ab 0.00 s, 1.30 s |
 | klingel.wav | 2.08 s, 16 kHz | Elektrische Werksklingel: Feierabend (Alternative zur Sirene) | K/1269.ogg ab 0.00 s, 2.20 s |
 | sirene.wav | 4.90 s, 12 kHz | Werkssirene: Feierabend — läuft hoch, steht kurz, läuft aus | L/3260.ogg ab 0.00 s, 3.20 s; L/3260.ogg ab 33.90 s, 2.00 s |

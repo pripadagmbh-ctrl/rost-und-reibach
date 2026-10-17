@@ -18,6 +18,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { brauchtNeuaufbau, brauchtWeckruf, istHoerbar } from "../src/audio/tonzustand";
 import { tonZeile } from "../src/core/debugOverlay";
 import { AudioManager } from "../src/audio/audioManager";
+import { alleProben } from "../src/audio/klangregeln";
 
 // ---------------------------------------------------------------- Attrappen
 
@@ -162,6 +163,9 @@ afterEach(() => {
 /** Manager anlegen und mit einer ersten Geste in Betrieb nehmen. */
 function starteSpiel(): { mgr: AudioManager; ctx: FakeCtx } {
   const mgr = new AudioManager();
+  // E-153: Ohne Aufnahmen schweigt der Ton (keine Ersatz-Synthese mehr) — Attrappen bereitlegen
+  const proben = (mgr as unknown as { proben: Map<string, unknown> }).proben;
+  for (const n of alleProben()) proben.set(n, { duration: 0.5, length: 24000, numberOfChannels: 1 });
   feuere("pointerdown");
   laufeFristen();
   return { mgr, ctx: kanaele[0]! };

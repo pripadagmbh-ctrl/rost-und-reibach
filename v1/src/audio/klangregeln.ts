@@ -2,187 +2,118 @@
  * KLANGREGELN (E-121, 06.10.2026) — was wie klingt, ohne WebAudio.
  *
  * Alles hier ist reine Rechnung: Aus einem Ereignis (Material, Masse, Wucht,
- * Untergrund) wird ein Rezept (Teiltoene, Abklingzeiten, Pegel). Gespielt wird
+ * Untergrund) wird ein Rezept (Aufnahmen, Tempo, Pegel, Dauer). Gespielt wird
  * es in `audioManager.ts`. Getrennt, damit die Waechter pruefen koennen, dass
  * haerter auch lauter heisst, ohne einen Lautsprecher zu brauchen.
  *
  * AUFNAHMEN (E-130, 16.10.2026): Seit Patricks Befund „beim greifen eher ein
  * summen" klingt alles hier aus echten Aufnahmen (`public/ton/`, Herkunft in
- * `public/ton/QUELLEN.md`, Schnitt in `tools/tonwerk/rezepte.mjs`). Die
- * Teiltoene unten bleiben als Ersatz, solange die Dateien laden oder fehlen.
- * Welche Aufnahme zu welcher Familie gehoert, steht in `proben`.
+ * `public/ton/QUELLEN.md`, Schnitt in `tools/tonwerk/rezepte.mjs`). Welche
+ * Aufnahme zu welcher Familie gehoert, steht in `proben`. Seit E-153 gibt es
+ * keine gerechneten Teiltoene mehr, auch nicht als Ersatz beim Laden.
  *
  * KLEINE LAUTSPRECHER: Ein iPhone-mini-Lautsprecher gibt unter etwa 300 Hz
- * praktisch nichts wieder, ein iPad unter etwa 150 Hz. Ein Stahlschlag, der
- * nur aus 90 Hz besteht, ist dort stumm. Deshalb hat jedes Rezept unten
- * Teiltoene zwischen 300 Hz und 3 kHz — der tiefe Grundton liefert den
- * Druck im Kopfhoerer, die Mitten tragen den Klang ueber das Geraet.
+ * praktisch nichts wieder. Der Waechter in `test/tonaufnahmen.test.ts` misst
+ * deshalb an jeder Aufnahme selbst, dass genug davon ueber 300 Hz liegt.
  */
 
 /** Worauf ein Teil faellt oder worueber die Spinne schleift. */
 export type Untergrund = "beton" | "stahl" | "schrott";
 
-/** Ein Metallschlag als Rezept. */
+/** Eine Klangfamilie: welche Aufnahmen, wie laut, wie lange (E-153: ohne Teiltoene). */
 export interface Schlag {
-  /** Teiltonfrequenzen (Hz), bewusst nicht ganzzahlig zueinander */
-  teiltoene: number[];
-  /** Abklingzeit je Teilton (s) */
-  abkling: number[];
   /** Grundlautstaerke vor dem Pegel */
   laut: number;
-  /** Grenzfrequenz des Anriss-Rauschens (Hz) */
-  anriss: number;
-  /** Lautstaerke des Anrisses */
-  anrissLaut: number;
   /** Streuung der Tonhoehe je Anschlag (Anteil) */
   streu: number;
-  /** Nachschlaege fuer Scheppern: so oft klappert es kurz hinterher */
-  scheppern: number;
-  /** Rascheln (Kabel, Geroell): Grenzfrequenz, 0 = keins */
-  rascheln: number;
+  /** Wie lange ein Schlag klingt (s) — fuer die Stimmenzaehlung. Aus den alten Abklingzeiten uebernommen. */
+  dauer: number;
   /** Aufnahmen dieser Familie (Dateiname ohne .wav in public/ton/), zufaellig gewaehlt (E-130) */
   proben: string[];
 }
 
 /*
- * KLANGFAMILIEN. Alle Werte SW (Startwerte zum Austesten am Geraet), die
- * Teiltoene sind aus den bisherigen `playDrop`-Klaengen abgeleitet und nach
+ * KLANGFAMILIEN. Alle Werte SW (Startwerte zum Austesten am Geraet), nach
  * Patricks Vorgabe (06.10.2026) sortiert: „Stahl dumpf-schwer, Blech
  * scheppernd, Kupfer und Alu heller".
  */
 export const FAMILIEN: Record<string, Schlag> = {
-  // Massiver Stahl: tief, kurz, schwer. Die drei oberen Teiltoene tragen ihn
-  // ueber kleine Lautsprecher.
+  // Massiver Stahl: tief, kurz, schwer.
   stahl: {
-    teiltoene: [92, 151, 233, 347, 512, 760],
-    abkling: [0.3, 0.26, 0.22, 0.18, 0.13, 0.09],
     laut: 0.3,
-    anriss: 900,
-    anrissLaut: 0.34,
     streu: 0.06,
-    scheppern: 0,
-    rascheln: 0,
+    dauer: 0.35,
     proben: ["stahl_1", "stahl_2", "stahl_3"],
   },
-  // Blech: viele hohe Teiltoene, und es klappert zweimal nach.
+  // Blech: hell, es scheppert.
   blech: {
-    teiltoene: [310, 467, 689, 1013, 1490, 2190, 3170],
-    abkling: [0.22, 0.2, 0.17, 0.14, 0.11, 0.08, 0.06],
     laut: 0.22,
-    anriss: 3000,
-    anrissLaut: 0.26,
     streu: 0.08,
-    scheppern: 2,
-    rascheln: 0,
+    dauer: 0.37,
     proben: ["blech_1", "blech_2", "blech_3"],
   },
   // Edelstahl: klar und lange nachklingend — aber kuerzer als der alte
   // Abwurfklang (1,25 s), sonst singt ein Haufen.
   va: {
-    teiltoene: [392, 611, 913, 1327, 1904],
-    abkling: [0.6, 0.5, 0.4, 0.3, 0.2],
     laut: 0.2,
-    anriss: 3400,
-    anrissLaut: 0.2,
     streu: 0.03,
-    scheppern: 0,
-    rascheln: 0,
+    dauer: 0.65,
     proben: ["va_1", "va_2"],
   },
   // Alu: leicht, hell, kurz, ein Nachklappern.
   alu: {
-    teiltoene: [587, 905, 1340, 1890, 2650],
-    abkling: [0.16, 0.13, 0.1, 0.08, 0.06],
     laut: 0.2,
-    anriss: 4200,
-    anrissLaut: 0.22,
     streu: 0.05,
-    scheppern: 1,
-    rascheln: 0,
+    dauer: 0.26,
     proben: ["alu_1", "alu_2"],
   },
   // Kupfer: hell, aber warm, mit tragendem Nachklang.
   kupfer: {
-    teiltoene: [450, 702, 1046, 1520, 2210],
-    abkling: [0.42, 0.34, 0.26, 0.18, 0.12],
     laut: 0.2,
-    anriss: 2400,
-    anrissLaut: 0.18,
     streu: 0.04,
-    scheppern: 0,
-    rascheln: 0,
+    dauer: 0.47,
     proben: ["kupfer_1", "kupfer_2"],
   },
   // Kabelbund: dumpf, mit Rascheln.
   kabel: {
-    teiltoene: [132, 189, 420],
-    abkling: [0.12, 0.1, 0.06],
     laut: 0.16,
-    anriss: 900,
-    anrissLaut: 0.26,
     streu: 0.09,
-    scheppern: 0,
-    rascheln: 1600,
+    dauer: 0.17,
     proben: ["kabel_1"],
   },
   // Akku, Kunststoffgehaeuse mit Blei: ein Klotz ohne Klang.
   klotz: {
-    teiltoene: [120, 260, 410],
-    abkling: [0.08, 0.06, 0.05],
     laut: 0.18,
-    anriss: 600,
-    anrissLaut: 0.32,
     streu: 0.05,
-    scheppern: 0,
-    rascheln: 0,
+    dauer: 0.13,
     proben: ["klotz_1"],
   },
   // Holz: kurzes Klopfen.
   holz: {
-    teiltoene: [340, 610, 980],
-    abkling: [0.07, 0.05, 0.04],
     laut: 0.2,
-    anriss: 1800,
-    anrissLaut: 0.25,
     streu: 0.06,
-    scheppern: 0,
-    rascheln: 0,
+    dauer: 0.12,
     proben: ["holz_1", "holz_2"],
   },
-  // Reifen: tiefer, weicher Plumps; der obere Teilton traegt ihn ueber kleine Lautsprecher.
+  // Reifen: tiefer, weicher Plumps.
   reifen: {
-    teiltoene: [70, 140, 480],
-    abkling: [0.18, 0.12, 0.06],
     laut: 0.22,
-    anriss: 400,
-    anrissLaut: 0.3,
     streu: 0.05,
-    scheppern: 0,
-    rascheln: 0,
+    dauer: 0.23,
     proben: ["reifen_1"],
   },
   // Kunststoff: hohles Klacken.
   kunststoff: {
-    teiltoene: [520, 880, 1460],
-    abkling: [0.05, 0.04, 0.03],
     laut: 0.14,
-    anriss: 2600,
-    anrissLaut: 0.2,
     streu: 0.06,
-    scheppern: 0,
-    rascheln: 0,
+    dauer: 0.1,
     proben: ["kunststoff_1", "kunststoff_2"],
   },
   // Bauschutt: Brocken und Geroell, kaum Ton.
   geroell: {
-    teiltoene: [150, 300, 520],
-    abkling: [0.06, 0.04, 0.03],
     laut: 0.12,
-    anriss: 1200,
-    anrissLaut: 0.3,
     streu: 0.1,
-    scheppern: 0,
-    rascheln: 2200,
+    dauer: 0.11,
     proben: ["geroell_1", "geroell_2"],
   },
 };
@@ -222,7 +153,7 @@ export function familieVon(materialId: string, massKg: number, blech: boolean): 
   }
 }
 
-/** Messing klingt heller als Kupfer, Zink dumpfer. Faktor auf alle Teiltoene. */
+/** Messing klingt heller als Kupfer, Zink dumpfer. Faktor aufs Abspieltempo. */
 const TONHOEHE: Record<string, number> = { brass: 1.15, zinc: 0.85 };
 
 /**
@@ -277,36 +208,21 @@ export interface AufprallRezept {
  */
 export const GRUND: Record<Untergrund, Schlag> = {
   beton: {
-    teiltoene: [180, 410],
-    abkling: [0.05, 0.03],
     laut: 0.1,
-    anriss: 500,
-    anrissLaut: 0.3,
     streu: 0.1,
-    scheppern: 0,
-    rascheln: 0,
+    dauer: 0.1,
     proben: ["grund_beton"],
   },
   stahl: {
-    teiltoene: [143, 231, 368, 590, 870],
-    abkling: [0.5, 0.42, 0.32, 0.22, 0.14],
     laut: 0.18,
-    anriss: 1200,
-    anrissLaut: 0.12,
     streu: 0.03,
-    scheppern: 0,
-    rascheln: 0,
+    dauer: 0.55,
     proben: ["grund_stahl_1", "grund_stahl_2"],
   },
   schrott: {
-    teiltoene: [270, 430, 655, 980, 1460],
-    abkling: [0.12, 0.1, 0.08, 0.06, 0.05],
     laut: 0.1,
-    anriss: 2200,
-    anrissLaut: 0.12,
     streu: 0.12,
-    scheppern: 1,
-    rascheln: 0,
+    dauer: 0.22,
     proben: ["grund_schrott_1", "grund_schrott_2"],
   },
 };
@@ -339,18 +255,14 @@ export function aufprallKlang(e: {
     pegel,
     rate: hoehe,
     daempf,
-    teil: {
-      ...fam,
-      teiltoene: fam.teiltoene.map((f) => f * hoehe),
-      abkling: fam.abkling.map((d) => d * daempf),
-    },
+    teil: { ...fam, dauer: fam.dauer * daempf },
     grund: GRUND[e.untergrund],
   };
 }
 
 /** Wie lange ein Schlag klingt (s) — fuer die Stimmenzaehlung. */
 export function dauerVon(s: Schlag): number {
-  return Math.max(...s.abkling) + 0.05 * s.scheppern + 0.05;
+  return s.dauer;
 }
 
 /* ------------------------------------------------------------- Greifen -- */

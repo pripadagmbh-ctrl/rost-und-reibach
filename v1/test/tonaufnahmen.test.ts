@@ -56,6 +56,36 @@ describe("Aufnahmen (E-130)", () => {
     if (q.includes("| H/")) expect(q).toContain("Pixabay Content License");
   });
 
+  /**
+   * KLEINE LAUTSPRECHER (vorher in geraeusche.test.ts an gerechneten
+   * Teiltoenen geprueft, seit E-153 an den Aufnahmen selbst): Ein
+   * iPhone-mini-Lautsprecher gibt unter etwa 300 Hz fast nichts wieder. Jede
+   * Datei braucht darum hoerbare Energie darueber. Gemessen mit einem
+   * Hochpass 300 Hz (2. Ordnung): Anteil der Energie, der durchkommt.
+   * SW-Schranke 1 % (−20 dB). Am knappsten (Stand E-153): Reifen 2 %,
+   * Bauschutt 3–5 %, Kabel 9 % — auf dem iPhone leise, aber da.
+   */
+  it("jede Aufnahme hat hoerbare Anteile ueber 300 Hz (iPhone-Lautsprecher)", () => {
+    for (const f of dateien) {
+      const b = readFileSync(resolve(ORDNER, f));
+      const rate = b.readUInt32LE(24);
+      const n = b.readUInt32LE(40) / 2;
+      const w = (2 * Math.PI * 300) / rate;
+      const al = Math.sin(w) / (2 * Math.SQRT1_2);
+      const c = Math.cos(w);
+      const [b0, b1, b2, a0, a1, a2] = [(1 + c) / 2, -(1 + c), (1 + c) / 2, 1 + al, -2 * c, 1 - al];
+      let x1 = 0, x2 = 0, y1 = 0, y2 = 0, hoch = 0, alle = 0;
+      for (let i = 0; i < n; i++) {
+        const x = b.readInt16LE(44 + 2 * i) / 32768;
+        const y = (b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+        x2 = x1; x1 = x; y2 = y1; y1 = y;
+        hoch += y * y;
+        alle += x * x;
+      }
+      expect(hoch / alle, f).toBeGreaterThan(0.01);
+    }
+  });
+
   it("Groesse und Speicher bleiben im Rahmen (iPhone mini)", () => {
     let bytes = 0;
     let sekunden = 0;
