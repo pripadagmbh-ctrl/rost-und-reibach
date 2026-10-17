@@ -12,6 +12,12 @@
  * Renderer fehlt. Die Millisekunden sind deshalb PHYSIK-Zeit, nicht Bildzeit.
  *
  * Aufruf: npx vite-node tools/platzlast.ts
+ *
+ * SPIEL=1 (E-135): wie `main.ts` — erst `items.settle()`, dann in jedem
+ * Schritt `clampSpeeds` und das gemeinsame Einschlafen (`settleSleep`). Ohne
+ * das misst das Werkzeug nur Rapiers eigenen Schlaf, und den gibt es im Spiel
+ * so nicht. LAEUFE=n wiederholt den ganzen Aufbau n-mal (der Haufen wird jedes
+ * Mal neu gewuerfelt) und zaehlt, wie oft er zur Ruhe kommt.
  */
 import * as THREE from "three";
 /*
@@ -59,12 +65,20 @@ import { ItemManager, randomCargo } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
 import { PressManager } from "../src/world/press";
 import { OfficeBuilding } from "../src/world/office";
-import { START_HAUFEN, START_AUTOS, START_STREU } from "../src/world/startplatz";
+import { START_HAUFEN, START_AUTOS, START_STREU, START_LKW } from "../src/world/startplatz";
 import { EventBus } from "../src/core/events";
 
 async function main(): Promise<void> {
   leinwandAttrappe();
   await initPhysics();
+  const laeufe = Number(process.env.LAEUFE ?? 1);
+  let ruhig = 0;
+  for (let l = 0; l < laeufe; l++) if (await lauf()) ruhig++;
+  if (laeufe > 1) console.log(`ZUSAMMEN: ${ruhig} von ${laeufe} Laeufen kommen zur Ruhe.`);
+}
+
+/** Ein Aufbau samt Messung; true = der Platz ist eingeschlafen. */
+async function lauf(): Promise<boolean> {
   const scene = new THREE.Scene();
   /*
    * Die Welt des Spiels, nicht eine eigene: Die Kontaktwerte stehen in
@@ -125,6 +139,9 @@ async function main(): Promise<void> {
   console.log(`Karosserieform: ${form ?? "bestand"}`);
   if (process.env.OHNEAUTOS !== "1")
     for (const a of autos) composites.spawnCar(new THREE.Vector3(a.x, 0.5, a.z));
+  // E-135: das LKW-Wrack wie in `main.ts` (OHNELKW=1 laesst es weg)
+  if (!alt && process.env.OHNELKW !== "1")
+    composites.spawnCar(new THREE.Vector3(START_LKW.x, 0.5, START_LKW.z), "lkw", START_LKW.gier);
   randomCargo(START_STREU.teile).forEach((sp, i) => {
     const w = (i / START_STREU.teile) * Math.PI * 2;
     items.spawnScrap(
@@ -139,6 +156,14 @@ async function main(): Promise<void> {
     );
   });
   console.log(`Nach dem Starthaufen: ${world.bodies.len()} Koerper, ${items.items.length} Teile`);
+  const spiel = process.env.SPIEL === "1";
+  if (spiel) items.settle(world);
+  /*
+   * WECKEN=1: nach dem Setzen alles wecken — so, wie es die Spinne tut, wenn
+   * sie in den Haufen greift. `settle` legt am Ende alles schlafen; ob der
+   * Haufen von SELBST wieder einschlaeft, zeigt erst das.
+   */
+  if (process.env.WECKEN === "1") world.bodies.forEach((b) => b.isDynamic() && b.wakeUp());
 
   const dt = 1 / 60;
   let ruheAb = -1;
@@ -156,6 +181,10 @@ async function main(): Promise<void> {
     const a = Date.now();
     items.clampSpeeds(dt);
     phys.step();
+    if (spiel) {
+      items.settleSleep(dt);
+      composites.update();
+    }
     const ms = Date.now() - a;
     if (i >= AUFWAERMEN) {
       summe += ms;
@@ -203,6 +232,8 @@ async function main(): Promise<void> {
       );
     }
   }
+  world.free();
+  return ruheAb >= 0;
 }
 
 void main();

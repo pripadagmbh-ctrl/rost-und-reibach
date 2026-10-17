@@ -118,6 +118,18 @@ export interface CarDef {
   karosserie: KarosserieDef;
   parts: PartDef[];
   windows: WindowDef[];
+  /**
+   * Grundtöne, aus denen der Standort den Lack zieht (E-135). Fehlt die Liste,
+   * gilt die Autopalette (`AUTOLACK`). Ein Wohnwagen ist cremeweiß, kein Rot.
+   */
+  lackPalette?: number[];
+  /**
+   * So weit liegt die Wrackmitte auf dem Abschlepper VOR der Flächenmitte, m
+   * (E-135). Fehlt es: mittig, wie jedes Auto.
+   */
+  ladeVersatz?: number;
+  /** Rückwärts aufladen — Schnauze bzw. Deichsel zum Heck des Abschleppers (E-135). */
+  ladeRueckwaerts?: boolean;
 }
 
 export const CAR_DEF: CarDef = {
@@ -253,4 +265,219 @@ export const CAR_DEF: CarDef = {
     { id: "left", anchor: [-0.77, 0.98, -0.2], size: [1.8, 0.44], rotY: Math.PI / 2 },
     { id: "right", anchor: [0.77, 0.98, -0.2], size: [1.8, 0.44], rotY: Math.PI / 2 },
   ],
+};
+
+/**
+ * Was nur der Bestand (zwei Quader, E-116) liest — Kabinenmaße. Die großen
+ * Wracks gibt es nur als Fassung mit Querschnitten; hier steht ihr Chassis,
+ * weil die Anbauteile ihren Sitz als Anteil davon angeben.
+ */
+function nurChassis(b: number, l: number, anbau: AnbauDef[]): KarosserieDef {
+  return { chassis: [b, 1, l], chassisY: 0.5, kabine: [b, 1, l], kabineY: 1.5, kabineZ: 0, radlaufLuft: 0.09, radlaufDicke: 0.055, radlaufVersatz: 0.01, anbau };
+}
+
+/**
+ * DAS LKW-WRACK (E-135) — eine ausgediente Sattelzugmaschine, die von Anfang
+ * an auf dem Platz steht. Form, Hohlkörper und Knautschen: `FORM_LKW`.
+ *
+ * MASSE 7 000 kg. // Quelle: Leergewicht einer 4x2-Sattelzugmaschine der
+ * 18-t-Klasse 7,0–7,5 t (Herstellerangaben, z. B. MAN TGX 18.xxx um 7,2 t);
+ * ein ausgedientes Fahrzeug ohne Diesel und AdBlue an der unteren Grenze.
+ *
+ * WAS ABGEHT (Masse je Teil // SW aus Bauteilgewichten dieser Klasse):
+ *  - Motorblock 1 050 kg: 12-l-Reihensechszylinder, trocken um 1 t. Stahl,
+ *    nicht Alu wie am Pkw — Lkw-Blöcke sind Grauguss.
+ *  - Dieseltank 70 kg: 400-l-Alutank, leer.
+ *  - Batteriekasten 110 kg: zwei 12-V-Starterbatterien à 55 kg (Blei).
+ *  - Sattelkupplung 180 kg: Platte samt Lagerbock, Stahl.
+ *  - Räder: vorn je 100 kg (315/80 R22.5 auf Stahlfelge), hinten je 200 kg
+ *    (Zwillingsräder, als EIN Teil).
+ * Bleibt der Rumpf mit 4 990 kg: Rahmen, Achsen, Fahrerhaus. Er ist über der
+ * Traglast der Spinne (3 500 kg, mit Ausbau 5 250 kg — `gripSystem.ts`) —
+ * ganz geht der Lkw nicht hoch, und in die Presse (Kammer 4,05 x 4,20 m) passt
+ * er mit 6 m auch nicht. Was mit ihm geschieht: zerdrücken und zerlegen.
+ *
+ * Kein Teil hat einen Kollider, solange es dranhängt (wie am Pkw); sie liegen
+ * im Rahmen-Quader. Der Motor sitzt unter dem Fahrerhaus: Von oben auf dem
+ * heilen Dach liegt er außerhalb des Greifradius, erst ein geknautschtes
+ * Fahrerhaus bringt die Spinne nahe genug heran.
+ */
+export const LKW_DEF: CarDef = {
+  totalMassKg: 7000,
+  hullMassKg: 4990,
+  hullMaterialId: "mixed",
+  // SW: Rahmen und Achsen sind Stahl, im Fahrerhaus Verkleidung, Sitze, Glas, Kabel.
+  hullZusammensetzung: [
+    { materialId: "steel", anteil: 0.82 },
+    { materialId: "plastic", anteil: 0.06 },
+    { materialId: "alu", anteil: 0.04 },
+    { materialId: "cable", anteil: 0.03 },
+    { materialId: "rubble", anteil: 0.03 },
+    { materialId: "tires", anteil: 0.02 },
+  ],
+  // Für Schwerpunkt und Trägheit: ein Klotz 2,50 x 2,00 x 6,00 m, Schwerpunkt 1,0 m hoch. // SW
+  colliderHalf: [1.25, 1.0, 3.0],
+  colliderYOffset: 1.0,
+  crushScales: [1, 0.76, 0.55],
+  glassImpactDv: 4.5,
+  crushImpactDv: 7,
+  karosserie: nurChassis(2.5, 6.0, []),
+  parts: [
+    {
+      id: "engine",
+      name: "Motorblock",
+      materialId: "steel",
+      massKg: 1050,
+      // SW: fester als ein Pkw-Motor (2,6 s) — mehr Lager, mehr Leitungen.
+      tearSeconds: 4.0,
+      // SW: kleiner als der Abstand vom heilen Dach (Spinne 3,2 m, Motor 0,95 m).
+      grabRadius: 0.9,
+      anchor: [0, 0.95, 1.75],
+      size: [0.9, 0.9, 1.3],
+      kind: "box",
+      color: 0x3e4247,
+    },
+    {
+      id: "tank",
+      name: "Dieseltank",
+      materialId: "alu",
+      massKg: 70,
+      tearSeconds: 1.8,
+      grabRadius: 0.8,
+      anchor: [1.0, 0.75, -0.4],
+      size: [0.6, 0.6, 1.3],
+      kind: "box",
+      color: 0xb8bcc0,
+    },
+    {
+      id: "batterie",
+      name: "Batteriekasten",
+      materialId: "battery",
+      massKg: 110,
+      tearSeconds: 1.4,
+      grabRadius: 0.7,
+      anchor: [-1.0, 0.75, -0.3],
+      size: [0.6, 0.5, 0.7],
+      kind: "box",
+      color: 0x2a2c30,
+    },
+    {
+      id: "sattel",
+      name: "Sattelkupplung",
+      materialId: "steel",
+      massKg: 180,
+      tearSeconds: 2.6,
+      grabRadius: 0.9,
+      anchor: [0, 1.15, -1.75],
+      size: [1.2, 0.2, 1.2],
+      kind: "box",
+      color: 0x24262a,
+    },
+    ...([
+      [-1.03, 1.6, 0.315, 100],
+      [1.03, 1.6, 0.315, 100],
+      [-0.92, -2.0, 0.62, 200],
+      [0.92, -2.0, 0.62, 200],
+    ] as const).map(
+      ([x, z, breite, kg], i): PartDef => ({
+        id: `wheel_${i}`,
+        name: "Rad",
+        materialId: "tires",
+        massKg: kg,
+        // SW: zehn Radmuttern statt vier oder fünf
+        tearSeconds: 2.0,
+        grabRadius: 0.7,
+        anchor: [x, 0.535, z],
+        size: [0.535, breite],
+        kind: "wheel",
+        color: 0x1e2022,
+      })
+    ),
+  ],
+  windows: [],
+};
+
+/**
+ * DER WOHNWAGEN (E-135) — kommt ab und zu auf dem Abschlepper zum
+ * Verschrotten. Form, Hohlkörper und Knautschen: `FORM_WOHNWAGEN`.
+ *
+ * MASSE 820 kg. // SW: Leergewicht kleiner Einachser mit 4,2 m Aufbau,
+ * Baujahre 80er/90er, laut Prospekten 750–900 kg — leicht für seine Größe,
+ * weil die Wand aus Alublech, Styropor und Sperrholz besteht.
+ *
+ * Was abgeht: zwei Räder (185/70 R13 auf Stahlfelge, je 16 kg) und die
+ * Achse (Gummifederachse bis 1 t, 45 kg). // SW
+ */
+export const WOHNWAGEN_DEF: CarDef = {
+  totalMassKg: 820,
+  hullMassKg: 743,
+  hullMaterialId: "mixed",
+  // SW, aus der Bauweise: Holzrahmen und Möbel, Alu-Außenhaut, Styropor und
+  // Kunststoff (Fenster, Bug), Stahlfahrgestell, Dämmung, Kabel.
+  hullZusammensetzung: [
+    { materialId: "wood", anteil: 0.35 },
+    { materialId: "plastic", anteil: 0.2 },
+    { materialId: "steel", anteil: 0.2 },
+    { materialId: "alu", anteil: 0.15 },
+    { materialId: "rubble", anteil: 0.07 },
+    { materialId: "cable", anteil: 0.03 },
+  ],
+  // Schwerpunkt tief (Fahrgestell, Boden, Möbel unten): 0,9 m. // SW
+  colliderHalf: [1.025, 0.9, 2.1],
+  colliderYOffset: 0.9,
+  crushScales: [1, 0.76, 0.55],
+  glassImpactDv: 4.5,
+  crushImpactDv: 7,
+  karosserie: nurChassis(2.05, 4.2, []),
+  parts: [
+    {
+      id: "achse",
+      name: "Achse",
+      materialId: "steel",
+      massKg: 45,
+      tearSeconds: 2.0,
+      grabRadius: 0.7,
+      anchor: [0, 0.3, -0.15],
+      size: [1.45, 0.12, 0.14],
+      kind: "box",
+      color: 0x5a5a5a,
+    },
+    ...([-0.8, 0.8] as const).map(
+      (x, i): PartDef => ({
+        id: `wheel_${i}`,
+        name: "Rad",
+        materialId: "tires",
+        massKg: 16,
+        tearSeconds: 1.2,
+        grabRadius: 0.5,
+        anchor: [x, 0.295, -0.15],
+        size: [0.295, 0.185],
+        kind: "wheel",
+        color: 0x1e2022,
+      })
+    ),
+  ],
+  windows: [],
+  // SW: cremeweiß, weiß, beige — die Farben, in denen Wohnwagen gebaut werden.
+  lackPalette: [0xece8dc, 0xf2f2ee, 0xe4dccb],
+  /*
+   * Auf dem Abschlepper (Fläche 5,40 m, Stirnwand und Heckklappe innen bei
+   * 0,05 und 5,35): rückwärts, der Kasten 10 cm vor der Stirnwand (Mitte
+   * 0,45 m vor der Flächenmitte), die Deichsel 0,5 m über das Heck hinaus.
+   * Gemessen: Mit der Deichsel nach vorn lag der Kasten auf der Heckklappe,
+   * wurde in die Mitte gedrückt, und die Deichsel stand 1 m im Fahrerhaus.
+   */
+  ladeVersatz: 0.45,
+  ladeRueckwaerts: true,
+};
+
+/**
+ * Welche Wracks es gibt (E-135) — ein neues Fahrzeug ist ein neuer Datensatz
+ * und eine Zeile hier (dazu seine Fassung in `wrackformen.ts`).
+ */
+export type WrackArt = "pkw" | "lkw" | "wohnwagen";
+export const WRACKDATEN: Record<WrackArt, CarDef> = {
+  pkw: CAR_DEF,
+  lkw: LKW_DEF,
+  wohnwagen: WOHNWAGEN_DEF,
 };

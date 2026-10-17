@@ -7,6 +7,7 @@ import {
   type ScrapShape,
 } from "../world/scrapItems";
 import type { CompositeManager, CarComposite } from "../dismantle/composites";
+import { WRACKDATEN } from "../dismantle/carDef";
 import { WEIGH_Z, KAFFEE_THEKE } from "../world/yard";
 import { baueKundenfigur, baueHund, type Kundenfigur } from "../world/kundenfigur";
 import { AUSSEHEN_NEUTRAL } from "./aussehen";
@@ -1700,11 +1701,16 @@ class DeliveryVehicle {
     this.group.updateWorldMatrix(true, true);
     if (this.isPickup) return; // Abholer kommt leer — der Spieler belädt ihn
     if (this.kind === "wrack") {
-      const pos = new THREE.Vector3(0, 0.25, this.bedLen / 2);
+      // E-135: Auch ein Wohnwagen kommt auf dem Abschlepper — rückwärts, der
+      // Kasten an der Stirnwand, die Deichsel über das Heck (`ladeVersatz`).
+      const art = this.customer?.wrackArt ?? "pkw";
+      const lage = WRACKDATEN[art];
+      const pos = new THREE.Vector3(0, 0.25, this.bedLen / 2 + (lage.ladeVersatz ?? 0));
       this.bedGroup.localToWorld(pos);
-      this.cargo.car = composites.spawnCar(pos);
+      this.cargo.car = composites.spawnCar(pos, art);
       const q = new THREE.Quaternion();
       this.group.getWorldQuaternion(q);
+      if (lage.ladeRueckwaerts) q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
       this.cargo.car.body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
       return;
     }

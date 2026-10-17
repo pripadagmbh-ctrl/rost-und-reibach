@@ -45,7 +45,9 @@
 import * as THREE from "three";
 import type { AnbauDef } from "./carDef";
 
-export type WrackformId = "bestand" | "a" | "b" | "c";
+export type WrackformId = "bestand" | "a" | "b" | "c" | GrosswrackId;
+/** Die Fassungen, die kein Pkw sind (E-135) — jede gehört zu genau einem `CarDef`. */
+export type GrosswrackId = "lkw" | "wohnwagen";
 
 /**
  * DAS GESICHT FÜR ALLE DREI FASSUNGEN — Stoßstangen, Grill, Leuchten, Spiegel.
@@ -277,6 +279,18 @@ export interface KnautschZone {
 export interface KnautschDef {
   /** Von unten nach oben, lückenlos: `bis` einer Zone ist `von` der nächsten. */
   zonen: KnautschZone[];
+  /**
+   * In welcher Höhe eine Spinne, die NEBEN dem Wrack steht, seitlich
+   * hineindrückt, m — mitten in die Türen. Fehlt es, gilt 0,75 m (Pkw, E-124).
+   */
+  seitenHoehe?: number;
+  /**
+   * Wie viel weiter ein Biss das Blech mitnimmt als am Pkw (E-135). Ein Biss
+   * drückt das Auto um höchstens 0,2 m ein; eine Wohnwagenwand aus Alublech,
+   * Styropor und Sperrholz trägt die Schale nicht so lange — sie geht weiter
+   * mit. Fehlt es, gilt 1.
+   */
+  wegFaktor?: number;
 }
 
 /**
@@ -870,8 +884,219 @@ export const FORM_C: WrackformDef = {
   },
 };
 
-export const WRACKFORMEN: Record<Exclude<WrackformId, "bestand">, WrackformDef> = {
+export const WRACKFORMEN: Record<"a" | "b" | "c", WrackformDef> = {
   a: FORM_A,
   b: FORM_B,
   c: FORM_C,
+};
+
+/* ------------------------------------------------------------------------- */
+/* GROSSE WRACKS (E-135) — dieselbe Bauweise wie Fassung C, andere Daten     */
+/* ------------------------------------------------------------------------- */
+
+/*
+ * Patrick, 17.10.2026: „am anfang sollen auch mehr schrott schon da sein, die
+ * zwei autos, ein lkw wrack und ab und zu bringt jmd auch nen wohnwagen zum
+ * verschrotten".
+ *
+ * Beide sind KEIN neuer Mechanismus: Querschnitte für die Haut, Felder darin
+ * für die Scheiben, Quader für den Hohlkörper, Knautschzonen für das
+ * Zusammengehen — genau die Tabellen, aus denen Fassung C besteht (E-117,
+ * E-124, E-128). Was sie von einem Auto unterscheidet, steht in Zahlen.
+ */
+
+/**
+ * DER AUSGEDIENTE LASTWAGEN — eine Sattelzugmaschine, zwei Achsen.
+ *
+ * Warum eine Zugmaschine und kein Kipper: Eine Kipperbrücke wäre ein Teil,
+ * das abgeht (wie Motor und Räder), aber zugleich eine Wand, auf der die
+ * Spinne steht — also ein Kollider, der beim Abreißen mitgehen müsste. Das
+ * kann der Verbund nicht (seine Quader sind fest, nur ihre Höhe folgt dem
+ * Knautschen); es wäre neuer Code. Eine Zugmaschine hat hinter dem
+ * Fahrerhaus nur den Rahmen mit Sattelkupplung — alles, was dort abgeht,
+ * steckt im Rahmen-Quader wie der Motor im Auto.
+ *
+ * Maße (Wrack-lokal, +z Schnauze): 6,00 m lang, 2,50 m breit, Dach 3,00 m.
+ * Vorbild 4x2-Zugmaschine mit Fahrerhaus ohne Hochdach: Länge um 5,9–6,1 m,
+ * Radstand 3,6 m, Breite 2,50 m (zulässig 2,55, StVZO § 32), Fahrerhaus
+ * 2,2 m lang. // SW: 3,00 m ist ein flaches Fahrerhaus — ein Hochdach
+ * (3,6–3,9 m) wäre echter, aber noch höher über der Spinne.
+ * Räder 315/80 R22.5: Durchmesser 1,07 m. Vorderachse z +1,60, Hinterachse
+ * z −2,00 (Radstand 3,60).
+ *
+ * Acht Ebenen: Unterkante · Trittstufe · Kabinenboden · Türmitte (Knick) ·
+ * Brüstung · Scheibenmitte (Knick) · Dachkante · Dachmitte. Hinter dem
+ * Fahrerhaus liegen alle acht als RAHMEN zusammen — 0,86 m breit, 0,72 bis
+ * 1,05 m hoch, dunkel (Schattenfuge). Die Windschutzscheibe ist der Trick aus
+ * Fassung A: Im vordersten Schnitt liegen die oberen Ebenen flach auf der
+ * Brüstung, das Stück Haut von dort zum zweiten Schnitt ist das Glas.
+ */
+export const FORM_LKW: WrackformDef = {
+  name: "LKW — ausgediente Sattelzugmaschine",
+  absicht:
+    "Fahrerhaus, das knautscht, auf einem starren Rahmen; Motor, Tank, " +
+    "Batterien, Sattelkupplung und Räder gehen einzeln ab.",
+  breite: 2.5,
+  laenge: 6.0,
+  ebenen: [0.45, 0.95, 1.35, 1.7, 2.05, 2.45, 2.85, 3.0],
+  fugeDunkel: 0.6,
+  schnitte: [
+    // z (m) / 3,00     Unterk. Tritt Boden Türm. Brüst. Scheib. Dachk. Dachm.
+    { name: "Stoßfänger", z: 3.0 / 3, b: [0.94, 0.97, 0.97, 0.97, 0.96, 0.93, 0.88, 0.45], y: [0.45, 0.95, 1.35, 1.7, 2.0, 2.005, 2.01, 2.015] },
+    { name: "A-Säule", z: 2.82 / 3, b: [0.97, 0.99, 0.99, 0.99, 0.99, 0.97, 0.93, 0.6], y: [0.45, 0.95, 1.35, 1.7, 2.05, 2.45, 2.85, 2.98] },
+    // Über dem Vorderrad (Oberkante 1,07 m) steigen die unteren Ebenen: Radlauf.
+    { name: "Radlauf vorn, Kante", z: 2.2 / 3, b: [0.98, 1, 1, 1, 1, 0.98, 0.94, 0.62], y: [0.5, 0.95, 1.35, 1.7, 2.05, 2.45, 2.85, 3.0] },
+    { name: "Radlauf vorn, oben", z: 2.1 / 3, b: [0.98, 1, 1, 1, 1, 0.98, 0.94, 0.62], y: [0.95, 1.05, 1.35, 1.7, 2.05, 2.45, 2.85, 3.0] },
+    { name: "Radmitte vorn", z: 1.6 / 3, b: [0.98, 1, 1, 1, 1, 0.98, 0.94, 0.62], y: [1.15, 1.22, 1.35, 1.7, 2.05, 2.45, 2.85, 3.0] },
+    { name: "Radlauf hinten, oben", z: 1.1 / 3, b: [0.98, 1, 1, 1, 1, 0.98, 0.94, 0.62], y: [0.95, 1.05, 1.35, 1.7, 2.05, 2.45, 2.85, 3.0] },
+    { name: "Einstieg", z: 1.0 / 3, b: [0.98, 1, 1, 1, 1, 0.98, 0.94, 0.62], y: [0.5, 0.95, 1.35, 1.7, 2.05, 2.45, 2.85, 3.0] },
+    { name: "Rückwand", z: 0.8 / 3, b: [0.98, 1, 1, 1, 1, 0.98, 0.94, 0.62], y: [0.5, 0.95, 1.35, 1.7, 2.05, 2.45, 2.85, 3.0] },
+    // Rahmen: zwei Längsträger, 0,86 m über alles, Oberkante 1,05 m.
+    { name: "Rahmen vorn", z: 0.76 / 3, b: [0.34, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.3], y: [0.72, 0.76, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05], fuge: true },
+    { name: "Rahmenende", z: -1, b: [0.34, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.3], y: [0.72, 0.76, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05], fuge: true },
+  ],
+  scheiben: [
+    // Acht Ebenen: r = 6 rechte Dachkante, 7 Dachmitte rechts, 8 links, 9 linke Dachkante.
+    { id: "front", vonSchnitt: 0, bisSchnitt: 1, vonRing: 6, bisRing: 9 },
+    // Seitenscheiben in der Tür: Brüstung (4) bis Dachkante (6), A-Säule bis Radmitte.
+    { id: "right", vonSchnitt: 1, bisSchnitt: 4, vonRing: 4, bisRing: 6 },
+    { id: "left", vonSchnitt: 1, bisSchnitt: 4, vonRing: 9, bisRing: 11 },
+  ],
+  anbau: [
+    { name: "Stoßfänger", size: [2.4 / 2.5, 0.35, 0.2], anchor: [0, 0.62, 3.02 / 3], farbe: 0x24262a },
+    { name: "Kühlergrill", size: [1.4 / 2.5, 0.55, 0.05], anchor: [0, 1.32, 3.01 / 3], farbe: 0x30333a },
+    { name: "Scheinwerfer", size: [0.35 / 2.5, 0.18, 0.06], anchor: [0.82 / 1.25, 0.95, 3.02 / 3], paarweise: true, farbe: 0xfffff4 },
+    { name: "Außenspiegel", size: [0.12 / 2.5, 0.45, 0.25], anchor: [0, 2.3, 2.7 / 3], paarweise: true, amFlanke: true, farbe: 0x24262a },
+    { name: "Kotflügel hinten", size: [0.7 / 2.5, 0.06, 1.2], anchor: [0.92 / 1.25, 1.12, -2.0 / 3], paarweise: true, farbe: 0x24262a },
+    { name: "Heckträger", size: [2.3 / 2.5, 0.12, 0.1], anchor: [0, 0.9, -2.95 / 3], farbe: 0x24262a },
+    { name: "Rückleuchte", size: [0.3 / 2.5, 0.12, 0.06], anchor: [1.0 / 1.25, 0.9, -3.01 / 3], paarweise: true, farbe: 0xb82b1e },
+    // Senkrechtes Auspuffrohr hinter dem Fahrerhaus
+    { name: "Auspuff", size: [0.16 / 2.5, 1.6, 0.16], anchor: [-1.0 / 1.25, 2.2, 0.68 / 3], farbe: 0x5a5a5a },
+  ],
+  /*
+   * Der Verbund: Rahmen samt Achsen bis 1,05 m über die ganze Grundfläche
+   * (er trägt die Masse und steht auf dem Boden, die Räder sind Netze darin —
+   * wie am Pkw), darauf das Fahrerhaus als EIN Block von 1,05 bis 2,99 m.
+   * Seine Oberkante geht beim Knautschen mit der Haut herunter (E-128).
+   *
+   * WARUM KEINE HOHLE SCHALE WIE AM PKW — gemessen (`tools/wrackdruck.ts`,
+   * ART=lkw). Am Auto kommt der Biss über das Greifen: Die Spinne fasst das
+   * Wrack, und gedrückt wird, was in ihr hängt. Einen 7-t-Lkw fasst sie nicht
+   * (Traglast), also zählt nur, was vor den Zähnen STEHT. Mit dünnen
+   * Wänden (16 cm) wie am Auto standen die Zähne 0,3 s an der Wand, stießen
+   * hindurch und schlossen im leeren Fahrerhaus — der Druck braucht 0,7 s,
+   * der Biss kam nie; über die offenen Fenster hakten sie unter der
+   * Dachkante ein. Am Block bleiben sie stehen, und der Biss kommt.
+   */
+  bleche: [
+    { name: "Rahmen", mitte: [0, 0.525, 0], halb: [1.25, 0.525, 3.0] },
+    { name: "Fahrerhaus", mitte: [0, 2.02, 1.9], halb: [1.22, 0.97, 1.1] },
+  ],
+  /*
+   * Das Fahrerhaus knautscht über dem Kabinenboden (1,35 m); Rahmen und
+   * Kabinenboden bleiben starr. Erst das Glashaus (Säulen knicken heraus),
+   * dann die Türen (knicken hinein) — wie am Pkw. Ganz flach:
+   * 1,35 + 0,15 + 0,12 = 1,62 m. // SW, am Bild abzustimmen
+   */
+  knautsch: {
+    seitenHoehe: 1.7,
+    zonen: [
+      { name: "Tür", von: 1.35, bis: 2.05, rest: 0.15, ab: 0.25, voll: 0.9, knick: 1.7, nach: -1 },
+      { name: "Glashaus", von: 2.05, bis: 3.0, rest: 0.12, ab: 0, voll: 0.6, knick: 2.45, nach: 1 },
+    ],
+  },
+};
+
+/**
+ * DER WOHNWAGEN — ein Blechkasten auf einer Achse.
+ *
+ * Vorbild: kleiner Einachser der 80er/90er Jahre, Aufbaulänge 4,20 m, Breite
+ * 2,05 m, Höhe 2,40 m über der Straße, Aufbau ab 0,45 m. Davor die Deichsel,
+ * 1,55 m mit dem Kupplungskopf — über alles 5,75 m. // SW, Maße aus
+ * Prospektwerten dieser Klasse (Aufbau 4,0–4,5 m, Breite 2,0–2,2 m).
+ *
+ * Neun Ebenen wie Fassung C: Unterkante · Boden · Wandmitte (Knick) ·
+ * Fensterunterkante · Fenstermitte (Knick) · Fensteroberkante · Oberwand
+ * (Knick) · Dachkante · Dachmitte. Bug und Heck sind gerundet; Bug- und
+ * Heckfenster sind wieder der Trick aus Fassung A (obere Ebenen im
+ * äußersten Schnitt flach auf der Fensterunterkante).
+ */
+export const FORM_WOHNWAGEN: WrackformDef = {
+  name: "Wohnwagen",
+  absicht:
+    "Ein leichter Kasten mit dünnen Wänden: knautscht schneller als ein " +
+    "Auto, Achse und Räder gehen ab.",
+  breite: 2.05,
+  laenge: 4.2,
+  ebenen: [0.45, 0.6, 0.88, 1.15, 1.45, 1.75, 2.05, 2.3, 2.4],
+  glatt: true,
+  fugeDunkel: 0.3,
+  schnitte: [
+    // z (m) / 2,10      Unterk. Boden Wandm. Fenst.u Fenst.m Fenst.o Oberw. Dachk. Dachm.
+    { name: "Bug unten", z: 1, b: [0.92, 0.95, 0.95, 0.95, 0.94, 0.92, 0.88, 0.8, 0.45], y: [0.45, 0.6, 0.88, 1.15, 1.4, 1.405, 1.41, 1.415, 1.42] },
+    { name: "Bugfenster oben", z: 2.05 / 2.1, b: [0.93, 0.96, 0.96, 0.96, 0.96, 0.95, 0.92, 0.85, 0.5], y: [0.45, 0.6, 0.88, 1.15, 1.45, 1.75, 1.95, 1.99, 2.02] },
+    { name: "Bugkante", z: 1.92 / 2.1, b: [0.95, 0.98, 0.98, 0.98, 0.98, 0.98, 0.96, 0.92, 0.58] },
+    { name: "Wand vorn", z: 1.4 / 2.1, b: [0.97, 1, 1, 1, 1, 1, 0.99, 0.96, 0.62] },
+    { name: "Fenster vorn", z: 0.85 / 2.1, b: [0.97, 1, 1, 1, 1, 1, 0.99, 0.96, 0.62] },
+    { name: "Wandmitte", z: 0.2 / 2.1, b: [0.97, 1, 1, 1, 1, 1, 0.99, 0.96, 0.62] },
+    { name: "Fenster hinten", z: -0.45 / 2.1, b: [0.97, 1, 1, 1, 1, 1, 0.99, 0.96, 0.62] },
+    { name: "Wand hinten", z: -1.2 / 2.1, b: [0.97, 1, 1, 1, 1, 1, 0.99, 0.96, 0.62] },
+    { name: "Heckkante", z: -1.92 / 2.1, b: [0.95, 0.98, 0.98, 0.98, 0.98, 0.98, 0.96, 0.92, 0.58] },
+    { name: "Heckfenster oben", z: -2.05 / 2.1, b: [0.93, 0.96, 0.96, 0.96, 0.96, 0.95, 0.92, 0.85, 0.5], y: [0.45, 0.6, 0.88, 1.15, 1.45, 1.75, 1.95, 1.99, 2.02] },
+    { name: "Heck unten", z: -1, b: [0.92, 0.95, 0.95, 0.95, 0.94, 0.92, 0.88, 0.8, 0.45], y: [0.45, 0.6, 0.88, 1.15, 1.4, 1.405, 1.41, 1.415, 1.42] },
+  ],
+  scheiben: [
+    // Neun Ebenen: r = 6 rechte Oberwand … 11 linke Oberwand; 3–5 rechts, 12–14 links.
+    { id: "front", vonSchnitt: 0, bisSchnitt: 1, vonRing: 6, bisRing: 11 },
+    { id: "rear", vonSchnitt: 9, bisSchnitt: 10, vonRing: 6, bisRing: 11 },
+    { id: "right", vonSchnitt: 4, bisSchnitt: 6, vonRing: 3, bisRing: 5 },
+    { id: "left", vonSchnitt: 4, bisSchnitt: 6, vonRing: 12, bisRing: 14 },
+  ],
+  anbau: [
+    // Deichsel bis zum Kupplungskopf, verzinkt; Stützrad vorn rechts daneben.
+    { name: "Deichsel", size: [0.12 / 2.05, 0.12, 1.3], anchor: [0, 0.42, 2.75 / 2.1], farbe: 0x9aa0a6 },
+    { name: "Deichselquerträger", size: [1.4 / 2.05, 0.1, 0.1], anchor: [0, 0.42, 2.12 / 2.1], farbe: 0x9aa0a6 },
+    { name: "Kupplungskopf", size: [0.14 / 2.05, 0.14, 0.3], anchor: [0, 0.45, 3.5 / 2.1], farbe: 0x24262a },
+    { name: "Stützrad", size: [0.08 / 2.05, 0.36, 0.2], anchor: [0.15 / 1.025, 0.18, 3.2 / 2.1], farbe: 0x1e2022 },
+    // Aufbautür rechts (Beifahrerseite), hinter dem Fenster.
+    { name: "Aufbautür", size: [0.03 / 2.05, 1.7, 0.6], anchor: [0, 1.5, -0.9 / 2.1], amFlanke: true, farbe: 0xd9d4c6 },
+    { name: "Rückleuchte", size: [0.18 / 2.05, 0.12, 0.05], anchor: [0.82 / 1.025, 0.55, -2.12 / 2.1], paarweise: true, farbe: 0xb82b1e },
+    { name: "Dachluke", size: [0.5 / 2.05, 0.08, 0.5], anchor: [0, 2.43, 0.3 / 2.1], farbe: 0xd8dcde },
+  ],
+  /*
+   * Ein geschlossener Kasten: Fahrgestell mit Boden bis 0,60 m (trägt die
+   * Masse, die Räder stehen darin wie am Pkw), zwei Seitenwände, Bug- und
+   * Heckwand, Dach. Die Wände laufen über die Fenster durch — anders als am
+   * Pkw gibt es keine offene Fahrgastzelle, in die eine Schale greifen könnte.
+   */
+  bleche: [
+    { name: "Fahrgestell und Boden", mitte: [0, 0.3, 0], halb: [1.025, 0.3, 2.1] },
+    { name: "Wand rechts", mitte: [0.965, 1.45, 0], halb: [0.06, 0.85, 1.95] },
+    { name: "Wand links", mitte: [-0.965, 1.45, 0], halb: [0.06, 0.85, 1.95] },
+    { name: "Dach", mitte: [0, 2.34, 0], halb: [0.95, 0.06, 1.9] },
+    { name: "Bugwand", mitte: [0, 1.45, 1.98], halb: [0.95, 0.85, 0.06] },
+    { name: "Heckwand", mitte: [0, 1.45, -1.98], halb: [0.95, 0.85, 0.06] },
+  ],
+  /*
+   * Drei Bänder über dem Boden (0,60 m): oben zuerst (Dach und Oberwand),
+   * dann das Fensterband, zuletzt die Wand unter den Fenstern. Raus, rein,
+   * raus wie am Pkw. Ganz flach: 0,60 + 0,10 + 0,08 + 0,08 = 0,86 m. // SW
+   */
+  knautsch: {
+    seitenHoehe: 1.45,
+    // SW: dreifacher Weg je Biss — die Wand gibt unter der Schale nach, wo
+    // Autoblech trägt. Mit 2 knautschte er gemessen so langsam wie ein Auto
+    // (drei Bisse, Grad 0,52); mit 3 ist er nach etwa vier Bissen flach.
+    wegFaktor: 3,
+    zonen: [
+      { name: "Wand unten", von: 0.6, bis: 1.15, rest: 0.1, ab: 0.4, voll: 1, knick: 0.88, nach: 1 },
+      { name: "Fensterband", von: 1.15, bis: 1.75, rest: 0.08, ab: 0.15, voll: 0.85, knick: 1.45, nach: -1 },
+      { name: "Oberwand und Dach", von: 1.75, bis: 2.4, rest: 0.08, ab: 0, voll: 0.6, knick: 2.05, nach: 1 },
+    ],
+  },
+};
+
+export const GROSSWRACK_FORMEN: Record<GrosswrackId, WrackformDef> = {
+  lkw: FORM_LKW,
+  wohnwagen: FORM_WOHNWAGEN,
 };

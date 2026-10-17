@@ -1,11 +1,12 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { CAR_DEF, type CarDef, type PartDef } from "./carDef";
+import { CAR_DEF, WRACKDATEN, type CarDef, type PartDef, type WrackArt } from "./carDef";
 import type { ItemManager } from "../world/scrapItems";
 import type { EventBus } from "../core/events";
 import { AUTOLACK, lackton, verwittert } from "../world/objektbau";
 import { farbstoff, verschmelzeBunt, type Bauteil } from "../excavator/bauteile";
 import {
+  GROSSWRACK_FORMEN,
   WRACKFORMEN,
   aufDieFlanke,
   baueWrackform,
@@ -17,6 +18,8 @@ import {
   type WrackformDef,
   type WrackformId,
 } from "./wrackformen";
+
+export type { WrackArt };
 
 /**
  * Verbundobjekt-System (Briefing Kap. 8, M2-Umfang):
@@ -71,10 +74,12 @@ const MIN_DICKE = 0.12;
  * Grundrisses zusammengedrueckt ist, 0 heil … 1 flach — auf einem Raster quer
  * (links, Mitte, rechts) mal laengs (alle 25 cm). Die Haut liest es je
  * Eckpunkt, die Kollider je Quader; die Presse setzt es ueberall auf 1.
+ *
+ * Seit E-135 je Wrack aus seinen Massen: quer die halbe Breite, laengs so
+ * viele Punkte, dass der Abstand moeglichst 25 cm ist. Beim Pkw (1,70 x
+ * 4,00 m) genau wie vorher: −0,85 · 0 · 0,85 und 17 Punkte im Abstand 0,25.
  */
-const FELD_X = [-0.85, 0, 0.85];
-const FELD_DZ = 0.25;
-const FELD_NZ = 17; // z = −2,00 … +2,00 m
+const FELD_DZ_SOLL = 0.25;
 
 /**
  * Wie der Druck durchs Auto wandert. Ein Biss knautscht unter der Spinne um
@@ -157,16 +162,16 @@ function lackSchluessel(x: number, z: number): number {
  * „zwölf verschiedene Farben" auch dann meldet, wenn es zwei Grundtöne in
  * zwölf Alterungsstufen sind. Genau das ist am 17.09. passiert.
  */
-export function wrackGrundton(x: number, z: number): number {
+export function wrackGrundton(x: number, z: number, palette: number[] = AUTOLACK): number {
   // 100000 ist durch 16 teilbar, die durchgerührten unteren Bits bleiben also
   // erhalten — und an ihnen hängt die Wahl aus der Palette.
   const k = lackSchluessel(x, z) % 100000;
-  return lackton(AUTOLACK, k, k, k);
+  return lackton(palette, k, k, k);
 }
 
-export function wrackLack(x: number, z: number): number {
+export function wrackLack(x: number, z: number, palette: number[] = AUTOLACK): number {
   const streu = (lackSchluessel(x, z) >>> 11) % 100;
-  return verwittert(wrackGrundton(x, z), 0.25 + (streu / 100) * 0.6);
+  return verwittert(wrackGrundton(x, z, palette), 0.25 + (streu / 100) * 0.6);
 }
 
 /**
@@ -348,7 +353,8 @@ export function aktiveWrackform(): WrackformId {
 
 /** Die Formbeschreibung zu einer Fassung; `null` heißt: Bestand, zwei Quader. */
 export function wrackform(id: WrackformId): WrackformDef | null {
-  return id === "bestand" ? null : WRACKFORMEN[id];
+  if (id === "bestand") return null;
+  return id === "lkw" || id === "wohnwagen" ? GROSSWRACK_FORMEN[id] : WRACKFORMEN[id];
 }
 
 /**
@@ -424,8 +430,13 @@ export class CarComposite {
   private bleche: BlechDef[] | null;
   /** Wie die Karosserie zusammenknautscht; `null` = Quader mit Quetschstufen (Bestand, A, B). */
   private knautsch: KnautschDef | null;
-  /** Das Knautschfeld (E-128): laengs mal quer, 0 heil … 1 flach. */
-  private feld = new Float32Array(FELD_NZ * FELD_X.length);
+  /** Das Knautschfeld (E-128): laengs mal quer, 0 heil … 1 flach. Raster: siehe `FELD_DZ_SOLL`. */
+  private feld: Float32Array;
+  private feldX: number[];
+  private feldNz: number;
+  private feldDz: number;
+  /** Halbe Laenge des Wracks, m — dort beginnt das Feld. */
+  private halbL: number;
   private blechPunkt = new THREE.Vector3();
   /**
    * Wo die Spinne zuletzt am Wrack anlag: ihr Gelenk und ihre Achse
@@ -474,22 +485,34 @@ export class CarComposite {
     private bus: EventBus,
     pos: THREE.Vector3,
     /** In welcher Fassung dieses Wrack gebaut wird (E-116). */
-    readonly formId: WrackformId = VORGABE_FORM
+    readonly formId: WrackformId = VORGABE_FORM,
+    /** Drehung um die Hochachse beim Anlegen, rad (E-135) — gleich am Koerper, nicht danach. */
+    gier = 0
   ) {
     this.form = wrackform(formId);
+    const breite = this.form?.breite ?? def.karosserie.chassis[0];
+    const laenge = this.form?.laenge ?? def.karosserie.chassis[2];
+    this.halbL = laenge / 2;
+    this.feldX = [-breite / 2, 0, breite / 2];
+    this.feldNz = Math.round(laenge / FELD_DZ_SOLL) + 1;
+    this.feldDz = laenge / (this.feldNz - 1);
+    this.feld = new Float32Array(this.feldNz * this.feldX.length);
     // Hohl ist nur, was auch knautschen kann: Die Quader folgen der Knautschrechnung.
     const hohl = this.form?.bleche && this.form.knautsch ? this.form : null;
     this.bleche = hohl?.bleche ?? null;
     this.knautsch = hohl?.knautsch ?? null;
     this.def = def = wrackDaten(def, formId);
     this.currentMassKg = def.totalMassKg;
-    this.buildMeshes(wrackLack(pos.x, pos.z));
+    this.buildMeshes(wrackLack(pos.x, pos.z, def.lackPalette));
     this.group.position.copy(pos);
+    const dreh = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), gier);
+    this.group.quaternion.copy(dreh);
     scene.add(this.group);
 
     this.body = world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true)
         .setTranslation(pos.x, pos.y, pos.z)
+        .setRotation({ x: dreh.x, y: dreh.y, z: dreh.z, w: dreh.w })
         .setAngularDamping(0.8)
         .setLinearDamping(0.05)
     );
@@ -511,6 +534,11 @@ export class CarComposite {
     });
   }
 
+  /** Was fuer ein Wrack es ist — haengt an der Fassung (E-135). */
+  get art(): WrackArt {
+    return this.formId === "lkw" || this.formId === "wohnwagen" ? this.formId : "pkw";
+  }
+
   /** Wie viele Kollider dieses Wrack hat (fuer Messung und Waechter). */
   get kolliderZahl(): number {
     return this.kollider.length;
@@ -530,10 +558,11 @@ export class CarComposite {
 
   /** Wie weit das Wrack an dieser Stelle zusammengeknautscht ist, 0…1 (Wrack-lokal, m). */
   knautschBei(x: number, z: number): number {
-    const nx = FELD_X.length;
-    const fz = THREE.MathUtils.clamp((z + 2) / FELD_DZ, 0, FELD_NZ - 1);
-    const fx = THREE.MathUtils.clamp(((x - FELD_X[0]!) / (FELD_X[nx - 1]! - FELD_X[0]!)) * (nx - 1), 0, nx - 1);
-    const z0 = Math.min(Math.floor(fz), FELD_NZ - 2);
+    const FX = this.feldX;
+    const nx = FX.length;
+    const fz = THREE.MathUtils.clamp((z + this.halbL) / this.feldDz, 0, this.feldNz - 1);
+    const fx = THREE.MathUtils.clamp(((x - FX[0]!) / (FX[nx - 1]! - FX[0]!)) * (nx - 1), 0, nx - 1);
+    const z0 = Math.min(Math.floor(fz), this.feldNz - 2);
     const x0 = Math.min(Math.floor(fx), nx - 2);
     const tz = fz - z0;
     const tx = fx - x0;
@@ -820,11 +849,13 @@ export class CarComposite {
       const { ort, achse } = this.spinne;
       const vonOben = this.strahl(ort, achse);
       if (vonOben) return vonOben;
-      const hoehe = knautschHoehe(this.knautsch!, SEITEN_HOEHE, this.knautschgrad);
+      const hoehe = knautschHoehe(this.knautsch!, this.knautsch!.seitenHoehe ?? SEITEN_HOEHE, this.knautschgrad);
       const t = Math.abs(achse.y) > 1e-3 ? (hoehe - ort.y) / achse.y : 0;
       const seitlich = ort.clone().addScaledVector(achse, Math.max(0, t));
       seitlich.y = hoehe;
-      const hin = new THREE.Vector3(0, hoehe, THREE.MathUtils.clamp(seitlich.z, -1.6, 1.6))
+      // 40 cm vor den Enden bleiben (beim Pkw ±1,60 wie bisher)
+      const rand = this.halbL - 0.4;
+      const hin = new THREE.Vector3(0, hoehe, THREE.MathUtils.clamp(seitlich.z, -rand, rand))
         .sub(seitlich)
         .normalize();
       const vonDerSeite = this.strahl(seitlich, hin);
@@ -1154,12 +1185,13 @@ export class CarComposite {
    * plattes Dach, geht das Auto drumherum zusammen.
    */
   private knautschen(herd: THREE.Vector3, dv: number): void {
-    const zuwachs = Math.min(0.2, 0.035 * dv) / knautschWeg(this.knautsch!);
-    const nx = FELD_X.length;
+    const k = this.knautsch!;
+    const zuwachs = (Math.min(0.2, 0.035 * dv) * (k.wegFaktor ?? 1)) / knautschWeg(k);
+    const nx = this.feldX.length;
     let ueber = 0;
-    for (let iz = 0; iz < FELD_NZ; iz++) {
+    for (let iz = 0; iz < this.feldNz; iz++) {
       for (let ix = 0; ix < nx; ix++) {
-        const d = Math.hypot(FELD_X[ix]! - herd.x, -2 + iz * FELD_DZ - herd.z);
+        const d = Math.hypot(this.feldX[ix]! - herd.x, -this.halbL + iz * this.feldDz - herd.z);
         const w = KNAUTSCH_GRUND + (1 - KNAUTSCH_GRUND) * Math.max(0, 1 - d / KNAUTSCH_RADIUS);
         const j = iz * nx + ix;
         const h = this.feld[j]! + zuwachs * w;
@@ -1274,10 +1306,11 @@ export class CarComposite {
   }
 
   /** Zustand für den Spielstand (Kap. 18). Beulen werden bewusst nicht gesichert. */
-  get saveState(): { pos: number[]; rot: number[]; crushStage: number; torn: string[]; brokenWindows: string[] } {
+  get saveState(): { art: WrackArt; pos: number[]; rot: number[]; crushStage: number; torn: string[]; brokenWindows: string[] } {
     const p = this.body.translation();
     const r = this.body.rotation();
     return {
+      art: this.art,
       pos: [p.x, p.y, p.z],
       rot: [r.x, r.y, r.z, r.w],
       crushStage: this.crushStage,
@@ -1492,8 +1525,16 @@ export class CompositeManager {
     });
   }
 
-  spawnCar(pos: THREE.Vector3): CarComposite {
-    const car = new CarComposite(CAR_DEF, this.scene, this.world, this.items, this.bus, pos, AKTIVE_FORM);
+  /**
+   * Ein Wrack anlegen. Ohne Art ein Pkw in der gerade gewaehlten Fassung; ein
+   * Lkw oder Wohnwagen (E-135) hat genau eine Fassung, seine eigene. `gier`
+   * dreht es um die Hochachse — gleich beim Anlegen, nicht danach.
+   */
+  spawnCar(pos: THREE.Vector3, art: WrackArt = "pkw", gier = 0): CarComposite {
+    const car =
+      art === "pkw"
+        ? new CarComposite(CAR_DEF, this.scene, this.world, this.items, this.bus, pos, AKTIVE_FORM, gier)
+        : new CarComposite(WRACKDATEN[art], this.scene, this.world, this.items, this.bus, pos, art, gier);
     this.cars.push(car);
     return car;
   }
@@ -1517,7 +1558,8 @@ export class CompositeManager {
     const alt = this.cars.splice(0, this.cars.length);
     let neu = 0;
     for (const car of alt) {
-      if (!car.body.isValid() || car.body.isKinematic()) {
+      // Lkw und Wohnwagen haben nur ihre eigene Fassung (E-135).
+      if (!car.body.isValid() || car.body.isKinematic() || car.art !== "pkw") {
         this.cars.push(car);
         continue;
       }

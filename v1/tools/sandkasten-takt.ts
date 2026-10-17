@@ -14,7 +14,9 @@
  *        ABLADEN=20: ein „Spieler" nimmt nach 20 s am Abladeplatz alles von
  *        der Fläche — so faehrt die Fuhre ab, statt ihre Standzeit auszustehen,
  *        ANSTEHEN=0: ohne die Fuhren, die seit E-131 beim Start auf den
- *        Warteplätzen stehen — der Stand vor E-131)
+ *        Warteplätzen stehen — der Stand vor E-131,
+ *        WOHNWAGEN=1: nur Wohnwagen auf dem Abschlepper (E-135); mit ABLADEN
+ *        hebt der „Spieler" ihn nach so vielen Sekunden von der Fläche)
  *
  * Seit E-131 wird zusätzlich jedes Bild gemessen, wie tief ein Wagen in ein
  * Bauwerk der Hindernisliste ragt (`tiefsteDurchdringung`, derselbe Umriss
@@ -33,7 +35,7 @@ import { setBaggerOrt, ANSTEH_START_ANZAHL } from "../src/delivery/routes";
 import { tiefsteDurchdringung } from "../src/delivery/umriss";
 import { alleHindernisse } from "../src/world/obstacles";
 import { Shift } from "../src/economy/shift";
-import { rollEinzelstueck } from "../src/delivery/customers";
+import { rollEinzelstueck, rollWohnwagen } from "../src/delivery/customers";
 
 async function main(): Promise<void> {
   await initPhysics();
@@ -61,6 +63,14 @@ async function main(): Promise<void> {
     m.spawnNow = (kind, kunde) => {
       if (kind === "abholer") return spawn(kind, kunde);
       const c = kunde ?? rollEinzelstueck();
+      spawn(c.vehicle, c);
+    };
+  }
+  if (process.env.WOHNWAGEN) {
+    const spawn = m.spawnNow.bind(m);
+    m.spawnNow = (kind, kunde) => {
+      if (kind === "abholer") return spawn(kind, kunde);
+      const c = kunde ?? rollWohnwagen();
       spawn(c.vehicle, c);
     };
   }
@@ -108,11 +118,16 @@ async function main(): Promise<void> {
 
     if (abladenS > 0) {
       const v = (m as unknown as {
-        active: { phaseName: string; cargo: { items: Parameters<typeof items.remove>[0][] } } | null;
+        active: {
+          phaseName: string;
+          cargo: { items: Parameters<typeof items.remove>[0][]; car: { body: RAPIER.RigidBody } | null };
+        } | null;
       }).active;
       amPlatz = v?.phaseName === "waitUnload" ? amPlatz + dt : 0;
       if (v && amPlatz >= abladenS) {
         for (const it of [...v.cargo.items]) if (items.items.includes(it)) items.remove(it);
+        // Ein Wrack hebt der „Spieler" von der Fläche — weit weg abgestellt (E-135)
+        if (v.cargo.car?.body.isValid()) v.cargo.car.body.setTranslation({ x: 200 + i / 100, y: 1, z: 200 }, true);
         amPlatz = 0;
       }
     }

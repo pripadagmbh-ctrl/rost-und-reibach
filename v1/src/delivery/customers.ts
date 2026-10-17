@@ -32,6 +32,7 @@ import {
 import type { Aussehen, KundenEintrag } from "./aussehen";
 import { KATALOG_BIG, KATALOG_HUGE, type PileSpec } from "../world/objektkatalog";
 import { packeLadung, stueckMass } from "./ladung";
+import { WOHNWAGEN_DEF } from "../dismantle/carDef";
 
 export type CustomerGroup = "privat" | "haendler" | "gewerbe";
 
@@ -74,6 +75,11 @@ export interface CustomerProfile {
    * Optional, damit Prüfstände ihre Profile nicht anfassen müssen.
    */
   einzelstueck?: PileSpec;
+  /**
+   * Was der Abschlepper bringt, wenn es kein Pkw ist (E-135). Fehlt das
+   * Feld, liegt ein Altauto auf der Brücke — wie bisher.
+   */
+  wrackArt?: "wohnwagen";
 }
 
 /**
@@ -713,7 +719,59 @@ export function rollEinzelstueck(): CustomerProfile {
  * gelten für sie unverändert.
  */
 export function rollAnlieferung(): CustomerProfile {
-  return Math.random() < EINZELSTUECK_ANTEIL ? rollEinzelstueck() : rollCustomer();
+  const r = Math.random();
+  if (r < EINZELSTUECK_ANTEIL) return rollEinzelstueck();
+  // Oberes Ende derselben Zahl: Die Einzelstücke und der Zufallsstrom davor
+  // bleiben, wie sie waren (E-135).
+  if (r >= 1 - WOHNWAGEN_ANTEIL) return rollWohnwagen();
+  return rollCustomer();
+}
+
+/**
+ * WIE OFT EIN WOHNWAGEN KOMMT (E-135). Patrick, 17.10.2026: „ab und zu bringt
+ * jmd auch nen wohnwagen zum verschrotten".
+ *
+ * // SW: einer je Sandkastenstunde. Gerechnet wie `EINZELSTUECK_ANTEIL`: 24
+ * Ankünfte je Stunde (E-126), davon 1/24. Er nimmt seinen Anteil der
+ * gewohnten Kundschaft weg, nicht den Einzelstücken.
+ */
+export const WOHNWAGEN_ANTEIL = 1 / 24;
+
+/** Was der Besitzer sagt — Familie und Alltag, sonst nichts. */
+const WOHNWAGEN_SPRUECHE = [
+  "Die Kinder fahren nicht mehr mit.",
+  "Stand zwölf Jahre im Garten.",
+  "Das Dach war schon lange undicht.",
+  "Der TÜV hat abgewunken.",
+];
+
+/**
+ * Ein Privatmann gibt seinen Wohnwagen ab. Er kommt auf dem Abschlepper —
+ * dieselbe Fuhre wie ein Altauto, nur liegt etwas anderes auf der Brücke.
+ * Warum nicht als Anhänger hinter dem Pkw: Der Pkw-Anhänger ist ein fest
+ * gebautes Fahrzeugteil mit Gelenk; ein Wohnwagen dort wäre das Wrack selbst
+ * am Haken — ein neuer Ablauf in `vehicles.ts` und `vehicleModel.ts`.
+ */
+export function rollWohnwagen(): CustomerProfile {
+  const p = pick(PRIVATLEUTE);
+  const fuhre = baueFuhre({ kind: "wrack", fuellgrad: 1, hauptfraktion: null, stoerstoffAnteil: 0 });
+  return {
+    group: "privat",
+    name: p.name,
+    subtitle: pick(PRIVAT_ORTE),
+    // Die Waage wiegt, was der Datensatz wiegt — eine Zahl, eine Stelle.
+    massKg: WOHNWAGEN_DEF.totalMassKg,
+    vehicle: "wrack",
+    aufbau: "flach",
+    fuellgrad: fuhre.fuellgrad,
+    dichte: fuhre.dichte,
+    sortedMaterial: null,
+    contaminantShare: 0,
+    hardness: HAERTE_PRIVAT,
+    greeting: pick(WOHNWAGEN_SPRUECHE),
+    aussehen: p.aussehen,
+    wrackArt: "wohnwagen",
+  };
 }
 
 /* ------------------------------------------------- Der Abholfahrer ------- */

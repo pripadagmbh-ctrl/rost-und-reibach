@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-135 | 17.10.2026 | Voller Start, LKW-Wrack an der Ostmauer, ab und zu ein Wohnwagen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-134 | 17.10.2026 | Gehaltener Schrott kracht, wenn die Spinne ihn aufschlägt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-132 | 16.10.2026 | Die Spinne pendelt frei, ein Wurf behält seinen Schwung | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-131 | 16.10.2026 | Pripada.de statt Rust’n’Reibach, Werbeschilder, drei Laster stehen zum Start an | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -147,6 +148,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-135 — Voller Start, LKW-Wrack, Wohnwagen** (iPad, dann iPhone mini)
+- SANDKASTEN starten: Liegt der Haufen im Mischschrott, stehen die zwei Autos nebeneinander in der Stahlhalde, und siehst du rechts vorn an der Ostmauer das LKW-Wrack mit dem Fahrerhaus zu dir?
+- Zum LKW fahren und mehrmals aufs Fahrerhausdach drücken: Geht das Fahrerhaus zusammen? Kommt nach ein paar Bissen der Motor heraus? Sind Tank, Batteriekasten, Sattelkupplung und Räder einzeln abzureißen?
+- Einen Wohnwagen abwarten (etwa einmal je Sandkastenstunde, NACHSCHUB bringt ihn nicht): Liegt er rückwärts auf dem Abschlepper, bleibt er am Abladeplatz greifbar stehen, und geht er beim Zudrücken schneller zusammen als ein Auto?
+- iPhone mini: so flüssig wie vorher, auch direkt vor dem LKW?
 
 **E-134 — Gehaltener Schrott kracht, wenn die Spinne ihn aufschlägt** (Augen zu, iPad-Lautsprecher)
 - Jemand greift einen Träger und haut ihn einmal auf den Beton, ohne loszulassen. Hörst du **einen** Krach, und klingt er nach Stahl auf Beton?

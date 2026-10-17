@@ -39,6 +39,12 @@
  * drei von drei Laeufen ebenfalls wach. Die Koerper kriechen dabei mit unter
  * 0,05 m/s; es ist ein Einschlaf-Problem des Haufens, kein Platzproblem, und
  * gehoert in ein eigenes Paket.
+ *
+ * NACHTRAG E-135 (17.10.2026): erledigt, und zwar schon vorher. Die vier Laeufe
+ * massen Rapiers eigenen Schlaf. Im Spiel legt `items.settleSleep` den Haufen
+ * gemeinsam schlafen (v2-Lehre E-012). Nachgemessen wie in `main.ts`
+ * (`tools/platzlast.ts SPIEL=1 WECKEN=1 LAEUFE=6`, nach dem Setzen alles
+ * geweckt): 6 von 6 Laeufen ruhig nach 2,0 s, auch mit Autos und LKW-Wrack.
  */
 /*
  * Nachtrag 14.09.2026 abends: von z −33,0 auf −32,0.
@@ -67,7 +73,14 @@
  * Beschaeftigung, bis der erste Haendler kommt. Wenn Patrick auch die weg
  * haben will, ist das eine Zeile mehr.
  */
-export const LEERER_START = true;
+export const LEERER_START = false;
+/*
+ * Nachtrag 17.10.2026 (E-135): wieder `false`. Patrick: „am anfang sollen
+ * auch mehr schrott schon da sein, die zwei autos, ein lkw wrack und ab und
+ * zu bringt jmd auch nen wohnwagen zum verschrotten". Der Versuch vom
+ * 15.09. ist damit beendet; Haufen und Streugut kommen in ihren alten
+ * Groessen zurueck (85 und 10 Teile), dazu das LKW-Wrack (`START_LKW`).
+ */
 
 /** Wie viele Teile der Starthaufen haette — null, solange `LEERER_START` gilt. */
 const HAUFEN_TEILE = LEERER_START ? 0 : 85;
@@ -97,11 +110,46 @@ export const START_HAUFEN = { x: -3.0, z: -32.0, streuung: 2.9, teile: HAUFEN_TE
  * ausserhalb des Bands. Das erste steht jetzt in der Stahlhalde, das zweite
  * im Mischschrott und dort im Kreis des Starthaufens; solange `LEERER_START`
  * gilt, liegt dort nichts.
+ *
+ * E-135 (17.10.2026): Der Haufen ist zurueck, also muss das zweite Auto aus
+ * seinem Kreis. Im Mischschrott ist neben einem Haufen von 2,9 m Streuung
+ * kein Platz fuer ein 4-m-Auto (die Halde ist 6,8 x 6,0 m). Es steht jetzt
+ * ebenfalls in der Stahlhalde, rechts neben dem ersten:
+ *  - 0,9 m Luft zum ersten Auto (Kante zu Kante),
+ *  - seine vordere Haelfte im Schwenkband (Vorderkante 8,7 m vom Sitz, die
+ *    Mitte 10,3 m — wie beim Starthaufen, dessen hintere Haelfte man auch
+ *    erst nach einem Stueck Vorfahren erreicht),
+ *  - 1,6 m hinter dem Heck eines Kippers am Abladeplatz (Standflaeche bis
+ *    z −27,6, das Auto beginnt bei −29,2).
+ * Das erste Auto bleibt, wo es war.
  */
 export const START_AUTOS: Array<{ x: number; z: number }> = [
   { x: 2.4, z: -29.8 },
-  { x: -2.2, z: -31.0 },
+  { x: 5.0, z: -31.2 },
 ];
+
+/**
+ * DAS LKW-WRACK (E-135) — eine ausgediente Sattelzugmaschine (`LKW_DEF`),
+ * 6,00 x 2,50 m.
+ *
+ * Patrick, 17.10.2026: „… die zwei autos, ein lkw wrack …". Es steht AM RAND,
+ * an der Ostmauer, und nicht im Schwenkband: Ein 7-t-Wrack vor den Mulden
+ * versperrte das Sortieren, und es ist eine eigene Aufgabe — hinfahren,
+ * zerdruecken, zerlegen.
+ *
+ * Laengs an der Ostmauer, die Schnauze nach Sueden (`gier` π): Vom Bagger aus
+ * sieht man das Fahrerhaus von vorn. Grundriss x 6,15 … 8,65, z 6,0 … 12,0:
+ *  - 1,55 m bis zur Innenkante der Ostmauer (x 10,2),
+ *  - 1,15 m noerdlich der Pripada-Mulde an der Ostmauer (E-133, (9,0 | 3,0),
+ *    reicht bis z 4,85) — `test/startplatz.test.ts` rechnet gegen sie,
+ *  - 12 m vom naechsten Punkt der Anlieferspur (Wegpunkt (4 | −6), an dem
+ *    der Laster am weitesten nach Osten ausschwenkt), weit ausserhalb der
+ *    Spurbreite von 2,6 m (`laneWatch.ts`),
+ *  - 32 m vom Sitz: Der Bagger faehrt hin, wie zum Verladeplatz.
+ * Kein Eintrag in der Hindernisliste: Das Wrack ist ein Koerper, der
+ * geknautscht und zerlegt wird, kein Bauwerk.
+ */
+export const START_LKW = { x: 7.4, z: 9.0, gier: Math.PI };
 
 /** Streuschrott ringsum: zehn Teile auf einem Kreis um den Haufen. */
 export const START_STREU = { x: START_HAUFEN.x, z: START_HAUFEN.z, radius: 2.9, teile: STREU_TEILE };

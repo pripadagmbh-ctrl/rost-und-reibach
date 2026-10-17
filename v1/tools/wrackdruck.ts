@@ -24,6 +24,7 @@
  *   (Umgebung) REIHE=1                                 sechs Stellen, je eine Zeile
  *   (Umgebung) VORHER=1                                dasselbe mit dem alten Quader
  *   (Umgebung) KNAUTSCH=0.5                            das Wrack vorher halb zusammendruecken (E-128)
+ *   (Umgebung) ART=lkw | ART=wohnwagen                 dasselbe am LKW-Wrack bzw. Wohnwagen (E-135)
  * Unter PowerShell: `$env:REIHE=1; npx vite-node tools/wrackdruck.ts`
  */
 import * as THREE from "three";
@@ -33,7 +34,7 @@ import { Excavator } from "../src/excavator/excavator";
 import { GripSystem } from "../src/physics/gripSystem";
 import { initPhysics, PhysicsWorld } from "../src/physics/physicsWorld";
 import { ItemManager } from "../src/world/scrapItems";
-import { CompositeManager, type CarComposite } from "../src/dismantle/composites";
+import { CompositeManager, type CarComposite, type WrackArt } from "../src/dismantle/composites";
 import { FORM_C } from "../src/dismantle/wrackformen";
 import { EventBus } from "../src/core/events";
 
@@ -213,7 +214,23 @@ const DREI: Ansatz[] = [
   { name: "Tuer (rechte Flanke)", x: 0.75, z: -0.05 },
   { name: "Haube (ueber dem Motor)", x: 0, z: 1.35 },
 ];
-const REIHE: Ansatz[] = [
+const ART = (process.env.ART ?? "pkw") as WrackArt;
+/* E-135: die Stellen am LKW-Wrack und am Wohnwagen (Wrack-lokal, +z Schnauze). */
+const REIHE_LKW: Ansatz[] = [
+  { name: "Fahrerhausdach", x: 0, z: 1.85 },
+  { name: "Tuer rechts", x: 1.17, z: 1.9 },
+  { name: "Sattelkupplung", x: 0, z: -1.75 },
+  { name: "Tank rechts", x: 1.0, z: -0.4 },
+  { name: "Rad hinten rechts", x: 0.92, z: -2.0 },
+];
+const REIHE_WOHNWAGEN: Ansatz[] = [
+  { name: "Dach", x: 0, z: 0.2 },
+  { name: "Wand rechts", x: 0.97, z: 0.2 },
+  { name: "Bug", x: 0, z: 1.6 },
+  { name: "Heck", x: 0, z: -1.6 },
+  { name: "Rad rechts", x: 0.8, z: -0.15 },
+];
+const REIHE_PKW: Ansatz[] = [
   { name: "Dach", x: 0, z: -0.05 },
   { name: "Tuer vorn rechts", x: 0.75, z: 0.35 },
   { name: "Tuer hinten rechts", x: 0.75, z: -0.6 },
@@ -249,7 +266,8 @@ function lauf(ansatz: Ansatz, korrektur: { x: number; z: number }, heben: boolea
 
   // 2. Wrack so hinstellen, dass die Ansatzstelle unter der Spinne liegt
   const car = s.composites.spawnCar(
-    new THREE.Vector3(gp.x - ansatz.x - korrektur.x, 0.02, gp.z - ansatz.z - korrektur.z)
+    new THREE.Vector3(gp.x - ansatz.x - korrektur.x, 0.02, gp.z - ansatz.z - korrektur.z),
+    ART
   );
   // KNAUTSCH=0.5: vorher so weit zusammendruecken (E-128) — greift die Spinne auch ein geknautschtes Wrack?
   if (process.env.KNAUTSCH) car.zusammendruecken(Number(process.env.KNAUTSCH));
@@ -435,7 +453,8 @@ async function main(): Promise<void> {
     for (let r = 0; r < 3; r++) last();
     return;
   }
-  if (process.env.REIHE === "1") {
+  const REIHE = ART === "lkw" ? REIHE_LKW : ART === "wohnwagen" ? REIHE_WOHNWAGEN : REIHE_PKW;
+  if (process.env.REIHE === "1" || (ART !== "pkw" && !process.env.STELLEN)) {
     for (const a of REIHE) {
       console.log(`${a.name.padEnd(24)} ${anStelle(a, false).kurz}`);
       console.log(`${"".padEnd(24)} Heben: ${anStelle(a, true).kurz}`);
