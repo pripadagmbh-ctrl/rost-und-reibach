@@ -93,6 +93,13 @@ export function setzeGreifer(
   grip: GripSystem,
   form: Greiferform
 ): Greiferform {
+  /*
+   * E-145: Der Bagger braucht die Posen der gehaltenen Teile fuer die
+   * Wandsperre. Hier treffen sich Bagger und Greifsystem ohnehin (main ruft
+   * diese Funktion beim Start), also wird hier verbunden — kein Haken in
+   * main.ts noetig.
+   */
+  bagger.greifsystem = grip;
   if (!bagger.setGreifer(form)) return bagger.greiferform;
   /*
    * Die Sensorkugel gehoert dem Greifsystem und wird neu angelegt: Eine

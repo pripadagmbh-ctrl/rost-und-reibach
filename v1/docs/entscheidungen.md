@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-145 | 17.10.2026 | Gehaltene Körper bleiben an Wänden, Wegschwenken geht immer | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-148 | 17.10.2026 | Echte Hupe, Werkssirene zum Feierabend, Werksklingel als Alternative | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-144 | 17.10.2026 | Linker Stick bewegt den linken Hebel in der Kabine | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-141 | 17.10.2026 | Absetzkipper: Mulde an Ketten, ausgekippt oder abgesetzt und geholt | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -159,6 +160,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-145 — Gehaltene Körper an Wänden**
+- Auto greifen, gegen Box-Betonwand, Scherenwand und Außenmauer schwenken: Bleibt es davor stehen, ohne zu zittern?
+- Danach wegschwenken: Geht das sofort und ohne Ruck?
+- Auto gegen eine Laster-Bordwand fahren: Bleibt es davor? Ist das Anschlagen gut oder zu hart?
 
 **E-148 — Echte Hupe, Werkssirene, Werksklingel** (iPad-Lautsprecher)
 - Laster blockieren, bis der Fahrer hupt: Klingt das nach einer echten LKW-Hupe? „Kurz, dann lang“ oder lieber einmal?

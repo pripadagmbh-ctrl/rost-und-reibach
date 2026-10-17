@@ -49,6 +49,15 @@ export interface CollisionContext {
   grippedHandles: Set<number>;
   /** Position des Platzwarts, damit der Arm ihn verschont */
   getStaffPos: () => THREE.Vector3 | null;
+  /** Die eigenen Koerper des Baggers — gegen sie stoesst eine Last nicht an (E-145) */
+  selfHandles: Set<number>;
+}
+
+/** Ein gehaltenes Teil mit seiner Pose relativ zur Spinne (`GripSystem.gehalten`) */
+export interface GehaltenesTeil {
+  body: RAPIER.RigidBody;
+  vonPos: THREE.Vector3;
+  vonQuat: THREE.Quaternion;
 }
 
 /*
@@ -150,6 +159,19 @@ const PLOW_HALF_KG = 500;
 const PLOW_MIN = 0.2;
 /** Ab dieser Masse ist ein Brocken nicht mehr wegzuschieben */
 const HEAVY_BLOCK_KG = 700;
+/**
+ * E-145: So tief darf ein gehaltenes Teil in Festes druecken, bevor die
+ * Bewegung zurueckgenommen wird (m). Vorschlag des Welt-Agenten (E-138): ein
+ * wenig Einfedern wie beim geworfenen Wrack (gemessen Pkw bis 0,08 m), aber
+ * kein Durchtauchen.
+ */
+const HALT_EINFEDERN_M = 0.05;
+/**
+ * Rechenrauschen beim Entlanggleiten an einer Wand (m, SW). Klein genug, dass
+ * daraus kein Hineinkriechen wird: Schon das erste Bild der Schwenkrampe
+ * bewegt ein Auto 4 mm.
+ */
+const HALT_RAUSCHEN_M = 0.0005;
 /** So nah darf die tief hängende Spinne an den Platzwart heran */
 const STAFF_CLEARANCE = 1.9;
 
@@ -174,6 +196,11 @@ export class ExcavatorCollision {
 
   private pos = new THREE.Vector3();
   private local = new THREE.Vector3();
+  private hPos = new THREE.Vector3();
+  private hQuat = new THREE.Quaternion();
+  private hInv = new THREE.Quaternion();
+  private hcPos = new THREE.Vector3();
+  private hcQuat = new THREE.Quaternion();
   private armPos = new THREE.Vector3();
   private armQuat = new THREE.Quaternion();
 
@@ -292,6 +319,97 @@ export class ExcavatorCollision {
     return this.ctx.obstacleBodies.size > 0 && this.armHitsVehicle();
   }
 
+  /**
+   * E-145: Drueckte die Bewegung der Spinne von `vorher` nach `jetzt` ein
+   * gehaltenes Teil tiefer in Festes, als es schon steckt?
+   *
+   * Patrick, 17.10.2026: „Körper wie autos gehen durch Betonwände oder
+   * scherenwände." Ein Teil in der Spinne ist kinematisch und haelt an nichts
+   * an. Darum wird fuer beide Posen gerechnet, wie tief es stuende — mit den
+   * Waenden, wie sie JETZT stehen. Gesperrt ist nur, was tiefer hineinfuehrt
+   * als `HALT_EINFEDERN_M`; alles, was die Tiefe haelt oder verkleinert,
+   * geht durch. Das ist der Fluchtweg, und es gibt keinen Zustand, der ihn
+   * verschliessen koennte (keine Ratsche wie in E-137): Faehrt ein Laster in
+   * das gehaltene Auto, steigen beide Tiefen gleich, und der Bagger bleibt
+   * bedienbar.
+   */
+  gehaltenesStoesstAn(
+    gehalten: ReadonlyArray<GehaltenesTeil>,
+    vorherPos: THREE.Vector3,
+    vorherQuat: THREE.Quaternion,
+    jetztPos: THREE.Vector3,
+    jetztQuat: THREE.Quaternion
+  ): boolean {
+    for (const t of gehalten) {
+      if (!t.body.isValid()) continue;
+      const neu = this.tiefeBei(t, gehalten, jetztPos, jetztQuat);
+      if (neu <= HALT_EINFEDERN_M) continue;
+      const alt = this.tiefeBei(t, gehalten, vorherPos, vorherQuat);
+      if (neu > Math.max(alt, HALT_EINFEDERN_M) + HALT_RAUSCHEN_M) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Wie tief stuende ein gehaltenes Teil in Festem, wenn die Spinne an
+   * (gPos, gQuat) haengt? Fest heisst: feste Koerper ausser dem Boden
+   * (dieselbe Regel wie `eindringtiefeInBauwerk` in `world/obstacles.ts`) und
+   * fremde kinematische — Laster samt Bordwand, Streifenwagen, Pressstempel.
+   * Lose Teile und bewegliche Mulden sind dynamisch und werden geschoben.
+   *
+   * Treffer erst sammeln, dann messen (v2 E-044).
+   */
+  private tiefeBei(
+    t: GehaltenesTeil,
+    gehalten: ReadonlyArray<GehaltenesTeil>,
+    gPos: THREE.Vector3,
+    gQuat: THREE.Quaternion
+  ): number {
+    const body = t.body;
+    // Pose des Teils an dieser Spinnenstellung: Spinne · von (wie `carryHeld`)
+    this.hPos.copy(t.vonPos).applyQuaternion(gQuat).add(gPos);
+    this.hQuat.copy(gQuat).multiply(t.vonQuat);
+    const bp = body.translation();
+    const br = body.rotation();
+    this.hInv.set(br.x, br.y, br.z, br.w).invert();
+    let tiefe = 0;
+    for (let i = 0; i < body.numColliders(); i++) {
+      const c = body.collider(i);
+      if (c.isSensor()) continue;
+      // Lage des Kolliders im Teil, aus den aktuellen Posen
+      const cp = c.translation();
+      const cr = c.rotation();
+      this.hcPos.set(cp.x - bp.x, cp.y - bp.y, cp.z - bp.z).applyQuaternion(this.hInv);
+      this.hcQuat.set(cr.x, cr.y, cr.z, cr.w).premultiply(this.hInv);
+      this.hcPos.applyQuaternion(this.hQuat).add(this.hPos);
+      this.hcQuat.premultiply(this.hQuat);
+      const treffer: RAPIER.Collider[] = [];
+      this.ctx.world.intersectionsWithShape(
+        this.hcPos,
+        this.hcQuat,
+        c.shape,
+        (o) => {
+          const b = o.parent();
+          if (!b || o.isSensor() || b.isDynamic()) return true;
+          if (this.ctx.selfHandles.has(b.handle)) return true;
+          if (gehalten.some((g) => g.body.handle === b.handle)) return true;
+          if (b.isFixed() && istBoden(o)) return true;
+          treffer.push(o);
+          return true;
+        },
+        undefined,
+        undefined,
+        undefined,
+        body
+      );
+      for (const o of treffer) {
+        const k = o.contactShape(c.shape, this.hcPos, this.hcQuat, 0);
+        if (k && k.distance < 0) tiefe = Math.max(tiefe, -k.distance);
+      }
+    }
+    return tiefe;
+  }
+
   /** Spinne gegen Mauern, Mulden und Schere. */
   private grappleHitsBuilding(): boolean {
     this.ctx.grappleGroup.getWorldPosition(this.pos);
@@ -369,4 +487,14 @@ export class ExcavatorCollision {
     }
     return false;
   }
+}
+
+/**
+ * Der Boden: ein fester Quader, dessen Oberkante auf Hoehe 0 liegt — dieselbe
+ * Regel wie `istBoden` in `world/obstacles.ts` (dort nicht exportiert).
+ */
+function istBoden(c: RAPIER.Collider): boolean {
+  if (c.shapeType() !== RAPIER.ShapeType.Cuboid) return false;
+  const he = c.halfExtents();
+  return Math.abs(c.translation().y + he.y) < 0.02 && he.x > 20;
 }

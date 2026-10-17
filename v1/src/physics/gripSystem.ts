@@ -249,6 +249,16 @@ export class GripSystem {
   }
 
   /**
+   * Die gehaltenen Teile mit ihrer Pose relativ zur Spinne (E-145). Daraus
+   * rechnet der Bagger, wo ein Teil nach seiner Bewegung stuende, und nimmt
+   * die Bewegung zurueck, wenn es dort tiefer in einer Wand steckte. Nur
+   * lesen — die Pose bleibt, wie sie beim Zupacken war.
+   */
+  get gehalten(): ReadonlyArray<Readonly<Pick<GrippedItem, "body" | "vonPos" | "vonQuat">>> {
+    return this.items;
+  }
+
+  /**
    * Pro Physik-Step aufrufen.
    * @param closure aktueller Schließgrad 0..1
    * @param closing true solange der Spieler die Greif-Taste hält

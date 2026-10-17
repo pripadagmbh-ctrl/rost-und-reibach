@@ -5,6 +5,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import type { Input } from "../core/input";
 import { Aufschlagmelder, SPINNE_WUCHT_VOLL_MS, DRUECK_AB, DRUECK_PAUSE_S, DRUECK_WEG_M } from "./aufschlag";
 import { ExcavatorCollision, type ArmShape } from "./collision";
+import type { GripSystem } from "../physics/gripSystem";
 import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver, fahrerArme } from "./driver";
 import { baueRad, radGeometrien, radStoffe, RAD_R } from "./wheelParts";
@@ -897,6 +898,25 @@ export class Excavator {
   readonly selfHandles: Set<number> = new Set();
   /** true, solange der Arm gegen ein Fahrzeug drückt (fürs HUD/Audio) */
   armBlocked = false;
+  /**
+   * Das Greifsystem, dessen Teile die Spinne traegt (E-145) — verbunden in
+   * `setzeGreifer`. Ohne es gibt es keine Wandsperre fuer gehaltene Teile.
+   */
+  greifsystem: GripSystem | null = null;
+  /** true, solange ein gehaltenes Teil an einer Wand ansteht (E-145) */
+  lastAnWand = false;
+  /** Rotator-Stellung, die zuletzt angenommen wurde — das Mausrad dreht zwischen den Schritten (E-145) */
+  private rotatorOk = 0;
+  /** Stand vor der Bewegung dieses Schritts, zum Zuruecknehmen (E-145) */
+  private halt = {
+    gPos: new THREE.Vector3(),
+    gQuat: new THREE.Quaternion(),
+    swing: new THREE.Vector2(),
+    qPendel: new THREE.Quaternion(),
+    neigung: 0,
+    achse: new THREE.Vector3(),
+    wheelSpin: 0,
+  };
 
   // Pendel der Spinne am Kardan-Gelenk (x: Kippen um Welt-X, y: um Welt-Z)
   private swing = new THREE.Vector2();
@@ -1772,6 +1792,7 @@ export class Excavator {
       obstacleBodies: this.obstacleBodies,
       grippedHandles: this.grippedHandles,
       getStaffPos: () => this.getStaffPos?.() ?? null,
+      selfHandles: this.selfHandles,
     });
 
     for (const b of [this.chassisBody, this.bladeBody, this.boomBody, this.stickBody]) {
@@ -1927,6 +1948,17 @@ export class Excavator {
     const prevStick = this.stickAngle;
     const prevCabYaw = this.cabYaw;
     const prevPos = this.tmpPrevPos.copy(this.position);
+    const traegt = (this.greifsystem?.gehalten.length ?? 0) > 0;
+    if (traegt) {
+      const h = this.halt;
+      h.gPos.copy(this.grappleGroup.position);
+      h.gQuat.copy(this.grappleGroup.quaternion);
+      h.swing.copy(this.swing);
+      h.qPendel.copy(this.qPendel);
+      h.neigung = this.neigung;
+      h.achse.copy(this.pendelAchse);
+      h.wheelSpin = this.wheelSpin;
+    }
 
     // --- Fahrwerk ---
     // Auf ausgefahrenen Stützen steht die Maschine aufgebockt — dann wird
@@ -2162,6 +2194,9 @@ export class Excavator {
       (this.wheelSpin + (Math.sign(this.driveVel) * gefahren) / RAD_R) % (Math.PI * 2);
 
     this.integratePendulum(dt);
+    this.lastAnWand = false;
+    if (traegt) this.haltAnWand(prevBoom, prevStick, prevCabYaw, prevPos);
+    this.rotatorOk = this.rotatorYaw;
     this.syncBodies();
 
     if (this.groundContact.active) {
@@ -3203,6 +3238,79 @@ export class Excavator {
 
   private qPendel = new THREE.Quaternion();
   private pendelEuler = new THREE.Euler();
+
+  /**
+   * E-145: Gehaltene Teile bleiben an Waenden.
+   *
+   * Erst wenn die Pose des Bildes ganz feststeht — Fahrwerk, Arm, Rotator und
+   * Pendel —, wird gefragt, ob ein gehaltenes Teil dadurch tiefer in Festes
+   * kaeme (`ExcavatorCollision.gehaltenesStoesstAn`). Zwei Stufen:
+   *
+   *  1. Nur das Pendel zuruecknehmen. Die Last lehnt dann an der Wand und
+   *     schwingt nicht hinein, der Arm folgt weiter dem Hebel. Ohne diese
+   *     Stufe hielte das zurueckschwingende Pendel jede Bewegung fest — auch
+   *     das Wegschwenken (gemessen: Spinne kam 4 mm statt Meter zurueck).
+   *  2. Reicht das nicht, ALLES zuruecknehmen, was die Spinne bewegt hat:
+   *     Arm, Oberwagen, Rotator, Fahrwerk. Das Auto schlaegt an und bleibt
+   *     davor.
+   *
+   * Nur angehalten, nie angehoben (vgl. E-137): Die Spinne geht hoechstens
+   * auf die Stellung des letzten Bildes zurueck.
+   */
+  private haltAnWand(
+    prevBoom: number,
+    prevStick: number,
+    prevCabYaw: number,
+    prevPos: THREE.Vector3
+  ): void {
+    const h = this.halt;
+    const gehalten = this.greifsystem!.gehalten;
+    const stoesstAn = (): boolean =>
+      this.collision.gehaltenesStoesstAn(
+        gehalten,
+        h.gPos,
+        h.gQuat,
+        this.grappleGroup.position,
+        this.grappleGroup.quaternion
+      );
+    if (!stoesstAn()) return;
+    this.lastAnWand = true;
+    // Stufe 1: das Pendel steht, die Last lehnt an
+    this.swing.copy(h.swing);
+    this.swingVel.set(0, 0);
+    this.qPendel.copy(h.qPendel);
+    this.neigung = h.neigung;
+    this.pendelAchse.copy(h.achse);
+    this.pendelNachsetzen();
+    if (!stoesstAn()) return;
+    // Stufe 2: die ganze Bewegung des Bildes zurueck
+    this.armBlocked = true;
+    this.boomAngle = prevBoom;
+    this.stickAngle = prevStick;
+    this.cabYaw = prevCabYaw;
+    this.rotatorYaw = this.rotatorOk;
+    this.lastRotatorYaw = this.rotatorYaw;
+    this.position.x = prevPos.x;
+    this.position.z = prevPos.z;
+    this.wheelSpin = h.wheelSpin;
+    this.boomVel = 0;
+    this.stickVel = 0;
+    this.cabVel = 0;
+    this.driveVel = 0;
+    this.syncMeshes();
+    this.pendelNachsetzen();
+  }
+
+  /** Greiferdrehung wie `integratePendulum` (Pendel mal Gierung, auch im Totband); die Last steht. */
+  private pendelNachsetzen(): void {
+    this.grappleGroup.quaternion
+      .setFromEuler(this.pendelEuler.set(0, this.heading + this.cabYaw + this.rotatorYaw, 0))
+      .premultiply(this.qPendel);
+    // kein Ruck fuers Pendel im naechsten Bild
+    this.prevTip.copy(this.grappleGroup.position);
+    this.prevTipVel.set(0, 0, 0);
+    this.tipAcc.set(0, 0);
+  }
 
   private syncBodies(): void {
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.heading, 0));
