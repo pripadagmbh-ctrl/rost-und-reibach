@@ -13,6 +13,7 @@ import { baueKundenfigur, baueHund, type Kundenfigur } from "../world/kundenfigu
 import { AUSSEHEN_NEUTRAL } from "./aussehen";
 import type { Box } from "../world/boxen";
 import { packeLadung, stueckMass, deckelVolumen } from "./ladung";
+import { spaeneCargo, spaeneDrehung, spaeneSchuettung } from "../world/spaene";
 
 /**
  * So lange haelt JEDER Laster bei der Ausfahrt auf der Waage (s).
@@ -2123,8 +2124,22 @@ class DeliveryVehicle {
       plaetze = [{ x: 0, y: 0, z: nutzLaenge / 2, quer: lage?.quer ?? false }];
       fuellung = raum > 0 ? deckelVolumen(einzel.kind, einzel.dims) / raum : 0;
     }
+    /*
+     * DIE SPÄNEMULDE (E-147): geschüttet statt gepackt. Der Packer rechnet mit
+     * 0,20-m-Raster und 0,12 m Luft je Stück — für Knäuel von einem halben
+     * Meter blieb die Mulde damit zu vier Fünfteln leer (gemessen: 21 Knäuel
+     * auf dem Boden). Das Gitter in `spaeneSchuettung` setzt sie Lage für Lage
+     * bis an den Rand, ohne Überlappung.
+     */
+    if (!einzel && c?.spaene) {
+      const lagen = spaeneSchuettung(halbBreite, nutzLaenge, maxHoehe, zielFuellung);
+      specs = spaeneCargo(lagen.length);
+      stuecke = specs.map((sp) => stueckMass(sp.shape.kind, sp.shape.dims));
+      plaetze = lagen.map((l) => ({ ...l, quer: false }));
+      fuellung = raum > 0 ? specs.reduce((a2, sp) => a2 + deckelVolumen(sp.shape.kind, sp.shape.dims), 0) / raum : 0;
+    }
     let leerlauf = 0;
-    for (let runde = 0; !einzel && runde < 12 && fuellung < zielFuellung; runde++) {
+    for (let runde = 0; !einzel && !c?.spaene && runde < 12 && fuellung < zielFuellung; runde++) {
       const erste = runde === 0;
       /*
        * Die erste Runde richtet sich nach dem ZIEL, nicht nach der Bauart.
@@ -2364,6 +2379,7 @@ class DeliveryVehicle {
       this.bedGroup.localToWorld(local);
       lage.copy(bedQuat);
       if (platz.quer) lage.multiply(quer);
+      if (c?.spaene) lage.multiply(spaeneDrehung()); // E-147: nicht alle Knaeuel gleich
       const it = items.spawnScrap(sp.materialId, sp.massKg, sp.shape, local, lage);
       // Das Setzen soll niemand sehen: erst wenn die Ladung ruhig liegt,
       // taucht der LKW fertig beladen auf.

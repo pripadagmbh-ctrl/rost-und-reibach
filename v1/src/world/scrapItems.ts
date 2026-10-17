@@ -11,6 +11,7 @@ import {
   type PileSpec,
 } from "./objektkatalog";
 import { BESEN_PLATZ } from "./startplatz";
+import { spaeneGeometrie, spaeneHuelle } from "./spaene";
 
 /**
  * Schrottteile mit materialtypischen Formen (Briefing Kap. 7).
@@ -142,6 +143,13 @@ export interface ScrapShape {
    * ueber den Namen ginge es auch, aber Namen aendert man leichtfertig.
    */
   inventar?: string;
+  /**
+   * Späneknäuel (E-147): Variante 0..2 in `world/spaene.ts`. Dann kommen Netz
+   * (geteilt je Variante) und Kollider (Quader mit abgeschrägten Ecken) von dort; `kind` bleibt
+   * `box` mit dem Hüllquader in `dims`, damit Packer und Fraktionsregel wie
+   * bei jedem Teil rechnen.
+   */
+  spaene?: number;
 }
 
 /**
@@ -1501,7 +1509,19 @@ export class ItemManager {
     let teilKollider: RAPIER.ColliderDesc[] = [];
     /** Massenanteile der Teilkollider, in derselben Reihenfolge. */
     let teilAnteile: number[] = [];
-    if (shape.kind === "box") {
+    if (shape.spaene !== undefined) {
+      // E-147: geteilte Geometrie, darum Eckfarben auf weissem Grund
+      geo = spaeneGeometrie(shape.spaene);
+      material.color.setHex(0xffffff);
+      material.vertexColors = true;
+      // SW: oelig glatter als Stahlschrott (0,9), Glanz unter 0,5 (E-123)
+      material.roughness = 0.5;
+      material.metalness = 0.45;
+      const [w, h, d] = shape.dims;
+      collider =
+        RAPIER.ColliderDesc.convexHull(spaeneHuelle(shape.spaene)) ??
+        RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2);
+    } else if (shape.kind === "box") {
       const [w, h, d] = shape.dims;
       geo = new THREE.BoxGeometry(w, h, d);
       collider = RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2);
@@ -1918,6 +1938,8 @@ export class ItemManager {
      * Festhalten nach 1,1 Sekunden einen Fladen daraus.
      */
     if (istPlatzinventar(item.shape)) return false;
+    // E-147: Ein Knaeuel wird kein Fladen — sein flacher Kollider waere hoeher als es selbst
+    if (item.shape.spaene !== undefined) return false;
     return istPressbar(item.massKg, item.shape.dims);
   }
 

@@ -13,8 +13,8 @@ import { rollCustomer } from "../src/delivery/customers";
  * Großteil — ein Teil allein auf der flachen Pritsche.
  */
 describe("Nachschub", () => {
-  it("reihum Kipper, Pritsche, Wrack, Großteil, Absetzkipper (E-141)", () => {
-    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack", "einzelstueck", "absetzer"]);
+  it("reihum Kipper, Pritsche, Wrack, Großteil, Absetzkipper (E-141), Späne (E-147)", () => {
+    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack", "einzelstueck", "absetzer", "spaene"]);
   });
 
   it("das Profil hat das verlangte Fahrzeug — 50 Mal je Art", () => {
@@ -24,6 +24,10 @@ describe("Nachschub", () => {
         if (art === "einzelstueck") {
           expect(c.einzelstueck, "das Großteil fehlt").toBeDefined();
           expect(c.vehicle).toBe("pritsche");
+        } else if (art === "spaene") {
+          // E-147: die Spänemulde kommt mit dem Absetzkipper
+          expect(c.vehicle).toBe("absetzer");
+          expect(c.spaene).toBe(true);
         } else {
           expect(c.vehicle).toBe(art);
           // Pritsche heißt Schüttgut-Pritsche — kein Großteil durch die Hintertür

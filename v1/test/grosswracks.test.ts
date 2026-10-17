@@ -327,8 +327,9 @@ describe("Wohnwagen: wie oft und wer", () => {
   });
 
   it("NACHSCHUB kennt keinen Wohnwagen — der Wohnwagen ist der Zufall, nicht der Knopf", () => {
-    // Seit E-141 ist der Absetzkipper die fuenfte Art; der Wohnwagen bleibt draussen.
-    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack", "einzelstueck", "absetzer"]);
+    // Seit E-141 ist der Absetzkipper die fuenfte Art, seit E-147 die Spaenemulde die sechste;
+    // der Wohnwagen bleibt draussen.
+    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack", "einzelstueck", "absetzer", "spaene"]);
   });
 });
 

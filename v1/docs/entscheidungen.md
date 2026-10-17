@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-147 | 17.10.2026 | Späneknäuel: Spänemulde im Absetzkipper, Mischschrott, magnetisch | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-151 | 17.10.2026 | Magnet klackt, Teile klonken, Generator statt Brummen | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-146 | 17.10.2026 | Lasthebemagnet als dritter Greifer: nur Eisen und Stahl haften | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-145 | 17.10.2026 | Gehaltene Körper bleiben an Wänden, Wegschwenken geht immer | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -162,6 +163,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-147 — Späneknäuel**
+- Taste 1, bis „Ein Absetzkipper mit Spänen ist unterwegs" kommt: Ist die Mulde sichtbar voll, sehen die Knäuel nach Drehspänen aus (stahlgrau, blau angelaufen, ölig) — oder eher nach Draht?
+- Abgesetzt: Kommst du mit der Spinne an die Knäuel, einzeln oder zu zweit? Hängen sie am Magneten?
+- Gekippt: Liegt der Haufen ruhig, läuft das Bild flüssig (iPhone mini)?
+- Beim Abwerfen: Passt das Blech-Klappern, oder soll es rascheln?
 
 **E-151 — Ton des Lasthebemagneten** (iPad-Lautsprecher)
 - Magnet ein- und ausschalten: kräftiges, trockenes Klacken wie ein Schütz?

@@ -120,6 +120,17 @@ export function feststoffdichte(id: string): number {
   );
 }
 
+/**
+ * Späne als Mulde voller Knäuel (E-147) — keine Fraktion, sondern eine Form
+ * von Mischschrott, darum nicht in `SCHUETTDICHTE`.
+ *
+ * Lose Wirr- und Langspäne liegen bei 0,1–0,3 t/m³ (Branchenwert für
+ * ungebrochene Drehspäne; Kurz- und Bröckelspäne 0,5–1,5 t/m³). In dieser
+ * Sitzung nicht nachgeschlagen. SW: 150 — im unteren Teil des Bandes, weil die
+ * Knäuel im Spiel mit Lücken liegen.
+ */
+export const SPAENE_SCHUETTDICHTE = 150;
+
 /** Fallwert für eine Fraktion ohne Eintrag — so schwer wie Mischschrott. SW. */
 const STANDARD_DICHTE = 620;
 

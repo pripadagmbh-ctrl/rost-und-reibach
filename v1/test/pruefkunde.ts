@@ -36,7 +36,7 @@
 import type { CustomerProfile, CustomerGroup } from "../src/delivery/customers";
 import { rollCustomer } from "../src/delivery/customers";
 import { ladeVolumen, type Aufbau, type Fahrzeugart } from "../src/delivery/fuellgrad";
-import { ladungsDichte } from "../src/materials/schuettdichte";
+import { ladungsDichte, SPAENE_SCHUETTDICHTE } from "../src/materials/schuettdichte";
 import { AUSSEHEN_NEUTRAL } from "../src/delivery/aussehen";
 
 /**
@@ -178,5 +178,7 @@ export function fuhrenAbweichung(c: CustomerProfile): number {
 
 /** Schüttdichte, die zu Fraktion und Störstoffanteil eines Profils gehört. */
 export function erwarteteDichte(c: CustomerProfile): number {
+  // E-147: Eine Spaenemulde hat ihre eigene Schuettdichte (lose Wirrspaene)
+  if (c.spaene) return SPAENE_SCHUETTDICHTE;
   return ladungsDichte(c.sortedMaterial, c.contaminantShare);
 }

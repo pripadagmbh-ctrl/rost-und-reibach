@@ -306,10 +306,12 @@ export function baueFuhre(args: {
   fuellgrad: number;
   hauptfraktion: string | null;
   stoerstoffAnteil: number;
+  /** Schüttdichte vorgeben statt aus der Fraktion rechnen (Späne, E-147) */
+  dichte?: number;
 }): Fuhre {
   const aufbau = args.aufbau ?? "flach";
   const volumen = ladeVolumen(args.kind, aufbau);
-  const dichte = ladungsDichte(args.hauptfraktion, args.stoerstoffAnteil);
+  const dichte = args.dichte ?? ladungsDichte(args.hauptfraktion, args.stoerstoffAnteil);
   if (args.kind === "wrack") {
     // Ein Wrack ist keine Schüttung: Es wiegt, was es wiegt.
     return { fuellgrad: 1, massKg: WRACK_KG, dichte, volumen, nutzlastBegrenzt: false };

@@ -34,6 +34,7 @@ import type { Aussehen, KundenEintrag } from "./aussehen";
 import { KATALOG_BIG, KATALOG_HUGE, type PileSpec } from "../world/objektkatalog";
 import { packeLadung, stueckMass } from "./ladung";
 import { WOHNWAGEN_DEF } from "../dismantle/carDef";
+import { SPAENE_SCHUETTDICHTE } from "../materials/schuettdichte";
 
 export type CustomerGroup = "privat" | "haendler" | "gewerbe";
 
@@ -81,6 +82,11 @@ export interface CustomerProfile {
    * Feld, liegt ein Altauto auf der Brücke — wie bisher.
    */
   wrackArt?: "wohnwagen";
+  /**
+   * Eine Mulde voller Späneknäuel (E-147, `world/spaene.ts`). Nur beim
+   * Absetzkipper. Fehlt das Feld, ist es eine gewöhnliche Fuhre.
+   */
+  spaene?: boolean;
 }
 
 /**
@@ -211,6 +217,13 @@ export interface Trade {
   greetings: string[];
   /** Der Mensch, der den Firmenwagen fährt — fest je Betrieb. */
   aussehen: Aussehen;
+  /**
+   * Anteil seiner Absetzkipper-Fuhren, die eine Mulde voller Späne sind
+   * (E-147). Fehlt das Feld, bringt der Betrieb keine Späne.
+   */
+  spaene?: number;
+  /** Was er sagt, wenn er Späne bringt — sonst gelten `greetings`. */
+  spaeneGruesse?: string[];
 }
 
 export const TRADES: Trade[] = [
@@ -226,6 +239,8 @@ export const TRADES: Trade[] = [
     material: "steel",
     beifang: 0.05, // Späne sind sauber, aber ölig
     greetings: ["Späne, noch ölig.", "Frisch aus der Halle."],
+    // E-147: Der Container einer Dreherei IST der Spänecontainer
+    spaene: 1,
     aussehen: { groesse: 1.66, fuelle: 0.35, pflege: 0.2, haut: 3, haar: 2, jacke: 1, weste: false, merkmal: "muetze" },
   },
   {
@@ -233,6 +248,13 @@ export const TRADES: Trade[] = [
     material: "steel",
     beifang: 0.12,
     greetings: ["Große Teile heute, Vorsicht.", "Zwei Motoren sind dabei."],
+    /*
+     * E-147, SW: drei von vier Mulden aus der Fertigung sind Späne. Mit der
+     * Dreherei (1) macht das (1 + 0,75) / 7 Betriebe = 25 % aller
+     * Absetzkipper-Fuhren des Gewerbes.
+     */
+    spaene: 0.75,
+    spaeneGruesse: ["Späne aus der Fräserei.", "Diesmal nur Späne, die Mulde ist voll."],
     aussehen: { groesse: 1.9, fuelle: 0.55, pflege: 0.6, haut: 0, haar: 3, jacke: 0, weste: true, merkmal: "keins" },
   },
   {
@@ -411,16 +433,46 @@ function rollFahrzeug(group: CustomerGroup): Fahrzeugart {
 function fuhreFuer(
   group: CustomerGroup,
   sortedMaterial: string | null,
-  contaminantShare: number
+  contaminantShare: number,
+  /** Anteil der Absetzkipper-Fuhren mit Spänen (E-147, `Trade.spaene`) */
+  spaeneAnteil = 0,
+  /** NACHSCHUB „Späne“: kommt sicher mit dem Absetzkipper */
+  nurAbsetzer = false
 ): {
   vehicle: Fahrzeugart;
   aufbau: Aufbau;
   fuellgrad: number;
   massKg: number;
   dichte: number;
+  spaene: boolean;
 } {
-  const vehicle = rollFahrzeug(group);
+  const vehicle = nurAbsetzer ? "absetzer" : rollFahrzeug(group);
   const aufbau = rollAufbau(group);
+  /*
+   * Späne (E-147)? Gewürfelt wird nur, wo der Anteil zwischen 0 und 1 liegt —
+   * so bleibt der Zufallsstrom aller anderen Fuhren, wie er war.
+   */
+  const spaene =
+    vehicle === "absetzer" && spaeneAnteil > 0 && (spaeneAnteil >= 1 || Math.random() < spaeneAnteil);
+  if (spaene) {
+    /*
+     * Eine Spänemulde kommt randvoll — die Dreherei ruft, wenn der Container
+     * überläuft. Wirrspäne sind leicht (SPAENE_SCHUETTDICHTE); erst randvoll
+     * kommen sie sicher über die 600 kg, unter denen kein LKW vorfährt
+     * (`test/lademenge.test.ts`): 5,76 m³ × 0,80 × 150 kg/m³ = 691 kg.
+     */
+    const voll =
+      FUELL_KLASSEN.randvoll.von + Math.random() * (FUELL_KLASSEN.randvoll.bis - FUELL_KLASSEN.randvoll.von);
+    const f = baueFuhre({
+      kind: vehicle,
+      aufbau,
+      fuellgrad: voll,
+      hauptfraktion: "mixed",
+      stoerstoffAnteil: 0,
+      dichte: SPAENE_SCHUETTDICHTE,
+    });
+    return { vehicle, aufbau, fuellgrad: f.fuellgrad, massKg: Math.max(MINDEST_FUHRE_KG, f.massKg), dichte: f.dichte, spaene };
+  }
   /*
    * Die Mulde kommt, wenn sie voll ist (E-141): Ein Containerdienst holt
    * keine viertelvolle Mulde ab. SW: drei Viertel bis randvoll — sonst kaeme
@@ -444,6 +496,7 @@ function fuhreFuer(
     fuellgrad: fuhre.fuellgrad,
     massKg: Math.max(MINDEST_FUHRE_KG, fuhre.massKg),
     dichte: fuhre.dichte,
+    spaene: false,
   };
 }
 
@@ -531,11 +584,11 @@ function rollHaendler(): CustomerProfile {
   };
 }
 
-function rollGewerbe(): CustomerProfile {
-  const t = pick(TRADES);
+function rollGewerbe(nurSpaene = false): CustomerProfile {
+  const t = pick(nurSpaene ? TRADES.filter((x) => (x.spaene ?? 0) > 0) : TRADES);
   // Der Betrieb ruft, wenn sein Container voll ist — nicht, wenn der LKW voll
   // ist. Deshalb streut sein Füllgrad breiter als der des Händlers.
-  const fuhre = fuhreFuer("gewerbe", t.material, t.beifang);
+  const fuhre = fuhreFuer("gewerbe", t.material, t.beifang, nurSpaene ? 1 : (t.spaene ?? 0), nurSpaene);
   return {
     group: "gewerbe",
     name: t.name,
@@ -545,12 +598,19 @@ function rollGewerbe(): CustomerProfile {
     aufbau: fuhre.aufbau,
     fuellgrad: fuhre.fuellgrad,
     dichte: fuhre.dichte,
-    sortedMaterial: t.material,
-    contaminantShare: t.beifang,
+    // Späne sind als Ganzes Mischschrott (E-147): eine Fraktion, kein Beifang
+    sortedMaterial: fuhre.spaene ? "mixed" : t.material,
+    contaminantShare: fuhre.spaene ? 0 : t.beifang,
     hardness: HAERTE_GEWERBE, // sachlich, wenig Spielraum
-    greeting: pick(t.greetings),
+    greeting: pick(fuhre.spaene && t.spaeneGruesse ? t.spaeneGruesse : t.greetings),
     aussehen: t.aussehen,
+    ...(fuhre.spaene ? { spaene: true } : {}),
   };
+}
+
+/** Eine Spänemulde auf Bestellung (NACHSCHUB, E-147): Dreherei oder Maschinenbau. */
+export function rollSpaenefuhre(): CustomerProfile {
+  return rollGewerbe(true);
 }
 
 /**

@@ -1,4 +1,4 @@
-import { rollCustomer, rollEinzelstueck, type CustomerProfile } from "./customers";
+import { rollCustomer, rollEinzelstueck, rollSpaenefuhre, type CustomerProfile } from "./customers";
 import type { Fahrzeugart } from "./fuellgrad";
 
 /**
@@ -20,7 +20,7 @@ import type { Fahrzeugart } from "./fuellgrad";
  * Großteil ist kein eigenes Fahrzeug — es kommt auf der flachen Pritsche —,
  * deshalb ist die Art hier mehr als die Fahrzeugart.
  */
-export type NachschubArt = Fahrzeugart | "einzelstueck";
+export type NachschubArt = Fahrzeugart | "einzelstueck" | "spaene";
 
 export const NACHSCHUB_FOLGE: readonly NachschubArt[] = [
   "kipper",
@@ -29,6 +29,13 @@ export const NACHSCHUB_FOLGE: readonly NachschubArt[] = [
   "einzelstueck",
   // E-141: der Absetzkipper mit seiner Mulde — kippt sie aus oder setzt sie ab
   "absetzer",
+  /*
+   * E-147: eine Mulde voller Späne. Eigene Art, weil sie im Zufall der
+   * Kundschaft selten ist (Gewerbe 22 % × Absetzkipper 30 % × Späne 25 %,
+   * rund jede 60. Fuhre) — wer das Greifen loser Knäuel üben will, soll nicht
+   * darauf warten.
+   */
+  "spaene",
 ];
 
 /**
@@ -47,11 +54,12 @@ export const NACHSCHUB_MELDUNG: Record<NachschubArt, string> = {
   pkw: "Nachschub: Ein Anhänger ist unterwegs.",
   einzelstueck: "Nachschub: Ein Großteil ist unterwegs.",
   absetzer: "Nachschub: Ein Absetzkipper mit Mulde ist unterwegs.",
+  spaene: "Nachschub: Ein Absetzkipper mit Spänen ist unterwegs.",
 };
 
 /** Die Meldung zu einem fertigen Profil — ein Großteil kommt auf der Pritsche. */
 export function nachschubMeldung(c: CustomerProfile): string {
-  return NACHSCHUB_MELDUNG[c.einzelstueck ? "einzelstueck" : c.vehicle];
+  return NACHSCHUB_MELDUNG[c.einzelstueck ? "einzelstueck" : c.spaene ? "spaene" : c.vehicle];
 }
 
 /**
@@ -68,6 +76,7 @@ export function profilFuer(
   wuerfle: () => CustomerProfile = rollCustomer
 ): CustomerProfile {
   if (art === "einzelstueck") return rollEinzelstueck();
+  if (art === "spaene") return rollSpaenefuhre();
   let c = wuerfle();
   for (let i = 1; i < MAX_WUERFE && c.vehicle !== art; i++) c = wuerfle();
   return c;
