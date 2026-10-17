@@ -84,7 +84,8 @@ describe("Der Kipper lädt seitlich ab", () => {
      * Winkel zwischen beiden — er muss nahe 90 Grad liegen, sonst schaut der
      * Spieler wieder auf ein Heck.
      */
-    const [von, bis] = [rev[0]!, rev[1]!];
+    // Die letzte Gerade des Rangierzugs (E-140) — bis dahin die einzige.
+    const [von, bis] = [rev.at(-2)!, rev.at(-1)!];
     const achse = Math.atan2(bis[0] - von[0], bis[1] - von[1]);
     const zumSitz = Math.atan2(BAGGER_STAND.x - halt![0], BAGGER_STAND.z - halt![1]);
     let winkel = Math.abs(((achse - zumSitz) * 180) / Math.PI);
@@ -214,11 +215,20 @@ describe("Der Kipper lädt seitlich ab", () => {
     for (let z = -16.5; z <= -6.0; z += 0.5) {
       expect(hitsObstacle(2.0, z, 1.4), `alte Kipperspur bei z=${z.toFixed(1)} versperrt`).toBeNull();
     }
+    /*
+     * SEIT E-140 NUR NOCH DER TEIL IM SCHWENKBAND (z −17,27 … −13,65, siehe
+     * unten). Der Rangierzug an den Abladeplatz setzt im weiten Bogen ueber
+     * den Vorplatz zurueck und kreuzt die alte Spur an ihrem Nordende, bei
+     * z −9 — 13 m vom Sitz, weit ausserhalb des Bands. Die ganze Spur zu
+     * sperren, hiesse den Abladeplatz unerreichbar zu machen: Gerechnet mit
+     * der Spur als Bauwerk findet `planeRangierzug` keinen freien Zug mehr
+     * (0,60 m in der Ostwand). Der Teil, der fuer die Arbeit zaehlt, bleibt frei.
+     */
     const strecken = [routeInRev(), routeOut()];
     for (const route of strecken) {
       for (const [x, z] of route) {
-        const inSpur = Math.abs(x - 2.0) < 1.6 && z > -16.5 && z < -6.0;
-        expect(inSpur, `Wegpunkt (${x} | ${z}) liegt noch in der alten Kipperspur`).toBe(false);
+        const inSpur = Math.abs(x - 2.0) < 1.6 && z > -17.27 && z < -13.65;
+        expect(inSpur, `Wegpunkt (${x} | ${z}) liegt im Schwenkband der alten Kipperspur`).toBe(false);
       }
     }
     /*

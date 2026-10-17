@@ -27,7 +27,8 @@ import { endlich, mindestens } from "./zahl";
 // nicht mehr gegen den Baggerstand. Die drei Namen standen bis 15.09.2026 als
 // tote Einfuhr hier und wurden von der neuen Typpruefung gemeldet (E-038).
 import { bedLenFor, neueAbholstelle, routeInRev } from "../src/delivery/routes";
-import { alleStrecken } from "./strecken";
+import { alleStrecken, fahrplaene } from "./strecken";
+import { fahre, figurenFuer } from "./knicklauf";
 import {
   umrisseEntlang,
   umrissUeberlappung,
@@ -50,13 +51,30 @@ import {
  * Einzelstrecken sieht ihn nie.
  */
 
-/** Alle Fahrzeuglagen einer Streckenliste, mit ihrem Streckennamen. */
+/**
+ * Alle Fahrzeuglagen, mit ihrem Etappennamen — SO, WIE DER WAGEN FAEHRT.
+ *
+ * Seit E-140 aus dem Laufapparat (`test/knicklauf.ts`), der mit demselben
+ * Einspurmodell faehrt wie das Spiel. Vorher stand hier der Ursprung auf der
+ * Strecke, mit der Richtung der Strecke — fuer einen Wagen, der sich auf der
+ * Stelle dreht, war das die Fahrt. Einer, der einlenkt, schneidet Boegen
+ * innen an und steht dabei anders; die alte Rechnung meldete am Waagenbogen
+ * 0,29 m im Betriebsgebaeude, wo der Wagen gemessen 0,8 m Luft hat.
+ */
+let lagenSpeicher: Array<[string, ReturnType<typeof fahrzeugUmriss>]> | null = null;
 function alleLagen(): Array<[string, ReturnType<typeof fahrzeugUmriss>]> {
+  if (lagenSpeicher) return lagenSpeicher;
   const out: Array<[string, ReturnType<typeof fahrzeugUmriss>]> = [];
-  for (const [name, route, kind, rev] of alleStrecken()) {
-    for (const u of umrisseEntlang(route, bedLenFor(kind), rev)) out.push([name, u]);
+  for (const plan of fahrplaene()) {
+    const fahrt = fahre(plan);
+    // Jede vierte Lage: 1/15 s, hoechstens 0,32 m Weg — feiner als der
+    // schmalste Pfosten (0,30 m) breit ist, wenn man die Wagenbreite dazunimmt.
+    fahrt.spur.forEach((l, i) => {
+      if (i % 4 !== 0) return;
+      for (const u of figurenFuer(plan.kind, l)) out.push([l.etappe, u]);
+    });
   }
-  return out;
+  return (lagenSpeicher = out);
 }
 
 afterEach(() => {

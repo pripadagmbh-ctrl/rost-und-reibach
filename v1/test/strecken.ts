@@ -31,7 +31,9 @@ import {
   PICKUP_IN_FWD,
   PARK_SLOTS,
   routeToPark,
-  routeParkRueck,
+  routeParkRueckVon,
+  parkAusfahrt,
+  anfahrtVomPlatz,
   neueAbladestelle,
   neueAbholstelle,
   alleAbholPlaetze,
@@ -237,7 +239,7 @@ export function fahrplaene(): Fahrplan[] {
           },
           {
             name: `Parken ${i + 1}`,
-            route: routeParkRueck(slot),
+            route: routeParkRueckVon(aus.route, slot),
             rueckwaerts: true,
             tempo: PARK_RUECK_TEMPO,
             phasen: ["parkRueck"],
@@ -245,6 +247,71 @@ export function fahrplaene(): Fahrplan[] {
         ],
       });
     }
+  }
+  /*
+   * DAS GESPANN (E-140): Auto mit Anhaenger. Es faehrt dieselben Strecken wie
+   * die Pritsche (Abladeplatz, Warteplaetze), aber rueckwaerts zielt der
+   * Fahrer mit der Anhaengerachse, und der Anhaenger knickt. Ins Silo faehrt
+   * es nie (`faehrtInsSilo`: nur Kipper).
+   */
+  for (const f of [...out]) {
+    if (f.kind !== "pritsche") continue;
+    out.push({ ...f, name: `Gespann: ${f.name}`, kind: "pkw" });
+  }
+  /*
+   * VOM WARTEPLATZ WEG (E-140). Zwei Wege fuehren von einem Warteplatz: nach
+   * der Kaffeepause zum Tor (`parkAusfahrt`) und — fuer die Fuhren, die zum
+   * Start anstehen (E-131) — an den Abladeplatz oder ins Silo
+   * (`anfahrtVomPlatz`). Beide beginnen im Stand auf dem Platz, Kabine zum
+   * Hof; bis E-140 drehte sich der Wagen dort auf der Stelle.
+   */
+  for (const [i, slot] of PARK_SLOTS.entries()) {
+    out.push({
+      name: `Warteplatz ${i + 1} zum Tor`,
+      kind: "kipper",
+      etappen: [
+        {
+          name: `Warteplatz ${i + 1} Ausfahrt`,
+          route: parkAusfahrt(slot),
+          rueckwaerts: false,
+          tempo: SPEED,
+          phasen: ["out"],
+        },
+      ],
+    });
+    const ziele: Array<[string, (typeof CONFIGS)[number] | null]> = [
+      ["Abladeplatz", null],
+      ...CONFIGS.filter((c) => c.lager === true).map(
+        (c) => [c.label, c] as [string, (typeof CONFIGS)[number]]
+      ),
+    ];
+    for (const [wohin, silo] of ziele) {
+      const zug = anfahrtVomPlatz(slot, silo);
+      // Ins Silo nur der Kipper; an den Abladeplatz auch das Gespann.
+      for (const kind of silo ? ["kipper"] : ["kipper", "pkw"]) {
+      out.push({
+        name: `${kind === "pkw" ? "Gespann: " : ""}Ansteher ${i + 1} ${wohin}`,
+        kind,
+        etappen: [
+          {
+            name: `Ansteher ${i + 1} ${wohin} Anfahrt`,
+            route: zug.anfahrt,
+            rueckwaerts: false,
+            tempo: SPEED,
+            phasen: ["approach"],
+          },
+          {
+            name: `Ansteher ${i + 1} ${wohin} Rangieren`,
+            route: zug.rueckweg,
+            rueckwaerts: true,
+            tempo: RUECK_TEMPO,
+            phasen: ["reverseIn"],
+          },
+        ],
+      });
+      }
+    }
+    out.push({ ...out.find((f) => f.name === `Warteplatz ${i + 1} zum Tor`)!, name: `Gespann: Warteplatz ${i + 1} zum Tor`, kind: "pkw" });
   }
   return out;
 }

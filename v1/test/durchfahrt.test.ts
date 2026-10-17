@@ -65,10 +65,12 @@ import {
   UMRISS_TOLERANZ,
   type Rechteck,
 } from "../src/delivery/umriss";
+import { winkelRest, wendeRadius } from "../src/delivery/lenkung";
+import { lkwFahrwerk } from "../src/delivery/vehicleModel";
 import {
+  ABLADE_SPUR_X,
   bedLenFor,
   neueAbladestelle,
-  routeInRev,
   routeOut,
   routeToPark,
   PARK_ANFAHRT_M,
@@ -513,7 +515,9 @@ describe("Kollider ohne Wirkung", () => {
     let tempoImToPark = 0;
     let tempoAufDerStrecke = 0;
     let bilderImToPark = 0;
-    for (let f = 0; f < 3000; f++) {
+    // 4.500 Bilder = 75 s: Seit E-140 wendet der Wagen vor dem Abladeplatz
+    // im Rangierzug statt auf der Stelle, die Fuhre dauert laenger.
+    for (let f = 0; f < 4500; f++) {
       takt(p);
       const w = wagen(p);
       if (!w) break;
@@ -576,32 +580,22 @@ describe("Kollider ohne Wirkung", () => {
 
 /* ====================================================================== */
 
-describe("Die Kehre auf der Stelle", () => {
-  it("BEFUND: beim Eindrehen am Abladeplatz streift der Umriss bis 0,60 m durch die Ostwand", () => {
+describe("Die Kehre auf der Stelle gibt es nicht mehr (E-140)", () => {
+  it("GEGENPROBE: auf der Stelle gedreht stuende der Wagen 0,60 m in der Ostwand", () => {
     /*
-     * DIE DRITTE BEWEGUNG, DIE KEINE STRECKE IST.
+     * DER ALTE BEFUND, als Zahl stehen gelassen. Bis E-140 drehte ein Wagen
+     * vor dem Rueckwaertsfahren AUF DER STELLE ein, am Rangierpunkt der
+     * Abladespur (6,3 | −17,5). Ueber alle 360 Grad abgetastet steckte er im
+     * schlimmsten Fall 0,60 m in der Ostwand; `drehRichtung` waehlte die
+     * freiere Seite, der Rest blieb.
      *
-     * Seit E-081 dreht ein Wagen vor dem Rueckwaertsfahren AUF DER STELLE ein
-     * (`lenkung.ts`, `PIVOT_AB` und die Regel „vor jeder Rueckwaertsfahrt").
-     * Waehrend dieser Drehung steht er auf einem Wegpunkt, aber in einer
-     * Gierlage, die auf KEINER Strecke vorkommt — `test/fahrumriss.test.ts`
-     * tastet Strecken ab und bekommt genau diese Lagen nie zu sehen.
-     *
-     * Der Umriss ist 3,10 x rund 7,4 m. Auf der Stelle gedreht ueberstreicht
-     * er einen Kreis von 4,0 m Halbmesser; der Abladeplatz liegt auf
-     * x 6,30, die Ostwand beginnt bei x 8,45 (`YARD_MAX_X` minus
-     * Wanddicke). Ueber alle 360 Grad abgetastet steckt der Wagen im
-     * schlimmsten Fall 0,60 m in der Wand — und im gefahrenen Bogen wurden
-     * 0,27 m gemessen (17.09.2026, `tools/durchfahrt.ts`, Bild 4341,
-     * Umrissmitte 8,4 | −16,8).
-     *
-     * `lenkung.drehRichtung` waehlt bereits die Seite mit der GERINGEREN
-     * Durchdringung (`tiefeBeiGier`). Der Rest bleibt trotzdem stehen; das
-     * hier ist die Zahl dafuer.
+     * Die Geometrie gilt weiter — gedreht wird dort nur nicht mehr. Der Fall
+     * unten faehrt den Wagen wirklich und verlangt, dass er sich nie ohne
+     * Fahrt dreht.
      */
     setBuildingObstacles([]);
     neueAbladestelle();
-    const halt = routeInRev()[0]!;
+    const halt: [number, number] = [ABLADE_SPUR_X, -17.5];
     const bauten = alleHindernisse();
     let tief = 0;
     let wo = "";
@@ -618,22 +612,42 @@ describe("Die Kehre auf der Stelle", () => {
         }
       }
     }
-    expect(wo, "die tiefste Durchdringung steckt nicht mehr in der Ostwand").toBe("Ostwand");
-    expect(tief, "der Wagen dreht sich jetzt frei — Befund behoben?").toBeGreaterThan(0.5);
+    expect(wo).toBe("Ostwand");
+    expect(tief).toBeGreaterThan(0.5);
+  });
 
-    /*
-     * GEGENPROBE, DIE MELDEN MUSS: Derselbe Wagen auf demselben Punkt, aber
-     * in der Gierlage, die die Strecke vorschreibt (rueckwaerts nach Sueden,
-     * also 180 Grad). Dort ist er frei — und genau deshalb hat der
-     * Streckenwaechter nichts gemeldet.
-     */
-    const aufDerStrecke = fahrzeugUmriss({ x: halt[0], z: halt[1], rot: Math.PI }, bedLenFor("kipper"));
-    let tiefStrecke = 0;
-    for (const o of bauten) tiefStrecke = Math.max(tiefStrecke, umrissUeberlappung(aufDerStrecke, o));
-    expect(
-      tiefStrecke,
-      "auch in der Streckenlage steckt der Wagen in etwas — dann misst der Fall nicht die Kehre"
-    ).toBeLessThan(UMRISS_TOLERANZ);
+  it("der Kipper faehrt an den Abladeplatz, ohne sich je im Stand zu drehen", () => {
+    const p = bauePlatz();
+    p.m.spawnNow("kipper", mischkipper());
+    let standDreh = 0;
+    let engsterKreis = Infinity;
+    let warImRangieren = false;
+    let vx = NaN;
+    let vz = NaN;
+    let vg = NaN;
+    for (let f = 0; f < 4500; f++) {
+      takt(p);
+      const w = wagen(p);
+      if (!w) break;
+      if (w.phaseName === "reverseIn") warImRangieren = true;
+      const { x, z } = w.group.position;
+      const g = w.group.rotation.y;
+      if (!Number.isNaN(vx)) {
+        const weg = Math.hypot(x - vx, z - vz);
+        const dg = Math.abs(winkelRest(vg, g));
+        if (weg < 1e-6 && dg > standDreh) standDreh = dg;
+        if (weg > 1e-4 && dg > 1e-7) engsterKreis = Math.min(engsterKreis, weg / dg);
+      }
+      vx = x;
+      vz = z;
+      vg = g;
+      if (w.phaseName === "waitUnload" || w.phaseName === "tipping") break;
+    }
+    expect(warImRangieren, "der Wagen kam nie ins Rangieren").toBe(true);
+    expect(standDreh, "der Wagen dreht sich im Stand").toBe(0);
+    // Der Ursprung liegt vor der Hinterachse und faehrt einen etwas weiteren
+    // Kreis als sie; enger als der Wendekreis der Hinterachse geht es nie.
+    expect(engsterKreis).toBeGreaterThan(wendeRadius(lkwFahrwerk(bedLenFor("kipper"))) * 0.99);
   });
 });
 

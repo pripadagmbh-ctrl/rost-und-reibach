@@ -68,12 +68,6 @@ const VOLL_PRUEF_S = 0.25;
 const ABHOLER_CONTAINER_KG = 1800;
 /** Rueckwaertstempo beim Einparken (m/s) — Schrittgeschwindigkeit. */
 const PARK_RUECK_SPEED = 1.6;
-/**
- * Wie weit hinter dem naechsten Punkt ein Ansteher auf die Anfahrt einfaedelt
- * (E-131, SW: 6 m). Am naechsten Punkt selbst stuende er quer zur Spur und
- * muesste im Zickzack einlenken; 6 m weiter faehrt er schraeg darauf zu.
- */
-const ANSTEH_EINFAEDEL_M = 6;
 /*
  * Hier stand `LADUNG_UEBERSTAND = 0.35` als zweite Abschrift. Seit E-126 gibt
  * es zwei Hoehenregeln (Schuettgut, Einzelstueck); beide stehen an EINER
@@ -85,25 +79,21 @@ const LADE_BODEN = 0.1;
 const LADE_RAND = 0.2;
 /** Gehtempo des Fahrers (m/s) */
 const FAHRER_TEMPO = 1.5;
-/** Rechenhilfe fuer boxen() — kein neuer Vektor je Bild. */
-const BOX_TMP = new THREE.Vector3();
 import { alleHindernisse } from "../world/obstacles";
 import {
   fahrzeugUmriss,
+  zugwagenUmriss,
   anhaengerUmriss,
   poseAuf,
   tiefsteDurchdringung,
   UMRISS_TOLERANZ,
 } from "./umriss";
 import {
-  lenkeEin,
-  dreheWeiter,
-  drehRichtung,
-  winkelRest,
-  fahrtFaktor,
+  folgeSchritt,
+  fortschrittsPunkt,
   LENK_RATE,
-  PIVOT_AB,
-  VORAUS_M,
+  type Fahrwerk,
+  type Lage,
 } from "./lenkung";
 import { BAGGER_STAND } from "../world/baggerstand";
 import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
@@ -118,7 +108,13 @@ import {
   type Anliefererlage,
   type CustomerProfile,
 } from "./customers";
-import { buildVehicleModel, wandHoehe, brueckenKeilEcken, type Rad } from "./vehicleModel";
+import {
+  buildVehicleModel,
+  wandHoehe,
+  brueckenKeilEcken,
+  type Rad,
+  type LenkRad,
+} from "./vehicleModel";
 import { Federung, federungsDatenFuer } from "./federung";
 import {
   ANHAENGER_HALB_BREITE,
@@ -160,9 +156,11 @@ import {
   bayInRev,
   bayOut,
   PARK_SLOTS,
-  parkAnfahrt,
   routeToPark,
   routeParkRueck,
+  routeParkRueckVon,
+  parkAusfahrt,
+  anfahrtVomPlatz,
   PARK_TIME_S,
   SPEED,
   FIRST_DELAY_S,
@@ -252,18 +250,21 @@ class DeliveryVehicle {
    * nie umgestellt.
    */
   faedeltAus = true;
-  /** Drehrichtung einer laufenden Kehre; null heisst: keine Kehre. */
-  private kehre: 1 | -1 | null = null;
-  /** Phase des letzten Bildes — nur, um eine Kehre am Etappenwechsel zu loesen. */
-  private letztePhase: Phase | null = null;
+  /**
+   * Lenkeinschlag der Vorderraeder (rad) — E-140. Er bleibt stehen, wenn der
+   * Wagen haelt, und wird beim naechsten Anfahren weitergedreht.
+   */
+  private lenk = 0;
+  /** Wo die Achsen sitzen; daraus faehrt das Einspurmodell (`lenkung.ts`). */
+  private fahrwerk: Fahrwerk;
+  /** Die Teile der Vorderraeder, die sichtbar einschlagen. */
+  private lenkRaeder: LenkRad[] = [];
   private phaseT = 0;
   private tip = 0;
   cargo: Cargo = { items: [], car: null };
   /** Anhänger des PKW — eigener Körper, Gelenk an der Kupplung */
   private trailer: THREE.Group | null = null;
   private trailerYawRel = 0;
-  private letztePos = new THREE.Vector3();
-  private letzterYaw = 0;
   /** Ladekran der Händler — nur Bild, schwenkt beim Andocken zur Seite */
   private crane: THREE.Group | null = null;
   private craneSwing = 0;
@@ -429,38 +430,41 @@ class DeliveryVehicle {
    * sich dort ab und macht Pause; alle anderen fahren gleich vom Hof.
    */
   /**
-   * Anhänger nachführen. Ein Anhänger hat keinen eigenen Willen: Er dreht sich
-   * um seine Achse in die Richtung, in die die Kupplung ihn zieht. Das ist die
-   * übliche Einspur-Kinematik — je Meter Fahrweg dreht er um sin(Knickwinkel)
-   * geteilt durch den Abstand Kupplung–Achse.
+   * Lenkung und Anhaenger ans Modell geben (E-140).
    *
-   * Rückwärts gilt sie nicht: Dort ist die Gleichung instabil, der Anhänger
-   * knickt ein. Ein Fahrer hält beim Rangieren dagegen, und genau das tut hier
-   * die Rückstellung — sonst stünde der Anhänger nach dem Andocken quer.
+   * Gerechnet wird beides in `lenkung.ts` (`rolle`): der Lenkeinschlag beim
+   * Fahren, der Knick des Anhaengers aus seiner eigenen Achse. Hier wird nur
+   * gezeigt — die Vorderraeder schwenken um die Hochachse durch ihre
+   * Reifenmitte, Felge und Nabe gehen mit.
    */
-  private updateTrailer(dt: number): void {
-    if (!this.trailer || dt <= 0) return;
-    const p = this.group.position;
-    const psi = this.group.rotation.y;
-    const dx = p.x - this.letztePos.x;
-    const dz = p.z - this.letztePos.z;
-    const strecke = Math.hypot(dx, dz);
-    const vorwaerts = Math.sin(psi) * dx + Math.cos(psi) * dz;
-    let dpsi = psi - this.letzterYaw;
-    while (dpsi > Math.PI) dpsi -= Math.PI * 2;
-    while (dpsi < -Math.PI) dpsi += Math.PI * 2;
-    this.letztePos.copy(p);
-    this.letzterYaw = psi;
-
-    const L = this.bedLen / 2 + 1.05; // Kupplung bis Anhängerachse
-    if (strecke > 1e-5 && vorwaerts > 0) {
-      this.trailerYawRel += -Math.sin(this.trailerYawRel) * (strecke / L) - dpsi;
-    } else {
-      this.trailerYawRel += (0 - this.trailerYawRel) * Math.min(1, dt * 2.5);
+  private zeigeLenkung(): void {
+    if (this.trailer) this.trailer.rotation.y = this.trailerYawRel;
+    const c = Math.cos(this.lenk);
+    const sn = Math.sin(this.lenk);
+    for (const r of this.lenkRaeder) {
+      r.mesh.rotation.y = this.lenk;
+      r.mesh.position.x = r.achseX + r.versatz * c;
+      r.mesh.position.z = r.z - r.versatz * sn;
     }
-    // Ein Anhänger knickt irgendwann an der Deichsel an — weiter geht es nicht
-    this.trailerYawRel = THREE.MathUtils.clamp(this.trailerYawRel, -0.75, 0.75);
-    this.trailer.rotation.y = this.trailerYawRel;
+  }
+
+  /** Die Lage des Wagens fuer das Einspurmodell. */
+  private lage(): Lage {
+    return {
+      x: this.group.position.x,
+      z: this.group.position.z,
+      gier: this.group.rotation.y,
+      lenk: this.lenk,
+      knick: this.trailerYawRel,
+    };
+  }
+
+  private setzeLage(l: Lage): void {
+    this.group.position.x = l.x;
+    this.group.position.z = l.z;
+    this.group.rotation.y = l.gier;
+    this.lenk = l.lenk;
+    this.trailerYawRel = l.knick;
   }
 
   /**
@@ -562,6 +566,7 @@ class DeliveryVehicle {
        * (E-094): Er faehrt den Weg zum Streckenanfang AB, statt zu springen.
        */
       this.meinParkweg = routeToPark(this.routeOut, this.parkSpot);
+      this.meinParkRueck = routeParkRueckVon(this.routeOut, this.parkSpot);
       this.starteAusfaedeln(this.meinParkweg, "toPark", this.nearestS(this.meinParkweg));
       return;
     }
@@ -674,28 +679,40 @@ class DeliveryVehicle {
    * das Zugfahrzeug.
    */
   boxen(out: Box[]): void {
-    const p = this.group.position;
+    this.figurenBei(this.lage(), out);
+  }
+
+  /**
+   * Die Standflaechen in einer Lage: beim LKW eine, beim Gespann Auto und
+   * Anhaenger (er knickt an der Kupplung ab). Gerechnet in `umriss.ts`, wie
+   * im Waechter (`test/knicklauf.figurenFuer`).
+   */
+  private figurenBei(l: Lage, out: Box[]): void {
     /*
      * Die Standflaeche sitzt NICHT auf dem Ursprung, sondern dort, wo der
-     * Wagen wirklich steht (15.09.2026).
+     * Wagen wirklich steht (15.09.2026, seit E-054 aus `umriss.ts`).
      *
-     * Gerechnet wird sie seit E-054 in `umriss.ts` — von derselben Funktion,
-     * mit der `isBlockedByBuilding` nach vorn schaut und mit der
-     * `test/fahrumriss.test.ts` jede Strecke abfaehrt. Vorher stand die Figur
-     * dreimal da und war dreimal eine andere.
+     * Beim Gespann das AUTO (E-140): Der Rahmen hier ist das Zugfahrzeug, und
+     * `fahrzeugUmriss` mit der Anhaengerlaenge lag nur dort, wo der Anhaenger
+     * bei geradem Gespann steht — das Auto kam in keiner Pruefung vor.
      */
-    out.push(
-      fahrzeugUmriss({ x: p.x, z: p.z, rot: this.group.rotation.y }, this.bedLen)
-    );
-    if (this.trailer) {
-      const w = this.trailer.getWorldPosition(BOX_TMP);
-      // Der Anhänger hängt hinter der Kupplung; sein Mittelpunkt liegt eine
-      // halbe Ladeflächenlänge dahinter.
-      out.push(
-        anhaengerUmriss(w.x, w.z, this.group.rotation.y + this.trailerYawRel, this.bedLen)
-      );
+    const pose = { x: l.x, z: l.z, rot: l.gier };
+    const a = this.fahrwerk.anhaenger;
+    if (!this.trailer || !a) {
+      out.push(fahrzeugUmriss(pose, this.bedLen));
+      return;
     }
+    out.push(zugwagenUmriss(pose, this.fahrwerk.vorn, this.fahrwerk.hinten));
+    out.push(
+      anhaengerUmriss(
+        l.x + Math.sin(l.gier) * a.kupplung,
+        l.z + Math.cos(l.gier) * a.kupplung,
+        l.gier + l.knick,
+        this.bedLen
+      )
+    );
   }
+
 
   /**
    * STEHT BELADEN AUF DEM WARTEPLATZ AN (E-131).
@@ -739,13 +756,19 @@ class DeliveryVehicle {
     this.stehtAn = false;
     this.parkSpot = null;
     this.legeAbladestelleFest();
-    const route = this.routeApproach;
-    const bucht = parkAnfahrt(slot);
-    const ab = Math.min(
-      this.nearestS(route, bucht[0], bucht[1]) + ANSTEH_EINFAEDEL_M,
-      this.routeLength(route)
-    );
-    this.starteAusfaedeln(route, "approach", ab, [bucht], ab);
+    /*
+     * E-140: Vom Warteplatz aus gibt es einen eigenen Rangierzug. Der Wagen
+     * steht dort mit der Kabine zum Platz und faehrt einfach los — aus der
+     * Bucht, vorbei, wenden, zuruecksetzen. Bis E-140 faedelte er hier auf
+     * die gewohnte Anfahrt ein; das ging nur, solange er sich auf der Stelle
+     * drehen konnte.
+     */
+    const zug = anfahrtVomPlatz(slot, this.zielMulde);
+    this.meineAnfahrt = zug.anfahrt;
+    this.meinRueckweg = zug.rueckweg;
+    this.phase = "approach";
+    this.phaseT = 0;
+    this.routeS = 0;
   }
 
   /** Steht das Fahrzeug auf dem Warteplatz und macht Pause? */
@@ -923,8 +946,8 @@ class DeliveryVehicle {
    * an (gemessen 0,50 m in Halle 1 Sued, 0,63 m im Betriebsgebaeude).
    */
   private ausfaedelWeg: Array<[number, number]> = [];
-  /** Der Punkt, auf den gerade zugefahren wird (Weltkoordinaten). */
-  private ausfaedelPunkt: [number, number] | null = null;
+  /** Der Weg vom Standort bis zum Einfaedelpunkt — beim ersten Schritt gelegt. */
+  private ausfaedelBahn: Array<[number, number]> | null = null;
   /** Welche Phase laeuft, sobald die Strecke aufgenommen ist. */
   private ausfaedelFolge: Phase = "out";
   /** Auf welche Strecke eingefaedelt wird. */
@@ -976,52 +999,8 @@ class DeliveryVehicle {
       ...vorpunkte.map((p) => [p[0], p[1]] as [number, number]),
       this.punktAuf(route, zielS),
     ];
-    this.ausfaedelPunkt = null;
+    this.ausfaedelBahn = null;
     this.phase = "ausfaedeln";
-  }
-
-  /**
-   * WIE TIEF DIESER AUSFAEDELWEG IN EIN BAUWERK FUEHRT (m) — vor der Abfahrt.
-   *
-   * Dieselbe Frage, die `drehRichtung` fuer eine Kehre stellt (E-084): nicht
-   * gerechnet, sondern mit dem ECHTEN Umriss abgetastet. Sie muss gestellt
-   * werden, weil die beiden Wege verschieden ausgehen und keiner immer
-   * gewinnt:
-   *
-   *   Warteplatz 1 und 2 liegen am Tor. Direkt loszufahren heisst, quer in
-   *   einer 9,0 m breiten Toroeffnung zu stehen — 0,33 bzw. 0,40 m Nordwand.
-   *   Warteplatz 3 steht vor Halle 3. Erst aus der Bucht zu ziehen heisst,
-   *   vor ihrem Tor zu wenden — 0,50 m Halle 3 Sued.
-   *
-   * Gerechnet wird mit demselben Fahrgesetz wie die Fahrt, nur mit grobem
-   * Schritt (0,1 s statt 1/60 s): Die Probe soll den Weg abtasten, nicht ihn
-   * nachrechnen. 0,1 s sind bei SPEED hoechstens 0,48 m Weg und 0,085 rad.
-   */
-  private ausfaedelTiefe(ziele: Array<[number, number]>): number {
-    const PROBE_DT = 0.1;
-    let x = this.group.position.x;
-    let z = this.group.position.z;
-    let gier = this.group.rotation.y;
-    let tief = 0;
-    for (const ziel of ziele) {
-      // Deckel: 300 Proben sind 30 s Fahrzeit, mehr als jede Ausfaedelstrecke.
-      for (let i = 0; i < 300; i++) {
-        const dx = ziel[0] - x;
-        const dz = ziel[1] - z;
-        const d = Math.hypot(dx, dz);
-        if (d <= 1e-6) break;
-        const soll = Math.atan2(dx, dz);
-        const rest = Math.abs(winkelRest(gier, soll));
-        const schritt = Math.min(SPEED * PROBE_DT * fahrtFaktor(rest), d);
-        x += (dx / d) * schritt;
-        z += (dz / d) * schritt;
-        gier = lenkeEin(gier, soll, this.lenkrate * PROBE_DT);
-        const t = this.tiefeBei(x, z, gier);
-        if (t > tief) tief = t;
-        if (d - schritt <= 1e-6) break;
-      }
-    }
-    return tief;
   }
 
   /** Der Punkt der Polylinie bei Bogenlaenge `s` — ohne das Fahrzeug zu setzen. */
@@ -1030,39 +1009,31 @@ class DeliveryVehicle {
     return [p.x, p.z];
   }
 
-  /** Ein Schritt des Ausfaedelns; true, sobald die Strecke aufgenommen ist. */
+  /**
+   * Ein Schritt des Ausfaedelns.
+   *
+   * Seit E-140 mit demselben Fahrgesetz wie jede Etappe: Der Weg vom
+   * Standort ueber die Zwischenpunkte zum Einfaedelpunkt ist eine kleine
+   * Strecke, und `advance` faehrt sie mit dem Einspurmodell ab — samt
+   * Bauwerks- und Blockadepruefung. Vorher fuhr der Wagen hier eine
+   * Luftlinie mit begrenzter Drehrate und setzte seine Koerper hart nach
+   * (`snapBodiesToPose`): Rapier sah dabei keine Bewegung (E-098, „Gespenst").
+   */
   private ausfaedelSchritt(dt: number): void {
     const route = this.ausfaedelRoute ?? this.routeOut;
-    if (!this.ausfaedelPunkt) this.ausfaedelPunkt = this.ausfaedelWeg.shift() ?? null;
-    const ziel = this.ausfaedelPunkt;
-    if (!ziel) {
-      this.routeS = this.nearestS(route);
-      this.phase = this.ausfaedelFolge;
-      this.phaseT = 0;
-      this.ausfaedelRoute = null;
-      return;
+    if (!this.ausfaedelBahn) {
+      const [px, pz] = fortschrittsPunkt(this.lage(), this.fahrwerk);
+      this.ausfaedelBahn = [[px, pz], ...this.ausfaedelWeg];
+      this.ausfaedelWeg = [];
+      this.routeS = 0;
     }
-    const dx = ziel[0] - this.group.position.x;
-    const dz = ziel[1] - this.group.position.z;
-    const d = Math.hypot(dx, dz);
-    const soll = d > 1e-6 ? Math.atan2(dx, dz) : this.group.rotation.y;
-    const rest = Math.abs(winkelRest(this.group.rotation.y, soll));
-    const schritt = Math.min(SPEED * dt * fahrtFaktor(rest), d);
-    if (d > 1e-6) {
-      this.group.position.x += (dx / d) * schritt;
-      this.group.position.z += (dz / d) * schritt;
+    const bahn = this.ausfaedelBahn;
+    const laenge = this.routeLength(bahn);
+    if (laenge > 0.05 && this.routeS < laenge && this.phaseT <= DeliveryVehicle.AUSFAEDEL_FRIST_S) {
+      this.advance(bahn, SPEED * dt, false, dt);
+      if (this.routeS < laenge) return;
     }
-    this.group.rotation.y = lenkeEin(this.group.rotation.y, soll, this.lenkrate * dt);
-    this.snapBodiesToPose();
-    /*
-     * ANGEKOMMEN ist, wer den Punkt mit diesem Schritt erreicht hat. Der
-     * Schritt ist auf `d` gedeckelt, der Wagen steht also GENAU auf dem Punkt
-     * — und damit ist der Uebergang auf die Strecke wirklich sprungfrei und
-     * nicht nur fast.
-     */
-    if (d - schritt > 1e-6 && this.phaseT <= DeliveryVehicle.AUSFAEDEL_FRIST_S) return;
-    this.ausfaedelPunkt = null;
-    if (this.ausfaedelWeg.length > 0) return;
+    this.ausfaedelBahn = null;
     this.routeS = this.nearestS(route);
     this.phase = this.ausfaedelFolge;
     this.phaseT = 0;
@@ -1217,6 +1188,8 @@ class DeliveryVehicle {
    * Raedern weg, sobald der Bagger den Abladeplatz versetzt.
    */
   private meinParkweg: Array<[number, number]> | null = null;
+  /** Der Rueckweg in die Bucht, der zu `meinParkweg` gehoert (E-140). */
+  private meinParkRueck: Array<[number, number]> | null = null;
 
   /**
    * Halteposition nach der aktuellen Baggerstellung festlegen.
@@ -1241,6 +1214,13 @@ class DeliveryVehicle {
       this.meineAusfahrt = pickupOut();
       return;
     }
+    const mulde = this.zielMulde;
+    if (mulde) {
+      this.meineAnfahrt = bayApproach(mulde);
+      this.meinRueckweg = bayInRev(mulde);
+      this.meineAusfahrt = bayOut(mulde);
+      return;
+    }
     neueAbladestelle();
     this.meineAnfahrt = routeApproach();
     this.meinRueckweg = routeInRev();
@@ -1256,24 +1236,33 @@ class DeliveryVehicle {
    * von mir abgeladen werden." Was bleibt, entscheidet `faehrtInsSilo`:
    * sortenrein mit Lagersilo ins Lager, alles andere an den Abladeplatz.
    */
+  /*
+   * Seit E-140 gilt zuerst, was festgelegt ist (`legeAbladestelleFest`,
+   * `rueckeVor`, Abfahrt vom Warteplatz) — auch fuer die Silo-Kipper. Die
+   * Rechnung danach ist nur der Rueckfall fuer einen Wagen, der noch nicht
+   * losgefahren ist.
+   */
   private get routeApproach(): Array<[number, number]> {
-    if (this.isPickup) return this.meineAnfahrt ?? pickupApproach();
+    if (this.meineAnfahrt) return this.meineAnfahrt;
+    if (this.isPickup) return pickupApproach();
     const mulde = this.zielMulde;
-    if (mulde) return bayApproach(mulde);
-    return this.meineAnfahrt ?? routeApproach();
+    return mulde ? bayApproach(mulde) : routeApproach();
   }
   private get routeRev(): Array<[number, number]> {
-    if (this.isPickup) return this.meinRueckweg ?? pickupInRev();
+    if (this.meinRueckweg) return this.meinRueckweg;
+    if (this.isPickup) return pickupInRev();
     const mulde = this.zielMulde;
-    if (mulde) return bayInRev(mulde);
-    return this.meinRueckweg ?? routeInRev();
+    return mulde ? bayInRev(mulde) : routeInRev();
   }
   private get routeOut(): Array<[number, number]> {
-    if (this.isPickup) return this.meineAusfahrt ?? pickupOut();
+    if (this.ausfahrtVomPlatz) return this.ausfahrtVomPlatz;
+    if (this.meineAusfahrt) return this.meineAusfahrt;
+    if (this.isPickup) return pickupOut();
     const mulde = this.zielMulde;
-    if (mulde) return bayOut(mulde);
-    return this.meineAusfahrt ?? routeOut();
+    return mulde ? bayOut(mulde) : routeOut();
   }
+  /** Die Ausfahrt vom Warteplatz zum Tor (E-140) — gesetzt, wenn die Pause endet. */
+  private ausfahrtVomPlatz: Array<[number, number]> | null = null;
   /** Die Strecke zum Warteplatz — Ausfahrt bis zum Abzweig, dann in die Bucht. */
   private get routeParken(): Array<[number, number]> {
     return this.meinParkweg ?? routeToPark(this.routeOut, this.parkSpot ?? PARK_SLOTS[0]!);
@@ -1342,6 +1331,8 @@ class DeliveryVehicle {
     this.crane = teile.crane;
     this.trailer = teile.trailer;
     this.raeder = teile.raeder;
+    this.fahrwerk = teile.fahrwerk;
+    this.lenkRaeder = teile.lenkRaeder;
     /*
      * DER HUND AUF DEM BEIFAHRERSITZ (15.09.2026).
      *
@@ -2462,47 +2453,6 @@ class DeliveryVehicle {
     this.group.rotation.y = p.rot;
   }
 
-  /**
-   * Nur den ORT auf die Strecke setzen — die Gierlage fuehrt `advance` selbst.
-   *
-   * DIESE TRENNUNG IST DIE REPARATUR VON E-081. Bis zum 16.09.2026 gab es nur
-   * `placeAt`, und das setzte `rotation.y` HART auf die Richtung des
-   * Streckenstuecks. An einer Ecke wechselt diese Richtung zwischen zwei
-   * Bildern — gemessen bis 168,7 Grad in EINEM Rechenschritt, die weiteste
-   * Umrissecke sprang dabei 10,23 m. Rapier leitet daraus fuer den
-   * kinematischen Koerper 600 m/s ab und raeumt die Durchdringung des
-   * naechsten Bildes in einem Schlag aus. Das ist derselbe Katapult wie in
-   * E-073, nur an der Lenkung statt an der Mulde.
-   *
-   * `placeAt` bleibt daneben stehen, und zwar fuer die beiden Stellen, an
-   * denen ein Sprung richtig ist: das Setzen an den Streckenanfang beim
-   * Erzeugen (da ist noch nichts, was getroffen werden koennte) und die
-   * Vorausschau `probePoint`, die ihre Pose sofort wieder zuruecknimmt.
-   */
-  private setzeOrt(route: Array<[number, number]>, s: number, reverse: boolean): void {
-    const p = poseAuf(route, s, reverse);
-    this.group.position.set(p.x, 0, p.z);
-  }
-
-  /**
-   * Wie tief der Umriss dieses Wagens bei DIESER Gierlage in einem Bauwerk
-   * steckt (m) — die Frage, aus der `drehRichtung` ihre Antwort zieht.
-   *
-   * Ohne Anhaenger: Er knickt waehrend einer Kehre selbst ein, und seine Lage
-   * haengt vom ganzen Schwenkverlauf ab. Der Umriss des Zugfahrzeugs ist der
-   * groessere Kreis (5,14 m gegen 3,50 m) und damit der massgebliche.
-   */
-  private tiefeBeiGier(gier: number): number {
-    return this.tiefeBei(this.group.position.x, this.group.position.z, gier);
-  }
-
-  /** Dasselbe fuer eine beliebige Pose — der Eingang fuer die Ausfaedel-Probe. */
-  private tiefeBei(x: number, z: number, gier: number): number {
-    this.umrissCache.length = 0;
-    this.umrissCache.push(fahrzeugUmriss({ x, z, rot: gier }, this.bedLen));
-    return tiefsteDurchdringung(this.umrissCache, alleHindernisse());
-  }
-
   private routeLength(route: Array<[number, number]>): number {
     let len = 0;
     for (let i = 0; i < route.length - 1; i++) {
@@ -2548,18 +2498,33 @@ class DeliveryVehicle {
    */
   private isBlockedByBuilding(
     route: Array<[number, number]>,
-    aheadS: number,
-    reverse: boolean
+    reverse: boolean,
+    tempo: number
   ): boolean {
     const hind = alleHindernisse();
     this.umrissCache.length = 0;
     this.boxen(this.umrissCache);
     const tiefeJetzt = tiefsteDurchdringung(this.umrissCache, hind);
     this.umrissCache.length = 0;
-    const von = this.routeS;
-    for (let i = 1; i <= 3; i++) {
-      const s = von + ((aheadS - von) * i) / 3;
-      this.umrissCache.push(fahrzeugUmriss(poseAuf(route, s, reverse), this.bedLen));
+    /*
+     * VORAUS, WIE ER WIRKLICH FAEHRT (E-140). Bis E-140 stand hier die Lage,
+     * die der Wagen auf der Strecke haette — Ursprung auf der Linie, Richtung
+     * der Linie. Ein Wagen, der einlenkt, schneidet Boegen aber innen an, und
+     * am Waagenbogen meldete die Linie 0,29 m Betriebsgebaeude, wo der Wagen
+     * 0,8 m Luft hat: Er blieb fuer immer stehen. Jetzt faehrt eine Kopie
+     * seiner Lage dasselbe Gesetz 4 m weit voraus, in groben Schritten von
+     * 0,1 s, und geprueft werden die Lagen, die dabei herauskommen.
+     */
+    const l = this.lage();
+    const laenge = this.routeLength(route);
+    let s = this.routeS;
+    let weg = 0;
+    for (let i = 0; i < 40 && weg < 4; i++) {
+      const r = folgeSchritt(l, this.fahrwerk, route, laenge, s, reverse, Math.max(tempo, 1), 0.1);
+      s = r.s;
+      weg += r.weg;
+      if (i % 3 === 2 || r.fertig) this.figurenBei(l, this.umrissCache);
+      if (r.fertig) break;
     }
     const tiefeVoraus = tiefsteDurchdringung(this.umrissCache, hind);
     return tiefeVoraus > UMRISS_TOLERANZ && tiefeVoraus > tiefeJetzt;
@@ -2610,7 +2575,7 @@ class DeliveryVehicle {
     // Schrott gedacht, der irgendwann weggeraeumt wird. Auf Mauern, Mulden und
     // das Betriebsgebaeude darf sie nicht durchschlagen — sonst faehrt der LKW
     // nach der Wartezeit einfach hindurch, und genau das war zu sehen.
-    if (this.isBlockedByBuilding(route, this.routeS + 4, reverse)) {
+    if (this.isBlockedByBuilding(route, reverse, step / Math.max(dt, 1e-6))) {
       this.blockedT += dt;
       if (this.blockedT > HONK_AFTER_S && !this.honked) {
         this.honked = true;
@@ -2634,71 +2599,40 @@ class DeliveryVehicle {
       this.blockedT = 0;
       this.honked = false;
     }
-    /*
-     * EINLENKEN STATT SPRINGEN (E-081). Drei Regeln, alle in `lenkung.ts`
-     * hergeleitet und gemessen:
-     *
-     *  1. Der Fahrer schaut `VORAUS_M` Meter voraus und lenkt auf DIESE
-     *     Richtung ein, nicht auf die, in der er gerade steht. Ohne
-     *     Vorausschau bleibt er an jeder Ecke stehen und dreht sich wie ein
-     *     Gabelstapler; mit zuviel schneidet er die Ecke ab.
-     *  2. Er dreht hoechstens `lenkrate` rad je Sekunde.
-     *  3. Er faehrt nur mit dem Anteil seines Tempos, der ueberhaupt in
-     *     Bahnrichtung zeigt (`fahrtFaktor`) — in der Kurve wird ein LKW
-     *     langsam. Bei einer Kehre ist dieser Anteil null: Er dreht auf der
-     *     Stelle ein und faehrt erst dann los.
-     *
-     * Die Drehrichtung einer Kehre wird EINMAL gewaehlt (dorthin, wo Platz
-     * ist) und dann festgehalten — sonst kippte sie mitten im Schwenk hin und
-     * her.
-     */
     if (!Number.isFinite(this.lenkrate)) {
       /*
        * DER ALTE ZUSTAND, ausdruecklich erreichbar und nicht nachgebaut: Ort
        * UND Gierlage hart auf die Strecke setzen. Nur Gegenproben stellen
-       * `lenkrate` auf `Infinity`; im Spiel kommt dieser Zweig nie vor. Eine
-       * abgeschriebene kaputte Fassung im Waechter waere schlechter — sie
-       * altert getrennt vom Quelltext (Lehre aus E-054).
+       * `lenkrate` auf `Infinity`; im Spiel kommt dieser Zweig nie vor.
        */
       this.routeS += step;
       this.placeAt(route, this.routeS, reverse);
       return true;
     }
-    const ziel = poseAuf(route, this.routeS + Math.max(step, VORAUS_M), reverse);
-    const rest = Math.abs(winkelRest(this.group.rotation.y, ziel.rot));
-    // Rueckwaerts wird IMMER erst ausgerichtet: 90 Grad im Rueckwaertsfahren
-    // nachzuziehen kostet 5,3 m Weg, und die Silogasse ist 7,4 m tief.
-    const kehreNoetig = rest > PIVOT_AB || (reverse && this.routeS <= 0 && rest > 0.035);
-    if (this.kehre !== null || kehreNoetig) {
-      if (this.kehre === null) {
-        this.kehre = drehRichtung(this.group.rotation.y, ziel.rot, (g) => this.tiefeBeiGier(g));
-      }
-      this.group.rotation.y = dreheWeiter(
-        this.group.rotation.y,
-        ziel.rot,
-        this.lenkrate * dt,
-        this.kehre
-      );
-      if (Math.abs(winkelRest(this.group.rotation.y, ziel.rot)) < 1e-9) this.kehre = null;
-      return false;
-    }
-    this.routeS += step * fahrtFaktor(rest);
-    this.setzeOrt(route, this.routeS, reverse);
-    this.group.rotation.y = lenkeEin(this.group.rotation.y, ziel.rot, this.lenkrate * dt);
-    return true;
+    /*
+     * DAS EINSPURMODELL (E-140). Der Fahrer zielt auf die Strecke, lenkt die
+     * Vorderachse ein, und der Wagen faehrt den Kreis, den die Achsen
+     * vorgeben — ohne Fahrt keine Drehung. Gesetz und Zahlen in `lenkung.ts`.
+     */
+    if (!(dt > 0)) return false;
+    const l = this.lage();
+    const r = folgeSchritt(
+      l,
+      this.fahrwerk,
+      route,
+      this.routeLength(route),
+      this.routeS,
+      reverse,
+      step / dt,
+      dt
+    );
+    this.setzeLage(l);
+    this.routeS = r.s;
+    return r.weg > 0;
   }
 
   update(dt: number): void {
     this.phaseT += dt;
-    /*
-     * Eine begonnene Kehre gehoert zu EINER Etappe. Wechselt die Phase, faengt
-     * die Richtungswahl neu an — sonst drehte der Wagen auf der naechsten
-     * Strecke noch in die Richtung, die auf der vorigen frei war.
-     */
-    if (this.phase !== this.letztePhase) {
-      this.kehre = null;
-      this.letztePhase = this.phase;
-    }
     switch (this.phase) {
       case "settleCargo":
         // warten, bis sich der Ladungsberg gesetzt hat (max. 4 s)
@@ -2981,7 +2915,7 @@ class DeliveryVehicle {
          * dieselbe wie vorher: `poseAuf(..., true)` auf einer Bahn nach Norden
          * ist genau `rotation.y = Math.PI` — Front zum Platz, Heck zur Wand.
          */
-        const r = routeParkRueck(this.parkSpot!);
+        const r = this.meinParkRueck ?? routeParkRueck(this.parkSpot!);
         this.advance(r, PARK_RUECK_SPEED * dt, true, dt);
         if (this.routeS >= this.routeLength(r)) {
           this.phase = "parked";
@@ -3004,44 +2938,25 @@ class DeliveryVehicle {
         }
         if (this.phaseT > this.parkSeconds && this.fahrerState === "drin") {
           /*
-           * DER AUSFAEDEL-SPRUNG (E-093). Hier stand `routeS = nearestS(...)`,
-           * und der naechste Rechenschritt setzte den Wagen auf diesen Punkt
-           * — gemessen 5,59 / 8,74 / 6,63 m quer ueber den Hof, in EINEM Bild.
-           *
-           * Jetzt faehrt er den Weg. Und er faehrt ihn so, wie er gekommen
-           * ist. Die ZIELMARKE bleibt dieselbe wie im alten Stand — der
-           * naechste Punkt der Ausfahrt, von HIER aus gesehen.
-           *
-           * OB ER VORHER AUS DER BUCHT ZIEHT, WIRD ABGETASTET UND NICHT
-           * FESTGELEGT — genau wie die Drehrichtung einer Kehre (E-084).
-           * Der Zwischenpunkt ist dabei kein neuer Streckenpunkt, sondern
-           * genau der, an dem `toPark` den Wagen abgestellt hat, bevor er
-           * rueckwaerts an die Wand setzte: das Einparken rueckwaerts gelesen.
-           *
-           * Keiner der beiden Wege gewinnt immer, und darum wird gemessen:
-           *
-           *   Warteplatz 1 und 2 liegen am Tor. Das Tor ist 9,0 m breit, der
-           *   zweite Warteplatz 7,5 m oestlich seiner Mitte, und ein
-           *   Dreiachser braucht bei 5,60 m Wendekreis rund 10,6 m Weg, um
-           *   7,5 m zur Seite zu versetzen — zwischen Warteplatz und Nordwand
-           *   sind es 5 m. Ohne Zwischenpunkt: 0,33 / 0,40 m Nordwand West,
-           *   0,37 m Kaffeewagen. Mit: 0,00 m.
-           *   Warteplatz 3 steht vor dem Tor von Halle 3. MIT Zwischenpunkt
-           *   wendet der Wagen genau davor: 0,50 m Halle 3 Sued. Ohne: 0,00 m.
+           * VOM WARTEPLATZ ZUM TOR (E-140). Bis hierher faedelte der Wagen auf
+           * die Ausfahrt ein, von der er gekommen war (E-093) — am Punkt, der
+           * ihm am naechsten lag. Dort zeigt die Ausfahrt aber Richtung Tor,
+           * und der Wagen steht mit der Kabine zum Platz: Er haette sich auf
+           * der Stelle umdrehen muessen. Jetzt hat jeder Warteplatz seine
+           * eigene Ausfahrt: aus der Bucht nach vorn, im Bogen ueber den Platz
+           * und von Suedosten auf die Waage, wie alle anderen auch
+           * (`routes.parkAusfahrt`). Sie beginnt genau dort, wo er steht.
            */
-          const p = this.parkSpot!;
-          const bucht = parkAnfahrt(p);
-          const marke = this.punktAuf(this.routeOut, this.nearestS(this.routeOut));
-          const ohne = this.ausfaedelTiefe([marke]);
-          const mit = this.ausfaedelTiefe([bucht, marke]);
-          // 1 cm Toleranz wie in `drehRichtung`: darunter ist es Rundung.
-          // Bei Gleichstand gewinnt der kuerzere Weg, also der ohne Umweg.
-          this.starteAusfaedeln(
-            this.routeOut,
-            "out",
-            this.nearestS(this.routeOut),
-            ohne <= mit + UMRISS_TOLERANZ ? [] : [bucht]
-          );
+          this.phase = "out";
+          this.phaseT = 0;
+          if (!this.faedeltAus) {
+            // Die Gegenprobe der Waechter (E-093): der alte Sprung auf die
+            // naechste Stelle der Ausfahrt. Im Spiel nie.
+            this.routeS = this.nearestS(this.routeOut);
+          } else {
+            this.ausfahrtVomPlatz = parkAusfahrt(this.parkSpot!);
+            this.routeS = 0;
+          }
         }
         break;
       case "ausfaedeln":
@@ -3094,7 +3009,7 @@ class DeliveryVehicle {
         break;
     }
 
-    this.updateTrailer(dt);
+    this.zeigeLenkung();
     this.updateFahrer(dt);
 
     // Ladekran: beim Andocken zur Seite schwenken, damit der Ausleger nicht ueber

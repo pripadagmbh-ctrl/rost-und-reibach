@@ -1,46 +1,36 @@
 /**
- * EIN LAUFAPPARAT FÜR DEN RANGIERKNICK — Waechter und Messwerkzeug benutzen ihn.
+ * EIN LAUFAPPARAT FÜR DIE FAHRT — Waechter und Messwerkzeug benutzen ihn.
  *
  * Er faehrt einen Fahrplan KINEMATISCH ab, Rechenschritt fuer Rechenschritt,
- * genau so, wie `vehicles.advance` es tut — nur ohne Physik, ohne Ladung und
- * ohne Blockadepruefung. Das ist Absicht: Der Knick ist eine reine Frage der
- * Pose, und eine Messung ohne Physik streut nicht. Was der Knick in der
- * Physik ANRICHTET, misst `tools/rangier-wirkung.ts` mit echten Koerpern.
+ * mit genau dem Gesetz, mit dem `vehicles.advance` faehrt (`folgeSchritt` aus
+ * `lenkung.ts`, seit E-140 das Einspurmodell) — nur ohne Physik, ohne Ladung
+ * und ohne Blockadepruefung. Der Knick und der Platzbedarf sind reine Fragen
+ * der Pose, und eine Messung ohne Physik streut nicht.
  *
- * DREI ZAHLEN je Schritt, und die zweite ist die, auf die es ankommt:
+ * VIER ZAHLEN je Fahrt:
  *
  *   Grad je Schritt   wie weit sich die Gierlage in EINEM Bild dreht
  *   Sprung (m)        wie weit die WEITESTE Umrissecke dabei springt
  *   Tiefe (m)         wie tief der Umriss dabei in einem Bauwerk steckt
- *
- * Der Winkel allein sagt nichts: Eine Drehung um 90 Grad versetzt die Mitte
- * des Wagens um null und seine vordere Ecke um 7,3 m. Rapier sieht die Ecke.
+ *   Steckt            ob eine Etappe ihr Ende nicht erreicht
  *
  * DER ALTE ZUSTAND IST EIN EINGANGSWERT, kein geloeschter Code:
- * `lenkrate = Infinity` liefert Zeichen fuer Zeichen die Fahrt von vor dem
- * 16.09.2026 (hartes Setzen von `rotation.y`). Damit hat jeder Waechter hier
- * seine Gegenprobe, ohne dass jemand eine kaputte Fassung nachbauen muss.
+ * `lenkrate = Infinity` liefert die Fahrt von vor dem 16.09.2026 (hartes
+ * Setzen von Ort und Gier). Damit hat jeder Waechter seine Gegenprobe.
  */
-import { STATIC_OBSTACLES } from "../src/world/obstacles";
-import { bedLenFor } from "../src/delivery/routes";
+import { bedLenFor, fahrHindernisse } from "../src/delivery/routes";
+import { lkwFahrwerk, pkwFahrwerk, PKW_LAENGE_MAX } from "../src/delivery/vehicleModel";
 import {
   fahrzeugUmriss,
+  zugwagenUmriss,
+  anhaengerUmriss,
   poseAuf,
   streckenLaenge,
   eckenSprung,
   umrissUeberlappung,
   type Rechteck,
 } from "../src/delivery/umriss";
-import {
-  lenkeEin,
-  dreheWeiter,
-  drehRichtung,
-  winkelRest,
-  fahrtFaktor,
-  LENK_RATE,
-  PIVOT_AB,
-  VORAUS_M,
-} from "../src/delivery/lenkung";
+import { folgeSchritt, winkelRest, LENK_RATE, type Fahrwerk, type Lage } from "../src/delivery/lenkung";
 import type { Fahrplan } from "./strecken";
 
 /** Rechenschritt des Spiels (s) — `PhysicsWorld.timestep`, 60 Bilder je Sekunde. */
@@ -72,40 +62,58 @@ export interface Fahrt {
   maxSprungM: number;
   /** Tiefste Durchdringung eines Bauwerks ueber die ganze Fahrt (m). */
   maxTiefeM: number;
-  /** Wie lange die Fahrt dauert (s) — Einlenken kostet Zeit. */
+  /** Wie lange die Fahrt dauert (s). */
   dauerS: number;
   /** Alle Knicke ueber 1 Grad je Schritt, absteigend. */
   knicke: Knick[];
   /** Alle Durchdringungen ueber der Toleranz, absteigend. */
   anstoesse: Anstoss[];
+  /** Etappen, deren Ende nicht erreicht wurde — mit Rest in Metern. */
+  stecken: string[];
+  /** Drehte sich der Wagen irgendwann, ohne zu fahren? (Grad, groesster Wert) */
+  standDrehGrad: number;
+  /** Wie weit der Ursprung am Ende jeder Etappe neben ihrem Endpunkt steht (m). */
+  maxEndAbweichungM: number;
+  /** Engster gefahrener Kreis (m): Weg je Gieraenderung, ueber alle Schritte mit Fahrt. */
+  minRadiusM: number;
+  /** Groesster Knick des Anhaengers (Grad) — nur beim Gespann nicht null. */
+  maxKnickGrad: number;
+  /** Jede Lage, in Bildfolge — fuer Zeichnungen. */
+  spur: Array<{ etappe: string; x: number; z: number; gier: number; lenk: number; knick: number }>;
 }
 
 export interface Fahrweise {
-  /** rad/s; `Infinity` ist der alte Sprungzustand. */
+  /** `Infinity` ist der alte Sprungzustand, jeder endliche Wert das Einspurmodell. */
   lenkrate: number;
-  /** Restwinkel, ab dem erst eingedreht und dann gefahren wird (rad). */
-  pivotAb: number;
-  /** Wie weit der Fahrer vorausschaut, bevor er einlenkt (m). */
-  vorausM: number;
 }
 
-/** Tiefste Durchdringung dieses Umrisses in dieser Bauwerksliste (m). */
-function tiefsteTiefe(
-  b: ReturnType<typeof fahrzeugUmriss>,
-  hindernisse: ReadonlyArray<Rechteck>
-): number {
-  let tief = 0;
-  for (const o of hindernisse) {
-    const d = umrissUeberlappung(b, o);
-    if (d > tief) tief = d;
-  }
-  return tief;
+/** Wie das Spiel seit E-140 faehrt. */
+export const NEU: Fahrweise = { lenkrate: LENK_RATE };
+/** Wie es bis zum 16.09.2026 fuhr — die Gegenprobe jedes Waechters hier. */
+export const ALT: Fahrweise = { lenkrate: Infinity };
+
+/** Das Fahrwerk einer Fahrzeugart — dieselbe Quelle wie der Modellbau. */
+export function fahrwerkFuer(kind: string): Fahrwerk {
+  const bedLen = bedLenFor(kind);
+  return kind === "pkw" ? pkwFahrwerk(bedLen, PKW_LAENGE_MAX) : lkwFahrwerk(bedLen);
 }
 
-/** Wie das Spiel seit dem 16.09.2026 faehrt. */
-export const NEU: Fahrweise = { lenkrate: LENK_RATE, pivotAb: PIVOT_AB, vorausM: VORAUS_M };
-/** Wie es bis dahin fuhr — die Gegenprobe jedes Waechters hier. */
-export const ALT: Fahrweise = { lenkrate: Infinity, pivotAb: Infinity, vorausM: 0 };
+/**
+ * Die Figuren eines Wagens in dieser Lage — dieselben wie `vehicles.boxen`:
+ * beim LKW eine, beim Gespann Auto und Anhaenger (der knickt und steht
+ * anders als das Auto). Sprung und Winkel misst die erste.
+ */
+export function figurenFuer(kind: string, l: Lage): Array<ReturnType<typeof fahrzeugUmriss>> {
+  const bedLen = bedLenFor(kind);
+  const fw = fahrwerkFuer(kind);
+  const p = { x: l.x, z: l.z, rot: l.gier };
+  if (!fw.anhaenger) return [fahrzeugUmriss(p, bedLen)];
+  const k = fw.anhaenger.kupplung;
+  return [
+    zugwagenUmriss(p, fw.vorn, fw.hinten),
+    anhaengerUmriss(l.x + Math.sin(l.gier) * k, l.z + Math.cos(l.gier) * k, l.gier + l.knick, bedLen),
+  ];
+}
 
 /**
  * Einen Fahrplan abfahren und dabei jeden Schritt vermessen.
@@ -116,81 +124,86 @@ export const ALT: Fahrweise = { lenkrate: Infinity, pivotAb: Infinity, vorausM: 
 export function fahre(
   f: Fahrplan,
   w: Fahrweise = NEU,
-  hindernisse: ReadonlyArray<Rechteck & { label: string }> = STATIC_OBSTACLES
+  hindernisse: ReadonlyArray<Rechteck & { label: string }> = fahrHindernisse()
 ): Fahrt {
-  const bedLen = bedLenFor(f.kind);
+  const fw = fahrwerkFuer(f.kind);
   const knicke: Knick[] = [];
   const anstoesse: Anstoss[] = [];
+  const stecken: string[] = [];
+  const spur: Fahrt["spur"] = [];
   let maxGrad = 0;
   let maxSprung = 0;
   let maxTiefe = 0;
   let schritte = 0;
+  let standDreh = 0;
+  let maxEnd = 0;
+  let maxKnick = 0;
+  let minRadius = Infinity;
   // Startlage: der Wagen wird an der Einfahrt GESETZT, nicht eingelenkt
   // (`vehicles.ts`, Konstruktor: `placeAt(this.routeIn, 0)`).
   const start = poseAuf(f.etappen[0]!.route, 0, f.etappen[0]!.rueckwaerts);
-  let gier = start.rot;
-  let box = fahrzeugUmriss(start, bedLen);
-  const messe = (name: string, neu: typeof box, gradSchritt: number): void => {
+  const l: Lage = { x: start.x, z: start.z, gier: start.rot, lenk: 0, knick: 0 };
+  /*
+   * Die Figuren: beim LKW eine, beim Gespann Auto und Anhaenger (der knickt
+   * und steht anders als das Auto). Sprung und Winkel misst die erste.
+   */
+  const figuren = (): Array<ReturnType<typeof fahrzeugUmriss>> => figurenFuer(f.kind, l);
+  let box = figuren()[0]!;
+  const messe = (name: string, gradSchritt: number, weg: number): void => {
+    const alle = figuren();
+    const neu = alle[0]!;
     const sprung = eckenSprung(box, neu);
     if (gradSchritt > maxGrad) maxGrad = gradSchritt;
     if (sprung > maxSprung) maxSprung = sprung;
+    if (weg < 1e-9 && gradSchritt > standDreh) standDreh = gradSchritt;
+    if (weg > 1e-4 && gradSchritt > 1e-6) {
+      const r = weg / ((gradSchritt * Math.PI) / 180);
+      if (r < minRadius) minRadius = r;
+    }
+    if (Math.abs(l.knick) * (180 / Math.PI) > maxKnick) maxKnick = Math.abs(l.knick) * (180 / Math.PI);
     if (gradSchritt > 1 || sprung > 0.5) {
       knicke.push({ etappe: name, x: neu.x, z: neu.z, grad: gradSchritt, sprungM: sprung });
     }
-    for (const o of hindernisse) {
-      const d = umrissUeberlappung(neu, o);
-      if (d > maxTiefe) maxTiefe = d;
-      if (d > 0.01) {
-        anstoesse.push({ etappe: name, bauwerk: o.label, tiefeM: d, x: neu.x, z: neu.z });
+    for (const fig of alle) {
+      for (const o of hindernisse) {
+        const d = umrissUeberlappung(fig, o);
+        if (d > maxTiefe) maxTiefe = d;
+        if (d > 0.01) {
+          anstoesse.push({ etappe: name, bauwerk: o.label, tiefeM: d, x: fig.x, z: fig.z });
+        }
       }
     }
     box = neu;
     schritte++;
+    spur.push({ etappe: name, x: l.x, z: l.z, gier: l.gier, lenk: l.lenk, knick: l.knick });
   };
   for (const e of f.etappen) {
     const laenge = streckenLaenge(e.route);
-    const step = e.tempo * SCHRITT_S;
     let s = 0;
-    /** Laeuft gerade eine Kehre? Dann steht die Drehrichtung fest. */
-    let kehre: 1 | -1 | null = null;
-    // Deckel gegen Endlosschleifen: die laengste Strecke ist 90 m, die
-    // groesste Kehre 360 Grad. 20.000 Schritte sind 5,5 Minuten Fahrzeit.
-    for (let i = 0; i < 20000 && s < laenge; i++) {
-      const ziel = poseAuf(e.route, Math.min(s + Math.max(step, w.vorausM), laenge), e.rueckwaerts);
-      const rest = Math.abs(winkelRest(gier, ziel.rot));
-      const vorher = gier;
-      const q = poseAuf(e.route, s, e.rueckwaerts);
-      /*
-       * WANN EINGEDREHT WIRD, in derselben Reihenfolge wie `vehicles.advance`:
-       * jede Rueckwaertsfahrt von Anfang an, sonst erst ab `pivotAb`. Eine
-       * begonnene Kehre laeuft zu Ende — sonst kippte die Richtungswahl
-       * mitten im Schwenk.
-       */
-      const muss = rest > w.pivotAb || (e.rueckwaerts && s === 0 && rest > 0.035);
-      if (kehre !== null || muss) {
-        if (kehre === null) {
-          kehre = drehRichtung(gier, ziel.rot, (g2) =>
-            tiefsteTiefe(fahrzeugUmriss({ x: q.x, z: q.z, rot: g2 }, bedLen), hindernisse)
-          );
-        }
-        gier = dreheWeiter(gier, ziel.rot, w.lenkrate * SCHRITT_S, kehre);
-        messe(
-          e.name,
-          fahrzeugUmriss({ x: q.x, z: q.z, rot: gier }, bedLen),
-          Math.abs(winkelRest(vorher, gier)) * (180 / Math.PI)
-        );
-        if (Math.abs(winkelRest(gier, ziel.rot)) < 1e-9) kehre = null;
+    let fertig = false;
+    // Deckel gegen Endlosschleifen: die laengste Strecke ist rund 90 m.
+    // 20.000 Schritte sind 5,5 Minuten Fahrzeit.
+    for (let i = 0; i < 20000 && !fertig; i++) {
+      const vorher = l.gier;
+      if (!Number.isFinite(w.lenkrate)) {
+        s = Math.min(s + e.tempo * SCHRITT_S, laenge);
+        const p = poseAuf(e.route, s, e.rueckwaerts);
+        l.x = p.x;
+        l.z = p.z;
+        l.gier = p.rot;
+        fertig = s >= laenge;
+        // Gefahren wird an der Hinterachse; beim Sprung ist das der Bogenschritt.
+        messe(e.name, Math.abs(winkelRest(vorher, l.gier)) * (180 / Math.PI), e.tempo * SCHRITT_S);
         continue;
       }
-      s = Math.min(s + step * fahrtFaktor(rest), laenge);
-      const p = poseAuf(e.route, s, e.rueckwaerts);
-      gier = lenkeEin(gier, ziel.rot, w.lenkrate * SCHRITT_S);
-      messe(
-        e.name,
-        fahrzeugUmriss({ x: p.x, z: p.z, rot: gier }, bedLen),
-        Math.abs(winkelRest(vorher, gier)) * (180 / Math.PI)
-      );
+      const r = folgeSchritt(l, fw, e.route, laenge, s, e.rueckwaerts, e.tempo, SCHRITT_S);
+      s = r.s;
+      fertig = r.fertig;
+      messe(e.name, Math.abs(winkelRest(vorher, l.gier)) * (180 / Math.PI), r.weg);
     }
+    if (!fertig) stecken.push(`${e.name} (${(laenge - s).toFixed(1)} m vor dem Ende)`);
+    const ende = e.route[e.route.length - 1]!;
+    maxEnd = Math.max(maxEnd, Math.hypot(l.x - ende[0], l.z - ende[1]));
   }
   knicke.sort((a, b) => b.sprungM - a.sprungM);
   anstoesse.sort((a, b) => b.tiefeM - a.tiefeM);
@@ -202,5 +215,11 @@ export function fahre(
     dauerS: schritte * SCHRITT_S,
     knicke: knicke.slice(0, 12),
     anstoesse: anstoesse.slice(0, 12),
+    stecken,
+    standDrehGrad: standDreh,
+    maxEndAbweichungM: maxEnd,
+    maxKnickGrad: maxKnick,
+    minRadiusM: minRadius,
+    spur,
   };
 }

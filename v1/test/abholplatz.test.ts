@@ -62,7 +62,8 @@ function ladeflaechenEcken(p: ReturnType<typeof abholPlatzFuer>): Array<[number,
   const [hx, hz] = p.halt;
   // Der Wagen steht mit der Laengsseite zum Bagger; seine lange Achse zeigt
   // in die Richtung, in der er zurueckgesetzt hat.
-  const laengsX = p.rueckweg[0]![0] !== p.rueckweg[1]![0];
+  // Die letzte Gerade des Rangierzugs (E-140) — bis dahin der ganze Rueckweg.
+  const laengsX = Math.abs(p.rueckweg.at(-2)![0] - p.rueckweg.at(-1)![0]) > 0.01;
   const out: Array<[number, number]> = [];
   for (const a of [-1, 1])
     for (const b of [-1, 1]) {
@@ -382,7 +383,8 @@ describe("Die Strecken folgen der Bestellung", () => {
      * gewaehlt ist; die ganze Strecke prueft `test/fahrumriss.test.ts`.
      */
     const va = abholPlatzFuer("va");
-    const rangier = va.rueckweg[0]!;
+    // Wo die letzte Gerade beginnt — seit E-140 kommt davor der Bogen.
+    const rangier = va.rueckweg.at(-2)!;
     expect(rangier[0], "der Suedschenkel wird von Osten angefahren").toBeGreaterThan(
       va.halt[0]
     );

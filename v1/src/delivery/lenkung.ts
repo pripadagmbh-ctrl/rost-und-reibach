@@ -1,181 +1,281 @@
 /**
- * EINLENKEN STATT SPRINGEN — die Drehung eines Fahrzeugs ueber mehrere
- * Rechenschritte gefuehrt.
+ * DAS EINSPURMODELL (E-140) — ein Fahrzeug faehrt Kreise, es dreht sich nicht.
  *
- * WAS VORHER WAR (gemessen, E-073 und E-080). `vehicles.placeAt` hat
- * `group.rotation.y` HART auf die Richtung des aktuellen Streckenstuecks
- * gesetzt. An einer Ecke der Polylinie wechselt diese Richtung zwischen zwei
- * Bildern — der Wagen lag also in EINEM Rechenschritt in der neuen Richtung:
+ * Patrick, 17.10.2026: „lkws drehen sich unrealistisch um ihren mittelpunkt.
+ * allerdings sollten die LKws und auch anhänger lenkende Achsen haben und die
+ * bewegung aus der lenkbewegung der achsen kommen. Wie bei echten fahrzeugen.
+ * Auch die Achse bei anhängern berücksichtigen."
  *
- *   Kipper, Wechsel `shiftPause` → `reverseIn`   168,7 Grad in einem Schritt
- *   Abholer, Ausfahrt am Muellcontainer          119,9 Grad in einem Schritt
- *   neun weitere Strecken                         90,0 Grad
+ * WAS VORHER WAR (E-084). Die Gierlage folgte der Streckenrichtung mit
+ * begrenzter Drehrate (0,85 rad/s), auch im Stand. An einer Kehre stand der
+ * Wagen still und drehte sich um seine Mitte — wie ein Gabelstapler.
  *
- * Das ist dieselbe Bauart wie der Kipper-Katapult: Ein Koerper wird VERSETZT
- * statt BEWEGT. Rapier leitet die Geschwindigkeit eines kinematischen Koerpers
- * aus der Posenaenderung ab; bei 119,9 Grad springt die weiteste Ecke des
- * Umrisses 10,75 m weit, und aus 10,75 m in 1/60 s werden 645 m/s. Was auf dem
- * Weg liegt, steckt im naechsten Bild tief im Fahrzeug, und der Loeser raeumt
- * die Durchdringung in einem einzigen Bild aus. Gemessen an schon liegendem
- * Schrott: 6.596 km/h und bis zu 9,3 m Verschiebung (E-073, 12 Saaten).
+ * WAS JETZT GILT — das „Fahrradmodell", wie es jedes Fahrschul-Lehrbuch hat:
  *
- * WAS JETZT GILT. Die Gierlage folgt der Streckenrichtung mit BEGRENZTER
- * DREHRATE. Damit ist der Sprung eine Bewegung, und die Bewegung ist so
- * langsam, dass der Loeser sie als Beruehrung sieht und nicht als
- * Entdurchdringung.
+ *   - Bezugspunkt ist die Mitte der starren Hinterachse(n). Dort steht kein
+ *     Rad quer zur Fahrt, also bewegt sich dieser Punkt nur in Wagenrichtung.
+ *   - Die Vorderachse lenkt um den Winkel δ, hoechstens `LENK_MAX`, und der
+ *     Lenkeinschlag aendert sich hoechstens mit `LENK_TEMPO` (Lenkrad drehen
+ *     dauert).
+ *   - Die Gierrate folgt allein daraus:  ω = v · tan δ / Radstand.
+ *     Ohne Fahrt (v = 0) dreht sich NICHTS — auch wenn die Raeder schon
+ *     eingeschlagen sind.
+ *   - Ein Anhaenger haengt an der Kupplung und laeuft mit seiner eigenen
+ *     starren Achse nach (Knickwinkel-Gleichung, siehe `rolle`).
+ *
+ * Gefahren wird eine Strecke mit einem BAHNFOLGER ("Pure Pursuit"): Der
+ * Fahrer schaut ein Stueck die Strecke entlang voraus und lenkt so ein, dass
+ * ein Kreisbogen ihn genau dorthin fuehrt. Rueckwaerts ebenso — dann schaut er
+ * nach hinten, und beim Gespann zielt er mit der ANHAENGERACHSE, nicht mit
+ * dem Auto (so setzt man einen Anhaenger zurueck).
  *
  * Die Rechnung steht hier und nicht in `vehicles.ts`, weil drei Stellen
- * dasselbe Gesetz brauchen und keine davon ihre eigene Abschrift fuehren darf:
- * die Fahrt (`vehicles.advance`), der Waechter (`test/rangierknick.test.ts`)
- * und das Messwerkzeug (`tools/rangierknick.ts`).
+ * dasselbe Gesetz brauchen: die Fahrt (`vehicles.advance`), die Waechter
+ * (`test/knicklauf.ts`) und die Strecken-Abtastung beim Ausfaedeln.
  */
 
 /**
- * WIE SCHNELL GELENKT WERDEN DARF (rad/s).
+ * Groesster Lenkeinschlag der Vorderraeder (rad).
  *
- * SW, aber hergeleitet und nicht gegriffen: Ein LKW dreht sich nicht um seine
- * Hochachse, er faehrt einen Kreis. Die Gierrate eines fahrenden Fahrzeugs ist
+ * 40 Grad aus dem Auftrag E-140 (Orchestrator, „Einschlag begrenzt ~40°");
+ * dieselbe Zahl, aus der E-084 schon den Wendekreis hergeleitet hatte. Ein
+ * Dreiachser mit 4,70 m Radstand faehrt damit einen Kreis von
+ * 4,70 / tan 40° = 5,60 m um die Hinterachse; seine aeusserste Ecke streicht
+ * dabei rund 9,4 m weit aus.
+ */
+export const LENK_MAX = (40 * Math.PI) / 180;
+
+/**
+ * Wie schnell der Fahrer am Lenkrad dreht (rad/s, am Rad gemessen).
  *
- *     omega = v / R
+ * SW: 0,6 rad/s — von geradeaus bis voll eingeschlagen gut eine Sekunde. Ein
+ * LKW mit Servolenkung braucht dafuer rund zwei Lenkradumdrehungen.
+ */
+export const LENK_TEMPO = 0.6;
+
+/**
+ * Wie stark der Wagen in der Kurve quer beschleunigen darf (m/s²).
  *
- * mit R dem Wendekreisradius. Der Dreiachser in `vehicleModel.ts` hat seine
- * Vorderachse bei `bedLen/2 + 1,1` und die beiden Hinterachsen bei 0,10 und
- * `−bedLen/2 + 0,80`; ihr Mittel liegt bei −0,90 m. Der Radstand (Vorderachse
- * bis Mitte der Hinterachsen) ist damit
+ * SW: 1,2 m/s². Daraus folgt das Kurventempo v = √(a·R): bei vollem Einschlag
+ * (R 5,6 m) 2,6 m/s, auf weitem Bogen (R 15 m) 4,2 m/s. Ein LKW auf dem Hof
+ * faehrt Kurven im Schritt, nicht mit Umschlagtempo.
+ */
+export const QUER_BESCHL = 1.2;
+
+/**
+ * Wie weit der Fahrer voraus zielt (m): `max(VORAUS_MIN, VORAUS_JE_MS · Tempo)`.
  *
- *     Pritsche (bedLen 5,4)   3,80 − (−0,90) = 4,70 m
- *     Kipper   (bedLen 6,0)   4,10 − (−0,90) = 5,00 m
+ * SW: 3,0 m und 0,9 s. Bei 4,8 m/s sind das 4,3 m. Kuerzer laesst den Wagen
+ * schlingern, laenger schneidet er Ecken ab — gemessen mit dem Waechter
+ * `test/rangierknick.test.ts`.
+ */
+export const VORAUS_MIN = 3.0;
+export const VORAUS_JE_MS = 0.9;
+
+/**
+ * Lenkt der Fahrer noch nach, faehrt er langsamer (rad).
  *
- * Ein gelenktes Vorderrad schlaegt rund 40 Grad ein; daraus folgt
- * R = 4,70 / tan 40 Grad = 5,60 m. Bei Umschlagstempo SPEED = 4,8 m/s
- * (`routes.ts`) sind das
- *
- *     omega = 4,8 / 5,60 = 0,857 rad/s = 49 Grad/s.
- *
- * Gerundet 0,85 rad/s. Eine Viertelwendung (90 Grad) dauert damit 1,8 s, die
- * volle Kehre (180 Grad) 3,7 s. Ab welcher Rate der gemessene Schaden
- * verschwindet, steht in `tools/rangier-wirkung.ts` und im Log (E-081).
+ * SW: Fehlen dem Lenkeinschlag 0,35 rad (20 Grad) zum Soll, steht der Wagen
+ * und der Fahrer kurbelt im Stand — das tut man auf dem Hof auch. Darunter
+ * geht das Tempo linear mit.
+ */
+export const LENK_NACHLAUF = 0.35;
+
+/**
+ * Wie hart der Fahrer beim Zuruecksetzen des Gespanns den Knick nachfuehrt
+ * (1/m). SW: Ein Meter Weg, dann ist der Fehler auf gut ein Drittel herunter.
+ */
+export const KNICK_FOLGE = 1.0;
+
+/** Groesster Knick, den der Fahrer beim Zuruecksetzen anstrebt (rad, SW 35°). */
+export const KNICK_SOLL_MAX = 0.6;
+
+/**
+ * Wo ein Anhaenger an der Deichsel anschlaegt (rad). 1,0 rad = 57 Grad.
+ * Eine Notbremse fuer den Fall, dass der Fahrer blockiert steht und der
+ * Knick weiterliefe — im Waechter wird sie nie erreicht.
+ */
+export const KNICK_ANSCHLAG = 1.0;
+
+/** Ab diesem Rest gilt eine Strecke als abgefahren (m). */
+export const ZIEL_REST = 0.02;
+
+/**
+ * DIE GEGENPROBE (seit E-084). Steht `lenkrate` eines Wagens auf `Infinity`,
+ * faehrt er wie vor dem 16.09.2026: Ort und Gierlage hart auf die Strecke
+ * gesetzt. Jeder endliche Wert heisst: Einspurmodell. Die Zahl selbst ist die
+ * hoechste Gierrate, die das Modell bei Umschlagtempo erreicht
+ * (4,8 m/s · tan 40° / 4,70 m = 0,857 rad/s).
  */
 export const LENK_RATE = 0.85;
 
-/**
- * Ab diesem Restwinkel dreht der Wagen erst ein und faehrt dann los (rad).
- *
- * 1,75 rad = 100 Grad. Die Zahl trennt zwei verschiedene Vorgaenge:
- *
- *   Eine ECKE faehrt man durch. Der Wagen laeuft weiter und zieht seine
- *   Gierlage nach; ein bis zwei Wagenlaengen lang steht er dabei etwas
- *   schraeg zur Bahn. Das ist, was ein LKW auch auf dem Hof tut.
- *
- *   Eine KEHRE faehrt man nicht durch. Am Uebergang `shiftPause` →
- *   `reverseIn` verlangt die Strecke 168,7 Grad: Der Wagen kommt von Norden
- *   an und soll rueckwaerts weiter nach Sueden. Wer das im Fahren nachzieht,
- *   schiebt seinen Umriss quer ueber die halbe Abladespur.
- *
- * 100 Grad liegt zwischen den 90 Grad der neun Ecken und den 119,9 Grad der
- * Abholer-Ausfahrt: Alle rechten Winkel werden gefahren, die Kehren gedreht.
- *
- * DAZU KOMMT EINE REGEL OHNE ZAHL: VOR JEDER RUECKWAERTSFAHRT wird
- * eingedreht, auch bei 90 Grad. Das ist gemessen (E-081) und nicht aus
- * Anschauung: Wer 90 Grad im Rueckwaertsfahren nachzieht, braucht dafuer
- * 1,9 s und legt in dieser Zeit 5,3 m zurueck — die Silogasse ist aber nur
- * 7,4 m tief. Sein Umriss stand dabei 0,70 m tief in den Flanken der
- * Nachbarsilos. Ein Fahrer, der rueckwaerts in eine Box setzt, richtet
- * ebenfalls erst aus und stoesst dann zurueck.
- */
-export const PIVOT_AB = 1.75;
-
-/**
- * WIE WEIT DER FAHRER VORAUSSCHAUT, BEVOR ER EINLENKT (m).
- *
- * Ohne Vorausschau lenkt der Wagen erst ein, wenn er die Ecke schon erreicht
- * hat — er haelt dort an (siehe `fahrtFaktor`), dreht sich und faehrt weiter.
- * Das ist kein LKW, das ist ein Gabelstapler. Ein Fahrer sieht die Ecke
- * kommen und zieht vorher am Lenkrad.
- *
- * Die Zahl folgt aus der Rate: Bei 0,85 rad/s braucht eine Viertelwendung
- * 1,85 s, und in dieser Zeit legt der Wagen bei 4,8 m/s 8,9 m zurueck. So weit
- * vorauszuschauen hiesse, die Ecke um Meter abzuschneiden. Gemessen (E-081,
- * `tools/lenkrate.ts`) ist die beste Wahl viel kuerzer, weil der Wagen in der
- * Kurve ohnehin langsamer wird: Bei 3,0 m schneidet er die Ecke sichtbar,
- * unter 1,0 m bleibt er stehen und dreht sich.
- */
-export const VORAUS_M = 1.5;
-
-/**
- * WIE SCHNELL EIN WAGEN FAEHRT, DER NOCH NICHT IN DER BAHN LIEGT — als Anteil.
- *
- * Das ist der zweite Teil der Reparatur, und ohne ihn taugt der erste nicht.
- * Wer nur die Drehrate begrenzt, faehrt mit voller Geschwindigkeit geradeaus
- * weiter, waehrend er sich noch dreht: Der Wagen laeuft quer aus der Bahn, und
- * gemessen steckte sein Umriss dabei bis zu 0,70 m in den Silowaenden (E-081).
- * Ein LKW macht das nicht — er wird in der Kurve langsam.
- *
- * Die Rechnung ist der Kosinus des Restwinkels, also der Anteil des Schubs,
- * der ueberhaupt in Bahnrichtung zeigt:
- *
- *     Rest    0 Grad  →  voll         Rest  60 Grad  →  halbes Tempo
- *     Rest   30 Grad  →  87 %         Rest  90 Grad  →  steht, dreht nur
- *
- * Damit braucht es keine zweite Zahl fuer „wann wird gedreht statt gefahren":
- * Bei einer Kehre geht der Anteil von selbst auf null. `PIVOT_AB` entscheidet
- * nur noch, ob die DREHRICHTUNG frei gewaehlt werden darf.
- */
-export function fahrtFaktor(rest: number): number {
-  const c = Math.cos(rest);
-  return c > 0 ? c : 0;
+/** Wo die Achsen eines Fahrzeugs sitzen — Laengslagen im Fahrzeugrahmen (m, +z vorn). */
+export interface Fahrwerk {
+  /** Lenkende Vorderachse. */
+  vorn: number;
+  /** Mitte der starren Hinterachse(n) — der Bezugspunkt des Modells. */
+  hinten: number;
+  /**
+   * Der Anhaenger, falls einer dranhaengt:
+   *   kupplung  Laengslage der Kugel im Zugrahmen
+   *   deichsel  Kupplung bis Anhaengerachse
+   *   heck      Anhaengerachse bis Heck (= der Punkt, der bei geradem Gespann
+   *             auf dem Fahrzeugursprung liegt)
+   */
+  anhaenger: { kupplung: number; deichsel: number; heck: number } | null;
 }
 
-/** Der Weg von `ist` nach `soll` in einer festen Drehrichtung (rad, >= 0). */
-export function restInRichtung(ist: number, soll: number, richtung: 1 | -1): number {
-  const d = winkelRest(ist, soll) * richtung;
-  return d >= 0 ? d : d + Math.PI * 2;
+/** Die Lage eines Fahrzeugs: Ursprung, Gier, Lenkeinschlag, Knick des Anhaengers. */
+export interface Lage {
+  x: number;
+  z: number;
+  gier: number;
+  /** Lenkeinschlag der Vorderraeder (rad); positiv dreht die Gier positiv. */
+  lenk: number;
+  /** Gier des Anhaengers gegen das Zugfahrzeug (rad) — `trailerYawRel`. */
+  knick: number;
+}
+
+export function radstand(f: Fahrwerk): number {
+  return f.vorn - f.hinten;
+}
+
+/** Der Kreisradius der Hinterachse bei vollem Einschlag (m). */
+export function wendeRadius(f: Fahrwerk): number {
+  return radstand(f) / Math.tan(LENK_MAX);
+}
+
+export function hinterachse(l: Lage, f: Fahrwerk): [number, number] {
+  return [l.x + Math.sin(l.gier) * f.hinten, l.z + Math.cos(l.gier) * f.hinten];
+}
+
+export function anhaengerAchse(l: Lage, f: Fahrwerk): [number, number] {
+  const a = f.anhaenger!;
+  const t = l.gier + l.knick;
+  return [
+    l.x + Math.sin(l.gier) * a.kupplung - Math.sin(t) * a.deichsel,
+    l.z + Math.cos(l.gier) * a.kupplung - Math.cos(t) * a.deichsel,
+  ];
 }
 
 /**
- * IN WELCHE RICHTUNG DER FAHRER EINDREHT — dorthin, wo Platz ist.
+ * Der Punkt, dessen Lage auf der Strecke „wie weit bin ich" beantwortet.
  *
- * Eine Kehre auf der Stelle ueberstreicht einen Kreis mit dem Radius der
- * weitesten Umrissecke: beim Kipper 5,14 m (1,55 x 4,90 m Halbmasse). Welche
- * Haelfte dieses Kreises frei ist, haengt vom Ort ab — und die Kehre am
- * Abladeplatz zeigt, dass es nicht gleichgueltig ist: Rechtsherum schwenkt
- * die Kabine nach OSTEN und 0,60 m in die Ostmauer, linksherum nach WESTEN
- * ueber den offenen Hof. Der Winkel ist dabei laenger (191 statt 169 Grad,
- * also 0,3 s mehr), und das ist der Preis.
- *
- * `tiefeBei` liefert, wie tief der Umriss bei DIESER Gierlage in einem
- * Bauwerk steckt. Es kommt von aussen, weil `vehicles.ts` dafuer seinen
- * eigenen Umriss samt Anhaenger baut und der Waechter denselben Kreis ohne
- * Fahrzeug abtastet.
- *
- * Bei Gleichstand gewinnt der kuerzere Weg — sonst drehte sich ein Wagen auf
- * freiem Feld ohne Grund einmal fast herum.
+ * Beim LKW der Ursprung (Mitte der Ladeflaeche) — die Halteplaetze aller
+ * Strecken sind fuer genau diesen Punkt ausgemessen. Beim Gespann das Heck des
+ * Anhaengers: Bei geradem Gespann liegt es auf dem Ursprung, beim Knick nicht,
+ * und die Ladung liegt auf dem Anhaenger.
  */
-export function drehRichtung(
-  ist: number,
-  soll: number,
-  tiefeBei: (gier: number) => number,
-  schritte = 32
-): 1 | -1 {
-  let bestRichtung: 1 | -1 = 1;
-  let bestTiefe = Infinity;
-  let bestWeg = Infinity;
-  for (const r of [1, -1] as const) {
-    const weg = restInRichtung(ist, soll, r);
-    let tief = 0;
-    for (let i = 1; i <= schritte; i++) {
-      const t = tiefeBei(ist + r * (weg * i) / schritte);
-      if (t > tief) tief = t;
-    }
-    // 1 cm Toleranz: darunter ist es Rundung, nicht Blech in Beton
-    // (`UMRISS_TOLERANZ` in `umriss.ts`).
-    if (tief < bestTiefe - 0.01 || (tief < bestTiefe + 0.01 && weg < bestWeg)) {
-      bestTiefe = tief;
-      bestWeg = weg;
-      bestRichtung = r;
-    }
+export function fortschrittsPunkt(l: Lage, f: Fahrwerk): [number, number] {
+  if (!f.anhaenger) return [l.x, l.z];
+  const [ax, az] = anhaengerAchse(l, f);
+  const t = l.gier + l.knick;
+  return [ax - Math.sin(t) * f.anhaenger.heck, az - Math.cos(t) * f.anhaenger.heck];
+}
+
+/** Mit welchem Punkt der Fahrer zielt: Hinterachse — rueckwaerts im Gespann die Anhaengerachse. */
+function fuehrPunkt(l: Lage, f: Fahrwerk, rueck: boolean): [number, number] {
+  return rueck && f.anhaenger ? anhaengerAchse(l, f) : hinterachse(l, f);
+}
+
+/**
+ * Ein Stueck Weg rollen: `ds` Meter an der Hinterachse, vorwaerts positiv.
+ *
+ * Exakt fuer den Kreisbogen: Die Hinterachse rueckt auf der Sehne mit der
+ * mittleren Gier vor. Der Anhaenger folgt der Gleichung
+ *
+ *     dθ = (ds · sin φ − M · dψ · cos φ) / Lt,     φ = ψ − θ
+ *
+ * mit M = Hinterachse bis Kupplung und Lt = Kupplung bis Anhaengerachse. Sie
+ * sagt nur: Die Anhaengerachse bewegt sich nie quer zu sich selbst. Vorwaerts
+ * zieht sie den Knick von selbst gerade, rueckwaerts schaukelt sie ihn auf —
+ * deshalb muss rueckwaerts gelenkt werden (`folgeSchritt`).
+ */
+export function rolle(l: Lage, f: Fahrwerk, ds: number): void {
+  const dpsi = (ds * Math.tan(l.lenk)) / radstand(f);
+  const [hx, hz] = hinterachse(l, f);
+  const mitte = l.gier + dpsi / 2;
+  const nx = hx + ds * Math.sin(mitte);
+  const nz = hz + ds * Math.cos(mitte);
+  if (f.anhaenger) {
+    const M = f.hinten - f.anhaenger.kupplung;
+    const phi = -l.knick;
+    const dtheta = (ds * Math.sin(phi) - M * dpsi * Math.cos(phi)) / f.anhaenger.deichsel;
+    l.knick += dtheta - dpsi;
+    if (l.knick > KNICK_ANSCHLAG) l.knick = KNICK_ANSCHLAG;
+    if (l.knick < -KNICK_ANSCHLAG) l.knick = -KNICK_ANSCHLAG;
   }
-  return bestRichtung;
+  l.gier += dpsi;
+  l.x = nx - Math.sin(l.gier) * f.hinten;
+  l.z = nz - Math.cos(l.gier) * f.hinten;
+}
+
+/* ------------------------------------------------------------ Strecke --- */
+
+/**
+ * Der Punkt bei Bogenlaenge `s` — VOR dem Anfang und HINTER dem Ende
+ * geradeaus verlaengert. Der Fahrer zielt am Streckenende ueber den Halt
+ * hinaus, sonst schaute er in den letzten Metern auf seine eigenen Fuesse.
+ */
+export function punktBei(route: ReadonlyArray<readonly [number, number]>, s: number): [number, number] {
+  let rest = s;
+  const n = route.length;
+  if (n < 2) return [route[0]![0], route[0]![1]];
+  for (let i = 0; i < n - 1; i++) {
+    const [ax, az] = route[i]!;
+    const [bx, bz] = route[i + 1]!;
+    const len = Math.hypot(bx - ax, bz - az);
+    if (len < 1e-9) continue;
+    if (rest <= len || i === n - 2 || (i === 0 && rest < 0)) {
+      const t = rest / len;
+      return [ax + (bx - ax) * t, az + (bz - az) * t];
+    }
+    rest -= len;
+  }
+  return [route[n - 1]![0], route[n - 1]![1]];
+}
+
+/**
+ * Die Bogenlaenge des naechstgelegenen Streckenpunkts — nur im Fenster
+ * `sMitte ± fenster`. Das Fenster ist Pflicht: Eine Strecke, die an sich selbst
+ * vorbeifuehrt (Wendeschleife, Rangierzug), liegt sonst an zwei Stellen nah,
+ * und der Fahrer saehe sich ploetzlich am anderen Ende.
+ */
+export function projiziere(
+  route: ReadonlyArray<readonly [number, number]>,
+  px: number,
+  pz: number,
+  sMitte: number,
+  fenster: number
+): number {
+  const von = sMitte - fenster;
+  const bis = sMitte + fenster;
+  let best = sMitte;
+  let bestD = Infinity;
+  let s0 = 0;
+  const n = route.length;
+  for (let i = 0; i < n - 1; i++) {
+    const [ax, az] = route[i]!;
+    const [bx, bz] = route[i + 1]!;
+    const dx = bx - ax;
+    const dz = bz - az;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-9) continue;
+    // Erstes und letztes Stueck reichen ins Unendliche (siehe `punktBei`).
+    const tMin = Math.max(i === 0 ? -Infinity : 0, (von - s0) / len);
+    const tMax = Math.min(i === n - 2 ? Infinity : 1, (bis - s0) / len);
+    if (tMin <= tMax) {
+      let t = ((px - ax) * dx + (pz - az) * dz) / (len * len);
+      t = Math.min(Math.max(t, tMin), tMax);
+      const d = Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
+      if (d < bestD) {
+        bestD = d;
+        best = s0 + len * t;
+      }
+    }
+    s0 += len;
+  }
+  return best;
 }
 
 /** Der kuerzeste Weg von `ist` nach `soll`, in (−pi, pi]. */
@@ -186,13 +286,7 @@ export function winkelRest(ist: number, soll: number): number {
   return d;
 }
 
-/**
- * Einen Schritt in Richtung `soll` — hoechstens `maxSchritt` rad weit.
- *
- * `maxSchritt = Infinity` liefert genau den alten Sprungzustand. Das ist kein
- * Versehen, sondern die Gegenprobe: Ein Waechter, der den reparierten Stand
- * misst, muss am kaputten Stand melden.
- */
+/** Einen Schritt in Richtung `soll` — hoechstens `maxSchritt` weit. */
 export function lenkeEin(ist: number, soll: number, maxSchritt: number): number {
   const d = winkelRest(ist, soll);
   if (!(maxSchritt < Math.abs(d))) return soll;
@@ -200,18 +294,95 @@ export function lenkeEin(ist: number, soll: number, maxSchritt: number): number 
 }
 
 /**
- * Ein Schritt einer Kehre — wie `lenkeEin`, aber in vorgegebener Drehrichtung.
- *
- * Getrennt, weil `lenkeEin` immer den kuerzeren Weg nimmt und eine Kehre
- * genau das nicht darf: Sie geht dorthin, wo Platz ist (`drehRichtung`).
+ * Wie stark ein Bogen von `von` zum Ziel `(tx, tz)` gekruemmt sein muss, wenn
+ * er in Richtung `richtung` beginnt (1/m) — die Pure-Pursuit-Formel
+ * κ = 2 · sin α / Abstand. Liegt das Ziel hinter dem Fahrer, zaehlt der volle
+ * Einschlag zur richtigen Seite (sonst ergaebe sin 180° = 0 „geradeaus").
  */
-export function dreheWeiter(
-  ist: number,
-  soll: number,
-  maxSchritt: number,
-  richtung: 1 | -1
-): number {
-  const rest = restInRichtung(ist, soll, richtung);
-  if (!(maxSchritt < rest)) return soll;
-  return ist + richtung * maxSchritt;
+function kruemmungZu(vx: number, vz: number, richtung: number, tx: number, tz: number): number {
+  const d = Math.hypot(tx - vx, tz - vz);
+  if (d < 1e-6) return 0;
+  const a = winkelRest(richtung, Math.atan2(tx - vx, tz - vz));
+  const s = Math.abs(a) > Math.PI / 2 ? Math.sign(a) : Math.sin(a);
+  return (2 * s) / Math.max(d, 0.5);
+}
+
+export interface FolgeErgebnis {
+  /** Neuer Fortschritt auf der Strecke (m). */
+  s: number;
+  /** Ist der Halt am Streckenende erreicht? */
+  fertig: boolean;
+  /** Gefahrene Strecke an der Hinterachse in diesem Schritt (m, vorzeichenlos). */
+  weg: number;
+}
+
+/**
+ * EIN RECHENSCHRITT DES FAHRERS: zielen, lenken, Tempo waehlen, rollen.
+ *
+ * `s` ist der bisherige Fortschritt (`fortschrittsPunkt` auf der Strecke),
+ * `tempo` das Wunschtempo dieser Etappe. Die Strecke ist in FAHRTRICHTUNG
+ * aufgeschrieben, rueckwaerts wie vorwaerts.
+ */
+export function folgeSchritt(
+  l: Lage,
+  f: Fahrwerk,
+  route: ReadonlyArray<readonly [number, number]>,
+  laenge: number,
+  s: number,
+  rueck: boolean,
+  tempo: number,
+  dt: number
+): FolgeErgebnis {
+  if (laenge - s <= ZIEL_REST) return { s: Math.max(s, laenge), fertig: true, weg: 0 };
+  const dir = rueck ? -1 : 1;
+  const L = radstand(f);
+  const gespannRueck = rueck && f.anhaenger !== null;
+  // In welche Richtung der Fuehrpunkt faehrt (Weltwinkel).
+  const fahrRichtung = gespannRueck ? l.gier + l.knick + Math.PI : l.gier + (rueck ? Math.PI : 0);
+  const [fx, fz] = fuehrPunkt(l, f, rueck);
+  const [px, pz] = fortschrittsPunkt(l, f);
+  // Wo der Fuehrpunkt auf der Strecke steht: Fortschritt plus sein Vorsprung.
+  const vorsprung = (fx - px) * Math.sin(fahrRichtung) + (fz - pz) * Math.cos(fahrRichtung);
+  const sF = projiziere(route, fx, fz, s + vorsprung, 2.5);
+  const voraus = Math.max(VORAUS_MIN, VORAUS_JE_MS * tempo);
+  const [tx, tz] = punktBei(route, sF + voraus);
+
+  let soll: number;
+  if (!gespannRueck) {
+    soll = dir * Math.atan(kruemmungZu(fx, fz, fahrRichtung, tx, tz) * L);
+  } else {
+    /*
+     * RUECKWAERTS MIT ANHAENGER. Gezielt wird mit der Anhaengerachse; aus der
+     * Kruemmung, die SIE fahren soll, folgt der Knick, den das Gespann dafuer
+     * braucht (im Beharrungszustand sin φ ≈ −κ·(Lt + M)), und aus dem
+     * Knickfehler der Lenkeinschlag des Autos. Die mittlere Zeile ist die
+     * Knickgleichung aus `rolle`, nach der Gierrate umgestellt.
+     */
+    const a = f.anhaenger!;
+    const M = f.hinten - a.kupplung;
+    const Lt = a.deichsel;
+    const kt = kruemmungZu(fx, fz, fahrRichtung, tx, tz);
+    const phi = -l.knick;
+    const phiSoll = Math.max(-KNICK_SOLL_MAX, Math.min(KNICK_SOLL_MAX, -Math.atan(kt * (Lt + M))));
+    const v = -Math.max(tempo, 0.1);
+    const omega =
+      (KNICK_FOLGE * -v * (phiSoll - phi) + (v * Math.sin(phi)) / Lt) /
+      (1 + (M * Math.cos(phi)) / Lt);
+    soll = Math.atan((omega * L) / v);
+  }
+  soll = Math.max(-LENK_MAX, Math.min(LENK_MAX, soll));
+  l.lenk = lenkeEin(l.lenk, soll, LENK_TEMPO * dt);
+
+  let v = tempo;
+  const tan = Math.abs(Math.tan(l.lenk));
+  if (tan > 1e-6) v = Math.min(v, Math.sqrt((QUER_BESCHL * L) / tan));
+  v *= Math.max(0, 1 - Math.abs(soll - l.lenk) / LENK_NACHLAUF);
+  v = Math.min(v, (laenge - s) / dt);
+  if (v <= 0) return { s, fertig: false, weg: 0 };
+  rolle(l, f, dir * v * dt);
+  const [qx, qz] = fortschrittsPunkt(l, f);
+  let sNeu = projiziere(route, qx, qz, s + v * dt, Math.max(1, 2 * v * dt));
+  const fertig = laenge - sNeu <= ZIEL_REST;
+  if (fertig) sNeu = laenge;
+  return { s: sNeu, fertig, weg: v * dt };
 }

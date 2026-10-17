@@ -155,6 +155,28 @@ export function anhaengerUmriss(wx: number, wz: number, rot: number, bedLen: num
 }
 
 /**
+ * Der Umriss des ZUGWAGENS eines Gespanns (E-140).
+ *
+ * Bis E-140 stand fuer den PKW nur `fahrzeugUmriss` mit der Anhaengerlaenge
+ * da: Er deckte den Anhaenger ab, wie er bei geradem Gespann steht — das Auto
+ * davor kam in keiner Pruefung vor. Seit das Gespann wirklich knickt, braucht
+ * es zwei Figuren: das Auto (hier, aus den Achslagen: 0,95 m Ueberhang vor
+ * und hinter den Achsen, 1,90 m breit) und den Anhaenger (`anhaengerUmriss`).
+ *
+ * `vorn` und `hinten` sind die Achslagen des Autos im Wagenrahmen.
+ */
+export function zugwagenUmriss(p: Pose, vorn: number, hinten: number): Box {
+  const mitte = (vorn + hinten) / 2;
+  return {
+    x: p.x + Math.sin(p.rot) * mitte,
+    z: p.z + Math.cos(p.rot) * mitte,
+    hw: 0.95,
+    hd: (vorn - hinten) / 2 + 0.95,
+    rot: p.rot,
+  };
+}
+
+/**
  * Welche Lage ein Fahrzeug bei Bogenlaenge `s` auf dieser Strecke einnimmt.
  *
  * Dieselbe Rechnung, die `vehicles.placeAt` fuer die Fahrt benutzt — sie steht
@@ -179,6 +201,56 @@ export function poseAuf(route: Array<[number, number]>, s: number, reverse: bool
   }
   const [ax, az] = route[0]!;
   return { x: ax, z: az, rot: reverse ? Math.PI : 0 };
+}
+
+/**
+ * Wie weit der Ursprung (Mitte der Ladeflaeche) vor der Mitte der
+ * Hinterachsen liegt (m) — beim Dreiachser `bedLen/4 − 0,45`: 0,90 bei
+ * 5,40 m Ladeflaeche, 1,05 beim Kipper. Dieselbe Zahl wie
+ * `−vehicleModel.lkwFahrwerk(bedLen).hinten`; `test/vehicleModel.test.ts`
+ * haelt beide zusammen.
+ */
+export function ursprungVorAchse(bedLen: number): number {
+  return bedLen / 4 - 0.45;
+}
+
+/**
+ * DIE LAGE, IN DER DER WAGEN BEI FORTSCHRITT `s` WIRKLICH STEHT (E-140).
+ *
+ * Gefahren wird mit der Hinterachse auf der Strecke — dort lenkt das
+ * Einspurmodell hin (`lenkung.folgeSchritt`), und dort steht der Wagen immer
+ * tangential. Der Ursprung liegt `vor` Meter davor (in Blickrichtung der
+ * Kabine), seine Bogenlaenge ist `s`. Vorwaerts laeuft die Hinterachse also
+ * `vor` hinterher, rueckwaerts voraus. Vor dem Anfang und hinter dem Ende
+ * ist die Strecke geradeaus verlaengert.
+ */
+export function lageAuf(
+  route: Array<[number, number]>,
+  s: number,
+  reverse: boolean,
+  bedLen: number,
+  vor = ursprungVorAchse(bedLen)
+): Pose {
+  const sa = reverse ? s + vor : s - vor;
+  const n = route.length;
+  let rest = sa;
+  let i = 0;
+  // Stueck suchen; vor dem Anfang das erste, hinter dem Ende das letzte.
+  for (; i < n - 2; i++) {
+    const l = Math.hypot(route[i + 1]![0] - route[i]![0], route[i + 1]![1] - route[i]![1]);
+    if (rest <= l) break;
+    rest -= l;
+  }
+  const [ax, az] = route[i]!;
+  const [bx, bz] = route[i + 1]!;
+  const l = Math.hypot(bx - ax, bz - az) || 1;
+  const t = rest / l;
+  const rot = Math.atan2(bx - ax, bz - az) + (reverse ? Math.PI : 0);
+  return {
+    x: ax + (bx - ax) * t + Math.sin(rot) * vor,
+    z: az + (bz - az) * t + Math.cos(rot) * vor,
+    rot,
+  };
 }
 
 /** Laenge einer Polylinie (m). */
@@ -287,18 +359,17 @@ export function umrisseEntlang(
   reverse: boolean,
   schritt = 0.5
 ): Box[] {
+  /*
+   * Seit E-140 mit der HINTERACHSE auf der Strecke (`lageAuf`): So faehrt der
+   * Wagen wirklich. Vorher stand der Ursprung darauf, mit der Richtung der
+   * Strecke an DIESER Stelle — im Bogen von 7,5 m ist das 7,6 Grad zu frueh
+   * gedreht, und die Heckecke stand 0,4 m neben der Wirklichkeit.
+   */
   const out: Box[] = [];
-  for (let i = 0; i < route.length - 1; i++) {
-    const [ax, az] = route[i]!;
-    const [bx, bz] = route[i + 1]!;
-    const rot = Math.atan2(bx - ax, bz - az) + (reverse ? Math.PI : 0);
-    const len = Math.hypot(bx - ax, bz - az);
-    for (let t = 0; t <= 1.0001; t += schritt / Math.max(len, 0.001)) {
-      const tt = Math.min(1, t);
-      out.push(
-        fahrzeugUmriss({ x: ax + (bx - ax) * tt, z: az + (bz - az) * tt, rot }, bedLen)
-      );
-    }
+  const laenge = streckenLaenge(route);
+  const n = Math.max(1, Math.ceil(laenge / schritt));
+  for (let i = 0; i <= n; i++) {
+    out.push(fahrzeugUmriss(lageAuf(route, (laenge * i) / n, reverse, bedLen), bedLen));
   }
   return out;
 }

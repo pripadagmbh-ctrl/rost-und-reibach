@@ -36,7 +36,7 @@ for (const p of alleAbholPlaetze()) {
    * zum Bagger — die lange Achse zeigt also in die Richtung, in der er
    * zurueckgesetzt hat.
    */
-  const laengsX = p.rueckweg[0]![0] !== p.rueckweg[1]![0];
+  const laengsX = Math.abs(p.rueckweg.at(-2)![0] - p.rueckweg.at(-1)![0]) > 0.01;
   const ecken: Array<[number, number]> = [];
   for (const a of [-1, 1])
     for (const b of [-1, 1]) {

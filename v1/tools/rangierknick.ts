@@ -22,27 +22,20 @@ import { fahre, ALT, NEU, type Fahrt } from "../test/knicklauf";
 const g = (x: number, n = 1): string => x.toFixed(n).padStart(6);
 
 /*
- * Andere Fahrweise durchrechnen, ohne den Quelltext anzufassen:
- *
- *     npx vite-node tools/rangierknick.ts -- --rate=1.2 --pivot=0.9 --voraus=1.5
+ * Seit E-140 gibt es nur noch eine Stellgroesse: `--rate=Infinity` ist der
+ * alte Sprungzustand, jeder endliche Wert das Einspurmodell aus `lenkung.ts`.
  */
 const arg = (n: string, s: number): number => {
   const t = process.argv.find((a) => a.startsWith(`--${n}=`));
   return t ? Number(t.slice(n.length + 3)) : s;
 };
-const WEISE = {
-  lenkrate: arg("rate", NEU.lenkrate),
-  pivotAb: arg("pivot", NEU.pivotAb),
-  vorausM: arg("voraus", NEU.vorausM),
-};
+const WEISE = { lenkrate: arg("rate", NEU.lenkrate) };
 const plaene = fahrplaene();
 const alt = plaene.map((p) => fahre(p, ALT));
 const neu = plaene.map((p) => fahre(p, WEISE));
 const zeilen: string[] = [];
 zeilen.push(
-  `Lenkrate ${WEISE.lenkrate} rad/s (${((WEISE.lenkrate * 180) / Math.PI).toFixed(0)} Grad/s), ` +
-    `Eindrehen ab ${((WEISE.pivotAb * 180) / Math.PI).toFixed(0)} Grad, ` +
-    `Vorausschau ${WEISE.vorausM} m`
+  Number.isFinite(WEISE.lenkrate) ? "Einspurmodell (E-140)" : "alter Sprungzustand (vor E-084)"
 );
 zeilen.push("");
 zeilen.push(

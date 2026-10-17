@@ -279,10 +279,24 @@ export function staende(): AbfahrtStand[] {
   const out: AbfahrtStand[] = [];
   for (const weg of ["abladen", "silo"] as const) {
     for (let i = 0; i < PARK_SLOTS.length; i++) {
-      out.push({ name: `${weg} Warteplatz ${i + 1} SPRUNG`, platz: i, weg, faedeltAus: false });
+      // Seit E-140 kann der Wagen nur noch springen, wenn auch die Lenkung
+      // auf dem alten Stand ist: Das Einspurmodell setzt nie einen Ort.
+      out.push({
+        name: `${weg} Warteplatz ${i + 1} SPRUNG`,
+        platz: i,
+        weg,
+        faedeltAus: false,
+        lenkrate: Infinity,
+      });
       out.push({ name: `${weg} Warteplatz ${i + 1} AUSFAEDELN`, platz: i, weg });
     }
-    out.push({ name: `${weg} ohne Warteplatz SPRUNG`, platz: null, weg, faedeltAus: false });
+    out.push({
+      name: `${weg} ohne Warteplatz SPRUNG`,
+      platz: null,
+      weg,
+      faedeltAus: false,
+      lenkrate: Infinity,
+    });
     out.push({ name: `${weg} ohne Warteplatz AUSFAEDELN`, platz: null, weg });
   }
   return out;

@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-140 | 17.10.2026 | Laster lenken mit der Vorderachse, Anhänger knicken, Rangierzüge statt Kehren | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-143 | 17.10.2026 | Nur noch Pripada.de auf den Schildern, fremde Logos raus | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-142 | 17.10.2026 | Echte Arme, Arbeitshandschuhe umschließen die Joysticks | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-139 | 17.10.2026 | Keine Tonketten, Hämmern und Drücken hörbar, Lautstärke je Gruppe | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -155,6 +156,14 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-140 — Laster lenken, Anhänger knicken, Rangierzüge** (iPad)
+- Einem Kipper von der Waage bis an den Abladeplatz folgen: Fährt er vorbei, hält und setzt im weiten Bogen zurück — dreht er sich nirgends auf der Stelle?
+- Nah an einen stehenden Laster, kurz bevor er losfährt: Schlagen die Vorderräder ein, bevor er rollt?
+- Privatkunde mit Anhänger beim Zurücksetzen: Knickt der Anhänger wie bei einem echten Gespann, und kommt er gerade in der Gasse an?
+- Durchs Tor auf die Waage und hinaus: sauber an den Pfosten vorbei, ordentlich auf der Brücke (hinaus leicht schräg)?
+- Nach einer Kaffeepause: Fährt der Laster in weiter Schleife zum Tor — Fahrer oder Kreisverkehr?
+- Eine Runde stoppen: zu langsam geworden (45 statt 40 s)?
 
 **E-143 — Nur Pripada.de auf den Schildern**
 - Nord- und Ostmauer, drei Hallen: Steht überall Pripada.de, gut lesbar?

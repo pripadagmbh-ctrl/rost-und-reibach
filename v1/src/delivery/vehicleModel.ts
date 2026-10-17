@@ -4,6 +4,47 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { BED_HALF_W } from "./routes";
 import { ladeHoeheGrenze } from "./fuellgrad";
 import { werbeAtlas, atlasFeld, PRIPADA_GRUEN } from "../world/werbung";
+import type { Fahrwerk } from "./lenkung";
+
+/**
+ * WO DIE ACHSEN DES DREIACHSERS SITZEN (E-140) — eine Quelle fuer Bau und Fahrt.
+ *
+ * Vorn eine lenkende Achse, hinten zwei starre mit Zwillingsreifen. Fuer das
+ * Einspurmodell (`lenkung.ts`) zaehlt die Mitte der beiden Hinterachsen:
+ *
+ *   Pritsche, Abholer, Abschlepper (bedLen 5,4)  vorn 3,80  hinten −0,90  Radstand 4,70 m
+ *   Kipper                         (bedLen 6,0)  vorn 4,10  hinten −1,05  Radstand 5,15 m
+ */
+export function lkwAchsen(bedLen: number): [number, number, number] {
+  return [bedLen / 2 + 1.1, 0.1, -bedLen / 2 + 0.8];
+}
+
+export function lkwFahrwerk(bedLen: number): Fahrwerk {
+  const [vorn, h1, h2] = lkwAchsen(bedLen);
+  return { vorn, hinten: (h1 + h2) / 2, anhaenger: null };
+}
+
+/**
+ * Das Gespann: Auto vorn, Anhaenger an der Kugel (E-140).
+ *
+ * Laengslagen im Wagenrahmen, Ursprung = Heck des geraden Anhaengers. Die
+ * Kupplung sitzt `bedLen + 1,05` vor dem Ursprung, das Auto (Laenge `len`)
+ * 0,35 m davor; seine Achsen 0,95 m von Front und Heck. Radstand des Autos
+ * `len − 1,90` (2,40 bzw. 2,80 m), Kupplung 1,30 m hinter seiner Hinterachse,
+ * Anhaengerachse `bedLen/2 + 1,05` = 2,25 m hinter der Kupplung.
+ */
+export function pkwFahrwerk(bedLen: number, len: number): Fahrwerk {
+  const kupplung = bedLen + 1.05;
+  const zugZ = kupplung + 0.35 + len / 2;
+  return {
+    vorn: zugZ + len / 2 - 0.95,
+    hinten: zugZ - len / 2 + 0.95,
+    anhaenger: { kupplung, deichsel: bedLen / 2 + 1.05, heck: bedLen / 2 },
+  };
+}
+
+/** Der laengere der beiden Personenwagen — der groessere Wendekreis, fuer die Waechter. */
+export const PKW_LAENGE_MAX = 4.7;
 
 /**
  * Oberkante des Ladeflächen-KOLLIDERS in Flächenkoordinaten.
@@ -275,7 +316,22 @@ export interface Rad {
 }
 
 /** Die beweglichen Teile, die der Ablauf danach ansteuert. */
+/** Ein Teil eines lenkenden Rads: Es schwenkt um die Hochachse durch die Reifenmitte. */
+export interface LenkRad {
+  mesh: THREE.Object3D;
+  /** Querlage der Reifenmitte (Drehachse) */
+  achseX: number;
+  /** Querversatz dieses Teils gegen die Reifenmitte (Felge, Nabe) */
+  versatz: number;
+  /** Laengslage */
+  z: number;
+}
+
 export interface VehicleModelParts {
+  /** Wo die Achsen sitzen — daraus faehrt das Einspurmodell (E-140). */
+  fahrwerk: Fahrwerk;
+  /** Die Teile der Vorderraeder, die beim Lenken einschlagen. */
+  lenkRaeder: LenkRad[];
   tailGate: { hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody } | null;
   /** Drehbare Kransäule — der Ablauf schwenkt sie beim Andocken zur Seite */
   crane: THREE.Group | null;
@@ -322,7 +378,9 @@ function baueRad(
   breite: number,
   zwilling: boolean,
   /** Sammelstelle für die Federung — sie schiebt die Räder gegen die Einfederung */
-  raeder?: Rad[]
+  raeder?: Rad[],
+  /** Sammelstelle der lenkenden Räder (E-140) */
+  lenk?: LenkRad[]
 ): void {
   const gummi = new THREE.MeshStandardMaterial({ color: 0x1d1f21, roughness: 0.95 });
   const felge = new THREE.MeshStandardMaterial({
@@ -347,6 +405,7 @@ function baueRad(
     rad.castShadow = true;
     ziel.add(rad);
     raeder?.push({ mesh: rad, y0: y, z });
+    lenk?.push({ mesh: rad, achseX: x, versatz: px - x, z });
   }
   // Felge und Nabe nur aussen: innen sieht sie ohnehin niemand
   const rim = new THREE.Mesh(scheibe, felge);
@@ -354,11 +413,13 @@ function baueRad(
   rim.position.set(x + seite * breite * 0.36, y, z);
   ziel.add(rim);
   raeder?.push({ mesh: rim, y0: y, z });
+  lenk?.push({ mesh: rim, achseX: x, versatz: rim.position.x - x, z });
   const hub = new THREE.Mesh(nabe, felge);
   hub.name = BAUGRUPPE.rad;
   hub.position.set(x + seite * breite * 0.45, y, z);
   ziel.add(hub);
   raeder?.push({ mesh: hub, y0: y, z });
+  lenk?.push({ mesh: hub, achseX: x, versatz: hub.position.x - x, z });
 }
 
 /**
@@ -722,8 +783,9 @@ function buildCarAndTrailer(
   _paint: THREE.MeshStandardMaterial,
   dark: THREE.MeshStandardMaterial,
   bedMat: THREE.MeshStandardMaterial,
-  raeder: Rad[]
+  teile: VehicleModelParts
 ): THREE.Group {
+  const raeder = teile.raeder;
   const farben = [0x35618f, 0x7a2f2a, 0x2f5c3a, 0x8a8f95, 0xb08a3a, 0x2b2f36];
   const lack = new THREE.MeshStandardMaterial({
     color: farben[Math.floor(Math.random() * farben.length)],
@@ -761,9 +823,10 @@ function buildCarAndTrailer(
     emissive: 0x2a0806,
   });
   const kombi = Math.random() < 0.7;
-  const len = kombi ? 4.3 : 4.7;
+  const len = kombi ? 4.3 : PKW_LAENGE_MAX;
+  teile.fahrwerk = pkwFahrwerk(v.bedLen, len);
   // Kupplung: ein Stück vor der Anhängerfront, dort greift die Deichsel an
-  const kupplungZ = v.bedLen + 1.05;
+  const kupplungZ = teile.fahrwerk.anhaenger!.kupplung;
   // Zugfahrzeug steht davor, mit Luft zwischen Heck und Kupplung
   const zugZ = kupplungZ + 0.35 + len / 2;
   /** z in Wagenkoordinaten: 0 = Mitte, positiv nach vorn. */
@@ -851,7 +914,11 @@ function buildCarAndTrailer(
   v.group.add(kugel);
 
   for (const rx of [-0.86, 0.86]) {
-    for (const rz of radZ) baueRad(v.group, rx, 0.33, w(rz), 0.33, 0.2, false);
+    for (const rz of radZ) {
+      // Die Vorderräder lenken (E-140) — `radZ[0]` ist die Vorderachse.
+      const lenk = rz === radZ[0] ? teile.lenkRaeder : undefined;
+      baueRad(v.group, rx, 0.33, w(rz), 0.33, 0.2, false, undefined, lenk);
+    }
   }
 
   // --- Anhänger (eigene Gruppe, Ursprung = Kupplung) ---
@@ -1024,10 +1091,17 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const bedMat = new THREE.MeshStandardMaterial({ color: 0x5c6166, roughness: 0.7, metalness: 0.4 });
 
   // Was der Ablauf danach ansteuert, wird hier gesammelt und zurückgegeben
-  const teile: VehicleModelParts = { tailGate: null, crane: null, trailer: null, raeder: [] };
+  const teile: VehicleModelParts = {
+    fahrwerk: lkwFahrwerk(v.bedLen),
+    lenkRaeder: [],
+    tailGate: null,
+    crane: null,
+    trailer: null,
+    raeder: [],
+  };
 
   if (v.kind === "pkw") {
-    teile.trailer = buildCarAndTrailer(v, paint, dark, bedMat, teile.raeder);
+    teile.trailer = buildCarAndTrailer(v, paint, dark, bedMat, teile);
     return teile;
   }
   const chassis = new THREE.Mesh(leiterrahmen(v.bedLen + 1.6), dark);
@@ -1110,14 +1184,16 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   cap.position.set(-0.45, 1.97, v.bedLen / 2 + 0.74);
   v.group.add(cap);
   // Dreiachser: vorn Einzelrad und lenkbar, hinten Zwillinge auf beiden Achsen
+  const [vorn, h1, h2] = lkwAchsen(v.bedLen);
   const achsen: Array<[number, boolean]> = [
-    [v.bedLen / 2 + 1.1, false],
-    [0.1, true],
-    [-v.bedLen / 2 + 0.8, true],
+    [vorn, false],
+    [h1, true],
+    [h2, true],
   ];
   for (const [z, zwilling] of achsen) {
     for (const x of [-1.0, 1.0]) {
-      baueRad(v.group, x, 0.48, z, 0.48, 0.3, zwilling, teile.raeder);
+      const lenk = z === vorn ? teile.lenkRaeder : undefined;
+      baueRad(v.group, x, 0.48, z, 0.48, 0.3, zwilling, teile.raeder, lenk);
     }
   }
   baueFahrerhaus(v, paint, dark, windowMat);

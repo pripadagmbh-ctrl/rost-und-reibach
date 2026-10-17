@@ -1,5 +1,17 @@
 import * as THREE from "three";
-import { GATE_X, WEIGH_X } from "../world/yard";
+import { WEIGH_X } from "../world/yard";
+import { STATIC_OBSTACLES } from "../world/obstacles";
+import { START_LKW } from "../world/startplatz";
+import { fahrzeugUmriss, type Rechteck } from "./umriss";
+import {
+  bahnLagen,
+  bahnTiefe,
+  dubins,
+  planeRangierzug,
+  RANGIER,
+  type Pose,
+  type Rangierzug,
+} from "./rangierplan";
 import { BAGGER_STAND, VERLADE_STAND } from "../world/baggerstand";
 import {
   CONFIGS,
@@ -16,7 +28,7 @@ import {
  * Einfahrt. Jeder Weg auf den Platz beginnt und endet hier; deshalb steht der
  * Punkt einmal und wird ueberall eingesetzt.
  */
-export const WAAGE_HALT: [number, number] = [WEIGH_X, 22.5];
+export const WAAGE_HALT: [number, number] = [WEIGH_X + 0.3, 22.0];
 /**
  * Erster Punkt suedlich der Waage, von dem aus sich die Wege verzweigen.
  *
@@ -26,6 +38,13 @@ export const WAAGE_HALT: [number, number] = [WEIGH_X, 22.5];
  * Blockadepruefung der LKW mit 1,4 m abtastet.
  */
 export const VERTEILER: [number, number] = [-27.0, 16.0];
+/**
+ * Bis hierher faehrt jede Anfahrt dieselben Punkte (E-140): von der Waage am
+ * Verteiler vorbei schraeg auf den freien Platz. Ab (−21 | 10) rechnet der
+ * Rangierzug. Den Verteiler allein (Fahrtrichtung Sued) zu nehmen, ginge
+ * nicht — geradeaus laege der Wagen auf dem dritten Warteplatz.
+ */
+const ANFAHRT_KOPF: Array<[number, number]> = [WAAGE_HALT, VERTEILER, [-21, 10]];
 
 /**
  * Das Streckennetz des Platzes.
@@ -46,11 +65,87 @@ export const VERTEILER: [number, number] = [-27.0, 16.0];
 // ANLIEFERUNG: Nordspur über die Brückenwaage, dann rückwärts an den
 // Abkippplatz vor dem Bagger. Ausfahrt vorwärts wieder über die Waage.
 // Einfahrt → Brückenwaage (dort wird brutto gewogen)
-export const ROUTE_IN_FWD: Array<[number, number]> = [
-  [GATE_X, 40],
-  [GATE_X, 28],
-  WAAGE_HALT,
-];
+/*
+ * DURCHS TOR SCHRAEG (E-140). Die Waage liegt WESTLICH der Toroeffnung: Tor
+ * x −26,5 … −17,5, Waage x −27,5. Ein Wagen, der sich nicht auf der Stelle
+ * drehen kann, kommt nicht senkrecht durchs Tor und steht drei Meter weiter
+ * gerade auf der Waage — dafuer reicht kein Wendekreis. Er kommt deshalb von
+ * Nordosten schraeg herein und zieht auf der Waage gerade, und er faehrt
+ * schraeg wieder hinaus. Die alten Punkte (Tor −22 | 28 und −22 | 40) hatten
+ * den Knick genau im Tor.
+ */
+/** Schraeglage im Tor (Grad gegen die Nord-Sued-Richtung, SW). */
+const TOR_WINKEL = (40 * Math.PI) / 180;
+/**
+ * Der Weg der Hinterachse vom Tor auf die Waage: gerade schraeg durchs Tor,
+ * dann ein Bogen von `RANGIER.radiusVor`, der genau im Halt gerade wird.
+ * Gerechnet und nicht gegriffen: Zwischen Mauerflucht (z 29) und Halt
+ * (z 22,0) liegen 7,0 m; der Bogen braucht davon R·sin 40° = 4,8 m, der Rest
+ * ist Gerade. Damit kreuzt die Hinterachse die Mauerflucht bei x −23,6 —
+ * 2,9 m oestlich des Westpfostens. Bei 35 Grad (x −23,9) streifte der
+ * Kipper den Pfosten mit dem Heck, gemessen 0,14 m.
+ */
+function torweg(): Array<[number, number]> {
+  const r = RANGIER.radiusVor;
+  const gerade = (29 - WAAGE_HALT[1] - r * Math.sin(TOR_WINKEL)) / Math.cos(TOR_WINKEL);
+  const x0 = WAAGE_HALT[0] + gerade * Math.sin(TOR_WINKEL) + r * (1 - Math.cos(TOR_WINKEL));
+  const gier = Math.PI + TOR_WINKEL;
+  const aussen: [number, number] = [x0 + 13 * Math.tan(TOR_WINKEL), 42];
+  const lagen = bahnLagen({ x: x0, z: 29, gier }, [
+    { art: "S", laenge: gerade },
+    { art: "L", laenge: r * TOR_WINKEL },
+  ], r, 1);
+  return [aussen, ...lagen.map((l) => [l.x, l.z] as [number, number]).slice(0, -1), WAAGE_HALT];
+}
+/** Einfahrt bis auf die Waage. */
+const TOR_REIN = torweg();
+/**
+ * DIE AUSFAHRT ZUR WAAGE UND DURCHS TOR — fuer jede Strecke dieselbe (E-140).
+ *
+ * Hinaus fuehrt die Kabine, und die ist 5,5 m vor der Hinterachse. Wer erst
+ * auf der Waage abbiegt, haengt mit der linken Vorderecke am Westpfosten.
+ * Deshalb zieht der Wagen schon auf der Waage um 20 Grad nach rechts und
+ * faehrt die Gerade durchs Tor; beim Kontrollhalt (Ursprung z 23,5) steht er
+ * also leicht schraeg auf der Bruecke. Gerechnet gegen beide Pfosten: Die
+ * Gerade kreuzt die Mauerflucht bei x −24,1; Vorder- und Hinterecke bleiben
+ * rund 0,6 m vor dem Westpfosten (x −26,5).
+ *
+ * Auf die Waagenspur kommt er schraeg von Suedosten, wie bisher ueber den
+ * alten Wegpunkt (−21 | 10): Von Sueden her steht der dritte Warteplatz im
+ * Weg. Der Bogen von Nordwest auf Nord (45 Grad, `RANGIER.radiusVor`) endet
+ * auf z 17,6 und laesst dessen Nordostecke 0,5 m frei.
+ */
+const TOR_RAUS: Array<[number, number]> = (() => {
+  const r = RANGIER.radiusVor;
+  const w = (20 * Math.PI) / 180;
+  const nw = Math.PI / 4;
+  // 0,3 m oestlich der Waagenmitte: Der Bahnfolger hinkt im Bogen etwas
+  // nach, und jeder Zentimeter davon geht am Pfosten ab.
+  const x = WAAGE_HALT[0] + 0.3;
+  const zBogen2 = 22.5 - r * Math.sin(w);
+  const zBogen1 = 17.6;
+  const start = {
+    x: x + r * (1 - Math.cos(nw)) + 4 * Math.sin(nw),
+    z: zBogen1 - r * Math.sin(nw) - 4 * Math.cos(nw),
+    gier: -nw,
+  };
+  const lagen = bahnLagen(
+    start,
+    [
+      { art: "S", laenge: 4 },
+      { art: "R", laenge: r * nw },
+      { art: "S", laenge: zBogen2 - zBogen1 },
+      { art: "R", laenge: r * w },
+    ],
+    r,
+    1
+  );
+  const ende = lagen[lagen.length - 1]!;
+  const aussen: [number, number] = [ende.x + (42 - ende.z) * Math.tan(w), 42];
+  return [...lagen.map((l) => [l.x, l.z] as [number, number]), aussen];
+})();
+
+export const ROUTE_IN_FWD: Array<[number, number]> = TOR_REIN;
 /**
  * DER ABLADEPLATZ — seit dem 14.09.2026 abends ein fester Ort in der
  * Suedostecke, und der Wagen steht mit der LAENGSSEITE zum Bagger.
@@ -180,36 +275,158 @@ export function abladestelle(): [number, number] {
  */
 export function routeApproach(): Array<[number, number]> {
   /*
-   * Der letzte Knick vor der Abladespur ist flach, und das ist gerechnet:
-   * Ein LKW nimmt am Wegpunkt sofort die Richtung des naechsten Stuecks an —
-   * er dreht sich auf der Stelle. Steht er dabei quer zur Ostmauer, schwenkt
-   * seine Ecke darueber hinaus. Bei der alten Fuehrung (−4 | −2) → (6,3 | −8)
-   * stand er 60 Grad schraeg und ragte 0,49 m in die Mauer.
-   *
-   * Aus (4 | −4) heraus sind es nur noch 30 Grad: Seine aeusserste Ecke liegt
-   * dann auf x 9,93, die Mauer steht innen bei 10,20 — 0,27 m Luft. Und der
-   * Zwischenpunkt (−4 | −4) haelt ihn beim Ausschwenken nach Osten 1,55 m
-   * suedlich der Flanke des untersten Silos.
+   * Seit E-140 der Rangierzug (`rangierAbladeplatz`): Bis dahin stand hier
+   * eine Punktkette, an deren Ende der Wagen sich um 169 Grad auf der Stelle
+   * drehte und dann zuruecksetzte.
    */
-  return [WAAGE_HALT, VERTEILER, [-21, 10], [-12, 4], [-4, -4], [4, -6], ABLADE_RANGIER];
+  return rangierAbladeplatz().anfahrt;
 }
 export function routeInRev(): Array<[number, number]> {
-  return [ABLADE_RANGIER, abladeStelle];
+  return rangierAbladeplatz().rueckweg;
+}
+
+/* ------------------------------------------------ RANGIERZUEGE (E-140) -- */
+
+/**
+ * WAS DER RANGIERZUG UMFAHREN MUSS — mehr als die Bauwerksliste.
+ *
+ * Die festen Bauwerke, dazu vier Dinge, die keine Bauwerke sind und trotzdem
+ * im Weg stehen, wenn ein Laster dort wendet:
+ *
+ *   - der Muellcontainer an seinem Startplatz (beweglich, `CONFIGS`),
+ *   - das LKW-Wrack an der Ostmauer an seinem Startplatz (E-135),
+ *   - der Baggerstand mit 3 m Rand (Heck und Ketten),
+ *   - die drei Warteplaetze — dort kann ein Wagen stehen; der eigene Platz
+ *     zaehlt nicht, sonst kaeme niemand hinein.
+ */
+export function planHindernisse(ohneSlot: readonly [number, number] | null = null): Rechteck[] {
+  const out: Rechteck[] = [...fahrHindernisse()];
+  for (const slot of PARK_SLOTS) {
+    if (ohneSlot && slot[0] === ohneSlot[0] && slot[1] === ohneSlot[1]) continue;
+    const b = fahrzeugUmriss({ x: slot[0], z: slot[1], rot: Math.PI }, RANGIER.bedLen);
+    out.push({ x: b.x, z: b.z, hw: b.hw, hd: b.hd });
+  }
+  return out;
+}
+
+/**
+ * Was ein fahrender Wagen nie beruehren darf — die Bauwerke und, an ihren
+ * Startplaetzen, Muellcontainer, LKW-Wrack und Bagger. Die Waechter
+ * (`test/knicklauf.ts`) fahren dagegen; die Warteplaetze stehen nicht darin,
+ * weil ein Wagen in seinen eigenen hineinfahren muss.
+ */
+export function fahrHindernisse(): Array<Rechteck & { label: string }> {
+  const out: Array<Rechteck & { label: string }> = [...STATIC_OBSTACLES];
+  const muell = CONFIGS.find((c) => c.id === "r_rubble");
+  if (muell) {
+    out.push({ x: muell.x, z: muell.z, hw: muell.size[0] / 2, hd: muell.size[1] / 2, label: "MUELL Startplatz" });
+  }
+  // Wrack 6,00 x 2,50 m, laengs (`startplatz.ts`)
+  out.push({ x: START_LKW.x, z: START_LKW.z, hw: 1.25, hd: 3.0, label: "LKW-Wrack Startplatz" });
+  out.push({ x: BAGGER_STAND.x, z: BAGGER_STAND.z, hw: 3, hd: 3, label: "Baggerstand" });
+  return out;
+}
+
+const rangierSpeicher = new Map<string, Rangierzug>();
+/**
+ * Ein Rangierzug, einmal gerechnet und dann gemerkt. Die Getter der
+ * Fahrzeuge fragen je Bild; gerechnet wird nur beim ersten Mal (gemessen
+ * unter 10 ms je Zug auf dem Dev-PC, `tools/einspur-plan.ts`).
+ */
+function rangierzug(
+  vorlauf: ReadonlyArray<readonly [number, number]>,
+  halt: readonly [number, number],
+  gierHalt: number,
+  ohneSlot: readonly [number, number] | null = null,
+  bedLen = RANGIER.bedLen
+): Rangierzug {
+  const key = JSON.stringify([vorlauf, halt, gierHalt, ohneSlot, bedLen]);
+  let z = rangierSpeicher.get(key);
+  if (!z) {
+    z = planeRangierzug(vorlauf, halt, gierHalt, planHindernisse(ohneSlot), bedLen);
+    rangierSpeicher.set(key, z);
+  }
+  return z;
+}
+
+/** Alle bisher gerechneten Rangierzuege — fuer Waechter und Werkzeuge. */
+export function rangierzuege(): Rangierzug[] {
+  return [...rangierSpeicher.values()];
+}
+
+/**
+ * DER ABLADEPLATZ (E-140). Der Wagen steht dort mit der Kabine nach +z, er
+ * setzt also rueckwaerts nach −z hinein. Kommt er von der Waage, schaut er in
+ * die falsche Richtung — vorbeifahren, wenden, im Bogen zuruecksetzen. Die
+ * feste Anfahrt endet bei (−12 | 4) mitten auf dem freien Platz; von dort
+ * rechnet `planeRangierzug` den Zug.
+ */
+export function rangierAbladeplatz(): Rangierzug {
+  return rangierzug([WAAGE_HALT, VERTEILER, [-21, 10], [-12, 4]], abladeStelle, 0);
 }
 export function routeOut(): Array<[number, number]> {
-  return [
-    abladeStelle,
-    ABLADE_RANGIER,
-    [4, -6],
-    [-4, -4],
-    [-12, 4],
-    [-21, 10],
-    VERTEILER,
-    WAAGE_HALT,
-    [GATE_X, 28],
-    [GATE_X, 40],
-  ];
+  return zumTor([abladeStelle, ABLADE_RANGIER]);
 }
+
+/**
+ * VOM HALTEPLATZ ZUM TOR (E-140) — jede Ausfahrt endet gleich.
+ *
+ * Die Ausfahrt begann frueher mit derselben Punktkette wie die Anfahrt,
+ * rueckwaerts gelesen. Mit echtem Wendekreis taugt das nicht mehr: An
+ * (−21 | 10) und am Verteiler knickte sie um 45 Grad, und wer diese Knicke
+ * ausfaehrt, kommt schraeg auf die Waage und haengt am Torpfosten.
+ *
+ * Jetzt fuehrt vom Ende der Gasse ein Weg aus Kreisboegen (`RANGIER.radiusVor`)
+ * und Geraden genau auf den Anfang der Torausfahrt (`TOR_RAUS`), gerade nach
+ * Norden. Er wird gegen dieselbe Liste geprueft wie der Rangierzug; liegt der
+ * kuerzeste Weg in einem Bauwerk, wird er ueber einen der alten Wegpunkte
+ * gefuehrt (`TOR_ANKER`).
+ */
+function zumTor(
+  vorher: Array<[number, number]>,
+  ohneSlot: readonly [number, number] | null = null
+): Array<[number, number]> {
+  const key = JSON.stringify(["tor", vorher, ohneSlot]);
+  const schon = torSpeicher.get(key);
+  if (schon) return schon;
+  const r = RANGIER.radiusVor;
+  const n = vorher.length;
+  const [ax, az] = vorher[n - 1]!;
+  const [bx, bz] = vorher[n - 2]!;
+  const a: Pose = { x: ax, z: az, gier: Math.atan2(ax - bx, az - bz) };
+  const ziel: Pose = { x: TOR_RAUS[0]![0], z: TOR_RAUS[0]![1], gier: -Math.PI / 4 };
+  const hind = planHindernisse(ohneSlot);
+  const frei = (von: Pose, nach: Pose): Pose[] | null => {
+    for (const b of dubins(von, nach, r)) {
+      const lagen = bahnLagen(von, b.glieder, r, 1);
+      if (bahnTiefe(lagen, hind) <= 0) return lagen;
+    }
+    return null;
+  };
+  let weg = frei(a, ziel);
+  for (const m of TOR_ANKER) {
+    if (weg) break;
+    const eins = frei(a, m);
+    const zwei = eins && frei(m, ziel);
+    if (eins && zwei) weg = [...eins, ...zwei.slice(1)];
+  }
+  // Kein freier Weg: der kuerzeste — der Waechter meldet ihn dann.
+  weg ??= bahnLagen(a, dubins(a, ziel, r)[0]!.glieder, r, 1);
+  const out: Array<[number, number]> = [
+    ...vorher,
+    ...weg.slice(1, -1).map((l) => [l.x, l.z] as [number, number]),
+    ...TOR_RAUS,
+  ];
+  torSpeicher.set(key, out);
+  return out;
+}
+const torSpeicher = new Map<string, Array<[number, number]>>();
+/** Zwischenziele, falls der direkte Weg zum Tor verbaut ist: die alten Wegpunkte, Richtung Waage. */
+const TOR_ANKER: Pose[] = [
+  { x: -21, z: 10, gier: -Math.PI / 4 },
+  { x: -12, z: 4, gier: -Math.PI / 4 },
+  { x: -22, z: 9, gier: 0 },
+];
 
 /*
  * ABHOLUNG — zum VERLADEPLATZ vor der Silo-Reihe.
@@ -231,11 +448,7 @@ export function routeOut(): Array<[number, number]> {
  * Der Weg kreuzt die Anlieferung nicht: Der Kipper faehrt oestlich an den
  * Bagger, der Abholer westlich an die Silos.
  */
-export const PICKUP_IN_FWD: Array<[number, number]> = [
-  [GATE_X, 40],
-  [GATE_X, 28],
-  WAAGE_HALT,
-];
+export const PICKUP_IN_FWD: Array<[number, number]> = ROUTE_IN_FWD;
 /**
  * Die LKW-Spur des Verladeplatzes und der Punkt, an dem der Abholer steht.
  *
@@ -423,7 +636,7 @@ export function abholPlatzFuer(order: string | null): AbholPlatz {
       halt: [ABLADE_SPUR_X, ABLADE_HALT_Z],
       stand: { x: BAGGER_STAND.x, z: BAGGER_STAND.z },
       anfahrt: routeApproach(),
-      rueckweg: [ABLADE_RANGIER, [ABLADE_SPUR_X, ABLADE_HALT_Z]],
+      rueckweg: routeInRev(),
       ausfahrt: routeOut(),
     };
   }
@@ -433,25 +646,27 @@ export function abholPlatzFuer(order: string | null): AbholPlatz {
    * Von der Waage in die leere Suedwesthaelfte. Der Knick bei (−22 | 9) haelt
    * die Gerade oestlich der Hallenfront (x −30,6) und westlich der
    * Silo-Gasse; dazwischen steht auf dieser Haelfte des Platzes nichts.
+   *
+   * Ab dort der Rangierzug (E-140): Die Kabine schaut im Halt dorthin, woher
+   * die Spur kommt (zum Rangierpunkt), der Wagen setzt also rueckwaerts
+   * hinein.
    */
-  const kopf: Array<[number, number]> = [WAAGE_HALT, VERTEILER, [-22, 9], rangier];
+  const zug = rangierzug(
+    ANFAHRT_KOPF,
+    halt,
+    Math.atan2(rangier[0] - halt[0], rangier[1] - halt[1]),
+    null,
+    BED_LEN.abholer
+  );
   return {
     order,
     ziel,
     name: `Verladeplatz ${ziel.label}`,
     halt,
     stand: verladeStandFuer(ziel),
-    anfahrt: kopf,
-    rueckweg: [rangier, halt],
-    ausfahrt: [
-      halt,
-      rangier,
-      [-22, 9],
-      VERTEILER,
-      WAAGE_HALT,
-      [GATE_X, 28],
-      [GATE_X, 40],
-    ],
+    anfahrt: zug.anfahrt,
+    rueckweg: zug.rueckweg,
+    ausfahrt: zumTor([halt, rangier]),
   };
 }
 
@@ -635,10 +850,6 @@ export function faehrtInsSilo(kind: string, lagerMulde: ContainerConfig | null):
  */
 export const MULDEN_GASSE_X = -28.0;
 export const MULDEN_GASSE_Z = -17.0;
-/** Die Ecke, an der beide Schenkel ineinander uebergehen. */
-const GASSEN_ECKE: [number, number] = [MULDEN_GASSE_X, MULDEN_GASSE_Z];
-/** Wo die Gasse von der Waage her beginnt — suedlich der dritten Halle. */
-const GASSEN_KOPF: [number, number] = [MULDEN_GASSE_X, -2.0];
 
 /**
  * Wie weit der Wagen in das Silo zurueckstoesst (Wagenmitte).
@@ -688,18 +899,23 @@ export function bayApproach(c: ContainerConfig): Array<[number, number]> {
    * 7 Grad aus der Suedrichtung, seine westlichste Ecke liegt damit auf
    * −30,02 — 0,58 m Luft. Ein schaerferer Knick kostete pro Grad rund 7 cm.
    */
-  const kopf: Array<[number, number]> = [WAAGE_HALT, VERTEILER, [-27, 6], GASSEN_KOPF];
-  if (!amSuedschenkel(c)) return [...kopf, gassenHalt(c)];
-  return [...kopf, GASSEN_ECKE, gassenHalt(c)];
+  return rangierSilo(c).anfahrt;
 }
 export function bayInRev(c: ContainerConfig): Array<[number, number]> {
-  return [gassenHalt(c), muldenHalt(c)];
+  return rangierSilo(c).rueckweg;
+}
+/**
+ * In das Silo setzt der Kipper rueckwaerts (E-140): Die Kabine schaut zur
+ * Gasse. Die feste Anfahrt endet am Gassenkopf; den Zug dorthin rechnet
+ * `planeRangierzug`.
+ */
+function rangierSilo(c: ContainerConfig): Rangierzug {
+  const [gx, gz] = gassenHalt(c);
+  const [mx, mz] = muldenHalt(c);
+  return rangierzug(ANFAHRT_KOPF, [mx, mz], Math.atan2(gx - mx, gz - mz));
 }
 export function bayOut(c: ContainerConfig): Array<[number, number]> {
-  const zurueck: Array<[number, number]> = amSuedschenkel(c)
-    ? [muldenHalt(c), gassenHalt(c), GASSEN_ECKE, GASSEN_KOPF]
-    : [muldenHalt(c), gassenHalt(c), GASSEN_KOPF];
-  return [...zurueck, [-27, 6], VERTEILER, WAAGE_HALT, [GATE_X, 28], [GATE_X, 40]];
+  return zumTor([muldenHalt(c), gassenHalt(c)]);
 }
 
 /**
@@ -774,20 +990,54 @@ export function routeToPark(
   ausfahrt: Array<[number, number]>,
   slot: [number, number]
 ): Array<[number, number]> {
-  const bucht = parkAnfahrt(slot);
-  let abzweig = 0;
-  let naechster = Infinity;
-  for (let i = 0; i < ausfahrt.length; i++) {
-    const d = Math.hypot(ausfahrt[i]![0] - bucht[0], ausfahrt[i]![1] - bucht[1]);
-    if (d < naechster) {
-      naechster = d;
-      abzweig = i;
-    }
+  return parkZug(ausfahrt, slot).anfahrt;
+}
+
+/**
+ * VOM WARTEPLATZ ZUM TOR (E-140): aus der Bucht nach vorn und von dort wie
+ * jede Ausfahrt auf die Waage. Der Wagen steht mit der Kabine zum Platz.
+ */
+export function parkAusfahrt(slot: [number, number]): Array<[number, number]> {
+  return zumTor([[slot[0], slot[1]], parkAnfahrt(slot)], slot);
+}
+
+/**
+ * VOM WARTEPLATZ AN DEN ABLADEPLATZ ODER INS SILO (E-131, E-140) — fuer die
+ * Fuhren, die zum Start schon anstehen. Aus der Bucht nach vorn, dann der
+ * Rangierzug wie von der Waage aus.
+ */
+export function anfahrtVomPlatz(slot: [number, number], silo: ContainerConfig | null): Rangierzug {
+  const vorlauf: Array<[number, number]> = [[slot[0], slot[1]], parkAnfahrt(slot)];
+  if (silo) {
+    const [gx, gz] = gassenHalt(silo);
+    const [mx, mz] = muldenHalt(silo);
+    return rangierzug(vorlauf, [mx, mz], Math.atan2(gx - mx, gz - mz), slot);
   }
-  const bis: Array<[number, number]> = ausfahrt
-    .slice(0, abzweig + 1)
-    .map((p) => [p[0], p[1]] as [number, number]);
-  return [...bis, bucht];
+  neueAbladestelle();
+  return rangierzug(vorlauf, abladeStelle, 0, slot);
+}
+
+/** Der Rueckweg in die Bucht zu dieser Anfahrt (E-140, Gegenstueck zu `routeToPark`). */
+export function routeParkRueckVon(
+  ausfahrt: Array<[number, number]>,
+  slot: [number, number]
+): Array<[number, number]> {
+  return parkZug(ausfahrt, slot).rueckweg;
+}
+
+/**
+ * Ausfahrt bis zum Abzweig, dann der Rangierzug in die Bucht (E-140): Der
+ * Wagen setzt rueckwaerts hinein und steht mit der Kabine zum Platz.
+ */
+function parkZug(ausfahrt: Array<[number, number]>, slot: [number, number]): Rangierzug {
+  /*
+   * E-140: Abgebogen wird gleich am Ende der Gasse. Bis dahin bog der Wagen
+   * am Punkt der Ausfahrt ab, der der Bucht am naechsten lag — dort faehrt er
+   * aber schon in Richtung Tor und muesste zum Zuruecksetzen ganz wenden. Ab
+   * der Gasse rechnet `planeRangierzug` einen Weg, der vorbeifuehrt und
+   * rueckwaerts in die Bucht setzt.
+   */
+  return rangierzug(ausfahrt.slice(0, 2), slot, Math.PI, slot);
 }
 
 /**

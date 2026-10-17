@@ -105,8 +105,17 @@ describe("Jede Fahrstrecke ist auf ganzer Länge frei", () => {
       strecke(`Anfahrt ${c.label}`, an.slice(0, an.length - 1));
       const aus = endlich(bayOut(c), `Ausfahrt ${c.label}`);
       strecke(`Ausfahrt ${c.label}`, aus.slice(1));
-      // Und das letzte Stück in die Mulde hinein steht wenigstens in der Spur
-      expect(bayInRev(c).length).toBe(2);
+      /*
+       * Und das letzte Stueck in die Mulde hinein ist eine Gerade. Bis E-140
+       * bestand der Rueckweg aus genau zwei Punkten; seit dem Rangierzug
+       * (`rangierplan.ts`) beginnt er mit einem Bogen und endet mit
+       * mindestens 6 m Geraden in der Spur der Mulde.
+       */
+      const rev = bayInRev(c);
+      const [ex, ez] = rev[rev.length - 1]!;
+      const [vx, vz] = rev[rev.length - 2]!;
+      const quer = c.facing === "north" ? Math.abs(vx - ex) : Math.abs(vz - ez);
+      expect(quer, `${c.label}: die letzte Gerade liegt nicht in der Spur`).toBeLessThan(0.01);
     });
   }
 });
