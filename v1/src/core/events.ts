@@ -140,6 +140,8 @@ export interface GameEvents {
     massKg: number;
     wucht: number;
     blech: boolean;
+    /** Späneknäuel (E-147): raschelt wie Draht statt nach Blech zu klingen */
+    spaene?: boolean;
     untergrund: "beton" | "stahl" | "schrott";
     x: number;
     y: number;

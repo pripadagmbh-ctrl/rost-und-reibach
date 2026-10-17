@@ -701,6 +701,7 @@ async function main(): Promise<void> {
       massKg: item.massKg,
       wucht,
       blech: items.isCrushable(item),
+      spaene: item.shape?.spaene !== undefined,
       // ponytail: "auf Schrott" nach Hoehe der Teilmitte (ueber 0,7 m); Strahl nach unten, falls es falsch klingt
       untergrund: stahlGrund(p.x, p.y, p.z) ? "stahl" : p.y > 0.7 ? "schrott" : "beton",
       x: p.x,

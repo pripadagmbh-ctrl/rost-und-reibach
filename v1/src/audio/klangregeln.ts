@@ -323,11 +323,13 @@ export function aufprallKlang(e: {
   massKg: number;
   wucht: number;
   blech: boolean;
+  spaene?: boolean;
   untergrund: Untergrund;
 }): AufprallRezept | null {
   if (!(e.wucht >= SCHLAG_AB_MS)) return null;
   const pegel = aufprallPegel(e.wucht, e.massKg);
-  const fam = FAMILIEN[familieVon(e.materialId, e.massKg, e.blech)]!;
+  // Späne rascheln wie Draht (E-147), obwohl sie als Mischschrott sonst Blech wären
+  const fam = FAMILIEN[e.spaene ? "kabel" : familieVon(e.materialId, e.massKg, e.blech)]!;
   // Groesser klingt tiefer: 80 kg ist die Mitte, gedeckelt auf ±30 %.
   const hoehe =
     (TONHOEHE[e.materialId] ?? 1) *
