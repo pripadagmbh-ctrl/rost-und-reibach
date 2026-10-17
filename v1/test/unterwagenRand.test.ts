@@ -53,6 +53,9 @@ function pruefung(pos: THREE.Vector3, heading: { rad: number }): ExcavatorCollis
     obstacleBodies: new Set<number>(),
     grippedHandles: new Set<number>(),
     getStaffPos: () => null,
+    // chassisHits() fragt weder Greiferkoerper noch eigene Kollider (E-137)
+    grappleBody: () => null as unknown as RAPIER.RigidBody,
+    selfHandles: new Set<number>(),
   });
 }
 
