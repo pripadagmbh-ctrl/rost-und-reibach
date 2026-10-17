@@ -554,6 +554,16 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 17.10.2026, Ton** — Patrick, wörtlich: „ton agent nochmal
+      anschmeissen, möglichst nur realistische töne verwenden und so wenig wie
+      möglich selbst komponierte die unrealistisch klingen und sich nicht mit
+      den realtönen vertragen" (E-153)
+
+      | # | Punkt |
+      |---|---|
+      | 20a | Möglichst nur echte Aufnahmen |
+      | 20b | Selbst erzeugte Klänge, die unecht klingen und nicht zu den Aufnahmen passen, raus |
+
 - [ ] **Gerätebefund 17.10.2026: schwere Großteile** — Patrick, wörtlich:
       „extrem schwere bzw. grosse objekte lassen sich oft nicht greifen oder
       verlangsamen den bager unnatürlich" (Stand live 16216bd, mit E-137)
