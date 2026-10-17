@@ -860,7 +860,7 @@ async function main(): Promise<void> {
   // Fahrer fahren weder durch den Bagger noch über liegenden Schrott (Kap. 13)
   vehicles.getExcavatorPos = () => excavator.position;
   vehicles.onHonk = () => {
-    audio.playWrong();
+    audio.playHupe();
     hud.toast("Der Fahrer hupt — Fahrspur ist blockiert!");
   };
   // Brückenwaage: voll rein, leer raus → Kunde bekommt sein Geld

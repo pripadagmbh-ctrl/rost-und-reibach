@@ -554,6 +554,13 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Gerätebefund 17.10.2026: verzinkt** — Patrick, wörtlich: „verzinkt ist
+      kein buntmetall". Betroffen: Gerüstrahmen (Paket, verzinkt), Gerüstrohre
+      verzinkt (Bund), Gerüstfeld, Verzinkte Gitterroste, Verzinkte
+      Leitungsrinnen — alle standen als Zink (Buntmetall). Verzinkter Stahl ist
+      Stahl; die eine Regel (E-042/E-138) entscheidet Stahl- oder Mischschrott.
+      Echtes Zink (Dachrinne, Zinkblech, Fallrohr, Anoden) bleibt Zink.
+
 - [ ] **Antworten 17.10.2026 zu Ton und Kabine** — Radio: „Aus beim Start".
       Hupe: „Echte Hupe holen". Feierabend: „Werkssirene oder Glocke".
       Hebelseiten: „Tauschen" (E-144). Freigegebene Downloads (CC0,
