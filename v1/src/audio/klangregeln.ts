@@ -547,6 +547,24 @@ export function spinnenDruecken(staerke01: number, grund: SpinnenGrund): Schicht
   }
 }
 
+/* --------------------------------------------- Lasthebemagnet (E-151) -- */
+
+/** Viele Teile schlagen kurz nacheinander an: ein Klonk je so viel Zeit. SW: 0,12 s. */
+export const KLONK_ABSTAND_S = 0.12;
+/** Magnet an: der Generator zieht am Diesel — so viel mehr Drehzahl (Abspieltempo) und Pegel. SW. */
+export const MAGNET_DREHZAHL = 0.06;
+export const MAGNET_LAUT = 0.015;
+
+/**
+ * Pegel des Klonks aus der neu haftenden Masse: 5 kg leise (0,3), ab 500 kg
+ * voll, logarithmisch dazwischen — ein Träger klonkt deutlich, nicht
+ * hundertmal lauter als eine Dose. SW.
+ */
+export function klonkPegel(massKg: number): number {
+  const m = Math.max(0, massKg);
+  return Math.min(1, Math.max(0.3, 0.3 + 0.35 * Math.log10(Math.max(m, 1) / 5)));
+}
+
 /* ----------------------------------------------- Aufnahmen-Liste (E-130) -- */
 
 /** Dauerklaenge: je eine Schleife aus `public/ton/`. */

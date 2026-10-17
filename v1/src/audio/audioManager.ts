@@ -38,6 +38,10 @@ import {
   spinnenDruecken,
   Stimmenbudget,
   VOLLE_KRAFT_KN,
+  KLONK_ABSTAND_S,
+  klonkPegel,
+  MAGNET_DREHZAHL,
+  MAGNET_LAUT,
   type AufprallRezept,
   type Schlag,
   type SpinnenGrund,
@@ -165,6 +169,10 @@ export class AudioManager {
       bus.on("greifer:zugedrueckt", (e) => this.playBiss(e.kraftKN));
       bus.on("released", () => this.playLoslassen());
       bus.on("wrack:geknautscht", (e) => this.playKnautsch(e.zuwachs));
+      // E-151: Lasthebemagnet
+      bus.on("magnet:an", () => this.playMagnet(true));
+      bus.on("magnet:aus", () => this.playMagnet(false));
+      bus.on("magnet:haftet", (e) => this.playMagnetKlonk(e.massKg));
       // E-139: Hämmern und Drücken mit der Spinne
       bus.on("spinne:aufschlag", (e) => this.playSpinnenAufschlag(e.wucht, e.untergrund));
       bus.on("spinne:druecken", (e) => this.playSpinnenDruecken(e.staerke, e.untergrund));
@@ -690,8 +698,10 @@ export class AudioManager {
     const t = this.ctx.currentTime;
     if (this.motorQuelle) {
       // E-130, SW: Drehzahl als Abspieltempo 0,9…1,3; die Aufnahme liegt bei −3 dBFS
-      this.motorQuelle.playbackRate.setTargetAtTime(0.9 + 0.3 * activity + 0.1 * load, t, 0.15);
-      this.engineGain.gain.setTargetAtTime(0.06 + 0.07 * activity + 0.02 * load, t, 0.15);
+      // E-151: Ist der Magnet an, zieht der Generator am Diesel — er dreht etwas hoeher und lauter
+      const gen = this.magnetAn ? 1 : 0;
+      this.motorQuelle.playbackRate.setTargetAtTime(0.9 + 0.3 * activity + 0.1 * load + MAGNET_DREHZAHL * gen, t, 0.15);
+      this.engineGain.gain.setTargetAtTime(0.06 + 0.07 * activity + 0.02 * load + MAGNET_LAUT * gen, t, 0.15);
     } else if (this.engineOsc) {
       // Beim Bedienen geht der Motor spürbar hoch — das trägt das Feedback
       this.engineOsc.frequency.setTargetAtTime(46 * (1 + 0.55 * activity + 0.22 * load), t, 0.12);
@@ -1115,6 +1125,47 @@ export class AudioManager {
    * („tut-tuuut"), wie ein Fahrer, der ungeduldig wird. Gruppe Bagger: ein
    * Signal des Platzbetriebs, kein Metallklang.
    */
+  private magnetAn = false;
+  private letzterKlonk = -1;
+
+  /**
+   * Lasthebemagnet an oder aus (`magnet:an` / `magnet:aus`, E-151): das
+   * Schütz klackt — trocken (Kunststoff-Klacken, tiefer gelegt) mit einem
+   * leisen Metallanschlag darunter. Beim Ausschalten etwas heller und leiser,
+   * dann fällt die Last (deren Aufprall kommt über `schrott:aufprall`).
+   *
+   * KEIN BRUMMEN: Ein echter Magnet brummt mit 50/100 Hz — ein stehender Ton,
+   * genau der Ufo-Befund (16.10.), und im Bestand gibt es keine Aufnahme davon.
+   * Was man an einem echten Magnetbagger hört, ist der Generator: Der Diesel
+   * zieht an. Darum dreht der Motor (`updateEngine`) etwas höher und lauter,
+   * solange der Magnet an ist — die vorhandene Aufnahme, kein neuer Ton.
+   */
+  playMagnet(an: boolean): void {
+    this.magnetAn = an;
+    this.spiele(EINZEL_KLICK, an ? 0.45 : 0.35, { rate: an ? 0.8 : 0.95, bagger: true }); // SW
+    this.spiele(EINZEL.anschlag, an ? 0.12 : 0.08, { rate: 0.7, tp: 2000, delay: 0.005, bagger: true }); // SW
+  }
+
+  /**
+   * Teile schlagen an der Magnetscheibe an (`magnet:haftet`, E-151): ein
+   * dumpfer Klonk — Stahl gegen die Stahlplatte, mit Tiefpass. Lauter mit
+   * der Masse. Kommen viele kurz nacheinander, klingt nur einer je
+   * `KLONK_ABSTAND_S`; der Rest klappert leise im Rasselbett.
+   */
+  playMagnetKlonk(massKg: number): void {
+    if (!this.ctx || !(massKg > 0)) return;
+    const t = this.ctx.currentTime;
+    const p = klonkPegel(massKg);
+    if (t - this.letzterKlonk < KLONK_ABSTAND_S) {
+      this.rassle(t, 0.2 * p); // SW
+      return;
+    }
+    this.letzterKlonk = t;
+    const r = 0.8 + Math.random() * 0.1; // SW: tief, ±5 %
+    this.spiele(FAMILIE_STAHL, AUFNAHME_LAUT * 0.25 * p, { rate: r, tp: 2500 });
+    this.spiele(GRUND_STAHL, AUFNAHME_LAUT * 0.2 * p, { rate: r });
+  }
+
   playHupe(): void {
     this.spiele(EINZEL.hupe, 0.45, { dauer: 0.3, bagger: true }); // SW
     this.spiele(EINZEL.hupe, 0.5, { delay: 0.45, bagger: true }); // SW

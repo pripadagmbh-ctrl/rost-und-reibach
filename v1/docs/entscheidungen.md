@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-151 | 17.10.2026 | Magnet klackt, Teile klonken, Generator statt Brummen | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-146 | 17.10.2026 | Lasthebemagnet als dritter Greifer: nur Eisen und Stahl haften | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-145 | 17.10.2026 | Gehaltene Körper bleiben an Wänden, Wegschwenken geht immer | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-148 | 17.10.2026 | Echte Hupe, Werkssirene zum Feierabend, Werksklingel als Alternative | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -161,6 +162,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-151 — Ton des Lasthebemagneten** (iPad-Lautsprecher)
+- Magnet ein- und ausschalten: kräftiges, trockenes Klacken wie ein Schütz?
+- Magnet zehn Sekunden an: Arbeitet der Motor hörbar mehr? Fehlt ein Brummen, oder gut so?
+- Auf einen Stahlträger, dann auf einen Haufen kleiner Teile: Klonkt der Träger schwer, und rattert der Haufen nicht?
+- Über der Mulde ausschalten: Klacken, dann fallen die Teile hörbar?
 
 **E-146 — Lasthebemagnet**
 - Pausenmenü → „Greifer → Lasthebemagnet": Scheibe mit gelbem Ring, Kabel und roter Lampe am Arm? Leuchtet die Lampe beim „Schließen"?

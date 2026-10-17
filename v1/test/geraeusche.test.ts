@@ -37,6 +37,7 @@ import {
 } from "../src/audio/klangregeln";
 import { LAUT_START, leseLautstaerken } from "../src/audio/lautstaerke";
 import { FEIERABEND_KLANG } from "../src/audio/audioManager";
+import { klonkPegel, KLONK_ABSTAND_S } from "../src/audio/klangregeln";
 
 // ---------------------------------------------------------------- Attrappen
 
@@ -759,6 +760,9 @@ describe("Lautstaerke je Gruppe (E-139, Wunsch 17.10.2026)", () => {
       mgr.playSterne(2);
       mgr.playFeierabend();
       mgr.playHupe();
+      bus.emit("magnet:an", {});
+      bus.emit("magnet:haftet", { massKg: 200 });
+      bus.emit("magnet:aus", {});
       ctx.currentTime += 1;
       mgr.playCrash(1);
       const karte = karteVon(mgr);
@@ -860,5 +864,67 @@ describe("Echte Signale: Hupe, Sirene, Klingel (E-148)", () => {
     const stern = ctx.alleQuellen.slice(vorher);
     expect(stern).toHaveLength(1);
     expect(stern[0]!.startAt as number).toBeGreaterThanOrEqual(ctx.currentTime + 4.9);
+  });
+});
+
+// --------------------------------------------- 10. Lasthebemagnet (E-151)
+
+describe("Lasthebemagnet: Klacken, Klonk, kein Brummen (E-151)", () => {
+  /** Den Verbindungen folgen, bis eine Lautstaerkegruppe erreicht ist. */
+  const gruppeDerQuelle = (mgr: AudioManager, q: Record<string, unknown>): unknown => {
+    const gruppen = Object.values((mgr as unknown as { gruppen: Record<string, unknown> }).gruppen);
+    let k: Record<string, unknown> | undefined = q;
+    while (k && !gruppen.includes(k)) k = (k.ziele as Array<Record<string, unknown>>)[0];
+    return k;
+  };
+
+  it("an und aus klacken an der Gruppe Bagger — keine Schleife, kein Oszillator", async () => {
+    const { mgr, bus } = await starteMitAufnahmen();
+    const gr = (mgr as unknown as { gruppen: Record<string, unknown> }).gruppen;
+    ctx.currentTime += 1;
+    for (const ev of ["magnet:an", "magnet:aus"] as const) {
+      const n0 = ctx.alleQuellen.length;
+      const o0 = ctx.oszillatoren;
+      const namen = gespielt(() => bus.emit(ev, {}));
+      expect(namen.length, ev).toBeGreaterThan(0);
+      expect(ctx.oszillatoren - o0, ev).toBe(0);
+      for (const q of ctx.alleQuellen.slice(n0)) {
+        expect(q.loop, ev + ": eine Schleife waere ein Dauerton").toBe(false);
+        expect(gruppeDerQuelle(mgr, q)).toBe(gr.bagger);
+      }
+    }
+  });
+
+  it("solange der Magnet an ist, zieht der Generator am Diesel (statt eines Brummtons)", async () => {
+    const { mgr, bus } = await starteMitAufnahmen();
+    const motor = (mgr as unknown as { motorQuelle: { playbackRate: Param } }).motorQuelle;
+    mgr.updateEngine(0, 0);
+    const aus = motor.playbackRate.ziel;
+    bus.emit("magnet:an", {});
+    mgr.updateEngine(0, 0);
+    expect(motor.playbackRate.ziel).toBeGreaterThan(aus);
+    bus.emit("magnet:aus", {});
+    mgr.updateEngine(0, 0);
+    expect(motor.playbackRate.ziel).toBeCloseTo(aus);
+  });
+
+  it("haftet: Stahl-Klonk, schwerer = lauter, und kein Maschinengewehr", async () => {
+    expect(klonkPegel(500)).toBeGreaterThan(klonkPegel(5));
+    const { bus } = await starteMitAufnahmen();
+    ctx.currentTime += 1;
+    const leise = miss(() => bus.emit("magnet:haftet", { massKg: 5 })).lautester;
+    ctx.currentTime += 1;
+    const namen = gespielt(() => bus.emit("magnet:haftet", { massKg: 500 }));
+    expect(namen.some((n) => n.startsWith("stahl_"))).toBe(true);
+    ctx.currentTime += 1;
+    const laut = miss(() => bus.emit("magnet:haftet", { massKg: 500 })).lautester;
+    expect(laut).toBeGreaterThan(leise);
+    // zwanzig Teile in 0,2 s: hoechstens zwei Klonks
+    let klonks = 0;
+    for (let i = 0; i < 20; i++) {
+      ctx.currentTime += 0.01;
+      if (gespielt(() => bus.emit("magnet:haftet", { massKg: 30 })).length) klonks++;
+    }
+    expect(klonks).toBeLessThanOrEqual(Math.ceil(0.2 / KLONK_ABSTAND_S));
   });
 });
