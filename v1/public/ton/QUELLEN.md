@@ -16,6 +16,9 @@ Format: WAV, 16 bit, mono, 24000 Hz (wo in der Tabelle nicht anders angegeben). 
 | E | BigSoundBank #1771, #1776, #0235 (Stahlstangen fallen) | https://bigsoundbank.com/falling-sheet-steel-bar-1-s1771.html · https://bigsoundbank.com/fall-2-sheet-steel-bars-1-s1776.html · https://bigsoundbank.com/iron-bar-falls-2-s0235.html | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | F | BigSoundBank #0118, #0148, #0771 (Dose zerdrückt, Glas birst, Scherben) | https://bigsoundbank.com/can-that-are-crushed-s0118.html · https://bigsoundbank.com/glass-burst-s0148.html · https://bigsoundbank.com/broken-glass-s0771.html | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | H | Pixabay „Grua recicladora“ (Schrottplatz-Greifkran), Datei freesound_community-grua-recicladora-48744.mp3, von Patrick am 16.10.2026 selbst geladen. Original auf Freesound als CC0: Fhmediahmo #191965 | https://pixabay.com/sound-effects/film-special-effects-grua-recicladora-48744/ | [Pixabay Content License — Einbau ins Spiel erlaubt, Weitergabe der Datei für sich allein nicht](https://pixabay.com/service/license-summary/) |
+| J | BigSoundBank #2721 Truck Horn (LKW-Drucklufthupe) | https://bigsoundbank.com/truck-horn-s2721.html | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| K | BigSoundBank #1269 Industrial Doorbell #1 (elektrische Werksklingel) | https://bigsoundbank.com/industrial-doorbell-s1269.html | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| L | BigSoundBank #3260 National alert signal, end (Sirene, Entwarnung) | https://bigsoundbank.com/national-alert-signal-end-s3260.html | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 ## Ausschnitte
 
@@ -63,6 +66,9 @@ Format: WAV, 16 bit, mono, 24000 Hz (wo in der Tabelle nicht anders angegeben). 
 | kehr_beton.wav | 2.00 s | Spinne schleift über Beton: raues Schaben (Schleife) | Streuung aus A/footstep_concrete_000.ogg, A/footstep_concrete_001.ogg, A/footstep_concrete_002.ogg, A/footstep_concrete_003.ogg, A/footstep_concrete_004.ogg (95 Schläge) |
 | kehr_stahl.wav | 2.00 s | Spinne schleift über Ladefläche/Mulde: Kreischen (Schleife) | D/0914.ogg ab 9.60 s, 2.50 s; Streuung aus A/impactMetal_light_000.ogg, A/impactMetal_light_001.ogg, A/impactMetal_light_002.ogg, A/impactMetal_light_004.ogg (14 Schläge) |
 | rassel.wav | 2.00 s | Schrott rutscht und klappert; Spinne über Schrott (Schleife) | Streuung aus A/impactTin_medium_000.ogg, A/impactTin_medium_001.ogg, A/impactTin_medium_002.ogg, A/impactTin_medium_003.ogg, A/impactTin_medium_004.ogg, A/impactMetal_light_000.ogg, A/impactMetal_light_001.ogg, A/impactMetal_light_004.ogg, A/impactPlate_light_000.ogg, A/impactPlate_light_002.ogg (48 Schläge) |
+| hupe.wav | 1.23 s, 16 kHz | LKW-Drucklufthupe: der Fahrer hupt (im Spiel einmal oder doppelt) | J/2721.ogg ab 0.00 s, 1.30 s |
+| klingel.wav | 2.08 s, 16 kHz | Elektrische Werksklingel: Feierabend (Alternative zur Sirene) | K/1269.ogg ab 0.00 s, 2.20 s |
+| sirene.wav | 4.90 s, 12 kHz | Werkssirene: Feierabend — läuft hoch, steht kurz, läuft aus | L/3260.ogg ab 0.00 s, 3.20 s; L/3260.ogg ab 33.90 s, 2.00 s |
 | motor.wav | 3.00 s, 12 kHz | Dieselmotor im Stand (Schleife), Tempo folgt der Bedienung | C/2147.ogg ab 12.00 s, 3.50 s |
 
-Kürzel in der Spalte „Herausgeschnitten aus“: `A/…` Kenney Impact Sounds, `I/…` OpenGameArt 100 CC0 metal and wood SFX, `B/`–`F/` BigSoundBank (Nummer = Dateiname), `H/…` Pixabay-Greifkran (Pixabay Content License: Einbau ins Spiel erlaubt, die Datei für sich allein darf nicht weitergegeben werden — deshalb liegen hier nur Ausschnitte, gemischt mit anderen Klängen).
+Kürzel in der Spalte „Herausgeschnitten aus“: `A/…` Kenney Impact Sounds, `I/…` OpenGameArt 100 CC0 metal and wood SFX, `B/`–`F/` und `J/`–`L/` BigSoundBank (Nummer = Dateiname), `H/…` Pixabay-Greifkran (Pixabay Content License: Einbau ins Spiel erlaubt, die Datei für sich allein darf nicht weitergegeben werden — deshalb liegen hier nur Ausschnitte, gemischt mit anderen Klängen).

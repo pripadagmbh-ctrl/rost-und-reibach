@@ -4,9 +4,10 @@
  *
  * Drei Gruppen, jeder Klang hängt an genau einer:
  *  - bagger: Motor, Hydraulik (Druck, Ventil, Ölströmen), Zupacken, Loslassen,
- *    Bedienklick und Funk-Knacken (beides kommt aus der Kabine)
+ *    Bedienklick und Funk-Knacken (beides kommt aus der Kabine), dazu die
+ *    Signale des Betriebs: Hupe, Feierabendsirene/-klingel (E-148)
  *  - metall: alles, was Metall auf etwas trifft — Aufprall, Hämmern, Drücken,
- *    Knautschen, Krallen-Schnappen, Kratzen, Glas, Abriss, Glocke, Sterne
+ *    Knautschen, Krallen-Schnappen, Kratzen, Glas, Abriss, Sterne
  *  - musik: das Kabinenradio
  *
  * Gemerkt in localStorage, eigener Schlüssel: Lautstärke gehört zum Gerät,

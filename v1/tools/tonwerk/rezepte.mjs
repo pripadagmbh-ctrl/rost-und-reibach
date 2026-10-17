@@ -50,6 +50,10 @@ export const QUELLEN = {
     lizenz: "Pixabay Content License — Einbau ins Spiel erlaubt, Weitergabe der Datei für sich allein nicht",
     lizenzUrl: "https://pixabay.com/service/license-summary/",
   },
+  // E-148: von Patrick am 17.10.2026 freigegeben, vom Orchestrator geladen
+  J: { name: "BigSoundBank #2721 Truck Horn (LKW-Drucklufthupe)", url: "https://bigsoundbank.com/truck-horn-s2721.html", lizenz: "CC0 1.0", lizenzUrl: "https://creativecommons.org/publicdomain/zero/1.0/" },
+  K: { name: "BigSoundBank #1269 Industrial Doorbell #1 (elektrische Werksklingel)", url: "https://bigsoundbank.com/industrial-doorbell-s1269.html", lizenz: "CC0 1.0", lizenzUrl: "https://creativecommons.org/publicdomain/zero/1.0/" },
+  L: { name: "BigSoundBank #3260 National alert signal, end (Sirene, Entwarnung)", url: "https://bigsoundbank.com/national-alert-signal-end-s3260.html", lizenz: "CC0 1.0", lizenzUrl: "https://creativecommons.org/publicdomain/zero/1.0/" },
 };
 
 /** H: der echte Greifkran (Pixabay), relativ zu ton-roh/ */
@@ -246,6 +250,40 @@ export const REZEPTE = [
       rate: [0.8, 1.3],
       samen: 9,
     },
+  },
+
+  /* ------------------------------------------------- Signale (E-148) -- */
+  {
+    name: "hupe",
+    wofuer: "LKW-Drucklufthupe: der Fahrer hupt (im Spiel einmal oder doppelt)",
+    art: "einmal",
+    dauer: 1.3,
+    abtastrate: 16000, // SW: Schwerpunkt 1,2 kHz, ueber 8 kHz nur Rauschen
+    // J 0–1,3 s: der ganze Stoss, 0,4 s voll, dann der Hall ueber den Platz
+    schichten: [{ q: "J/2721.ogg", von: 0, dauer: 1.3, aus: 0.3 }],
+  },
+  {
+    name: "klingel",
+    wofuer: "Elektrische Werksklingel: Feierabend (Alternative zur Sirene)",
+    art: "einmal",
+    dauer: 2.2,
+    abtastrate: 16000, // SW: Groessenbudget (2 MB); klingt etwas dumpfer als roh
+    // K 0–2,2 s: 1,2 s Klingeln, dann das Ausschwingen der Glocke
+    schichten: [{ q: "K/1269.ogg", von: 0, dauer: 2.2, aus: 0.5 }],
+  },
+  {
+    name: "sirene",
+    wofuer: "Werkssirene: Feierabend — läuft hoch, steht kurz, läuft aus",
+    art: "einmal",
+    dauer: 4.9,
+    abtastrate: 12000, // SW: Grundton um 340 Hz, Obertoene bis 6 kHz genuegen
+    schichten: [
+      // L 0–3,2 s: Hochlauf, bei 3 s steht der Ton
+      { q: "L/3260.ogg", von: 0, dauer: 3.2, ein: 0.01, aus: 0.3 },
+      // L ab 33,9 s: hier beginnt der Auslauf (der Ton sinkt), uebergeblendet
+      // und in 1,6 s ausgeblendet — kein stehender Ton
+      { q: "L/3260.ogg", von: 33.9, dauer: 2.0, versatz: 2.9, ein: 0.3, aus: 1.6 },
+    ],
   },
 
   /* ------------------------------------------------------------- Motor -- */

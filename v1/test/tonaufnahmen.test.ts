@@ -72,8 +72,11 @@ describe("Aufnahmen (E-130)", () => {
       `[E-130 Messung] ${dateien.length} Aufnahmen, ${sekunden.toFixed(1)} s, ` +
         `${(bytes / 1048576).toFixed(2)} MB Dateien, ${speicherMB.toFixed(1)} MB im Speicher (48 kHz)`
     );
-    // SW-Deckel: 2 MB Download, 10 MB Speicher. Wer mehr will, braucht MP3/AAC (ffmpeg).
+    // SW-Deckel: 2 MB Download, 12 MB Speicher. Wer mehr will, braucht MP3/AAC (ffmpeg).
+    // E-148: Speicher 10 → 12 MB fuer Hupe, Sirene, Klingel (8,4 s mehr, rund
+    // 1,6 MB dekodiert). Ein iPhone mini hat 4 GB; der Deckel bewacht das
+    // Wachstum, nicht eine Geraetegrenze. Der Download bleibt unter 2 MB.
     expect(bytes).toBeLessThan(2 * 1048576);
-    expect(speicherMB).toBeLessThan(10);
+    expect(speicherMB).toBeLessThan(12);
   });
 });

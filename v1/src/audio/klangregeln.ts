@@ -567,6 +567,10 @@ export const EINZEL = {
   biss: ["biss_1", "biss_2", "biss_3"],
   knautsch: ["knautsch_1", "knautsch_2"],
   glas: ["glas_1", "glas_2"],
+  // Signale (E-148): echte Aufnahmen, BigSoundBank #2721/#1269/#3260
+  hupe: ["hupe"],
+  sirene: ["sirene"],
+  klingel: ["klingel"],
 } as const;
 
 /** Alle Aufnahmen, die das Spiel laedt — Familien, Untergruende, Schleifen, Einzelklaenge. */

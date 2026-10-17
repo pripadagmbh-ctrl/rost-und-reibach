@@ -143,7 +143,7 @@ function schreibeQuellen(bericht) {
     z.push(`| ${r.name}.wav | ${b ? b.dauer.toFixed(2) + " s" + (b.rate !== ABTASTRATE ? `, ${b.rate / 1000} kHz` : "") : "?"} | ${r.wofuer} | ${herkunft} |`);
   }
   z.push("");
-  z.push("Kürzel in der Spalte „Herausgeschnitten aus“: `A/…` Kenney Impact Sounds, `I/…` OpenGameArt 100 CC0 metal and wood SFX, `B/`–`F/` BigSoundBank (Nummer = Dateiname), `H/…` Pixabay-Greifkran (Pixabay Content License: Einbau ins Spiel erlaubt, die Datei für sich allein darf nicht weitergegeben werden — deshalb liegen hier nur Ausschnitte, gemischt mit anderen Klängen).");
+  z.push("Kürzel in der Spalte „Herausgeschnitten aus“: `A/…` Kenney Impact Sounds, `I/…` OpenGameArt 100 CC0 metal and wood SFX, `B/`–`F/` und `J/`–`L/` BigSoundBank (Nummer = Dateiname), `H/…` Pixabay-Greifkran (Pixabay Content License: Einbau ins Spiel erlaubt, die Datei für sich allein darf nicht weitergegeben werden — deshalb liegen hier nur Ausschnitte, gemischt mit anderen Klängen).");
   z.push("");
   writeFileSync(join(ziel, "QUELLEN.md"), z.join("\n"));
 }

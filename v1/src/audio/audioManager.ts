@@ -61,9 +61,14 @@ const AUFNAHME_LAUT = 2.5;
 /** Aufnahmen fuer die Rueckmeldungen (E-139): aus dem Bestand, keine eigenen Dateien. */
 const FAMILIE_BLECH = FAMILIEN.blech!.proben;
 const FAMILIE_STAHL = FAMILIEN.stahl!.proben;
-const EINZEL_VA = FAMILIEN.va!.proben;
 const EINZEL_KLICK = FAMILIEN.kunststoff!.proben;
 const GRUND_STAHL = GRUND.stahl.proben;
+/**
+ * Womit der Feierabend gerufen wird (E-148): Werkssirene (läuft hoch, steht
+ * kurz, läuft aus) oder elektrische Werksklingel. Patrick entscheidet nach dem
+ * Hören — umstellen heißt dieses eine Wort ändern.
+ */
+export const FEIERABEND_KLANG: "sirene" | "klingel" = "sirene";
 /** Ein Knautscher und ein `crushed` im selben Moment: nur der erste klingt. SW: 0,3 s */
 const KNAUTSCH_SPERRE_S = 0.3;
 
@@ -1088,15 +1093,31 @@ export class AudioManager {
    */
   playSale(): void {}
 
+  /** Bis wann das Feierabendsignal klingt (Kanalzeit) — die Sterne warten darauf. */
+  private feierabendBis = -1;
+
   /**
-   * DIE FEIERABENDGLOCKE (E-113, E-139). Zwei Schläge auf ein aufgehängtes
-   * Stück Stahl — so wird auf Baustellen und Plätzen gerufen. E-139: Aufnahme
-   * (fallende Stahlstangen, BigSoundBank #1776/#0235, lang ausklingend) statt
-   * der gerechneten Glocke. Der zweite Schlag nach 0,62 s und schwächer.
+   * FEIERABEND (E-113, E-139, E-148): die Werkssirene oder die Werksklingel
+   * (`FEIERABEND_KLANG`), echte Aufnahmen. Gruppe Bagger: ein Signal des
+   * Betriebs, das auch hört, wer das Metall leise gestellt hat.
    */
   playFeierabend(): void {
-    this.spiele(EINZEL_VA, 0.5, { rate: 0.8 }); // SW
-    this.spiele(EINZEL_VA, 0.35, { rate: 0.8, delay: 0.62 }); // SW
+    const ctx = this.ctx;
+    const name = EINZEL[FEIERABEND_KLANG][0];
+    const buf = this.proben.get(name);
+    // SW: Sirene 0,35, Klingel 0,3 — beide stehen auf −1 dBFS und klingen lange
+    if (!ctx || !buf || !this.spiele([name], FEIERABEND_KLANG === "sirene" ? 0.35 : 0.3, { bagger: true })) return;
+    this.feierabendBis = ctx.currentTime + buf.duration;
+  }
+
+  /**
+   * Der Fahrer hupt (E-148): LKW-Drucklufthupe, zweimal — kurz, dann lang
+   * („tut-tuuut"), wie ein Fahrer, der ungeduldig wird. Gruppe Bagger: ein
+   * Signal des Platzbetriebs, kein Metallklang.
+   */
+  playHupe(): void {
+    this.spiele(EINZEL.hupe, 0.45, { dauer: 0.3, bagger: true }); // SW
+    this.spiele(EINZEL.hupe, 0.5, { delay: 0.45, bagger: true }); // SW
   }
 
   /**
@@ -1105,8 +1126,11 @@ export class AudioManager {
    * die Schläge. Nach der Glocke, damit sie nicht im Anschlag untergehen.
    */
   playSterne(anzahl: number): void {
+    // E-148: nach dem Feierabendsignal (die Sirene klingt fast 5 s), sonst nach 0,95 s
+    const jetzt = this.ctx?.currentTime ?? 0;
+    const ab = Math.max(0.95, this.feierabendBis - jetzt + 0.2); // SW: 0,2 s Luft
     for (let i = 0; i < Math.max(0, Math.min(3, anzahl)); i++) {
-      this.spiele(FAMILIE_STAHL, 0.55, { rate: 0.95 + Math.random() * 0.06, delay: 0.95 + i * 0.32 }); // SW
+      this.spiele(FAMILIE_STAHL, 0.55, { rate: 0.95 + Math.random() * 0.06, delay: ab + i * 0.32 }); // SW
     }
   }
 

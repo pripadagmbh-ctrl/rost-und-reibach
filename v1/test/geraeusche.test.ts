@@ -36,6 +36,7 @@ import {
   spinnenDruecken,
 } from "../src/audio/klangregeln";
 import { LAUT_START, leseLautstaerken } from "../src/audio/lautstaerke";
+import { FEIERABEND_KLANG } from "../src/audio/audioManager";
 
 // ---------------------------------------------------------------- Attrappen
 
@@ -98,7 +99,9 @@ class FakeCtx {
       },
       ziele: [] as unknown[],
       disconnect: () => {},
-      start: () => {},
+      start: (t?: number) => {
+        k.startAt = t ?? 0; // E-148: wann eine Quelle einsetzt
+      },
       stop: () => {},
     };
     if (quelle) this.alleQuellen.push(k);
@@ -641,6 +644,7 @@ describe("Echte Klaenge statt Tonketten (E-139, Befund 17.10.2026)", () => {
       mgr.playTick();
       mgr.playSterne(3);
       mgr.playFeierabend();
+      mgr.playHupe();
       mgr.playTear();
       mgr.playRattle();
       bus.emit("released", { count: 1 });
@@ -754,6 +758,7 @@ describe("Lautstaerke je Gruppe (E-139, Wunsch 17.10.2026)", () => {
       mgr.playTick();
       mgr.playSterne(2);
       mgr.playFeierabend();
+      mgr.playHupe();
       ctx.currentTime += 1;
       mgr.playCrash(1);
       const karte = karteVon(mgr);
@@ -818,5 +823,42 @@ describe("Lautstaerke je Gruppe (E-139, Wunsch 17.10.2026)", () => {
     } finally {
       delete g.localStorage;
     }
+  });
+});
+
+// ------------------------------------------- 9. Hupe und Feierabend (E-148)
+
+describe("Echte Signale: Hupe, Sirene, Klingel (E-148)", () => {
+  it("Feierabend ruft die Sirene (Vorgabe), die Klingel ist die Alternative", async () => {
+    expect(FEIERABEND_KLANG).toBe("sirene");
+    const { mgr } = await starteMitAufnahmen();
+    expect(gespielt(() => mgr.playFeierabend())).toEqual([FEIERABEND_KLANG]);
+    expect(alleProben()).toEqual(expect.arrayContaining(["sirene", "klingel", "hupe"]));
+  });
+
+  it("der Fahrer hupt zweimal mit der echten Hupe, an der Gruppe Bagger", async () => {
+    const { mgr } = await starteMitAufnahmen();
+    const n0 = ctx.alleQuellen.length;
+    expect(gespielt(() => mgr.playHupe())).toEqual(["hupe", "hupe"]);
+    const gr = (mgr as unknown as { gruppen: Record<string, unknown> }).gruppen;
+    for (const q of ctx.alleQuellen.slice(n0)) {
+      // jede Hupen-Quelle fuehrt ueber ihren Pegel direkt in die Gruppe Bagger
+      const pegel = (q.ziele as Array<Record<string, unknown>>)[0]!;
+      expect(pegel.ziele as unknown[]).toContain(gr.bagger);
+    }
+  });
+
+  it("die Sterne warten, bis die Sirene ausgeklungen ist", async () => {
+    const { mgr } = await starteMitAufnahmen();
+    // Attrappe: jede Aufnahme dauert 0,5 s → Sterne ab 0,7 s nach dem Signal, aber nie vor 0,95 s
+    const m = mgr as unknown as { feierabendBis: number };
+    mgr.playFeierabend();
+    expect(m.feierabendBis).toBeCloseTo(ctx.currentTime + 0.5);
+    m.feierabendBis = ctx.currentTime + 4.9; // echte Sirenenlaenge
+    const vorher = ctx.alleQuellen.length;
+    mgr.playSterne(1);
+    const stern = ctx.alleQuellen.slice(vorher);
+    expect(stern).toHaveLength(1);
+    expect(stern[0]!.startAt as number).toBeGreaterThanOrEqual(ctx.currentTime + 4.9);
   });
 });
