@@ -268,9 +268,11 @@ describe("Am echten Wrack in der echten Presse", () => {
         l.takt(1 / 60);
       }
       expect(l.pressenErlaubt(), "die Presse sieht das Wrack nicht in der Kammer").toBe(true);
-      // Der Befund, der `jetztLiegtSie` noetig macht: quer bleibt der Zyklus offen
-      const offen = (fk as unknown as { offen: unknown }).offen;
-      if (lage === "quer") expect(offen, "quer schlaeft es doch ein").not.toBeNull();
+      // Bis E-138 blieb das Wrack quer auf der Wandkrone liegen und der Zyklus
+      // offen — der Befund, der `jetztLiegtSie` noetig machte. In der
+      // groesseren Kammer (4,45 x 5,05 m) faellt es auch quer hinein; ob der
+      // Zyklus dann schon zu ist, haengt am Einschlafen. `jetztLiegtSie`
+      // bleibt der Weg fuer beide Faelle.
       press.onStart = () => fk.jetztLiegtSie();
       press.onStamp = () => l.presseHatGestempelt();
       expect(press.start()).toBe(true);
@@ -281,8 +283,12 @@ describe("Am echten Wrack in der echten Presse", () => {
       expect(ende, "die Presse hat nie gestempelt").not.toBeNull();
       expect(car.crushStage, "das Wrack wurde nicht gepresst").toBeGreaterThan(0);
       expect(ende!.messung.ruheGrad, "Ruhe nicht gemessen").not.toBeNull();
-      // gemessen wird, wo es lag — 30 cm neben der Mitte abgelegt
-      expect(ende!.messung.praezisionCm!).toBeLessThan(45);
+      // gemessen wird, wo es lag — 30 cm neben der Mitte abgelegt.
+      // Quer (Laenge im Pressweg) ist das Wrack laenger als der Raum vor dem
+      // geparkten Stempel (4,45 − 0,56 = 3,89 m < 4,00 m, E-138): Es kippt mit
+      // einem Ende auf den Stempel und rutscht — gemessen 0,76 m. Laengs liegt
+      // es flach, und dort gilt die alte Schranke.
+      expect(ende!.messung.praezisionCm!).toBeLessThan(lage === "laengs" ? 45 : 90);
       expect(world.bodies.len()).toBeGreaterThan(0);
     });
   }

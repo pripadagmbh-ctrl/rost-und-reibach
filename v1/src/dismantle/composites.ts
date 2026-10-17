@@ -410,6 +410,12 @@ function lackStoff(form: WrackformDef, id: WrackformId, kantig = false): THREE.M
     // steht, glänzt nicht mehr (17.09.2026).
     stoff = farbstoff(0.74, 0.12);
     stoff.flatShading = kantig || !form.glatt;
+    // Beidseitig: Hinter den Scheiben ist die Haut offen (E-138), durch das
+    // Loch sieht man die Innenseite der Bleche. Kein Zeichenruf mehr.
+    stoff.side = THREE.DoubleSide;
+    // Schatten wie vorher (einseitiger Stoff wirft mit der Rueckseite) —
+    // beidseitig im Schattenpass gaebe Streifen auf dem eigenen Lack.
+    stoff.shadowSide = THREE.BackSide;
     LACK_STOFF.set(schluessel, stoff);
   }
   return stoff;

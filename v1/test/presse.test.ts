@@ -106,10 +106,10 @@ describe("Presse: Wände ja, Deckel nein", () => {
 
   it("der Greifer passt zwischen die Wände — mit gemessener Luft", () => {
     /*
-     * Die offene Sichelkralle misst 3,38 m. Die lichte Kammer ist 4,20 m in
-     * der Pressrichtung und 4,05 m quer dazu; es bleiben 41 bzw. 34 cm je
-     * Seite. Weniger geht nicht, und das ist die Zahl, an der die Kammergröße
-     * hängt — sie ist Patricks Entscheidung (E-023, heute bestätigt).
+     * Die offene Sichelkralle misst 3,38 m. Die lichte Kammer ist seit E-138
+     * 4,45 m in der Pressrichtung und 5,05 m quer dazu (vorher 4,20 x 4,05);
+     * es bleiben 53 bzw. 83 cm je Seite. Unter 30 cm darf es nicht gehen
+     * (E-023).
      */
     const luftLaengs = (PRESS_INNER.laenge - SPANNE) / 2;
     const luftQuer = (PRESS_INNER.tiefe - SPANNE) / 2;
@@ -118,11 +118,12 @@ describe("Presse: Wände ja, Deckel nein", () => {
     expect(luftQuer, `nur ${(luftQuer * 100).toFixed(0)} cm Luft quer`).toBeGreaterThan(0.3);
     /*
      * Und der TASTPUNKT der Spinne (ein Punkt mit 0,25 m Rand, nicht die
-     * ganze Spanne) hat innen ein Fenster von 3,55 x 3,70 m, in dem er frei
-     * ist. Das ist es, was `grappleHitsBuilding` wirklich prueft.
+     * ganze Spanne) hat innen ein Fenster von 4,55 x 3,95 m (vor E-138
+     * 3,55 x 3,70), in dem er frei ist. Das ist es, was `grappleHitsBuilding`
+     * wirklich prueft.
      */
-    expect(2 * (PRESS_KAMMER.hw - GRAPPLE_PAD)).toBeCloseTo(3.55, 6);
-    expect(2 * (PRESS_KAMMER.hd - GRAPPLE_PAD)).toBeCloseTo(3.7, 6);
+    expect(2 * (PRESS_KAMMER.hw - GRAPPLE_PAD)).toBeCloseTo(4.55, 6);
+    expect(2 * (PRESS_KAMMER.hd - GRAPPLE_PAD)).toBeCloseTo(3.95, 6);
   });
 
   it("hinein, fassen, heraus: der ganze Weg ist frei", () => {

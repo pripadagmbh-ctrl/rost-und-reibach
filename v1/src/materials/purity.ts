@@ -222,7 +222,23 @@ export const WAND_AB_MM = 6;
  * Eintrag liegt zwischen 90 % und 95 %. Sie ist eine Regel fuer kuenftige
  * Eintraege.
  */
-export const VERBUND_BIS = 0.1;
+/*
+ * 0,10 → 0,15 SEIT E-138 (Patrick, 17.10.2026: „Minibagger sind eher Stahl
+ * als Mischschrott, weil viel Stahlblech oder Vollmaterial").
+ *
+ * Beide Minibagger im Katalog sind nach der Wandstaerke massiv (13,5 und
+ * 15,3 mm, Schwelle 6 mm) und scheiterten nur am Verbund: 14 % Fremdstoff —
+ * Gummiketten, Sitz und Schlaeuche, Alu-Kuehler, Kabelbaum. Das ist der Fall,
+ * den diese Zahl von Anfang an abbilden sollte: Fremdes, das an einem
+ * schweren Stahlstueck haengt, ohne es zum Verbund zu machen.
+ *
+ * Gemessen am ganzen Katalog (`tools/stahlschrott.ts`, 374 Eintraege) wechselt
+ * mit 0,15 GENAU diese zwei Eintraege die Mulde. Was darueber liegt, bleibt
+ * Mischschrott: Motorbloecke (16–18 % Alu und Kupfer), der Minibagger-
+ * Raupenunterwagen (20 % Gummiketten), Rangierlok (16 %), Busse und
+ * Buerocontainer (24–32 %).
+ */
+export const VERBUND_BIS = 0.15;
 
 /**
  * Ein Teil, so weit die Sortierregel es kennen muss.

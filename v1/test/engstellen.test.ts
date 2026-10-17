@@ -58,7 +58,12 @@ import {
 import { zielePlatz, type Ziel } from "../tools/engstellen-platz";
 
 /** Um wie viel der Prüfgreifer der Gegenprobe breiter ist (m). */
-const AUFBLASEN = 0.2;
+// E-138: 0,20 → 0,40. Mit der groesseren Presse (4,45 x 5,05 m) liegt keine
+// Engstelle mehr innerhalb von 20 cm ueber dem Huellkreis der Sichelkralle —
+// die Gegenprobe haette nichts mehr gefunden, und das waere keine Pruefung.
+// Bei 40 cm meldet sie die Presskammer (Sichelkralle) bzw. den MUELL-Container
+// (Fuenfschalengreifer).
+const AUFBLASEN = 0.4;
 
 interface Mass {
   form: Greiferform;
@@ -258,10 +263,10 @@ describe("Engstellen: passt der offene Greifer hinein?", () => {
     );
   });
 
-  it("GEGENPROBE: ein um 20 cm aufgeblasener Greifer MUSS gemeldet werden", () => {
+  it("GEGENPROBE: ein um 40 cm aufgeblasener Greifer MUSS gemeldet werden", () => {
     for (const m of masse) {
       /*
-       * Erst die Messung selbst: Der Prüfgreifer ist wirklich 20 cm breiter.
+       * Erst die Messung selbst: Der Prüfgreifer ist wirklich AUFBLASEN breiter.
        * Ohne diesen Satz prüfte die Gegenprobe nur, dass „Zahl plus 20" größer
        * ist als „Zahl" — und das weiß man auch ohne Test.
        */
@@ -278,7 +283,7 @@ describe("Engstellen: passt der offene Greifer hinein?", () => {
       );
       expect(
         jetzt.length,
-        `${m.form.name} um 20 cm breiter wird nirgends gemeldet — der Wächter wäre blind`
+        `${m.form.name} um ${AUFBLASEN * 100} cm breiter wird nirgends gemeldet — der Wächter wäre blind`
       ).toBeGreaterThan(heute.length);
       for (const a of heute) expect(jetzt, "ein alter Anstoß ist verschwunden").toContain(a);
     }

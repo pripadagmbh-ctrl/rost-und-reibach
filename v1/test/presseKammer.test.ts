@@ -211,7 +211,20 @@ describe("Presskammer: nichts Unsichtbares, und die Kralle passt", () => {
   it("GEGENPROBE: mit der Geisterklappe ist die Mündung zu eng", async () => {
     const { kaesten } = await baueMaschine();
     const spanne = clawSpan(CLAW_OPEN_SPLAY);
-    const frei = groessteFreieKante([...kaesten, GEISTERKLAPPE]);
+    /*
+     * Seit E-138 ist die Kammer 5,05 m tief: Die Geisterklappe in ihrer alten
+     * Lage (0,905 m in der Muendung) liesse jetzt mehr als die Spanne frei
+     * und pruefte nichts mehr. Dieselbe Klappe, an der Ostwand angesetzt und
+     * so weit hineinragend, dass 5 cm weniger als die Spanne bleiben — das
+     * MUSS der Waechter melden.
+     */
+    const ein = MUENDUNG.x1 - MUENDUNG.x0 - spanne + 0.05;
+    const geist: Kasten = {
+      ...GEISTERKLAPPE,
+      min: { ...GEISTERKLAPPE.min, x: MUENDUNG.x1 - ein, z: MUENDUNG.z0 },
+      max: { ...GEISTERKLAPPE.max, x: MUENDUNG.x1 + 1.15, z: MUENDUNG.z1 },
+    };
+    const frei = groessteFreieKante([...kaesten, geist]);
     expect(
       frei,
       "der Wächter hätte die eingeengte Mündung von vorher durchgelassen"

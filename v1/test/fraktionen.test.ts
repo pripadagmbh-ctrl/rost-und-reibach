@@ -142,12 +142,20 @@ describe("Was der Katalog daraus macht", () => {
     expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(60);
   });
 
-  it("von den 60 werden 57 zu Mischschrott, genau 3 bleiben sortenrein", () => {
+  it("von den 60 werden 55 zu Mischschrott, genau 5 bleiben sortenrein", () => {
     const mitZus = ALLE.filter((s) => s.zusammensetzung);
-    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(57);
+    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(55);
     // E-123: Der Minibagger-Ausleger kommt dazu — 4 % Schlaeuche, massives Blech.
+    // E-138: Beide Minibagger (14 % Fremdstoff, massiv) mit `VERBUND_BIS` 0,15
+    // — Patrick, 17.10.2026: „Minibagger sind eher Stahl als Mischschrott."
     const rein = mitZus.filter((s) => s.materialId !== "mixed").map((s) => s.name);
-    expect(rein.sort()).toEqual(["Baggerlöffel", "Minibagger-Ausleger mit Stiel", "Seecontainer 20 Fuß"]);
+    expect(rein.sort()).toEqual([
+      "Baggerlöffel",
+      "Minibagger (ausgeschlachtet)",
+      "Minibagger 1,5 t (ohne Arm/Dach)",
+      "Minibagger-Ausleger mit Stiel",
+      "Seecontainer 20 Fuß",
+    ]);
   });
 
   it("die abgeleitete Fraktion stimmt mit der Regel überein — bei jedem Eintrag", () => {

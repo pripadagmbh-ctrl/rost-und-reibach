@@ -81,7 +81,14 @@ import type { CompositeManager } from "../dismantle/composites";
  *  - Abstand zum Sitz (−0,5 | −22,5): 8,28 m, mitten im Schwenkband
  *    5,8 bis 9,2 m.
  */
-const CENTER = new THREE.Vector3(-8.0, 0, -26.0);
+/*
+ * E-138 (17.10.2026): z −26,0 → −26,025, weil die Kammer im Pressweg (z)
+ * um 0,25 m laenger wird (siehe `INNER_W`). Zwischen der Suedmauer
+ * (Innenkante −28,70) und der Suedwand der Buntmetall-Mulde (Aussenkante
+ * −23,35) sind 5,35 m frei; der Rahmen misst jetzt 5,15 m, und −26,025 ist
+ * die Mitte der Luecke — je 0,10 m Luft. x bleibt −8,0.
+ */
+const CENTER = new THREE.Vector3(-8.0, 0, -26.025);
 /** Mitte der Presskammer — auch fuer Hindernisliste und Tests. */
 export const PRESS_CENTER = CENTER;
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
@@ -108,8 +115,14 @@ export function baleYard(): { x: number; z: number; w: number; d: number } {
    * Kammer faellt es nicht auf, bei der naechsten Aenderung schon.
    */
   const quer = Math.abs(Math.sin(ROT)) > 0.5;
-  const laengs = INNER_W - 2.2;
-  const tief = INNER_D - 1.2;
+  /*
+   * Das Feld waechst NICHT mit der Kammer (E-138): 2,00 x 2,85 m wie bei der
+   * 4,20 x 4,05-Kammer. Die groessere Kammer reicht nach Westen ueber den
+   * Schwenkbereich hinaus; ein Paket dort laege 9,6 m vom Sitz, ausser
+   * Reichweite (`test/presse.test.ts`).
+   */
+  const laengs = 2.0;
+  const tief = 2.85;
   return { x: CENTER.x, z: CENTER.z, w: quer ? tief : laengs, d: quer ? laengs : tief };
 }
 /**
@@ -162,7 +175,16 @@ const ROT = Math.PI / 2;
  * 2026-09-14_presse.svg); 4,20 ist ein Vorschlag und haengt an dieser einen
  * Zahl.
  */
-const INNER_W = 4.2; // x — Länge, Pressweg (rechts → links)
+/*
+ * E-138 (Patrick, 17.10.2026: „die Schere muss etwas grösser werden"):
+ * 4,20 → 4,45 m (+6 %). Mehr geht im Pressweg nicht: Er liegt seit der
+ * Vierteldrehung in z, und dort fuellt der Rahmen (W + 0,70 = 5,15 m) die
+ * 5,35 m zwischen Suedmauer und Buntmetall-Mulde bis auf je 0,10 m. Gewachsen
+ * ist die Kammer deshalb vor allem in der TIEFE (`INNER_D`), quer zum
+ * Pressweg: Dort liegt ein Wrack richtig, der Stempel drueckt es ueber seine
+ * Breite (1,70 m Pkw), nicht ueber seine Laenge.
+ */
+const INNER_W = 4.45; // x — Länge, Pressweg (rechts → links)
 // Schmaler (Ansage 12.09.2026: „die Presse erscheint immer noch zu tief,
 // die kann ruhig noch ein bisschen schmaler werden").
 /*
@@ -188,7 +210,18 @@ const INNER_W = 4.2; // x — Länge, Pressweg (rechts → links)
  * 4,05 statt der urspruenglichen 4,70 sind damit −14 % statt −20. Die Laenge
  * bleibt bei den geforderten −15 %.
  */
-const INNER_D = 4.05;
+/*
+ * E-138: 4,05 → 5,05 m (+25 %), gerechnet am laengsten Wrack, das hinein
+ * soll — dem Wohnwagen-Aufbau, 4,20 m: quer zum Pressweg abgelegt bleiben
+ * ihm 0,42 m an jedem Ende, einem Pkw (4,00 m) 0,52 m. Bei 4,05 waren es
+ * beim Pkw 2 cm — wer ihn nicht millimetergenau absetzte, setzte ihn auf
+ * die Wand. Die Spinne (3,38 m offen) hat jetzt 0,83 m je Seite.
+ * Platz ist in diese Richtung: Die Klappe schwingt nach Westen bis x −12,35
+ * (vorher −11,85), das ABFALL-Silo beginnt bei −18,15. Nach Osten rueckt
+ * der Rahmen 0,5 m auf den Bagger zu (Aussenkante x −5,125).
+ * Zusammen: Grundflaeche 17,0 → 22,5 m² (+32 %).
+ */
+const INNER_D = 5.05;
 /** Lichte Masse der Kammer — fuer Tests und Platzplanung. */
 export const PRESS_INNER = { laenge: INNER_W, tiefe: INNER_D };
 /** Drehung der Maschine um die Hochachse (0 = Pressweg laeuft in x). */
@@ -225,6 +258,9 @@ export const PRESS_FUSS = {
  * sagte etwas anderes. Zwei Wahrheiten ueber dieselbe Sache halten nie —
  * deshalb kommen die Eintraege ab jetzt aus DERSELBEN Rechnung wie die
  * Kollider, so wie `hallenWaende()` es fuer die Hallen macht.
+ *
+ * (Zahlen unten: Stand vor E-138; seitdem 5,00 x 4,85 m licht, Mitte
+ * z −25,75 — die Rechnung ist dieselbe.)
  *
  * Die Kammer misst lichte 4,20 m (Pressweg) x 4,05 m (Tiefe), der Rahmen
  * ist rundum 0,35 m stark. Bei `ROT` = 90 Grad liegt der Pressweg in z:
@@ -293,7 +329,12 @@ export const PRESS_KAMMER = {
  * Gemessen an der offenen Maschine: 3,85 m zur Klappenseite. Die Klappe
  * haengt lokal im Sueden; die Drehung bildet das auf die Weltachsen ab.
  */
-export const KLAPPE_WEG = 3.85;
+/*
+ * 3,85 m waren an der offenen Maschine mit INNER_D 4,05 gemessen. Alles an
+ * der Klappe haengt an INNER_D / 2 (Scharnier, Plattenspann, Zylinderbock),
+ * also waechst der Weg um die halbe Tiefenaenderung mit (E-138).
+ */
+export const KLAPPE_WEG = 3.85 + (INNER_D - 4.05) / 2;
 export const KLAPPE_RICHTUNG = { x: -Math.sin(ROT), z: -Math.cos(ROT) };
 const WALL_H = 1.9;
 const PLATE_T = 0.3; // dicke Eisenplatten (SW)
@@ -310,6 +351,47 @@ const RAM_HOLD_TIME = 0.9;
 const RAM_BACK_TIME = 2.0;
 
 type Phase = "idle" | "lidsClose" | "ramFwd" | "hold" | "ramBack" | "lidsOpen";
+
+/**
+ * Wie weit reicht ein Koerper entlang einer Weltrichtung? (E-138)
+ *
+ * Aus seinen Quader-Kollidern gerechnet, so wie sie JETZT liegen — gedreht,
+ * geknautscht, schief in der Kammer. Andere Formen zaehlen mit ihrem
+ * Mittelpunkt. Gebraucht fuer zweierlei: Der Stempel darf ein Wrack nicht
+ * kuerzer schieben, als es lang ist, und die Klappe nicht tiefer schliessen,
+ * als sein Dach hoch ist.
+ */
+export function ausdehnung(body: RAPIER.RigidBody, achse: THREE.Vector3): { min: number; max: number } {
+  let min = Infinity;
+  let max = -Infinity;
+  const q = new THREE.Quaternion();
+  const e = new THREE.Vector3();
+  for (let i = 0; i < body.numColliders(); i++) {
+    const c = body.collider(i);
+    const t = c.translation();
+    const mitte = t.x * achse.x + t.y * achse.y + t.z * achse.z;
+    let r = 0;
+    if (c.shapeType() === RAPIER.ShapeType.Cuboid) {
+      const h = c.halfExtents();
+      const rot = c.rotation();
+      q.set(rot.x, rot.y, rot.z, rot.w);
+      r += Math.abs(e.set(1, 0, 0).applyQuaternion(q).dot(achse)) * h.x;
+      r += Math.abs(e.set(0, 1, 0).applyQuaternion(q).dot(achse)) * h.y;
+      r += Math.abs(e.set(0, 0, 1).applyQuaternion(q).dot(achse)) * h.z;
+    }
+    min = Math.min(min, mitte - r);
+    max = Math.max(max, mitte + r);
+  }
+  if (min > max) {
+    const t = body.translation();
+    min = max = t.x * achse.x + t.y * achse.y + t.z * achse.z;
+  }
+  return { min, max };
+}
+
+/** Der Pressweg als Weltrichtung: lokale x-Achse der gedrehten Maschine. */
+const PRESSWEG = new THREE.Vector3(Math.cos(ROT), 0, -Math.sin(ROT));
+const OBEN = new THREE.Vector3(0, 1, 0);
 
 export class PressManager {
   /**
@@ -362,9 +444,15 @@ export class PressManager {
   /** (Anzahl gepresster Teile, Position) */
   onStamp: ((count: number, pos: THREE.Vector3) => void) | null = null;
 
+  /**
+   * Warum die Presse eben nicht losgelaufen ist, `null` = sie lief oder lief
+   * schon. Fuer die Meldung in `main.ts` (E-138).
+   */
+  sperrgrund: string | null = null;
+
   constructor(
     scene: THREE.Scene,
-    world: RAPIER.World,
+    private world: RAPIER.World,
     private items: ItemManager,
     private composites: CompositeManager
   ) {
@@ -577,8 +665,17 @@ export class PressManager {
     this.ram.position.set(RAM_HOME_X, WALL_H / 2 + 0.3, 0);
     this.ram.castShadow = true;
     group.add(this.ram); // im Muldenrahmen — dreht mit
+    /*
+     * An der Startpose erzeugen (v2 E-058), nicht im Ursprung: Bis E-138 lag
+     * der Stempel einen Schritt lang auf (0 | 1,05 | 0) mitten im Platz.
+     */
+    this.ram.updateWorldMatrix(true, false);
+    const ramP = this.ram.getWorldPosition(new THREE.Vector3());
+    const ramQ = this.ram.getWorldQuaternion(new THREE.Quaternion());
     this.ramBody = world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased()
+        .setTranslation(ramP.x, ramP.y, ramP.z)
+        .setRotation({ x: ramQ.x, y: ramQ.y, z: ramQ.z, w: ramQ.w })
     );
     world.createCollider(
       RAPIER.ColliderDesc.cuboid((PLATE_T * 1.4) / 2, (WALL_H - 0.1) / 2, (INNER_D - 0.1) / 2),
@@ -597,7 +694,37 @@ export class PressManager {
   }
 
   start(): boolean {
+    this.sperrgrund = null;
     if (this.phase !== "idle") return false;
+    /*
+     * Was weder Schrottteil noch Wrack ist, wird nicht gepresst (Ansage
+     * 15.09.2026: „Der Container kann nicht gepresst werden. Dann gibt es die
+     * Fehlermeldung der Presse."). Bis E-138 erledigte das die Geometrie —
+     * der MUELL-Container (4,30 m) war laenger als die Kammer (4,20 m). Mit
+     * 5,00 m passt er hinein, also fragt die Presse jetzt nach: Steht ein
+     * beweglicher Koerper in der Kammer, den sie nicht kennt, laeuft sie nicht.
+     * Gesammelt, dann ausgewertet (v2 E-044).
+     */
+    const fremd: RAPIER.RigidBody[] = [];
+    const kennt = new Set<number>();
+    for (const it of this.items.items) kennt.add(it.body.handle);
+    for (const car of this.composites.cars) kennt.add(car.body.handle);
+    const kammer = new RAPIER.Cuboid(INNER_W / 2, WALL_H / 2, INNER_D / 2);
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ROT, 0));
+    this.world.intersectionsWithShape(
+      { x: CENTER.x, y: 0.3 + WALL_H / 2, z: CENTER.z },
+      { x: q.x, y: q.y, z: q.z, w: q.w },
+      kammer,
+      (c) => {
+        const b = c.parent();
+        if (b && b.isDynamic() && !kennt.has(b.handle)) fremd.push(b);
+        return true;
+      }
+    );
+    if (fremd.length > 0) {
+      this.sperrgrund = "Container kann nicht gepresst werden";
+      return false;
+    }
     this.phase = "lidsClose";
     this.t = 0;
     this.onStart?.();
@@ -636,10 +763,8 @@ export class PressManager {
       const p = item.body.translation();
       if (this.inChamber(p)) top = Math.max(top, p.y + 0.3);
     }
-    for (const car of this.composites.cars) {
-      const p = car.body.translation();
-      if (this.inChamber(p)) top = Math.max(top, p.y + 0.75);
-    }
+    // Wracks rechnet `lidLimit` selbst (E-138): Bei ihnen zaehlt nicht nur
+    // die Hoehe, sondern auch, wie nah am Scharnier das Dach anfaengt.
     return top;
   }
 
@@ -655,23 +780,58 @@ export class PressManager {
    */
   private computeRamTarget(): number {
     let count = 0;
-    let cars = 0;
+    let wrackLaenge = 0;
     for (const item of this.items.items) {
       if (this.inChamber(item.body.translation())) count++;
     }
+    /*
+     * Ein Wrack zaehlt mit seiner LAENGE im Pressweg, nicht pauschal 1,40 m
+     * (E-138). Das Knautschen macht es flach, nicht kuerzer — ein Pkw bleibt
+     * 4,00 m lang. Mit 1,40 m fuhr der Stempel bis 1,94 m vor die Stirnwand
+     * und schob ein laengs liegendes Auto 1,3 m durch sie hindurch.
+     */
     for (const car of this.composites.cars) {
-      if (this.inChamber(car.body.translation())) cars++;
+      if (!this.inChamber(car.body.translation())) continue;
+      const a = ausdehnung(car.body, PRESSWEG);
+      wrackLaenge += a.max - a.min;
     }
-    const thickness = 0.4 + 0.14 * count + 1.4 * cars;
-    return THREE.MathUtils.clamp(-INNER_W / 2 + thickness, RAM_END_X, RAM_HOME_X - 0.4);
+    const thickness = 0.4 + 0.14 * count + wrackLaenge;
+    const ziel = THREE.MathUtils.clamp(-INNER_W / 2 + thickness, RAM_END_X, RAM_HOME_X - 0.4);
+    // Nie naeher an die Stirnwand als die Wracks lang sind (+5 cm): Passt
+    // eines nicht hinein (der LKW), bleibt der Stempel, wo er ist.
+    // `ramX` ist die Mitte des Stempels; seine Druckflaeche liegt eine halbe
+    // Plattenstaerke davor.
+    const anschlag = wrackLaenge > 0 ? -INNER_W / 2 + wrackLaenge + 0.05 + (PLATE_T * 1.4) / 2 : -Infinity;
+    return Math.min(RAM_HOME_X, Math.max(ziel, anschlag));
   }
 
   /** Kleinstmöglicher Klappenwinkel, damit die Platte nicht ins Material presst. */
   private lidLimit(): number {
     const need = this.pileTop() + 0.08 - (LID_HINGE_Y + 0.3);
     const arm = INNER_D / 2;
-    if (need <= 0) return 0;
-    return Math.min(LID_OPEN_ANGLE, Math.asin(Math.min(need / arm, 1)));
+    let winkel = need <= 0 ? 0 : Math.asin(Math.min(need / arm, 1));
+    /*
+     * WRACKS (E-138). Bis hierher stand ein Wrack mit „Unterkante + 0,75 m" in
+     * `pileTop`, und gerechnet wurde an der Plattenspitze in der Kammermitte.
+     * Beides ist fuer ein Auto falsch: Sein Dach liegt 1,42 m hoch (Wohnwagen
+     * 2,40 m), und die Klappe ist am Scharnier am tiefsten, nicht an der
+     * Spitze — sie trifft das Dach an seiner scharniernahen Kante. Gemessen
+     * schloss sie bis 1,13 m ueber Grund und drueckte das Wrack durch den
+     * Kammerboden. Jetzt: Dach, wie es liegt, plus halbe Plattenstaerke, an
+     * der Stelle, an der das Wrack dem Scharnier am naechsten kommt.
+     */
+    const scharnierY = LID_HINGE_Y + 0.3;
+    const quer = new THREE.Vector3(Math.sin(ROT), 0, Math.cos(ROT)); // lokale z-Achse
+    const scharnierZ = -(INNER_D / 2 + 0.12); // die Klappe haengt lokal im Sueden
+    const mitteQuer = CENTER.x * quer.x + CENTER.z * quer.z;
+    for (const car of this.composites.cars) {
+      if (!this.inChamber(car.body.translation())) continue;
+      const dach = ausdehnung(car.body, OBEN).max + 0.08 + PLATE_T / 2 - scharnierY;
+      if (dach <= 0) continue;
+      const nah = Math.max(ausdehnung(car.body, quer).min - mitteQuer - scharnierZ, 0.3);
+      winkel = Math.max(winkel, Math.asin(Math.min(dach / nah, 1)));
+    }
+    return Math.min(LID_OPEN_ANGLE, winkel);
   }
 
   update(dt: number): void {

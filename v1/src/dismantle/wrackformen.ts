@@ -562,8 +562,27 @@ export function baueWrackform(form: WrackformDef, lack: number): Wrackbau {
    * Normalen so nach AUSSEN (nachgerechnet in `test/carShape.test.ts`, sonst
    * wäre das Auto von außen unsichtbar).
    */
+  /*
+   * HINTER DEM GLAS IST NICHTS (E-138, Patrick 17.10.2026: „wenn die
+   * Glasscheiben splittern, soll es dahinter halt auch leerer Raum sein").
+   *
+   * Bis hierher lief die lackierte Haut UNTER jeder Scheibe durch — die
+   * Scheibe lag 12 mm davor. Splitterte sie, sah man auf Blech in Wagenfarbe:
+   * ein voller Klotz. Jetzt bleibt das Feld der Scheibe in der Haut offen,
+   * und der Lackstoff ist beidseitig (`lackStoff`), damit man von innen die
+   * Rueckseite der Bleche sieht: Boden, Stirnwaende, die Innenseite der
+   * gegenueberliegenden Tuer. Die Eckpunkte bleiben alle (Knautschen und
+   * Beulen rechnen je Eckpunkt), es fallen nur Dreiecke weg.
+   */
+  const offen = new Set<number>();
+  for (const sch of form.scheiben) {
+    for (let s = sch.vonSchnitt; s < sch.bisSchnitt; s++) {
+      for (let r = sch.vonRing; r < sch.bisRing; r++) offen.add(s * R + r);
+    }
+  }
   for (let s = 0; s + 1 < S; s++) {
     for (let r = 0; r < R; r++) {
+      if (offen.has(s * R + r)) continue;
       const r1 = (r + 1) % R;
       const a = s * R + r;
       const b = (s + 1) * R + r;

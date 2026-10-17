@@ -32,7 +32,9 @@ import {
   MULDEN_GASSE_Z,
 } from "../src/delivery/routes";
 import { StaffManager, imBaggerrevier } from "../src/world/people";
-import { PRESS_INNER } from "../src/world/press";
+import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
+import { PRESS_CENTER, PRESS_INNER, PressManager } from "../src/world/press";
 
 const LAGER = CONFIGS.filter((c) => c.lager === true);
 
@@ -424,25 +426,41 @@ describe("Der Müllcontainer steht morgens richtig", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("und er passt nicht in die Presse — das ist die Sperre, nicht eine Abfrage", () => {
+  it("und er wird nicht gepresst — seit E-138 eine Abfrage der Presse, nicht mehr die Geometrie", async () => {
     /*
      * Ansage Patrick 15.09.2026: „Der Container kann nicht gepresst werden.
      * Dann gibt es die Fehlermeldung der Presse."
      *
-     * Zugemauert ist das zuerst geometrisch: Die Kammer misst licht 4,20 x
-     * 4,05 m (`PRESS_INNER`), der Container 3,60 x 4,30 m. In keiner der
-     * beiden achsparallelen Lagen passt er hinein — 4,30 ist länger als die
-     * längste Kammerseite. Wer den Container größer macht, darf ihn gern
-     * größer machen; wer ihn KLEINER macht als 4,20 m in der langen Richtung,
-     * macht ihn pressbar und muss sich etwas anderes überlegen.
+     * Bis E-138 war das Geometrie: Die Kammer (4,20 x 4,05 m) war kuerzer als
+     * der Container (4,30 m). Seit die Kammer 4,45 x 5,05 m misst (Patrick,
+     * 17.10.2026: „die Schere muss etwas grösser werden"), passt er hinein —
+     * also fragt die Presse: Steht ein beweglicher Koerper in der Kammer, der
+     * weder Schrottteil noch Wrack ist, laeuft sie nicht los und nennt den
+     * Grund. Geprueft am echten `PressManager` mit einem Koerper in den
+     * Massen des Containers; die Gegenprobe ist derselbe Koerper als
+     * Schrottteil angemeldet — dann presst sie.
      */
-    const [w, d] = muell.size;
-    const lang = Math.max(w, d);
+    const [w, d, h] = muell.size;
     const kammerLang = Math.max(PRESS_INNER.laenge, PRESS_INNER.tiefe);
-    expect(
-      lang,
-      `${lang.toFixed(2)} m passen in die ${kammerLang.toFixed(2)} m lange Kammer`
-    ).toBeGreaterThan(kammerLang);
+    expect(Math.max(w, d), "der Container passt jetzt hinein — darum braucht es die Abfrage").toBeLessThan(kammerLang);
+    await RAPIER.init();
+    const lauf = (alsTeil: boolean): { los: boolean; grund: string | null } => {
+      const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+      const body = world.createRigidBody(
+        RAPIER.RigidBodyDesc.dynamic().setTranslation(PRESS_CENTER.x, 0.35, PRESS_CENTER.z)
+      );
+      world.createCollider(RAPIER.ColliderDesc.cuboid(d / 2, h / 2, w / 2).setTranslation(0, h / 2, 0), body);
+      const items = { items: alsTeil ? [{ body }] : [] };
+      const press = new PressManager(new THREE.Scene(), world, items as never, { cars: [] } as never);
+      world.step();
+      return { los: press.start(), grund: press.sperrgrund };
+    };
+    const container = lauf(false);
+    expect(container.los, "die Presse lief mit dem Container los").toBe(false);
+    expect(container.grund).toMatch(/Container/);
+    const gegenprobe = lauf(true);
+    expect(gegenprobe.los, "GEGENPROBE: ein Schrottteil muss gepresst werden").toBe(true);
+    expect(gegenprobe.grund).toBeNull();
   });
 
   it("und der Abladeplatz selbst ist auf ganzer Wagenlänge frei", () => {

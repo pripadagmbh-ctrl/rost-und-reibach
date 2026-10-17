@@ -159,6 +159,16 @@ export interface ContainerConfig {
    */
   platzinventar?: boolean;
   /**
+   * Aufgemalt statt nur am schwebenden Schild (E-138): Lack der Wanne und
+   * Schrift auf beiden Laengsseiten. Gilt fuer `rolloff`.
+   *
+   * Patrick, 17.10.2026: „für Müll soll es doch eine Mulde geben." Es GAB
+   * eine — grau-beige wie Beton, 0,80 m flach, beschriftet nur am Schild,
+   * und das Schild blendet aus der Naehe aus und laesst sich ganz abschalten
+   * (MARKIERUNGEN). Auf den Fotos vom 17.10. ist es nicht zu sehen.
+   */
+  bemalung?: { lack: number; schrift: string };
+  /**
    * Lagermulde in der Silo-Reihe: das ENDE des Materialwegs.
    *
    * Dorthin faehrt ein sortenreiner Kipper, und dorthin traegt Lambert aus
@@ -531,6 +541,10 @@ export const CONFIGS: ContainerConfig[] = [
    *    Geometrie statt aus einer Abfrage (Ansage 15.09.2026: „Der Container
    *    kann nicht gepresst werden. Dann gibt es die Fehlermeldung der
    *    Presse.").
+   *    SEIT E-138 GILT DAS NICHT MEHR: Die Kammer misst 4,45 x 5,05 m, der
+   *    Container passt hinein. Die Sperre ist jetzt eine Abfrage in
+   *    `PressManager.start()` (beweglicher Koerper, der weder Schrottteil
+   *    noch Wrack ist → kein Start, `sperrgrund`).
    *  - 0,80 m Wandhoehe (SW): Bei 6,72 m Abstand zur Vorderkante bleiben aus
    *    der abgesenkten Kabine 40 % des Bodens sichtbar (`totenStreifen`). Bei
    *    1,00 m waeren es 18 %, bei 1,20 m gar nichts mehr.
@@ -577,7 +591,14 @@ export const CONFIGS: ContainerConfig[] = [
    */
   { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
     label: "MUELL", kind: "rolloff", x: -3.96, z: -14.04, size: [3.6, 4.3, 0.8],
-    platzinventar: true },
+    platzinventar: true,
+    /*
+     * E-138: Enzianblau (RAL 5010) mit weisser Schrift. Blau, weil der Platz
+     * sonst keinen blauen Behaelter hat (Pripada-Mulden gruen, Betonboxen
+     * grau, Orange liegt neben Kupfer, E-123); und Kunststoff — der in diese
+     * Mulde gehoert — traegt schon ein Blau als Fraktionsfarbe. // SW: am Bild
+     */
+    bemalung: { lack: 0x1f4e8c, schrift: "MÜLL" } },
 
   /*
    * REIFEN ist ersatzlos weg (Ansage 14.09.2026 abends: „Der Reifencontainer
@@ -1459,7 +1480,7 @@ class GameContainer {
       const T = ROLLOFF_WAND;
       const KUFE = ROLLOFF_KUFE;
       const stahl = new THREE.MeshStandardMaterial({
-        color: fraction.color,
+        color: cfg.bemalung?.lack ?? fraction.color,
         roughness: 0.62,
         metalness: 0.35,
       });
@@ -1517,6 +1538,7 @@ class GameContainer {
         kante.position.set(0, oberkante - ROLLOFF_RIEGEL / 2, sz * (d / 2));
         group.add(kante);
       }
+      if (cfg.bemalung) group.add(muldenSchrift(cfg.bemalung.schrift, w, d, KUFE + T + h / 2, h));
       // Haken-Öse an der Stirnseite: ohne sie ist es eine Kiste, keine Mulde
       const oese = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.045, 6, 12), rahmen);
       oese.rotation.y = Math.PI / 2;
@@ -1779,13 +1801,15 @@ class GameContainer {
    * braucht man sie auch (Design-Fix 29.08.2026).
    */
   refreshLabel(ampel: AmpelState | null = null, mitPreis = true): void {
+    // Was aufgemalt ist, steht auch am Schild: „MÜLL" statt „MUELL" (E-138).
+    const name = this.cfg.bemalung?.schrift ?? this.cfg.label;
     if (ampel === null) {
-      this.label.draw([this.cfg.label], null);
+      this.label.draw([name], null);
       return;
     }
     this.label.draw(
       [
-        this.cfg.label,
+        name,
         `${this.contentKg.toFixed(0)} kg · ${(this.purity * 100).toFixed(0)} %`,
         // Im Simulator (E-118) gibt es kein Geld — dann auch keinen Erlös am Schild
         ...(mitPreis ? [`≈ ${this.value.toFixed(0)} €`] : []),
@@ -1793,6 +1817,58 @@ class GameContainer {
       ampel
     );
   }
+}
+
+/**
+ * Aufgemalte Schrift auf beiden Laengsseiten einer Wanne (E-138).
+ *
+ * EIN Netz fuer beide Seiten (zwei Flaechen, eine Geometrie) — ein Zeichenruf,
+ * kein Schatten. Je Seite so gedreht, dass die Schrift von aussen richtig
+ * herum liest. Ohne `document` (Vitest) bleibt das Netz ohne Textur und
+ * unsichtbar; die Geometrie ist dieselbe.
+ */
+export function muldenSchrift(text: string, w: number, d: number, y: number, h: number): THREE.Mesh {
+  const breit = Math.min(d * 0.7, 3.0);
+  const hoch = Math.min(h * 0.8, breit / 3);
+  const seite = (sx: number): THREE.BufferGeometry => {
+    const g = new THREE.PlaneGeometry(breit, hoch);
+    g.rotateY(sx > 0 ? Math.PI / 2 : -Math.PI / 2);
+    g.translate(sx * (w / 2 + 0.006), y, 0);
+    return g;
+  };
+  const a = seite(1);
+  const b = seite(-1);
+  const pos = [...(a.getAttribute("position").array as Float32Array), ...(b.getAttribute("position").array as Float32Array)];
+  const uv = [...(a.getAttribute("uv").array as Float32Array), ...(b.getAttribute("uv").array as Float32Array)];
+  const n = a.getAttribute("position").count;
+  const idx = [...(a.getIndex()!.array as Uint16Array), ...[...(b.getIndex()!.array as Uint16Array)].map((i) => i + n)];
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ transparent: true, roughness: 0.7, metalness: 0.1 });
+  if (typeof document !== "undefined") {
+    const c = document.createElement("canvas");
+    c.width = 512;
+    c.height = Math.round((512 * hoch) / breit);
+    const ctx = c.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#f4f4f0";
+      ctx.font = `bold ${Math.round(c.height * 0.78)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, c.width / 2, c.height * 0.54);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    mat.map = tex;
+  } else {
+    mat.visible = false;
+  }
+  const m = new THREE.Mesh(geo, mat);
+  m.name = "muldenSchrift";
+  return m;
 }
 
 /** World-Space-Label als Canvas-Sprite (Name, Füllung, Reinheit, Erlös + Ampelrahmen). */

@@ -71,8 +71,9 @@ const NEU: Array<[string, string]> = [
   ["Gerüstfeld (ausgerissen)", "mixed"],
   ["Minibagger-Raupenunterwagen", "mixed"],
   ["Minibagger-Ausleger mit Stiel", "steel"],
-  ["Minibagger 1,5 t (ohne Arm/Dach)", "mixed"],
-  ["Minibagger (ausgeschlachtet)", "mixed"],
+  // E-138: Stahl — massiv und 14 % Fremdstoff liegt unter `VERBUND_BIS` 0,15
+  ["Minibagger 1,5 t (ohne Arm/Dach)", "steel"],
+  ["Minibagger (ausgeschlachtet)", "steel"],
 ];
 
 describe("Container, Gerueste, kleine Bagger stehen im Katalog (E-123)", () => {

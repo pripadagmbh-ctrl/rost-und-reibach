@@ -1,3 +1,4 @@
+import RAPIER from "@dimforge/rapier3d-compat";
 import { pressWaende } from "./press";
 import {
   YARD_D,
@@ -472,4 +473,60 @@ export function slideAround(
   out.x /= len;
   out.z /= len;
   return true;
+}
+
+/**
+ * Wie tief steckt ein Koerper in festem Bauwerk? Meter, 0 = frei (E-138).
+ *
+ * WOFUER. Patrick, 17.10.2026: „Körper wie Autos gehen durch Betonwände oder
+ * Scherenwände." Gemessen: Ein GEWORFENES Wrack bleibt an jeder Wand stehen
+ * (CCD, 6 bis 25 m/s, `test/waendeDicht.test.ts`). Durch die Wand kommt es,
+ * solange es in der Spinne HAENGT: Dann ist es kinematisch
+ * (`gripSystem.attachBody`), und einen kinematischen Koerper haelt Rapier
+ * an nichts Festem auf. Der Bagger prueft heute nur die Spinne selbst gegen
+ * die Bauwerke (`excavator/collision.ts`) — das Auto in ihr ist 4 m lang und
+ * ragt links und rechts zwei Meter hinaus. Laesst man es los, waehrend es in
+ * der Wand steckt, drueckt Rapier es heraus, oft auf die falsche Seite.
+ *
+ * Diese Abfrage ist der Baustein fuer den Bagger: Je gehaltenem Koerper
+ * fragen, und eine Bewegung, die die Tiefe wachsen laesst, zuruecknehmen —
+ * genau wie heute bei der Spinne.
+ *
+ * Gezaehlt werden nur FESTE Koerper (Waende, Mulden, Presse, Gebaeude). Der
+ * Boden zaehlt nicht mit (ein Kollider, dessen Oberkante auf Hoehe 0 liegt) —
+ * das Absetzen auf dem Boden regelt der Bodenanschlag des Baggers.
+ * Gesammelt, dann gemessen (v2 E-044).
+ */
+export function eindringtiefeInBauwerk(world: RAPIER.World, body: RAPIER.RigidBody): number {
+  const paare: Array<[RAPIER.Collider, RAPIER.Collider]> = [];
+  for (let i = 0; i < body.numColliders(); i++) {
+    const c = body.collider(i);
+    world.intersectionsWithShape(
+      c.translation(),
+      c.rotation(),
+      c.shape,
+      (o) => {
+        const b = o.parent();
+        if (b && b.isFixed() && !istBoden(o)) paare.push([c, o]);
+        return true;
+      },
+      undefined,
+      undefined,
+      undefined,
+      body
+    );
+  }
+  let tiefe = 0;
+  for (const [c, o] of paare) {
+    const k = c.contactCollider(o, 0);
+    if (k && k.distance < 0) tiefe = Math.max(tiefe, -k.distance);
+  }
+  return tiefe;
+}
+
+/** Der Boden: ein fester Quader, dessen Oberkante auf Hoehe 0 liegt. */
+function istBoden(c: RAPIER.Collider): boolean {
+  if (c.shapeType() !== RAPIER.ShapeType.Cuboid) return false;
+  const he = c.halfExtents();
+  return Math.abs(c.translation().y + he.y) < 0.02 && he.x > 20;
 }

@@ -13,6 +13,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | E-143 | 17.10.2026 | Nur noch Pripada.de auf den Schildern, fremde Logos raus | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-142 | 17.10.2026 | Echte Arme, Arbeitshandschuhe umschließen die Joysticks | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-139 | 17.10.2026 | Keine Tonketten, Hämmern und Drücken hörbar, Lautstärke je Gruppe | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-138 | 17.10.2026 | Hohle Fahrgastzelle, Minibagger Stahl, größere Schere, blaue MÜLL-Mulde, dichte Presswände | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-136 | 17.10.2026 | Kamera dreht in jeder Ansicht, Tablet: Finger in der Bildmitte | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-135 | 17.10.2026 | Voller Start, LKW-Wrack an der Ostmauer, ab und zu ein Wohnwagen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-134 | 17.10.2026 | Gehaltener Schrott kracht, wenn die Spinne ihn aufschlägt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -169,6 +170,13 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Spinne zwei Sekunden auf ein Wrack drücken: Knirscht es in einzelnen Stößen, und bleibt nie ein Ton stehen?
 - Falsch und richtig einsortieren: Hörst du den Unterschied (dumpfer Schlag gegen Funk-Knacken)?
 - Pause → Lautstärke: Schieber mit dem Daumen ziehbar, auch iPhone mini quer? Metall auf 0 % → Hauen still, Motor bleibt? Nach Neuladen noch gleich eingestellt?
+
+**E-138 — Hohle Fahrgastzelle, Minibagger Stahl, größere Schere, MÜLL-Mulde, Presswände** (iPad)
+- Scheiben eines Autos zersplittern lassen: Siehst du in einen leeren Innenraum statt auf eine Wand in Wagenfarbe? Dasselbe am LKW-Fahrerhaus.
+- Aus der Kabine rechts vorn: Erkennst du die blaue Mulde mit MÜLL an der Seite, auch ohne MARKIERUNGEN? Fällt Holz hinein?
+- Auto quer zur Pressrichtung in die Schere, SCHERE: Bleibt es ganz in der Kammer, nichts in Wand oder Boden? Wirkt die Schere größer?
+- MÜLL-Container in die Schere ziehen, SCHERE: Läuft sie nicht los?
+- Minibagger greifen: Zeigt die Griffanzeige Stahlschrott?
 
 **E-136 — Kamera drehen ohne Ansichtswechsel** (iPad quer, dann iPhone mini quer)
 - Einen Finger in die Bildmitte und langsam ziehen: Dreht die Kamera um den Bagger, ohne dass Arm oder Spinne zucken? Tempo angenehm, zu schnell, zu träge?
