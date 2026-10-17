@@ -15,6 +15,7 @@ import {
   STANDARD_GREIFER,
 } from "./excavator/greiferwahl";
 import { SICHELKRALLE } from "./excavator/greiferform";
+import { ferroAnteilVon } from "./excavator/magnet";
 import { OrbitCamera } from "./excavator/orbitCamera";
 import { Yard } from "./world/yard";
 import { ItemManager, type ScrapItem } from "./world/scrapItems";
@@ -655,6 +656,11 @@ async function main(): Promise<void> {
   };
   grip.onTear = () => audio.playTear();
   grip.onReleased = (count) => bus.emit("released", { count }); // E-121: Ton beim Loslassen
+  // E-146: Lasthebemagnet — was magnetisch ist, steht in der Zusammensetzung; Ton haengt am Bus
+  grip.ferroAnteil = (b) => ferroAnteilVon(b, items, composites.cars);
+  grip.onMagnetHaftet = (massKg) => bus.emit("magnet:haftet", { massKg });
+  excavator.onMagnetAn = () => bus.emit("magnet:an", {});
+  excavator.onMagnetAus = () => bus.emit("magnet:aus", {});
   /*
    * Aufschlaege: Der wichtigste Klang auf dem Platz. Ob es metallisch
    * wummert oder dumpf auf Beton klatscht, haengt daran, ob das Teil auf
