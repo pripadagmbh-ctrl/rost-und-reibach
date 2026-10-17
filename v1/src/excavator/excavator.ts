@@ -903,6 +903,11 @@ export class Excavator {
    * `setzeGreifer`. Ohne es gibt es keine Wandsperre fuer gehaltene Teile.
    */
   greifsystem: GripSystem | null = null;
+  /** E-146: Ist der Lasthebemagnet eingeschaltet? */
+  magnetAn = false;
+  /** E-146: Magnet ein- bzw. ausgeschaltet — main legt es auf den Bus (`magnet:an`, `magnet:aus`). */
+  onMagnetAn: (() => void) | null = null;
+  onMagnetAus: (() => void) | null = null;
   /** true, solange ein gehaltenes Teil an einer Wand ansteht (E-145) */
   lastAnWand = false;
   /** Rotator-Stellung, die zuletzt angenommen wurde — das Mausrad dreht zwischen den Schritten (E-145) */
@@ -1837,6 +1842,23 @@ export class Excavator {
         )
       );
     }
+    /*
+     * E-146: Der Magnet hat keine Schalen, aber eine Scheibe — sie haelt
+     * angezogene Teile auf und schiebt Schrott beiseite wie die Krallen. Sie
+     * steht in derselben Liste, damit sie beim Wechsel mit verschwindet;
+     * `updateClawColliders` beruehrt sie nicht (sie haengt hinter den Schalen).
+     */
+    const m = this.form.magnet;
+    if (m) {
+      this.clawColliders.push(
+        this.world.createCollider(
+          RAPIER.ColliderDesc.cylinder(m.hoehe / 2, m.radius)
+            .setTranslation(0, -m.unten + m.hoehe / 2, 0)
+            .setFriction(0.9),
+          this.grappleBody
+        )
+      );
+    }
   }
 
   /**
@@ -2087,6 +2109,7 @@ export class Excavator {
      * tatsaechlich.
      */
     if (
+      this.form.schalen > 0 && // E-146: ein Magnet schnappt nicht
       closeRate > 0 &&
       closureVorher < SCHNAPP_AB &&
       this.closure >= SCHNAPP_AB &&
@@ -2101,6 +2124,17 @@ export class Excavator {
     // „closing" steuert das Greifsystem: Zupacken solange die Spinne schließt
     // oder geschlossen gehalten wird
     this.closing = held || closeRate > 0 || (this.grappleHold && this.closure > 0.5);
+    /*
+     * E-146: Am Magneten ist „schliessen" EIN und „oeffnen" AUS — derselbe
+     * Eingang, dieselbe Zeile wie oben. Gemeldet wird nur das Umschalten.
+     */
+    const magnetAn = !!this.form.magnet && this.closing;
+    if (magnetAn !== this.magnetAn) {
+      this.magnetAn = magnetAn;
+      if (magnetAn) this.onMagnetAn?.();
+      else this.onMagnetAus?.();
+      this.greiferbau.setAn?.(magnetAn);
+    }
 
     // Kabinenhub fährt gleichmäßig auf die Zielhöhe
     const liftStep = CAB_LIFT_SPEED * dt;

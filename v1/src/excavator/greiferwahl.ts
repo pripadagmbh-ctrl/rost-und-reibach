@@ -2,6 +2,7 @@ import type { GripSystem } from "../physics/gripSystem";
 import type { Excavator } from "./excavator";
 import { SICHELKRALLE, type Greiferform, type GreiferId } from "./greiferform";
 import { FUENFSCHALEN } from "./greiferFuenfschalen";
+import { MAGNET } from "./magnet";
 
 /**
  * Die Greiferwahl im Pausenmenue (E-059, 15.09.2026).
@@ -14,8 +15,12 @@ import { FUENFSCHALEN } from "./greiferFuenfschalen";
  * und meldet das Ergebnis auf dem Ereignisbus.
  */
 
-/** Alle Greifer, die es gibt — in der Reihenfolge des Durchschaltens. */
-export const GREIFERFORMEN: Greiferform[] = [SICHELKRALLE, FUENFSCHALEN];
+/**
+ * Alle Greifer, die es gibt — in der Reihenfolge des Durchschaltens. Der
+ * Lasthebemagnet ist der dritte (E-146); der Knopf im Pausenmenue schaltet
+ * reihum.
+ */
+export const GREIFERFORMEN: Greiferform[] = [SICHELKRALLE, FUENFSCHALEN, MAGNET];
 
 /**
  * Womit eine NEUE Runde anfaengt (Ansage Patrick, 17.09.2026: „ansonsten
@@ -43,7 +48,7 @@ export function formZu(id: string): Greiferform {
   return GREIFERFORMEN.find((f) => f.id === id) ?? STANDARD_GREIFER;
 }
 
-/** Der jeweils andere Greifer — mit zweien ist „durchschalten" ein Umschalten. */
+/** Der naechste Greifer in der Reihe — nach dem letzten kommt wieder der erste. */
 export function naechsteForm(id: GreiferId): Greiferform {
   const i = GREIFERFORMEN.findIndex((f) => f.id === id);
   return GREIFERFORMEN[(i + 1) % GREIFERFORMEN.length]!;
@@ -111,7 +116,7 @@ export function setzeGreifer(
   return form;
 }
 
-/** Auf den jeweils anderen Greifer umschalten (der Knopf im Pausenmenue). */
+/** Auf den naechsten Greifer umschalten (der Knopf im Pausenmenue). */
 export function wechsleGreifer(bagger: Excavator, grip: GripSystem): Greiferform {
   return setzeGreifer(bagger, grip, naechsteForm(bagger.greiferform.id));
 }

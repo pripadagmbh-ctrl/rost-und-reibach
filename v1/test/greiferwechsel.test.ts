@@ -182,7 +182,7 @@ function greifversuch(
 }
 
 describe("Der Schalter", () => {
-  it("es gibt genau zwei Greifer, und der Fuenfschalengreifer ist die Vorgabe (E-105)", () => {
+  it("drei Greifer reihum, und der Fuenfschalengreifer ist die Vorgabe (E-105, E-146)", () => {
     /*
      * Ansage Patrick, 17.09.2026: „ansonsten fuenfschalengreifer als default".
      * Bis dahin war es die Sichelkralle (E-059).
@@ -200,9 +200,11 @@ describe("Der Schalter", () => {
      * `main.ts` setzt die Vorgabe beim Start; welcher Greifer beim Laden eines
      * alten Standes haengt, steht dort.
      */
-    expect(GREIFERFORMEN.map((f) => f.id)).toEqual(["sichel", "fuenfschalen"]);
+    // E-146: der Lasthebemagnet ist der dritte; der Knopf schaltet reihum
+    expect(GREIFERFORMEN.map((f) => f.id)).toEqual(["sichel", "fuenfschalen", "magnet"]);
     expect(naechsteForm("sichel")).toBe(FUENFSCHALEN);
-    expect(naechsteForm("fuenfschalen")).toBe(SICHELKRALLE);
+    expect(naechsteForm("fuenfschalen").id).toBe("magnet");
+    expect(naechsteForm("magnet")).toBe(SICHELKRALLE);
     // Was im Spielstand steht und was nicht
     expect(formZu("fuenfschalen")).toBe(FUENFSCHALEN);
     expect(formZu("sichel")).toBe(SICHELKRALLE);

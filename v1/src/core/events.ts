@@ -188,6 +188,20 @@ export interface GameEvents {
     y: number;
     z: number;
   };
+  /**
+   * Der Lasthebemagnet (E-146) wird eingeschaltet („schliessen") bzw.
+   * ausgeschaltet („oeffnen" — was haengt, faellt; das Fallen meldet weiter
+   * `released`). Einmal je Umschalten, nicht je Bild. Fuer den Ton: Brummen
+   * an, Klacken des Schuetzes.
+   */
+  "magnet:an": Record<string, never>;
+  "magnet:aus": Record<string, never>;
+  /**
+   * Teile sind an der Scheibe angeschlagen und haften. `massKg`: was in
+   * diesem Schritt dazugekommen ist (mehrere Teile im selben Schritt = eine
+   * Meldung). Fuer den Ton: der dumpfe Klonk, lauter mit der Masse.
+   */
+  "magnet:haftet": { massKg: number };
 }
 
 type Handler<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;

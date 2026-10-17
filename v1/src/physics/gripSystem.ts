@@ -2,6 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { TearTarget } from "../dismantle/composites";
 import { SICHELKRALLE, type Greiferform } from "../excavator/greiferform";
+import { MAGNET_AB } from "../excavator/magnet";
 
 /**
  * Greifsystem nach Briefing Kap. 6.2:
@@ -93,6 +94,24 @@ const CRUSH_TIME = 1.1;
  * Zupacken: Gefasst wird nur, was wirklich zwischen den Schalen liegt
  * (`insideGrapple`). Wer dort nicht hineinragt, wird gar nicht erst gegriffen.
  */
+/*
+ * --- Der Lasthebemagnet (E-146) ---
+ *
+ * Zug bis zur Scheibe: ein kurzer Impuls je Schritt, gedeckelt aufs Tempo
+ * (Lehre v2 E-045: Impuls statt `setLinvel`), dann anheften wie jedes
+ * gegriffene Teil. Kein Hineinruecken in die Mitte: Das Teil bleibt, wo es
+ * anschlaegt (Regel 2, kein „Saugen").
+ */
+/**
+ * Beschleunigung des Zugs (m/s²). SW: dreimal die Schwerkraft — ein Teil
+ * muss vom Boden hochkommen (Netto rund 2 g), und 0,6 m sind damit in gut
+ * einer Drittelsekunde zurueckgelegt: ein kurzer Ruck, kein Schweben.
+ */
+const MAGNET_ZUG_MS2 = 30;
+/** Hoechstens so schnell faehrt ein Teil auf die Scheibe zu (m/s). SW: unter der Fallgeschwindigkeit aus 0,3 m, damit es klonkt, nicht knallt. */
+const MAGNET_ZUG_MAX_MS = 2.0;
+/** So nah an der Unterseite gilt ein Teil als angeschlagen (m). SW: Kontaktabstand plus Rapier-Einfedern. */
+const MAGNET_HAFT_M = 0.04;
 /** Wie viele Schritte in die Loslass-Geschwindigkeit gemittelt werden */
 const RELEASE_AVG_STEPS = 3;
 /** Zusaetzlicher Abwaertsimpuls beim Loslassen (m/s) */
@@ -198,6 +217,14 @@ export class GripSystem {
   onGrabbed: ((bodies: RAPIER.RigidBody[]) => void) | null = null;
   onReleased: ((count: number) => void) | null = null;
   onTear: ((name: string) => void) | null = null;
+  /**
+   * E-146: Anteil Eisen und Stahl an einem Koerper (0..1). Von main gesetzt
+   * (`ferroAnteilVon` in `excavator/magnet.ts`); ohne ihn zieht der Magnet
+   * nichts an.
+   */
+  ferroAnteil: ((body: RAPIER.RigidBody) => number) | null = null;
+  /** E-146: Teile haften an der Scheibe — Masse, die in diesem Schritt dazukam. */
+  onMagnetHaftet: ((massKg: number) => void) | null = null;
   /** liefert eine abreißbare Baugruppe nahe des Sensors (Verbundobjekte, Kap. 8) */
   partResolver: ((pos: THREE.Vector3) => TearTarget | null) | null = null;
   /**
@@ -298,6 +325,11 @@ export class GripSystem {
     this.closureJetzt = closure;
     this.trackGrapple(dt);
     this.carryHeld();
+    // Der Magnet quetscht nicht, reisst nicht ab und kennt kein Greiffenster
+    if (this.form.magnet) {
+      this.updateMagnet(closing, sensorPos, dt);
+      return;
+    }
     this.updateCrush(closure, dt);
     if (!closing) {
       // Loslassen wirft sofort ab — und die Spinne ist direkt wieder scharf
@@ -344,6 +376,100 @@ export class GripSystem {
     if (closure >= GRAB_WINDOW_START && closure <= GRAB_WINDOW_END) {
       this.tryGrab(sensorPos);
     }
+  }
+
+  /**
+   * E-146: Der Magnet ist an. Was im Wirkfeld unter der Scheibe liegt und
+   * genug Stahl hat, wird gezogen; was anliegt, haftet. Erst sammeln, dann
+   * anwenden (v2 E-044).
+   *
+   * Angeschlagen ist ein Teil, wenn sein naechster Punkt an der Unterseite
+   * liegt — oder wenn es an einem Teil anliegt, das schon haftet: Das Feld
+   * geht durch Stahl, so haengt ein Buendel am Magneten.
+   */
+  private updateMagnet(an: boolean, sensorPos: THREE.Vector3, dt: number): void {
+    if (!an) {
+      if (this.items.length > 0) this.releaseAll();
+      return;
+    }
+    const m = this.form.magnet!;
+    const g = this.grappleBody.translation();
+    const r = this.grappleBody.rotation();
+    this.tmpQ.set(r.x, r.y, r.z, r.w);
+    // Mitte der Unterseite und Richtung „nach unten" der Scheibe
+    const unten = this.tmpB.set(0, -1, 0).applyQuaternion(this.tmpQ);
+    const mitte = this.tmpA.copy(unten).multiplyScalar(m.unten).add(new THREE.Vector3(g.x, g.y, g.z));
+    const kapazitaet = MAX_TOTAL_KG * (this.getCapacityBonus?.() ?? 1);
+    const gesehen = new Set<number>();
+    const ziehen: Array<{ body: RAPIER.RigidBody; dx: number; dy: number; dz: number }> = [];
+    const heften: RAPIER.RigidBody[] = [];
+    this.world.intersectionsWithShape(
+      { x: sensorPos.x, y: sensorPos.y, z: sensorPos.z },
+      { x: 0, y: 0, z: 0, w: 1 },
+      this.sensorShape,
+      (collider) => {
+        const body = collider.parent();
+        if (!body || !body.isDynamic() || gesehen.has(body.handle)) return true;
+        gesehen.add(body.handle);
+        if ((this.ferroAnteil?.(body) ?? 0) < MAGNET_AB) return true;
+        if (this.totalMassKg + body.mass() > kapazitaet) return true;
+        // naechster Punkt des Teils zur Mitte der Unterseite, ueber alle Kollider
+        let best = Infinity;
+        let px = 0;
+        let py = 0;
+        let pz = 0;
+        for (let i = 0; i < body.numColliders(); i++) {
+          const pr = body.collider(i).projectPoint(mitte, true);
+          if (!pr) continue;
+          const d = Math.hypot(pr.point.x - mitte.x, pr.point.y - mitte.y, pr.point.z - mitte.z);
+          if (d < best) {
+            best = d;
+            px = pr.point.x;
+            py = pr.point.y;
+            pz = pr.point.z;
+          }
+        }
+        if (best === Infinity) return true;
+        this.probe.set(px, py, pz);
+        if (this.insideGrapple && !this.insideGrapple(this.probe)) return true;
+        const spalt = (px - mitte.x) * unten.x + (py - mitte.y) * unten.y + (pz - mitte.z) * unten.z;
+        if (spalt <= MAGNET_HAFT_M || this.liegtAnHaftendem(body)) heften.push(body);
+        else ziehen.push({ body, dx: mitte.x - px, dy: mitte.y - py, dz: mitte.z - pz });
+        return true;
+      }
+    );
+    for (const z of ziehen) {
+      const len = Math.hypot(z.dx, z.dy, z.dz) || 1;
+      const nx = z.dx / len;
+      const ny = z.dy / len;
+      const nz = z.dz / len;
+      const v = z.body.linvel();
+      const vZu = v.x * nx + v.y * ny + v.z * nz;
+      const dv = Math.min(MAGNET_ZUG_MAX_MS - vZu, MAGNET_ZUG_MS2 * dt);
+      if (dv <= 0) continue;
+      const j = z.body.mass() * dv;
+      z.body.applyImpulse({ x: nx * j, y: ny * j, z: nz * j }, true);
+    }
+    let kg = 0;
+    for (const b of heften) if (this.attachBody(b)) kg += b.mass();
+    if (kg > 0) this.onMagnetHaftet?.(kg);
+  }
+
+  /** Beruehrt `body` ein Teil, das schon am Magneten haftet? (Rapier-Kontakte des letzten Schritts, nur lesen) */
+  private liegtAnHaftendem(body: RAPIER.RigidBody): boolean {
+    if (this.items.length === 0) return false;
+    let ja = false;
+    for (let i = 0; i < body.numColliders() && !ja; i++) {
+      const c = body.collider(i);
+      this.world.contactPairsWith(c, (o) => {
+        const ob = o.parent();
+        if (ja || !ob || !this.items.some((it) => it.body.handle === ob.handle)) return;
+        this.world.contactPair(c, o, (mf) => {
+          for (let k = 0; k < mf.numContacts(); k++) if (mf.contactDist(k) < 0.02) ja = true;
+        });
+      });
+    }
+    return ja;
   }
 
   /**

@@ -90,7 +90,7 @@ import {
  */
 
 /** Kennung einer Greiferform — sie steht so auch im Spielstand. */
-export type GreiferId = "sichel" | "fuenfschalen";
+export type GreiferId = "sichel" | "fuenfschalen" | "magnet";
 
 /** Der gebaute Greifer, wie der Bagger ihn bewegt. */
 export interface Greiferbau {
@@ -104,6 +104,8 @@ export interface Greiferbau {
    * stimmt, wenn alle Schalen stehen.
    */
   nachfuehren(): void;
+  /** Nur der Magnet (E-146): Lampe „Magnet ein" schalten. */
+  setAn?(an: boolean): void;
 }
 
 export interface Greiferform {
@@ -164,6 +166,11 @@ export interface Greiferform {
   readonly kolliderRadius: number;
   /** Ein neues Modell bauen — je Bagger eines, nicht wiederverwendbar. */
   baue(): Greiferbau;
+  /**
+   * Nur der Lasthebemagnet (E-146): Scheibe statt Schalen, Masse im Frame des
+   * Greifers (m). Ist das Feld da, zieht das Greifsystem an, statt zu greifen.
+   */
+  readonly magnet?: { radius: number; hoehe: number; unten: number };
 }
 
 /** Was `sensorRadiusVon` und `schalenlueckeVon` von einer Form brauchen. */
