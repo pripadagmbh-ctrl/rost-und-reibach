@@ -23,7 +23,7 @@ import { ContainerAbholung } from "./delivery/platzinventarAbholung";
 import { AudioManager } from "./audio/audioManager";
 import { Hud, type Zahlungslage } from "./ui/hud";
 import { Particles } from "./world/particles";
-import { CompositeManager } from "./dismantle/composites";
+import { CompositeManager, type WrackArt } from "./dismantle/composites";
 import { FenceManager } from "./world/fence";
 import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
@@ -39,7 +39,8 @@ import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } 
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
-import { START_HAUFEN, START_AUTOS, START_STREU } from "./world/startplatz";
+import { START_HAUFEN, START_AUTOS, START_STREU, START_LKW } from "./world/startplatz";
+import { lastAufschlagWucht } from "./audio/klangregeln";
 import { findeBox } from "./world/boxen";
 import { OfficeBuilding, BUERO_TUER } from "./world/office";
 import { Police } from "./world/police";
@@ -205,7 +206,10 @@ async function main(): Promise<void> {
       );
     }
     for (const c of save.cars) {
-      const car = composites.spawnCar(new THREE.Vector3(c.pos[0], c.pos[1], c.pos[2]));
+      const car = composites.spawnCar(
+        new THREE.Vector3(c.pos[0], c.pos[1], c.pos[2]),
+        (c as { art?: WrackArt }).art ?? "pkw"
+      );
       car.body.setRotation({ x: c.rot[0], y: c.rot[1], z: c.rot[2], w: c.rot[3] }, true);
       car.restoreState(c);
     }
@@ -238,6 +242,8 @@ async function main(): Promise<void> {
     );
     // Altfahrzeuge am Rand des Haufens, beide in der Mischschrottbox
     for (const a of START_AUTOS) composites.spawnCar(new THREE.Vector3(a.x, 0.5, a.z));
+    // LKW-Wrack an der Ostmauer (E-135)
+    composites.spawnCar(new THREE.Vector3(START_LKW.x, 0.5, START_LKW.z), "lkw", START_LKW.gier);
     // Etwas Streuschrott neben dem Stahlhaufen — er lag frueher an den
     // Schrottbergen, und die stehen jetzt ausserhalb der Mauer. Auf dem Platz
     // soll alles, was nach Material aussieht, auch aufzunehmen sein.
@@ -697,6 +703,26 @@ async function main(): Promise<void> {
   };
   // Zaehne treffen aufeinander — hoerbar, auch wenn nichts drin ist
   excavator.onClawSnap = (haerte) => audio.playClawSnap(haerte);
+  // Gehaltener Schrott schlaegt auf (E-134): das schwerste gegriffene Teil klingt
+  excavator.onAufschlag = (tempo, aufSchrott) => {
+    let it: ReturnType<typeof items.itemByBody>;
+    for (const b of grip.grippedBodies) {
+      const x = items.itemByBody(b);
+      if (x && (!it || x.massKg > it.massKg)) it = x;
+    }
+    if (!it) return;
+    const p = it.body.translation();
+    bus.emit("schrott:aufprall", {
+      materialId: it.materialId,
+      massKg: grip.totalMassKg,
+      wucht: lastAufschlagWucht(tempo),
+      blech: items.isCrushable(it),
+      untergrund: aufSchrott ? "schrott" : stahlGrund(p.x, p.y, p.z) ? "stahl" : "beton",
+      x: p.x,
+      y: p.y,
+      z: p.z,
+    });
+  };
   /*
    * Zudruecken richtet Schaden an (E-112 baut die Kraft, E-114 die Wirkung).
    * Der Bagger kennt keinen Bus, deshalb ein Haken wie `onClawSnap`; wer

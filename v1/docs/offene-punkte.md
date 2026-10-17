@@ -554,6 +554,48 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Gerätebefund 17.10.2026, zehn Punkte** — Patrick, wörtlich:
+      „1. Baue eine möglichkeit ein, die perspektive zu wechseln oder die
+      Kamera zu drehen, ohne zwischen den Ansichten switchen zu müssen.
+      2. Die Fahrgastzelle sollten bei holkörper leer sien, sprich wenn die
+      Glasscheiben splitern, soll es dahinter halt auch leerer raum sein.
+      3. Manche grossteile können nicht oder nur sehr schwer gegriffen werden,
+      auchverhällt sich der Kran ungewöhnlich, er steigt schrittweise nach oben
+      ohne den ausleger korrigieren zu könnne. 4. Insgesamt sind die
+      Klassifizierungen nicht immer eindeutig. Minibagger sind eher stahl als
+      misschrott., weil viel stahlblech oder vollmaterial. 5. Geräuschekullisse
+      von Pixabay hebt das spiel auf ein anderes level, anderseits sind
+      kindliche klänge und tonketten zu hören. das pass tnciht ganz, eher mit
+      echten klängen arbeiten. 6. die Schere muss etwas grösser werden. 7. für
+      Müll soll es doch eine Mulde geben. 8. die Zacken bei dem greifer sind zu
+      spitz. entweder aufweichen oder entfernen. 9. Hämmern und drücken soll
+      und muss mit der Spinne möglich sein, entsprechend gehört das auch bei
+      der Sound Kulisse dazu. Aktuell hört man nichts. Auch wirkt es, dass die
+      spinne beim hämmern abbremst. Bremsen kann nur das material oder den
+      boden die spinne. 10. Körper wie autos gehen durch Betonwände oder
+      scherenwände. Das fhelt offensichtlich eine sperre oder wie du das nennen
+      würdest"
+
+      | # | Punkt |
+      |---|---|
+      | 1a | Perspektive wechseln ohne Umschalten zwischen Ansichten |
+      | 1b | Kamera frei drehen können |
+      | 2 | Fahrgastzelle hohl: hinter zersplitterter Scheibe leerer Raum |
+      | 3a | Manche Großteile lassen sich nicht oder kaum greifen |
+      | 3b | Kran steigt schrittweise nach oben, Ausleger nicht korrigierbar |
+      | 4a | Klassifizierung nicht immer eindeutig |
+      | 4b | Minibagger sind Stahl, nicht Mischschrott |
+      | 5a | Pixabay-Aufnahme (Greifkran) ist sehr gut — so weiter |
+      | 5b | Kindliche Klänge und Tonketten raus, echte Klänge statt dessen |
+      | 6 | Schere etwas größer |
+      | 7 | Eine Mulde für Müll |
+      | 8 | Zacken am Greifer zu spitz — abrunden oder weg |
+      | 9a | Hämmern mit der Spinne muss gehen |
+      | 9b | Drücken mit der Spinne muss gehen |
+      | 9c | Hämmern und Drücken müssen zu hören sein (heute still) |
+      | 9d | Spinne bremst beim Hämmern ab — bremsen darf nur Material oder Boden |
+      | 10 | Autos gehen durch Betonwände und Scherenwände |
+
 - [ ] **Ansage 17.10.2026: voller Start, LKW-Wrack, Wohnwagen** — Patrick,
       wörtlich: „am anfang sollen auch mehr schrott schon da sein, die zwei
       autos, ein lkw wrack und ab und zu bringt jmd auch nen wohnwagen zum
