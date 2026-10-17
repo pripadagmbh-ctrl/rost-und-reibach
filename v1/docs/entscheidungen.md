@@ -11,6 +11,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
 | E-143 | 17.10.2026 | Nur noch Pripada.de auf den Schildern, fremde Logos raus | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
+| E-139 | 17.10.2026 | Keine Tonketten, Hämmern und Drücken hörbar, Lautstärke je Gruppe | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-136 | 17.10.2026 | Kamera dreht in jeder Ansicht, Tablet: Finger in der Bildmitte | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-135 | 17.10.2026 | Voller Start, LKW-Wrack an der Ostmauer, ab und zu ein Wohnwagen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-134 | 17.10.2026 | Gehaltener Schrott kracht, wenn die Spinne ihn aufschlägt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -155,6 +156,13 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 **E-143 — Nur Pripada.de auf den Schildern**
 - Nord- und Ostmauer, drei Hallen: Steht überall Pripada.de, gut lesbar?
 - Abholer und grüne Mulden: Sitzt das Logo wie vorher?
+
+**E-139 — Keine Tonketten mehr, Hämmern und Drücken hörbar** (Augen zu, iPad-Lautsprecher)
+- Fünf Minuten Sandkasten, Funktionsrad drehen, Teile einsortieren: Hörst du irgendwo noch eine Tonfolge, ein Piepen oder eine Melodie?
+- Leere Spinne kräftig auf Beton, Ladefläche, Schrotthaufen und Autodach hauen: Vier verschiedene Schläge? Klingt das Autodach dumpf nach Blech?
+- Spinne zwei Sekunden auf ein Wrack drücken: Knirscht es in einzelnen Stößen, und bleibt nie ein Ton stehen?
+- Falsch und richtig einsortieren: Hörst du den Unterschied (dumpfer Schlag gegen Funk-Knacken)?
+- Pause → Lautstärke: Schieber mit dem Daumen ziehbar, auch iPhone mini quer? Metall auf 0 % → Hauen still, Motor bleibt? Nach Neuladen noch gleich eingestellt?
 
 **E-136 — Kamera drehen ohne Ansichtswechsel** (iPad quer, dann iPhone mini quer)
 - Einen Finger in die Bildmitte und langsam ziehen: Dreht die Kamera um den Bagger, ohne dass Arm oder Spinne zucken? Tempo angenehm, zu schnell, zu träge?

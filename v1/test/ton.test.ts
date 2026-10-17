@@ -286,6 +286,7 @@ describe("Tonkanal aufwecken", () => {
 describe("Overlay-Anzeige", () => {
   it("meldet keine laufende Musik, solange der Kanal unterbrochen ist", () => {
     const { mgr, ctx } = starteSpiel();
+    mgr.toggleMusic(); // E-139: Radio startet aus — hier eingeschaltet, um den Wunsch zu pruefen
     ctx.resumeErfolg = false;
     ctx.setzeZustand("interrupted");
     laufeFristen();

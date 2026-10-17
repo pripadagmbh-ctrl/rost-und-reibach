@@ -50,7 +50,7 @@ export interface Schlag {
  * Patricks Vorgabe (06.10.2026) sortiert: „Stahl dumpf-schwer, Blech
  * scheppernd, Kupfer und Alu heller".
  */
-const FAMILIEN: Record<string, Schlag> = {
+export const FAMILIEN: Record<string, Schlag> = {
   // Massiver Stahl: tief, kurz, schwer. Die drei oberen Teiltoene tragen ihn
   // ueber kleine Lautsprecher.
   stahl: {
@@ -275,7 +275,7 @@ export interface AufprallRezept {
  *  - Stahl (Ladeflaeche, Mulde): die Platte wummert mit, tief und lang.
  *  - Schrott: ein zweites, kurzes Blechklappern — das Teil, auf das es faellt.
  */
-const GRUND: Record<Untergrund, Schlag> = {
+export const GRUND: Record<Untergrund, Schlag> = {
   beton: {
     teiltoene: [180, 410],
     abkling: [0.05, 0.03],
@@ -463,6 +463,88 @@ export function knautschKlang(zuwachs: number): { pegel: number; dauer: number; 
     rate: 1.1 - 0.25 * z,
     schlaege: Math.round(4 * z),
   };
+}
+
+/* ------------------------------------- Hämmern und Drücken (E-139) -- */
+
+/** Worauf die Spinne schlägt oder drückt: die drei Untergründe plus das Wrack. */
+export type SpinnenGrund = Untergrund | "wrack";
+
+/** Zwischen zwei Hammerschlägen mindestens so viel Zeit, sonst Maschinengewehr. SW: 0,15 s (wie E-134). */
+export const AUFSCHLAG_ABSTAND_S = 0.15;
+/**
+ * Drücken klingt in Stößen, nie als Dauerton: nach einem Stoß mindestens
+ * `DRUECK_ABSTAND_S` plus bis zu `DRUECK_STREU_S` Pause. Der Melder schickt
+ * höchstens alle 0,25 s; mit der Streuung fällt ab und zu einer aus — so
+ * knirscht es unregelmäßig wie echtes Blech, nicht im Takt. SW beide.
+ */
+export const DRUECK_ABSTAND_S = 0.2;
+export const DRUECK_STREU_S = 0.15;
+/** Ein Stoß ist kürzer als die kürzeste Pause — dazwischen ist es still. SW: 0,18 s. */
+export const DRUECK_DAUER_S = 0.18;
+
+/** Eine Schicht eines Spinnenklangs: welche Aufnahmen, wie laut, wie schnell, wie lang. */
+export interface Schicht {
+  proben: readonly string[];
+  pegel: number;
+  rate: number;
+  /** Abschneiden nach Sekunden (mit Ausblende); fehlt = ganz */
+  dauer?: number;
+  /** Tiefpass in Hz (dumpfer); fehlt = offen */
+  tp?: number;
+}
+
+/** ±`anteil` Zufall um 1 — kein Schlag klingt wie der vorige. */
+const streu = (anteil: number): number => 1 + (Math.random() - 0.5) * 2 * anteil;
+
+/**
+ * Die Spinne schlägt auf (`spinne:aufschlag`): schwerer Stahl (die Spinne
+ * selbst, gut eine Tonne, darum tiefer als ein fallender Träger) plus der
+ * Untergrund. Wrack: dumpf geknautschtes Blech statt Stahlklang. Lautstärke
+ * folgt der Wucht, Tonhöhe streut ±6 %. Alle Pegel SW.
+ */
+export function spinnenAufschlag(wucht01: number, grund: SpinnenGrund): Schicht[] {
+  const w = Math.min(1, Math.max(0, wucht01));
+  const p = 0.15 + 0.85 * Math.pow(w, 0.8);
+  const stahl: Schicht = { proben: FAMILIEN.stahl!.proben, pegel: 0.75 * p, rate: 0.78 * streu(0.06) };
+  switch (grund) {
+    case "beton":
+      return [stahl, { proben: GRUND.beton.proben, pegel: 0.5 * p, rate: 0.9 * streu(0.06) }];
+    case "stahl":
+      return [stahl, { proben: GRUND.stahl.proben, pegel: 0.6 * p, rate: 0.9 * streu(0.05) }];
+    case "schrott":
+      return [stahl, { proben: GRUND.schrott.proben, pegel: 0.5 * p, rate: streu(0.1) }, { proben: FAMILIEN.blech!.proben, pegel: 0.35 * p, rate: streu(0.08) }];
+    case "wrack":
+      return [
+        { proben: EINZEL.knautsch, pegel: 0.4 * p, rate: (1.05 - 0.15 * w) * streu(0.05), dauer: 0.35 + 0.4 * w },
+        { proben: FAMILIEN.blech!.proben, pegel: 0.5 * p, rate: 0.8 * streu(0.06), tp: 2500 },
+        { proben: FAMILIEN.stahl!.proben, pegel: 0.3 * p, rate: 0.75 * streu(0.06), tp: 1800 },
+      ];
+  }
+}
+
+/**
+ * Die Spinne drückt (`spinne:druecken`): ein kurzer Stoß Knirschen oder
+ * Ächzen, je Untergrund eine andere Aufnahme — Beton knirscht wie Schutt,
+ * Stahl ächzt (Kreischen aus der Ladefläche, tief gelegt), Schrott und Wrack
+ * geben nach wie eine Dose. Härter = lauter und tiefer. Höchstens
+ * `DRUECK_DAUER_S` lang, nie länger. Alle Pegel SW.
+ */
+export function spinnenDruecken(staerke01: number, grund: SpinnenGrund): Schicht {
+  const s = Math.min(1, Math.max(0, staerke01));
+  const pegel = (0.12 + 0.5 * s) * streu(0.2);
+  const tiefer = 1 - 0.15 * s;
+  const d = DRUECK_DAUER_S * (0.7 + 0.3 * Math.random()); // nie über DRUECK_DAUER_S
+  switch (grund) {
+    case "beton":
+      return { proben: FAMILIEN.geroell!.proben, pegel, rate: 0.75 * tiefer * streu(0.08), dauer: d };
+    case "stahl":
+      return { proben: [SCHLEIFEN.kehrStahl], pegel: 0.8 * pegel, rate: 0.65 * tiefer * streu(0.08), dauer: d, tp: 3500 };
+    case "schrott":
+      return { proben: EINZEL.biss, pegel, rate: 0.95 * tiefer * streu(0.08), dauer: d };
+    case "wrack":
+      return { proben: EINZEL.knautsch, pegel: 1.2 * pegel, rate: tiefer * streu(0.08), dauer: d };
+  }
 }
 
 /* ----------------------------------------------- Aufnahmen-Liste (E-130) -- */

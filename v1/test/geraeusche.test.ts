@@ -31,7 +31,11 @@ import {
   SCHLAG_AB_MS,
   Stimmenbudget,
   stoehnen,
+  DRUECK_ABSTAND_S,
+  DRUECK_DAUER_S,
+  spinnenDruecken,
 } from "../src/audio/klangregeln";
+import { LAUT_START, leseLautstaerken } from "../src/audio/lautstaerke";
 
 // ---------------------------------------------------------------- Attrappen
 
@@ -69,6 +73,8 @@ class FakeCtx {
   gains: Param[] = [];
   /** Alle Pufferquellen — welche Aufnahme sie spielen, steht in `buffer.name` (E-130) */
   pufferQuellen: Array<{ buffer: { name?: string } | null }> = [];
+  /** Jede Quelle (Puffer und Oszillator) — fuer die Gruppenpruefung (E-139) */
+  alleQuellen: Array<Record<string, unknown>> = [];
 
   private knoten(quelle: boolean): Record<string, unknown> {
     if (quelle) this.quellen++;
@@ -86,11 +92,16 @@ class FakeCtx {
       type: "",
       buffer: null,
       loop: false,
-      connect: (ziel: unknown) => ziel,
+      connect: (ziel: unknown) => {
+        (k.ziele as unknown[]).push(ziel); // E-139: wohin jeder Knoten geht
+        return ziel;
+      },
+      ziele: [] as unknown[],
       disconnect: () => {},
       start: () => {},
       stop: () => {},
     };
+    if (quelle) this.alleQuellen.push(k);
     this.gains.push(k.gain as Param);
     return k;
   }
@@ -153,7 +164,7 @@ afterEach(() => {
 function starte(): { mgr: AudioManager; bus: EventBus } {
   const bus = new EventBus();
   const mgr = new AudioManager(bus);
-  mgr.toggleMusic();
+  if (mgr.musicOn) mgr.toggleMusic(); // E-139: startet ohnehin aus
   (g as { _geste: () => void })._geste();
   return { mgr, bus };
 }
@@ -593,5 +604,219 @@ describe("Knautschen (E-130)", () => {
     const presse = gespielt(() => mgr.playKnautsch(1));
     expect(biss[0]).toMatch(/^knautsch_/);
     expect(presse.length).toBeGreaterThan(biss.length);
+  });
+});
+
+// ------------------------------------- 7. Keine Tonkette, kein Dauerton (E-139)
+
+/**
+ * Die Spinnen-Ereignisse (Vertrag E-139) kommen vom Bagger-Bereich nach
+ * core/events.ts; bis dahin hier ohne Typpruefung gesendet.
+ */
+type SpinnenGrund = "beton" | "stahl" | "schrott" | "wrack";
+function hieb(bus: EventBus, wucht: number, untergrund: SpinnenGrund): void {
+  (bus as unknown as { emit(n: string, p: unknown): void }).emit("spinne:aufschlag", { wucht, untergrund, x: 0, y: 0, z: 0 });
+}
+function druck(bus: EventBus, staerke: number, untergrund: SpinnenGrund): void {
+  (bus as unknown as { emit(n: string, p: unknown): void }).emit("spinne:druecken", { staerke, untergrund, x: 0, y: 0, z: 0 });
+}
+
+describe("Echte Klaenge statt Tonketten (E-139, Befund 17.10.2026)", () => {
+  /*
+   * Patrick: „kindliche Klänge und Tonketten … eher mit echten Klängen
+   * arbeiten." Und: Hämmern und Drücken mit der Spinne muss man hören.
+   */
+  it("das Radio ist beim Start aus", () => {
+    expect(new AudioManager().musicOn).toBe(false);
+  });
+
+  it("Rueckmeldungen, Abriss, Zaun, Glocke und Sterne spielen Aufnahmen — kein einziger Oszillator", async () => {
+    const { mgr, bus } = await starteMitAufnahmen();
+    ctx.currentTime += 2;
+    const o0 = ctx.oszillatoren;
+    const namen = gespielt(() => {
+      mgr.playSale();
+      mgr.playCorrect();
+      mgr.playWrong();
+      mgr.playTick();
+      mgr.playSterne(3);
+      mgr.playFeierabend();
+      mgr.playTear();
+      mgr.playRattle();
+      bus.emit("released", { count: 1 });
+      hieb(bus, 1, "beton");
+      druck(bus, 1, "wrack");
+    });
+    expect(ctx.oszillatoren - o0).toBe(0);
+    expect(namen.length).toBeGreaterThan(8);
+  });
+
+  it("Sterne: so viele Hammerschlaege wie Sterne, alle Stahl", async () => {
+    const { mgr } = await starteMitAufnahmen();
+    const namen = gespielt(() => mgr.playSterne(3));
+    expect(namen).toHaveLength(3);
+    for (const n of namen) expect(n).toMatch(/^stahl_/);
+  });
+
+  it("Hammerschlag: Untergrund hoerbar, haerter = lauter, nie Trommelfeuer", async () => {
+    const { bus } = await starteMitAufnahmen();
+    const schlag = (wucht: number, untergrund: SpinnenGrund): string[] => {
+      ctx.currentTime += 1;
+      return gespielt(() => hieb(bus, wucht, untergrund));
+    };
+    expect(schlag(1, "beton")).toContain("grund_beton");
+    expect(schlag(1, "stahl").some((n) => n.startsWith("grund_stahl"))).toBe(true);
+    expect(schlag(1, "schrott").some((n) => n.startsWith("grund_schrott"))).toBe(true);
+    expect(schlag(1, "wrack").some((n) => n.startsWith("knautsch_"))).toBe(true);
+    ctx.currentTime += 1;
+    const leise = miss(() => hieb(bus, 0.1, "beton")).lautester;
+    ctx.currentTime += 1;
+    const laut = miss(() => hieb(bus, 1, "beton")).lautester;
+    expect(laut).toBeGreaterThan(leise);
+    // gleich danach noch einer: still
+    ctx.currentTime += 0.05;
+    expect(gespielt(() => hieb(bus, 1, "beton"))).toHaveLength(0);
+  });
+
+  it("Druecken: ein Stoss ist immer kuerzer als die Pause danach", () => {
+    expect(DRUECK_DAUER_S).toBeLessThan(DRUECK_ABSTAND_S);
+    for (let i = 0; i < 500; i++) {
+      for (const u of ["beton", "stahl", "schrott", "wrack"] as const) {
+        expect(spinnenDruecken(Math.random(), u).dauer!).toBeLessThanOrEqual(DRUECK_DAUER_S);
+      }
+    }
+  });
+
+  it("Druecken: 3 s lang jedes Bild gemeldet → einzelne Stoesse, nie ein Dauerton", async () => {
+    const { bus } = await starteMitAufnahmen();
+    const t0 = ctx.currentTime + 1;
+    const starts: number[] = [];
+    for (let i = 0; i < 180; i++) {
+      ctx.currentTime = t0 + i / 60;
+      if (gespielt(() => druck(bus, 0.8, "schrott")).length) {
+        starts.push(ctx.currentTime);
+      }
+    }
+    // hoerbar: mehrere Stoesse; nie dichter als Stoss + Pause
+    expect(starts.length).toBeGreaterThanOrEqual(6);
+    expect(starts.length).toBeLessThanOrEqual(Math.ceil(3 / DRUECK_ABSTAND_S));
+    for (let i = 1; i < starts.length; i++) {
+      expect(starts[i]! - starts[i - 1]!).toBeGreaterThanOrEqual(DRUECK_ABSTAND_S - 1e-9);
+    }
+  });
+});
+
+// --------------------------------------- 8. Lautstaerke je Gruppe (E-139)
+
+describe("Lautstaerke je Gruppe (E-139, Wunsch 17.10.2026)", () => {
+  /** Welche Gruppen erreicht ein Knoten, wenn man seinen Verbindungen folgt? */
+  function gruppenVon(start: Record<string, unknown>, gruppen: Map<unknown, string>): Set<string> {
+    const gefunden = new Set<string>();
+    const offen: unknown[] = [start];
+    const gesehen = new Set<unknown>();
+    while (offen.length) {
+      const k = offen.pop() as Record<string, unknown>;
+      if (gesehen.has(k)) continue;
+      gesehen.add(k);
+      const name = gruppen.get(k);
+      if (name) {
+        gefunden.add(name);
+        continue;
+      }
+      offen.push(...((k.ziele as unknown[] | undefined) ?? []));
+    }
+    return gefunden;
+  }
+  const karteVon = (mgr: AudioManager): Map<unknown, string> => {
+    const gr = (mgr as unknown as { gruppen: Record<string, unknown> }).gruppen;
+    return new Map<unknown, string>(Object.entries(gr).map(([n, k]) => [k, n]));
+  };
+
+  it("jeder Klang haengt an genau einer Gruppe — Dauertoene, Ereignisse, Radio", async () => {
+    for (const mitAufnahmen of [false, true]) {
+      const { mgr, bus } = mitAufnahmen ? await starteMitAufnahmen() : starte();
+      mgr.toggleMusic(); // Radio an, damit es mitzaehlt
+      ctx.currentTime += 2;
+      bus.emit("schrott:aufprall", aufprall("steel", 5, "stahl", 300));
+      bus.emit("greifer:zugedrueckt", { handle: 1, kraftKN: 30, x: 0, y: 0, z: 0 });
+      bus.emit("released", { count: 1 });
+      bus.emit("wrack:geknautscht", { handle: 1, grad: 0.5, zuwachs: 0.5, x: 0, y: 0, z: 0 });
+      hieb(bus, 1, "wrack");
+      druck(bus, 1, "beton");
+      mgr.playGrab("copper");
+      mgr.playClawSnap(1);
+      mgr.playTear();
+      mgr.playRattle();
+      mgr.playGlass();
+      mgr.playDrop("steel");
+      mgr.playCorrect();
+      mgr.playWrong();
+      mgr.playTick();
+      mgr.playSterne(2);
+      mgr.playFeierabend();
+      ctx.currentTime += 1;
+      mgr.playCrash(1);
+      const karte = karteVon(mgr);
+      expect(ctx.alleQuellen.length).toBeGreaterThan(20);
+      for (const q of ctx.alleQuellen) {
+        const gr = gruppenVon(q, karte);
+        const name = (q.buffer as { name?: string } | null)?.name ?? "Rauschen/Oszillator";
+        expect(gr.size, `${name} (${mitAufnahmen ? "mit" : "ohne"} Aufnahmen) haengt an ${[...gr].join("+") || "keiner"}`).toBe(1);
+      }
+    }
+  });
+
+  it("Motor und Hydraulik an Bagger, Aufprall und Kratzen an Metall", async () => {
+    const { mgr, bus } = await starteMitAufnahmen();
+    const karte = karteVon(mgr);
+    ctx.currentTime += 2;
+    bus.emit("schrott:aufprall", aufprall("steel", 5, "stahl", 300));
+    const gruppeVon = (name: string): Set<string> =>
+      new Set(
+        ctx.alleQuellen
+          .filter((q) => (q.buffer as { name?: string } | null)?.name === name)
+          .flatMap((q) => [...gruppenVon(q, karte)])
+      );
+    expect(gruppeVon("motor")).toEqual(new Set(["bagger"]));
+    expect(gruppeVon("hyd_druck")).toEqual(new Set(["bagger"]));
+    expect(gruppeVon("hyd_fahrt")).toEqual(new Set(["bagger"]));
+    expect(gruppeVon("kehr_beton")).toEqual(new Set(["metall"]));
+    const grund = new Set([...gruppeVon("grund_stahl_1"), ...gruppeVon("grund_stahl_2")]);
+    expect(grund).toEqual(new Set(["metall"]));
+  });
+
+  it("der Regler wirkt sofort auf die Gruppe und wird gemerkt", () => {
+    const speicher = new Map<string, string>();
+    g.localStorage = { getItem: (k: string) => speicher.get(k) ?? null, setItem: (k: string, v: string) => speicher.set(k, v) };
+    try {
+      const { mgr } = starte();
+      mgr.setLautstaerke("metall", 0.3);
+      const gr = (mgr as unknown as { gruppen: Record<string, { gain: Param }> }).gruppen;
+      expect(gr.metall!.gain.ziel).toBeCloseTo(0.3);
+      expect(mgr.lautstaerke("metall")).toBeCloseTo(0.3);
+      const zweiter = new AudioManager(new EventBus()); // naechster Start
+      expect(zweiter.lautstaerke("metall")).toBeCloseTo(0.3);
+      expect(zweiter.lautstaerke("bagger")).toBe(1);
+    } finally {
+      delete g.localStorage;
+    }
+  });
+
+  it("kaputter oder fehlender Speicher: Startwerte, kein Absturz", () => {
+    expect(leseLautstaerken(null)).toEqual(LAUT_START);
+    expect(leseLautstaerken("{kaputt")).toEqual(LAUT_START);
+    expect(leseLautstaerken('{"bagger":7,"metall":-1,"musik":"laut"}')).toEqual({ bagger: 1, metall: 0, musik: 1 });
+    // Safari-Privatmodus: localStorage wirft
+    const wirft = (): never => {
+      throw new Error("privat");
+    };
+    g.localStorage = { getItem: wirft, setItem: wirft };
+    try {
+      const mgr = new AudioManager();
+      expect(mgr.lautstaerke("musik")).toBe(1);
+      expect(() => mgr.setLautstaerke("musik", 0.5)).not.toThrow();
+    } finally {
+      delete g.localStorage;
+    }
   });
 });

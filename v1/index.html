@@ -758,7 +758,7 @@
          Ein gemeinsamer Stil für alle drei. Sie waren zuvor ohne jede Regel
          im Dokument und wurden dadurch unsichtbar hinter dem Bild gerendert:
          Der Fahrer wartete auf eine Antwort, die niemand geben konnte. */
-      #pickup, #haggle, #shop, #radio, #abrechnung {
+      #pickup, #haggle, #shop, #radio, #ton, #abrechnung {
         display: none; position: fixed; inset: 0; z-index: 22;
         background: rgba(12, 14, 16, 0.72);
         align-items: center; justify-content: center;
@@ -766,27 +766,27 @@
         padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
         box-sizing: border-box;
       }
-      #pickup.open, #haggle.open, #shop.open, #radio.open, #abrechnung.open { display: flex; }
-      #pickup .panel, #haggle .panel, #shop .panel, #radio .panel, #abrechnung .panel {
+      #pickup.open, #haggle.open, #shop.open, #radio.open, #ton.open, #abrechnung.open { display: flex; }
+      #pickup .panel, #haggle .panel, #shop .panel, #radio .panel, #ton .panel, #abrechnung .panel {
         background: rgba(24, 27, 30, 0.97); border: 2px solid rgba(255,255,255,0.18);
         border-radius: 14px; padding: 22px 26px; text-align: center;
         min-width: 300px; max-width: 460px; max-height: 86vh; overflow-y: auto;
         color: #e8e8e4; font-family: "Consolas", monospace;
       }
-      #pickup h2, #haggle h2, #shop h2, #radio h2, #abrechnung h2 {
+      #pickup h2, #haggle h2, #shop h2, #radio h2, #ton h2, #abrechnung h2 {
         margin: 0 0 6px; font-size: 19px; letter-spacing: 3px; color: #f0b429;
       }
-      #pickup .sub, #haggle .sub, #shop .sub, #radio .sub, #abrechnung .sub {
+      #pickup .sub, #haggle .sub, #shop .sub, #radio .sub, #ton .sub, #abrechnung .sub {
         margin: 0 0 14px; font-size: 12px; line-height: 1.6; color: #9aa2a8;
       }
-      #pickup button, #haggle button, #shop button, #radio button, #abrechnung button {
+      #pickup button, #haggle button, #shop button, #radio button, #ton button, #abrechnung button {
         display: block; width: 100%; margin: 7px 0; padding: 12px 16px; cursor: pointer;
         background: rgba(46,52,57,0.95); color: #e8e8e4;
         font: 600 14px "Consolas", monospace; border: 2px solid rgba(255,255,255,0.22);
         border-radius: 9px; touch-action: manipulation;
       }
       #pickup button:hover, #haggle button:hover, #shop button:hover:not(:disabled),
-      #radio button:hover, #radio button:active,
+      #radio button:hover, #radio button:active, #ton button:hover, #ton button:active,
       #pickup button:active, #haggle button:active,
       #abrechnung button:hover, #abrechnung button:active {
         background: rgba(240,180,41,0.75); color: #1a1c1e;
@@ -833,6 +833,30 @@
       #radio button {
         text-align: left; min-height: 44px;
       }
+      /* --- Lautstaerke (E-139): drei Schieber, daumengross ---
+         Die ganze Zeile ist 44 px hoch, der Knopf 32 px; ein Tipp irgendwo auf
+         die Schiene setzt den Wert (ui/tonregler.ts). `touch-action: none`:
+         Ein waagerechter Zug gehoert dem Schieber, nicht dem Bild. */
+      #ton .regler {
+        display: grid; grid-template-columns: 70px 1fr 58px; align-items: center; gap: 10px;
+        margin: 6px 0; text-align: left; font: 600 14px "Consolas", monospace; color: #e8e8e4;
+      }
+      #ton input[type="range"] {
+        -webkit-appearance: none; appearance: none; width: 100%; height: 44px; margin: 0;
+        background: transparent; touch-action: none; cursor: pointer;
+      }
+      #ton input[type="range"]::-webkit-slider-runnable-track {
+        height: 8px; border-radius: 4px; background: rgba(255,255,255,0.22);
+      }
+      #ton input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 32px; height: 32px; margin-top: -12px; border-radius: 50%;
+        background: #f0b429; border: 2px solid #1a1c1e;
+      }
+      #ton input[type="range"]::-moz-range-track { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.22); }
+      #ton input[type="range"]::-moz-range-thumb {
+        width: 32px; height: 32px; border-radius: 50%; background: #f0b429; border: 2px solid #1a1c1e;
+      }
+      #ton output { text-align: right; font-size: 14px; color: #c8ced2; }
       /* Die Senderliste bekommt einen eigenen Scrollbereich — wie der Ausbau.
          Seit fuenf Sender darin stehen (E-093) waere sie auf dem iPhone mini
          quer laenger als das Feld, und der Aus-Schalter rutschte darunter aus
@@ -886,12 +910,12 @@
         #pause .hint { margin: 6px 0 0; font-size: 10px; line-height: 1.45; }
         /* Ankauf, Abholung und Ausbau hatten gar keine Regeln fuer flache
            Displays — dort standen 22 px Polster und 19-px-Ueberschriften. */
-        #pickup .panel, #haggle .panel, #shop .panel, #radio .panel, #abrechnung .panel {
+        #pickup .panel, #haggle .panel, #shop .panel, #radio .panel, #ton .panel, #abrechnung .panel {
           padding: 12px 16px; min-width: 260px; max-width: 92vw; max-height: 92vh;
         }
-        #pickup h2, #haggle h2, #shop h2, #radio h2, #abrechnung h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 2px; }
-        #pickup .sub, #haggle .sub, #shop .sub, #radio .sub { margin: 0 0 8px; font-size: 11px; line-height: 1.45; }
-        #pickup button, #haggle button, #shop button, #radio button {
+        #pickup h2, #haggle h2, #shop h2, #radio h2, #ton h2, #abrechnung h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 2px; }
+        #pickup .sub, #haggle .sub, #shop .sub, #radio .sub, #ton .sub { margin: 0 0 8px; font-size: 11px; line-height: 1.45; }
+        #pickup button, #haggle button, #shop button, #radio button, #ton button {
           margin: 5px 0; padding: 9px 12px; font-size: 12px;
         }
         /* Die Abrechnung wird NICHT kleiner gesetzt: Sie ist der einzige
@@ -1057,6 +1081,7 @@
         <button id="pause-shop">Platz ausbauen</button>
         <button id="pause-music">Musik an/aus</button>
         <button id="pause-radio">Radio</button>
+        <button id="pause-ton">Lautstärke</button>
         <button id="pause-save">Speichern</button>
         <button id="pause-load">Stand laden</button>
         <button id="pause-new">Neues Spiel</button>
@@ -1123,6 +1148,17 @@
         <div id="radio-list"></div>
         <button id="radio-power">Radio ausschalten</button>
         <button id="radio-close">Zurück</button>
+      </div>
+    </div>
+    <!-- Lautstaerke je Gruppe (E-139): Bagger, Metall, Musik. Verdrahtet in ui/tonregler.ts. -->
+    <div id="ton">
+      <div class="panel">
+        <h2>LAUTSTÄRKE</h2>
+        <p class="sub">Bagger: Motor, Hydraulik, Greifer · Metall: Schrott, Hämmern, Drücken · Musik: Radio</p>
+        <label class="regler" for="laut-bagger">Bagger<input type="range" id="laut-bagger" data-gruppe="bagger" min="0" max="100" step="5" /><output id="laut-bagger-wert">100 %</output></label>
+        <label class="regler" for="laut-metall">Metall<input type="range" id="laut-metall" data-gruppe="metall" min="0" max="100" step="5" /><output id="laut-metall-wert">100 %</output></label>
+        <label class="regler" for="laut-musik">Musik<input type="range" id="laut-musik" data-gruppe="musik" min="0" max="100" step="5" /><output id="laut-musik-wert">100 %</output></label>
+        <button id="ton-close">Zurück</button>
       </div>
     </div>
     <div id="haggle">

@@ -2,7 +2,8 @@
  * Kern-Sounds M1 (Briefing Kap. 15) — per WebAudio; Greifen, Aufprall, Kehren, Knautschen und
  * Motor seit E-130 aus geschnittenen Aufnahmen (public/ton/, Herkunft in QUELLEN.md), der Rest prozedural.
  * Audio ist der primäre Belohnungskanal: jeder Abwurf klingt nach seinem Material,
- * richtig = angenehmer Doppelton, falsch = stumpfer Missklang.
+ * richtig = Funk-Knacken, falsch = stumpfer Schlag. Seit E-139 keine Tonfolge mehr:
+ * kein Klang hier spielt eine Melodie oder einen Piepton (Waechter in geraeusche.test.ts).
  * Startet erst nach der ersten echten Nutzereingabe (Browser-Autoplay-Policy).
  *
  * Tonwaechter (Befund 14.09.2026, iPad): Der Tonkanal faellt auf iOS in den
@@ -19,22 +20,42 @@ import { brauchtNeuaufbau, brauchtWeckruf, istHoerbar, type Tondiagnose } from "
 import {
   alleProben,
   aufprallKlang,
+  AUFSCHLAG_ABSTAND_S,
   bissPegel,
   dauerVon,
+  DRUECK_ABSTAND_S,
+  DRUECK_STREU_S,
   Druckaufbau,
   EINZEL,
+  FAMILIEN,
+  GRUND,
   kehrKlang,
   knautschKlang,
   oelFluss,
   Rasselbett,
   SCHLEIFEN,
+  spinnenAufschlag,
+  spinnenDruecken,
   Stimmenbudget,
   VOLLE_KRAFT_KN,
   type AufprallRezept,
   type Schlag,
+  type SpinnenGrund,
   type Untergrund,
 } from "./klangregeln";
 import type { EventBus, GameEvents } from "../core/events";
+import { ladeLautstaerken, speichereLautstaerken, type Lautgruppe, type Lautstaerken } from "./lautstaerke";
+
+/**
+ * Vertrag E-139 mit dem Bagger-Bereich. Solange die beiden Ereignisse noch
+ * nicht in core/events.ts stehen, hier getippt; danach ist der Umweg harmlos
+ * und kann weg (dann direkt `bus.on("spinne:aufschlag", …)`).
+ */
+interface SpinnenEreignisse {
+  "spinne:aufschlag": { wucht: number; untergrund: SpinnenGrund; x: number; y: number; z: number };
+  "spinne:druecken": { staerke: number; untergrund: SpinnenGrund; x: number; y: number; z: number };
+}
+type SpinnenBus = { on<K extends keyof SpinnenEreignisse>(e: K, h: (p: SpinnenEreignisse[K]) => void): void };
 
 /**
  * Wo die Aufnahmen liegen (E-130). `BASE_URL` ist im Build "./" (vite.config:
@@ -48,6 +69,12 @@ const TON_ORDNER = `${import.meta.env?.BASE_URL ?? "./"}ton/`;
  * SW: 2,5 — am Geraet gegen Motor und Radio abgleichen.
  */
 const AUFNAHME_LAUT = 2.5;
+/** Aufnahmen fuer die Rueckmeldungen (E-139): aus dem Bestand, keine eigenen Dateien. */
+const FAMILIE_BLECH = FAMILIEN.blech!.proben;
+const FAMILIE_STAHL = FAMILIEN.stahl!.proben;
+const EINZEL_VA = FAMILIEN.va!.proben;
+const EINZEL_KLICK = FAMILIEN.kunststoff!.proben;
+const GRUND_STAHL = GRUND.stahl.proben;
 /** Ein Knautscher und ein `crushed` im selben Moment: nur der erste klingt. SW: 0,3 s */
 const KNAUTSCH_SPERRE_S = 0.3;
 
@@ -72,7 +99,7 @@ export class AudioManager {
   private master: GainNode | null = null;
   private music: Music | null = null;
   /** Musikwunsch des Spielers — gilt auch, bevor der Ton überhaupt läuft */
-  private musicWanted = true;
+  private musicWanted = false; // E-139: Radio aus beim Start (Befund 17.10.: „kindliche Klänge")
   /**
    * Gewaehlter Sender. Steht auch dann schon fest, wenn es den Tonkanal noch
    * gar nicht gibt: Die erste Geste baut ihn dann gleich mit dem richtigen
@@ -110,6 +137,9 @@ export class AudioManager {
    * „Dauerklaenge nicht auf den Schlag-Kompressor").
    */
   private sfx: GainNode | null = null;
+  /** Drei Lautstaerkegruppen vor dem Master (E-139); jeder Klang haengt an genau einer */
+  private gruppen: Record<Lautgruppe, GainNode> | null = null;
+  private readonly laut: Lautstaerken = ladeLautstaerken();
   /** Kehren: je Untergrund ein eigener Klangweg (E-121) */
   private kehr: Record<Untergrund, { gain: GainNode; filter: BiquadFilterNode }> | null = null;
   private kornQuelle: AudioBufferSourceNode | null = null;
@@ -141,6 +171,10 @@ export class AudioManager {
       bus.on("greifer:zugedrueckt", (e) => this.playBiss(e.kraftKN));
       bus.on("released", () => this.playLoslassen());
       bus.on("wrack:geknautscht", (e) => this.playKnautsch(e.zuwachs));
+      // E-139: Hämmern und Drücken mit der Spinne
+      const sb = bus as unknown as SpinnenBus;
+      sb.on("spinne:aufschlag", (e) => this.playSpinnenAufschlag(e.wucht, e.untergrund));
+      sb.on("spinne:druecken", (e) => this.playSpinnenDruecken(e.staerke, e.untergrund));
     }
     this.holeProben();
     const start = (): void => this.ensureStarted();
@@ -314,7 +348,7 @@ export class AudioManager {
   private spiele(
     namen: readonly string[],
     gain: number,
-    opt: { rate?: number; delay?: number; anteil?: number; dauer?: number; tp?: number } = {}
+    opt: { rate?: number; delay?: number; anteil?: number; dauer?: number; tp?: number; bagger?: boolean } = {}
   ): boolean {
     const ctx = this.ctx;
     if (!ctx || !this.sfx || namen.length === 0) return false;
@@ -334,7 +368,7 @@ export class AudioManager {
       f.frequency.value = opt.tp;
       kette = q.connect(f);
     }
-    kette.connect(g).connect(this.sfx);
+    kette.connect(g).connect(opt.bagger ? this.baggerBus : this.sfx);
     const voll = buf.duration / rate;
     const ende = Math.min(voll * (opt.anteil ?? 1), opt.dauer ?? voll);
     q.start(t);
@@ -431,6 +465,7 @@ export class AudioManager {
     this.cachedNoise = null;
     this.puffer.clear();
     this.sfx = null;
+    this.gruppen = null;
     this.weckversuche = 0;
     this.unterbrochen = false;
     try {
@@ -460,7 +495,14 @@ export class AudioManager {
       begrenzer.ratio.value = 20;
       begrenzer.attack.value = 0.002;
       begrenzer.release.value = 0.12;
-      this.sfx.connect(begrenzer).connect(this.master);
+      const gruppe = (g: Lautgruppe): GainNode => {
+        const n = ctx.createGain();
+        n.gain.value = this.laut[g];
+        n.connect(this.master!);
+        return n;
+      };
+      this.gruppen = { bagger: gruppe("bagger"), metall: gruppe("metall"), musik: gruppe("musik") };
+      this.sfx.connect(begrenzer).connect(this.gruppen.metall);
       this.unterbrochen = false;
       this.weckversuche = 0;
       // E-130: was schon geholt ist, jetzt dekodieren (der Rest, sobald es da ist)
@@ -476,7 +518,7 @@ export class AudioManager {
       };
 
       // Hintergrundmusik, zur Laufzeit erzeugt — keine fremden Aufnahmen
-      this.music = new Music(ctx, this.master, this.songWanted);
+      this.music = new Music(ctx, this.gruppen.musik, this.songWanted);
       if (this.musicWanted) this.music.start();
 
       this.baueDauertoene();
@@ -501,7 +543,7 @@ export class AudioManager {
 
     this.engineGain = ctx.createGain();
     this.engineGain.gain.value = 0.05;
-    this.engineGain.connect(master);
+    this.engineGain.connect(this.baggerBus);
     const motor = this.proben.get(SCHLEIFEN.motor);
     let motorQuelle: AudioScheduledSourceNode;
     if (motor) {
@@ -559,15 +601,18 @@ export class AudioManager {
       f.Q.value = q;
       return f;
     };
-    const stumm = (): GainNode => {
+    const stumm = (ziel: AudioNode = sfx): GainNode => {
       const g = ctx.createGain();
       g.gain.value = 0;
-      g.connect(sfx);
+      g.connect(ziel);
       return g;
     };
     const auf = (n: string): AudioBuffer | undefined => this.proben.get(n);
     let weissQ: AudioBufferSourceNode | null = null;
     const weiss = (): AudioBufferSourceNode => (weissQ ??= loop(this.noiseBuffer()));
+    // Eigene Rauschquelle fuer die Hydraulik: eine Quelle gehoert genau einer Lautstaerkegruppe (E-139)
+    let weissB: AudioBufferSourceNode | null = null;
+    const weissBagger = (): AudioBufferSourceNode => (weissB ??= loop(this.noiseBuffer()));
 
     // Kehren. Mit Aufnahme ein weicher Tiefpass (die Aufnahme bringt ihren
     // Klang mit) statt der engen Baender aus E-121.
@@ -600,18 +645,18 @@ export class AudioManager {
     // Druckaufbau beim Zudruecken: Greifkran unter Last (Aufnahme H), ersatzweise Rauschen
     const druck = auf(SCHLEIFEN.druck);
     this.stoehnFilter = band(900, 0.7, "lowpass");
-    this.stoehnGain = stumm();
+    this.stoehnGain = stumm(this.baggerBus);
     this.druckQuelle = druck ? loop(druck) : null;
-    (this.druckQuelle ?? weiss()).connect(this.stoehnFilter).connect(this.stoehnGain);
+    (this.druckQuelle ?? weissBagger()).connect(this.stoehnFilter).connect(this.stoehnGain);
     // Druckbegrenzungsventil: Zischen, wenn die Spinne am Ende ist
     const ventil = auf(SCHLEIFEN.ventil);
-    this.ventilGain = stumm();
-    (ventil ? loop(ventil) : weiss()).connect(band(3500, 0.7, "highpass")).connect(this.ventilGain);
+    this.ventilGain = stumm(this.baggerBus);
+    (ventil ? loop(ventil) : weissBagger()).connect(band(3500, 0.7, "highpass")).connect(this.ventilGain);
     // Schalen und Arm in Bewegung: Oel stroemt
     const fahrt = auf(SCHLEIFEN.fahrt);
-    this.schalenGain = stumm();
+    this.schalenGain = stumm(this.baggerBus);
     this.fahrtQuelle = fahrt ? loop(fahrt) : null;
-    (this.fahrtQuelle ?? weiss()).connect(band(fahrt ? 8000 : 900, 0.7, "lowpass")).connect(this.schalenGain);
+    (this.fahrtQuelle ?? weissBagger()).connect(band(fahrt ? 8000 : 900, 0.7, "lowpass")).connect(this.schalenGain);
 
     return quellen;
   }
@@ -828,10 +873,10 @@ export class AudioManager {
     const g = ctx.createGain();
     g.gain.setValueAtTime(ventil ? 0.3 : 0.07, t); // SW: die Aufnahme ist schmalbandiger als weisses Rauschen
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
-    src.connect(f).connect(g).connect(this.sfx);
+    src.connect(f).connect(g).connect(this.baggerBus);
     src.start(t);
     src.stop(t + 0.42);
-    if (!this.spiele(EINZEL.anschlag, 0.12, { rate: 1.25, delay: 0.02, tp: 3000 })) this.tone(900, 0.03, 0.05, 0.02);
+    this.spiele(EINZEL.anschlag, 0.12, { rate: 1.25, delay: 0.02, tp: 3000, bagger: true });
   }
 
   /** Ein Schlag nach Rezept, mit Nachklappern und Rascheln. */
@@ -871,7 +916,7 @@ export class AudioManager {
 
   playGrab(materialId?: string): void {
     // E-130: der Greifkran fasst Schrott (Pixabay „Grua recicladora“, H). SW: 0,5
-    if (!this.spiele(EINZEL.zupacken, 0.5)) {
+    if (!this.spiele(EINZEL.zupacken, 0.5, { bagger: true })) {
       // Ersatz: kurzer Rauschimpuls + tiefer Thump
       this.burst([70], 0.18, 0.35, "triangle");
       this.noiseBurst(500, 0.08, 0.25);
@@ -980,7 +1025,6 @@ export class AudioManager {
     });
   }
 
-  /** Metall-Kreischen beim Abreißen einer Baugruppe. */
   /*
    * ------------------------------------------------------------------
    * Stumm gestellt, nicht geloescht (Ansage 12.09.2026: "erst Ton fixen,
@@ -1011,20 +1055,15 @@ export class AudioManager {
   /** Taktgeber der Platzkulisse. Stumm, siehe oben. */
   tickUmgebung(_dt: number): void {}
 
+  /**
+   * Eine Baugruppe reißt ab: Metall kreischt kurz (Kreischen der Ladefläche,
+   * tief gelegt) und Blech kracht. E-139: vorher ein fallender Sägezahn —
+   * ein Laser-„Piu", kein Metall.
+   */
   playTear(): void {
-    if (!this.ctx || !this.master) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(340, t);
-    osc.frequency.exponentialRampToValueAtTime(70, t + 0.45);
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.22, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    osc.connect(g).connect(this.ausgang);
-    osc.start(t);
-    osc.stop(t + 0.55);
-    this.noiseBurst(1800, 0.35, 0.3);
+    const kreisch = this.spiele([SCHLEIFEN.kehrStahl], 0.35, { rate: 0.7 + Math.random() * 0.1, dauer: 0.45 });
+    const blech = this.spiele(FAMILIE_BLECH, 0.5, { rate: 0.85 + Math.random() * 0.1, delay: 0.05 });
+    if (!kreisch && !blech) this.noiseBurst(1800, 0.35, 0.3); // Ersatz, bis die Aufnahmen da sind
   }
 
   /** Schwerer Blech-Crash (Quetschstufe). */
@@ -1048,94 +1087,118 @@ export class AudioManager {
     this.noiseBurst(7000, 0.14, 0.22);
   }
 
-  /** Zaunfeld reißt aus der Verankerung / scheppert. */
+  /** Zaunfeld reißt aus der Verankerung: es scheppert und rasselt (E-139: Aufnahmen statt Dreieckston). */
   playRattle(): void {
-    this.noiseBurst(900, 0.35, 0.3);
-    this.burst([178, 242], 0.32, 0.24, "triangle");
-  }
-
-  /** Verkauf: Münz-Dreiklang. */
-  playSale(): void {
-    this.tone(880, 0.12, 0.14, 0);
-    this.tone(1175, 0.12, 0.14, 0.09);
-    this.tone(1568, 0.2, 0.14, 0.18);
+    const blech = this.spiele(FAMILIE_BLECH, 0.6);
+    const rassel = this.spiele([SCHLEIFEN.rassel], 0.5, { dauer: 0.5 });
+    if (!blech && !rassel) this.noiseBurst(900, 0.35, 0.3);
   }
 
   /**
-   * DIE FEIERABENDGLOCKE (E-113).
-   *
-   * Zwei Schläge auf eine Werksglocke, prozedural wie alles hier: ein
-   * Grundton und drei Teiltöne, die NICHT ganzzahlig darüber liegen. Genau das
-   * macht den Unterschied zwischen einer Glocke und einer Orgelpfeife —
-   * 2,00 × (Oktave), 2,76 × und 5,40 × sind die Teiltöne, die eine echte
-   * Glocke in diesem Verhältnis hat. Mit sauberen Oktaven klänge es nach
-   * Kirchenlied, mit einem Ton allein nach Türklingel.
-   *
-   * Lang ausklingend (2,2 s) und leise: Der Tag hört auf, er wird nicht
-   * angepfiffen. Der zweite Schlag kommt nach 0,62 s und etwas schwächer —
-   * niemand schlägt zweimal gleich hart an.
+   * Verkauf, Waage, Ausbau. E-139: gestrichen — der Münz-Dreiklang war eine
+   * Tonkette, und ein Schrottplatz hat keine. Die Einblendung bleibt.
+   */
+  playSale(): void {}
+
+  /**
+   * DIE FEIERABENDGLOCKE (E-113, E-139). Zwei Schläge auf ein aufgehängtes
+   * Stück Stahl — so wird auf Baustellen und Plätzen gerufen. E-139: Aufnahme
+   * (fallende Stahlstangen, BigSoundBank #1776/#0235, lang ausklingend) statt
+   * der gerechneten Glocke. Der zweite Schlag nach 0,62 s und schwächer.
    */
   playFeierabend(): void {
-    // SW: Lautstärken wie playSale (0,14) als Obergrenze, Glocke etwas darunter
-    const schlag = (delay: number, gain: number): void => {
-      this.tone(523, 2.2, gain, delay); // Grundton c''
-      this.tone(1046, 1.5, gain * 0.5, delay); // 2,00 ×
-      this.tone(1443, 1.0, gain * 0.26, delay); // 2,76 ×
-      this.tone(2824, 0.45, gain * 0.1, delay); // 5,40 ×
-    };
-    schlag(0, 0.12);
-    schlag(0.62, 0.085);
+    this.spiele(EINZEL_VA, 0.5, { rate: 0.8 }); // SW
+    this.spiele(EINZEL_VA, 0.35, { rate: 0.8, delay: 0.62 }); // SW
   }
 
   /**
-   * Die Sterne des Tages, hörbar (E-113).
-   *
-   * Ein bis drei kurze Töne, aufsteigend — man hört die Bewertung, ohne
-   * hinzusehen (Blindtest-Regel: Farbe und Zeichen sind nie der einzige
-   * Kanal, und der Ton ist der dritte). Sie setzen nach der Glocke ein, damit
-   * sie nicht im Anschlag untergehen.
+   * Die Sterne des Tages, hörbar (E-113). E-139: ein bis drei Hammerschläge
+   * auf Stahl, gleich hoch, statt einer aufsteigenden Tonfolge — man zählt
+   * die Schläge. Nach der Glocke, damit sie nicht im Anschlag untergehen.
    */
   playSterne(anzahl: number): void {
-    const stufen = [660, 880, 1320]; // Quinte, Oktave, Duodezime über e''
     for (let i = 0; i < Math.max(0, Math.min(3, anzahl)); i++) {
-      this.tone(stufen[i]!, 0.3, 0.1, 0.95 + i * 0.26);
+      this.spiele(FAMILIE_STAHL, 0.55, { rate: 0.95 + Math.random() * 0.06, delay: 0.95 + i * 0.32 }); // SW
     }
   }
 
+  /**
+   * Richtig sortiert, Challenge-Schritt geschafft. E-139: statt „Kaching"
+   * (zwei Sinustöne) das Knacken eines Funkgeräts, wenn jemand die Taste
+   * loslässt — „verstanden". Gefiltertes Rauschen, keine Tonhöhe.
+   */
   playCorrect(): void {
-    // dezentes „Kaching": zwei weiche Sinustöne (−6 dB unter Weltklang, SW)
-    this.tone(660, 0.1, 0.12, 0);
-    this.tone(990, 0.16, 0.12, 0.07);
+    this.funkKnacken(0, 0.18); // SW
+    this.funkKnacken(0.07, 0.12); // SW
   }
 
   /**
-   * Rastklick des Funktionsrädchens — ein sehr kurzer, trockener Tick, wie
-   * das Einrasten eines Drehschalters. Bewusst leise: er kommt bei jedem
-   * Eintrag und darf nicht nerven.
+   * Rastklick des Funktionsrädchens und jedes Antippens: ein trockenes
+   * Kunststoff-Klacken (E-139: Aufnahme statt zwei Pieptönen). Bewusst leise.
    */
   playTick(): void {
-    this.tone(1760, 0.035, 0.045, 0);
-    this.tone(2640, 0.022, 0.025, 0.004);
+    this.spiele(EINZEL_KLICK, 0.15, { rate: 1.5 + Math.random() * 0.1, tp: 5000, bagger: true }); // SW
   }
 
+  /**
+   * Falsch sortiert, Fahrer hupt (main.ts ruft beides hierher). E-139: ein
+   * stumpfer, tiefer Schlag auf eine Muldenwand statt des Rechteck-Brummens.
+   * Eine Hupe gibt es im Bestand nicht (offen für Patrick).
+   */
   playWrong(): void {
-    this.burst([110, 116], 0.3, 0.25, "square");
+    if (!this.spiele(GRUND_STAHL, 0.9, { rate: 0.6, tp: 700 })) this.noiseBurst(300, 0.25, 0.3); // SW
+  }
+
+  private letzterHieb = -1;
+  private naechsterDruck = -1;
+
+  /**
+   * Die Spinne schlägt auf (Ereignis `spinne:aufschlag`, E-139): schwerer
+   * Stahl plus Untergrund, laut nach Wucht. Mindestabstand gegen Trommelfeuer.
+   */
+  playSpinnenAufschlag(wucht: number, grund: SpinnenGrund): void {
+    if (!this.ctx || !(wucht > 0)) return;
+    const t = this.ctx.currentTime;
+    if (t - this.letzterHieb < AUFSCHLAG_ABSTAND_S) return;
+    this.letzterHieb = t;
+    for (const s of spinnenAufschlag(wucht, grund)) {
+      this.spiele(s.proben, AUFNAHME_LAUT * 0.3 * s.pegel, { rate: s.rate, dauer: s.dauer, tp: s.tp });
+    }
+    if (grund === "schrott") this.rassle(t, 0.3 * wucht); // SW: der Haufen rutscht nach
+  }
+
+  /**
+   * Die Spinne drückt (Ereignis `spinne:druecken`, E-139): ein kurzer Stoß
+   * Knirschen, dann Pause — nie ein Dauerton (Befund 16.10.: „wie in einem Ufo").
+   */
+  playSpinnenDruecken(staerke: number, grund: SpinnenGrund): void {
+    if (!this.ctx || !(staerke > 0)) return;
+    const t = this.ctx.currentTime;
+    if (t < this.naechsterDruck) return;
+    this.naechsterDruck = t + DRUECK_ABSTAND_S + Math.random() * DRUECK_STREU_S;
+    const s = spinnenDruecken(staerke, grund);
+    this.spiele(s.proben, AUFNAHME_LAUT * 0.3 * s.pegel, { rate: s.rate, dauer: s.dauer, tp: s.tp });
+  }
+
+  /** Ein Knacken wie aus dem Funkgerät: 25 ms Rauschen im Sprachband. */
+  private funkKnacken(delay: number, gain: number): void {
+    if (!this.ctx || !this.master) return;
+    const t = this.ctx.currentTime + delay;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noiseBuffer();
+    const f = this.ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.value = 1800; // SW: Mitte des Funk-Sprachbands
+    f.Q.value = 1.2;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.025);
+    src.connect(f).connect(g).connect(this.baggerBus);
+    src.start(t, Math.random() * 0.5);
+    src.stop(t + 0.04);
   }
 
   // ---------- Synthese-Helfer ----------
-
-  private tone(freq: number, dur: number, gain: number, delay: number): void {
-    if (!this.ctx || !this.master) return;
-    const t = this.ctx.currentTime + delay;
-    const osc = this.ctx.createOscillator();
-    osc.frequency.value = freq;
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(gain, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    osc.connect(g).connect(this.ausgang);
-    osc.start(t);
-    osc.stop(t + dur + 0.05);
-  }
 
   private burst(freqs: number[], dur: number, gain: number, type: OscillatorType = "sine"): void {
     if (!this.ctx || !this.master) return;
@@ -1169,9 +1232,28 @@ export class AudioManager {
     src.stop(t + dur + 0.05);
   }
 
-  /** Wohin Ereignisklaenge gehen: Schlag-Bus mit Begrenzer, sonst direkt. */
+  /** Wohin Ereignisklaenge gehen: Schlag-Bus mit Begrenzer (Gruppe Metall), sonst direkt. */
   private get ausgang(): AudioNode {
     return this.sfx ?? this.master!;
+  }
+
+  /** Gruppe Bagger: Motor, Hydraulik, Greifer-Mechanik, Kabine (E-139). */
+  private get baggerBus(): AudioNode {
+    return this.gruppen?.bagger ?? this.master!;
+  }
+
+  /** Lautstaerke einer Gruppe 0..1 (E-139). */
+  lautstaerke(g: Lautgruppe): number {
+    return this.laut[g];
+  }
+
+  /** Lautstaerke einer Gruppe setzen (0..1), sofort hoerbar und gemerkt. */
+  setLautstaerke(g: Lautgruppe, wert: number): void {
+    const v = Math.min(1, Math.max(0, Number.isFinite(wert) ? wert : 1));
+    this.laut[g] = v;
+    const n = this.gruppen?.[g];
+    if (n && this.ctx) n.gain.setTargetAtTime(v, this.ctx.currentTime, 0.03); // SW: 30 ms, knackfrei
+    speichereLautstaerken(this.laut);
   }
 
   /**
