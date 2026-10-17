@@ -5,6 +5,7 @@ import { BED_HALF_W } from "./routes";
 import { ladeHoeheGrenze } from "./fuellgrad";
 import { werbeAtlas, atlasFeld, PRIPADA_GRUEN } from "../world/werbung";
 import type { Fahrwerk } from "./lenkung";
+import { baueAbsetzmulde, zapfenLage, type MuldenBau } from "./absetzmulde";
 
 /**
  * WO DIE ACHSEN DES DREIACHSERS SITZEN (E-140) — eine Quelle fuer Bau und Fahrt.
@@ -293,6 +294,53 @@ export interface VehicleModelContext {
   world: RAPIER.World;
   sideWalls: Array<{ hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody; dir: number }>;
   tailGate: { hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody } | null;
+  /** Absetzkipper ohne eigene Mulde — er kommt, um eine abgesetzte zu holen (E-141). */
+  ohneMulde?: boolean;
+}
+
+/**
+ * DIE ABSETZANLAGE (E-141) — zwei Schwenkarme am Rahmenende, Ketten an den
+ * Spitzen, die Mulde hängt an ihren Zapfen.
+ *
+ * Alle Längen im Wagenrahmen (z vorn, y oben), SW nach einem
+ * Dreiachs-Absetzkipper: Armlager 0,10 m vor dem Rahmenende auf 1,10 m Höhe,
+ * Kette 0,60 m, die Mulde steht zur Fahrt mit ihrer Mitte 0,20 m hinter dem
+ * Wagenursprung auf dem Rahmen (Kufen auf 1,00 m). Die Armlänge folgt daraus:
+ * In Fahrstellung hängt die Kette senkrecht über dem Zapfen.
+ */
+export interface AbsetzGeometrie {
+  lagerZ: number;
+  lagerY: number;
+  /** Querlage der Arme (± x) */
+  armX: number;
+  armLaenge: number;
+  /** Armwinkel in Fahrstellung (rad, von +z nach +y) */
+  winkel0: number;
+  kette: number;
+  /** Mitte der Mulde in Fahrstellung (z) und Unterkante ihrer Kufen (y) */
+  muldeZ: number;
+  muldeY: number;
+}
+
+export function absetzGeometrie(bedLen: number): AbsetzGeometrie {
+  const lagerZ = -bedLen / 2 + 0.1;
+  const lagerY = 1.1;
+  const kette = 0.6;
+  const muldeZ = 0.2;
+  const muldeY = 1.0;
+  const zapfen = zapfenLage();
+  const spitzeZ = muldeZ;
+  const spitzeY = muldeY + zapfen.y + kette;
+  return {
+    lagerZ,
+    lagerY,
+    armX: zapfen.x + 0.17,
+    armLaenge: Math.hypot(spitzeZ - lagerZ, spitzeY - lagerY),
+    winkel0: Math.atan2(spitzeY - lagerY, spitzeZ - lagerZ),
+    kette,
+    muldeZ,
+    muldeY,
+  };
 }
 
 /**
@@ -328,6 +376,16 @@ export interface LenkRad {
 }
 
 export interface VehicleModelParts {
+  /**
+   * Die Absetzanlage (E-141): Arme drehen um ihr Lager (`rotation.x`),
+   * Ketten haengen senkrecht unter den Spitzen, die Mulde ist `bedGroup`.
+   */
+  absetz: {
+    geo: AbsetzGeometrie;
+    arme: THREE.Group[];
+    ketten: THREE.Mesh[];
+    mulde: MuldenBau | null;
+  } | null;
   /** Wo die Achsen sitzen — daraus faehrt das Einspurmodell (E-140). */
   fahrwerk: Fahrwerk;
   /** Die Teile der Vorderraeder, die beim Lenken einschlagen. */
@@ -981,6 +1039,59 @@ function buildCarAndTrailer(
   return anhaenger;
 }
 
+/**
+ * Arme, Ketten und Mulde des Absetzkippers (E-141). Die Mulde hängt an
+ * `bedGroup` (ihr Rahmen: `absetzmulde.ts`); wo sie steht, rechnet der
+ * Ablauf in `vehicles.ts` jedes Bild aus Armwinkel und Kippwinkel.
+ */
+function baueAbsetzanlage(
+  v: VehicleModelContext,
+  lack: number,
+  dark: THREE.MeshStandardMaterial
+): NonNullable<VehicleModelParts["absetz"]> {
+  const geo = absetzGeometrie(v.bedLen);
+  const armStoff = new THREE.MeshStandardMaterial({ color: lack, roughness: 0.6, metalness: 0.3 });
+  const arme: THREE.Group[] = [];
+  for (const sx of [-1, 1]) {
+    const arm = new THREE.Group();
+    arm.name = "Absetzarm";
+    arm.position.set(sx * geo.armX, geo.lagerY, geo.lagerZ);
+    // Kastenprofil 0,16 x 0,24 m längs des Arms (lokal +z), dazu ein Haken an der Spitze
+    const balken = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.24, geo.armLaenge + 0.2), armStoff);
+    balken.position.z = geo.armLaenge / 2;
+    balken.castShadow = true;
+    arm.add(balken);
+    const haken = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.16), dark);
+    haken.position.set(-sx * 0.1, -0.14, geo.armLaenge);
+    arm.add(haken);
+    v.group.add(arm);
+    arme.push(arm);
+  }
+  // Lagerrohr quer über den Rahmen, zwischen den Armen
+  const rohr = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.11, 0.11, geo.armX * 2, 10).rotateZ(Math.PI / 2),
+    dark
+  );
+  rohr.position.set(0, geo.lagerY, geo.lagerZ);
+  v.group.add(rohr);
+  // Ketten: dünne Stränge, senkrecht von der Armspitze zum Zapfen
+  const kettenStoff = new THREE.MeshStandardMaterial({ color: 0x3a3a38, roughness: 0.5, metalness: 0.8 });
+  const ketten: THREE.Mesh[] = [];
+  for (let i = 0; i < 2; i++) {
+    const kette = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1, 6), kettenStoff);
+    kette.name = "Absetzkette";
+    v.group.add(kette);
+    ketten.push(kette);
+  }
+  let mulde: MuldenBau | null = null;
+  if (!v.ohneMulde) {
+    mulde = baueAbsetzmulde(lack);
+    v.bedGroup.add(mulde.netz);
+  }
+  v.group.add(v.bedGroup);
+  return { geo, arme, ketten, mulde };
+}
+
 /* --------------------------------------------------------------------- */
 /* Leiterrahmen (E-108)                                                    */
 
@@ -1092,6 +1203,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
 
   // Was der Ablauf danach ansteuert, wird hier gesammelt und zurückgegeben
   const teile: VehicleModelParts = {
+    absetz: null,
     fahrwerk: lkwFahrwerk(v.bedLen),
     lenkRaeder: [],
     tailGate: null,
@@ -1198,6 +1310,10 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   }
   baueFahrerhaus(v, paint, dark, windowMat);
   baueFahrgestell(v, dark, bedMat);
+  if (v.kind === "absetzer") {
+    teile.absetz = baueAbsetzanlage(v, paint.color.getHex(), dark);
+    return teile;
+  }
 
   // Ladefläche: Ursprung am Heck-Kipp-Gelenk (Boden-Höhe der Fläche)
   const bedW = BED_HALF_W * 2;

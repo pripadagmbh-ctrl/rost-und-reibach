@@ -26,6 +26,7 @@ import {
   LADE_RAND,
   LKW_HALB_BREITE,
   WAND_HOEHE,
+  FUELL_KLASSEN,
   type Aufbau,
   type Fahrzeugart,
 } from "./fuellgrad";
@@ -386,7 +387,15 @@ function rollFahrzeug(group: CustomerGroup): Fahrzeugart {
     // Altauto an — dann kommt der Abschleppwagen.
     return Math.random() < 0.15 ? "wrack" : "pkw";
   }
-  if (group === "gewerbe") return Math.random() < 0.65 ? "kipper" : "pritsche";
+  /*
+   * Der Betrieb ruft, wenn sein Container voll ist — und oft IST es ein
+   * Container: Dann bringt ihn der Absetzkipper (E-141). SW: 30 % der
+   * Gewerbefuhren, der Rest wie bisher im Verhaeltnis 65 : 35.
+   */
+  if (group === "gewerbe") {
+    const g = Math.random();
+    return g < 0.3 ? "absetzer" : g < 0.3 + 0.7 * 0.65 ? "kipper" : "pritsche";
+  }
   // Händler: alles unterwegs, was Räder hat
   const r = Math.random();
   return r < 0.5 ? "kipper" : r < 0.85 ? "pritsche" : "wrack";
@@ -412,10 +421,20 @@ function fuhreFuer(
 } {
   const vehicle = rollFahrzeug(group);
   const aufbau = rollAufbau(group);
+  /*
+   * Die Mulde kommt, wenn sie voll ist (E-141): Ein Containerdienst holt
+   * keine viertelvolle Mulde ab. SW: drei Viertel bis randvoll — sonst kaeme
+   * ein Dreiachser mit 540 kg, und unter 600 kg faehrt kein LKW vor
+   * (`test/lademenge.test.ts`).
+   */
+  const fuellgrad =
+    vehicle === "absetzer"
+      ? FUELL_KLASSEN.dreiviertel.von + Math.random() * (FUELL_KLASSEN.randvoll.bis - FUELL_KLASSEN.dreiviertel.von)
+      : rollFuellgrad(group);
   const fuhre = baueFuhre({
     kind: vehicle,
     aufbau,
-    fuellgrad: rollFuellgrad(group),
+    fuellgrad,
     hauptfraktion: sortedMaterial,
     stoerstoffAnteil: contaminantShare,
   });
@@ -933,7 +952,7 @@ export function fahrerfunk(lage: Fahrerlage, schild: string | null = null): stri
  * WER es sagt, steht im Kundenprofil (`CustomerProfile.name`); es gibt hier
  * absichtlich keine zweite Namensliste (Lehre aus E-066).
  */
-export type Anliefererlage = "wartetLange" | "faehrtUnverrichtet";
+export type Anliefererlage = "wartetLange" | "faehrtUnverrichtet" | "muldeAbgesetzt";
 
 export const ANLIEFERER_SPRUECHE: Record<Anliefererlage, string[]> = {
   wartetLange: [
@@ -947,6 +966,12 @@ export const ANLIEFERER_SPRUECHE: Record<Anliefererlage, string[]> = {
     "Bleibt drauf. Ich fahr.",
     "Dann eben ein andermal.",
     "Zu lange gestanden. Bis dann.",
+  ],
+  // E-141: Der Absetzkipper laesst seine Mulde stehen
+  muldeAbgesetzt: [
+    "Mulde steht hinten. Wenn sie leer ist, hol ich sie.",
+    "Die Mulde bleibt da. Ruf, wenn sie leer ist.",
+    "Ich stell sie euch hin. Bis nachher.",
   ],
 };
 

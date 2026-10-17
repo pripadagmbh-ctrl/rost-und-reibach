@@ -349,6 +349,26 @@ function rangierzug(
   return z;
 }
 
+/**
+ * WO DER ABSETZKIPPER HAELT (E-141): in der Abladegasse, 2,5 m vor dem Halt
+ * der Laster. Er setzt die Mulde HINTER sich ab bzw. kippt sie dort aus, und
+ * hinter dem gewohnten Halt (z −23,0) waere bis zur Suedmauer (innen −28,7)
+ * kein Platz fuer eine 3,70 m lange Mulde. Bei z −20,5 steht sie mit ihrer
+ * Mitte auf z −25,5, 1,4 m vor der Mauer, und alle vier Ecken liegen im
+ * Schwenkband des Baggers (5,9 bis 8,9 m vom Sitz).
+ */
+export const ABSETZ_HALT: [number, number] = [ABLADE_SPUR_X, -20.5];
+
+/** Anfahrt und Rueckweg des Absetzkippers — derselbe Rangierzug, nur kuerzer. */
+export function rangierAbsetzplatz(): Rangierzug {
+  return rangierzug([WAAGE_HALT, VERTEILER, [-21, 10], [-12, 4]], ABSETZ_HALT, 0);
+}
+
+/** Ausfahrt des Absetzkippers: die Gasse hinauf, dann wie alle zum Tor. */
+export function absetzAusfahrt(): Array<[number, number]> {
+  return zumTor([ABSETZ_HALT, ABLADE_RANGIER]);
+}
+
 /** Alle bisher gerechneten Rangierzuege — fuer Waechter und Werkzeuge. */
 export function rangierzuege(): Rangierzug[] {
   return [...rangierSpeicher.values()];
@@ -770,6 +790,13 @@ export const BED_LEN: Record<string, number> = {
   pritsche: 5.4,
   abholer: 5.4,
   kipper: 6.0,
+  /*
+   * Der Absetzkipper (E-141) hat keine Ladeflaeche, sondern Rahmen, Mulde und
+   * Schwenkarme. 4,60 m ist die Laenge zwischen Fahrerhaus und Armlager —
+   * daraus baut `vehicleModel.ts` Rahmen und Achsen (Radstand 4,10 m) und
+   * `umriss.ts` die Standflaeche (6,64 m ohne Arme). SW.
+   */
+  absetzer: 4.6,
 };
 
 /** Ladeflaechenlaenge eines Fahrzeugs; Unbekanntes faehrt wie eine Pritsche. */

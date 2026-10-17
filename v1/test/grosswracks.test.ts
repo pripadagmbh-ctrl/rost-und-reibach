@@ -326,8 +326,9 @@ describe("Wohnwagen: wie oft und wer", () => {
     expect(c.massKg).toBe(WOHNWAGEN_DEF.totalMassKg);
   });
 
-  it("NACHSCHUB bleibt bei seinen vier Arten — der Wohnwagen ist der Zufall, nicht der Knopf", () => {
-    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack", "einzelstueck"]);
+  it("NACHSCHUB kennt keinen Wohnwagen — der Wohnwagen ist der Zufall, nicht der Knopf", () => {
+    // Seit E-141 ist der Absetzkipper die fuenfte Art; der Wohnwagen bleibt draussen.
+    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack", "einzelstueck", "absetzer"]);
   });
 });
 

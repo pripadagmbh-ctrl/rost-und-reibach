@@ -26,7 +26,37 @@ import { bedLenFor } from "./routes";
 export type Aufbau = "flach" | "rungen" | "koffer";
 
 /** Fahrzeugarten, die anliefern (Quelle: `vehicleForCustomer`). */
-export type Fahrzeugart = "kipper" | "pritsche" | "wrack" | "pkw";
+export type Fahrzeugart = "kipper" | "pritsche" | "wrack" | "pkw" | "absetzer";
+
+/**
+ * DIE ABSETZMULDE DES ABSETZKIPPERS (E-141) — 7 m³, ein offener Trog.
+ *
+ * Maße wie die 7-m³-Mulde von `world/firmenmulden.ts` (E-133, dort SW nach
+ * typischen Absetzmulden): oben 3,70 m lang, 1,85 m breit über die Zapfen,
+ * 1,55 m hoch. Der Boden ist 68 % der oberen Länge (2,52 m; DIN-Absetzmulde),
+ * die Stirnwände laufen schräg nach außen. Hier als reine Zahlen, damit
+ * `customers.ts` den Laderaum rechnen kann, ohne three.js zu laden; gebaut
+ * wird sie in `absetzmulde.ts`.
+ */
+export const ABSETZMULDE = {
+  laenge: 3.7,
+  breite: 1.85,
+  hoehe: 1.55,
+  /** Bodenlänge / obere Länge */
+  bodenAnteil: 0.68,
+  /** Kufen unter dem Boden (m) */
+  kufe: 0.08,
+  /** Blechstärke im Bild (m) */
+  blech: 0.04,
+  /** Platz außerhalb der Wand für Zapfen und Sicken, je Seite (m) */
+  rand: 0.12,
+  /** Höhe der Aufnahmezapfen über dem Boden: Kufe + 62 % der Wandhöhe (wie `firmenmulden.ts`) */
+  zapfenAnteil: 0.62,
+};
+/** Halbe Innenbreite der Mulde: halbe Breite minus Rand minus Blech. */
+export const ABSETZ_HALB_BREITE = ABSETZMULDE.breite / 2 - ABSETZMULDE.rand - ABSETZMULDE.blech;
+/** Innenhöhe vom Boden bis zur Oberkante. */
+export const ABSETZ_WAND = ABSETZMULDE.hoehe - ABSETZMULDE.kufe - ABSETZMULDE.blech;
 
 /** Gruppe der Kundschaft — dieselben drei wie in `customers.ts`. */
 export type LadeGruppe = "privat" | "haendler" | "gewerbe";
@@ -126,6 +156,7 @@ export const BED_LEN: Record<Fahrzeugart, number> = {
   wrack: bedLenFor("wrack"),
   kipper: bedLenFor("kipper"),
   pritsche: bedLenFor("pritsche"),
+  absetzer: bedLenFor("absetzer"),
 };
 
 /** Halbe Innenbreite der LKW-Ladefläche. Quelle: `routes.BED_HALF_W` 1,35 − 0,08 Wandstärke (`vehicles.ts`). */
@@ -208,6 +239,11 @@ export function rollAufbau(gruppe: LadeGruppe, rnd: () => number = Math.random):
 
 /** Nutzbarer Laderaum in m³ — Innenmaß mal Ladehöhe inklusive Überstand. */
 export function ladeVolumen(kind: Fahrzeugart, aufbau: Aufbau = "flach"): number {
+  if (kind === "absetzer") {
+    // Gepackt wird auf dem Boden der Mulde (die Stirnwände laufen nach außen)
+    const boden = ABSETZMULDE.laenge * ABSETZMULDE.bodenAnteil - 2 * LADE_RAND;
+    return ABSETZ_HALB_BREITE * 2 * boden * ladeHoeheGrenze(ABSETZ_WAND);
+  }
   const laenge = Math.max(0, BED_LEN[kind] - 2 * LADE_RAND);
   const halbBreite = kind === "pkw" ? ANHAENGER_HALB_BREITE : LKW_HALB_BREITE;
   const wand = kind === "pkw" ? ANHAENGER_WAND : WAND_HOEHE[aufbau];
@@ -233,6 +269,9 @@ export const NUTZLAST: Record<Fahrzeugart, number> = {
   pkw: 1800,
   // Der Abschleppwagen trägt ein Auto, keine Schüttung — siehe WRACK_KG.
   wrack: 2000,
+  // SW: Ein Dreiachs-Absetzkipper trägt 10 bis 12 t, die volle 7-m³-Mulde
+  // mit Mischschrott wiegt 2 bis 5 t. Die Grenze greift also erst bei Blei.
+  absetzer: 8000,
 };
 
 /**

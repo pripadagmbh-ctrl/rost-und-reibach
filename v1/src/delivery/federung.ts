@@ -398,6 +398,9 @@ const LEERGEWICHT_KG: Record<string, number> = {
   abholer: 9000,
   wrack: 7500,
   pkw: 900,
+  // SW: Dreiachser mit Absetzanlage, ohne Mulde (die leere 7-m³-Mulde wiegt
+  // rund 750 kg und liegt auf der Flaeche wie Ladung)
+  absetzer: 10500,
 };
 
 /**

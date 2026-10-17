@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-141 | 17.10.2026 | Absetzkipper: Mulde an Ketten, ausgekippt oder abgesetzt und geholt | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-140 | 17.10.2026 | Laster lenken mit der Vorderachse, Anhänger knicken, Rangierzüge statt Kehren | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-143 | 17.10.2026 | Nur noch Pripada.de auf den Schildern, fremde Logos raus | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-142 | 17.10.2026 | Echte Arme, Arbeitshandschuhe umschließen die Joysticks | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -156,6 +157,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-141 — Absetzkipper mit Mulde** (iPad, NACHSCHUB mit Taste 1)
+- Arme schwenken, Mulde hängt an den Ketten, beim Kippen landet die Fuhre hinter dem Wagen — fliegt nichts davon?
+- Abgesetzt: Steht die Mulde gerade auf dem Boden, kommst du mit der Spinne an alles heran?
+- Leer geräumt: Holt derselbe Laster sie nach ein paar Sekunden — sieht Einhängen und Aufnehmen glaubhaft aus?
+- Mulde in der Kundenfarbe gut, oder lieber eine feste Farbe?
 
 **E-140 — Laster lenken, Anhänger knicken, Rangierzüge** (iPad)
 - Einem Kipper von der Waage bis an den Abladeplatz folgen: Fährt er vorbei, hält und setzt im weiten Bogen zurück — dreht er sich nirgends auf der Stelle?

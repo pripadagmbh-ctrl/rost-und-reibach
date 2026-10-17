@@ -93,7 +93,7 @@ describe("Kundschaft", () => {
   it("schickt jede Gruppe im passenden Fahrzeug", () => {
     for (const c of ziehe(400)) {
       const v = vehicleForCustomer(c);
-      expect(["kipper", "pritsche", "wrack", "pkw"]).toContain(v);
+      expect(["kipper", "pritsche", "wrack", "pkw", "absetzer"]).toContain(v);
       if (c.group === "privat") {
         // Privat kommt mit dem eigenen Wagen, nie mit einem LKW
         expect(["pkw", "wrack"], `${c.name}`).toContain(v);

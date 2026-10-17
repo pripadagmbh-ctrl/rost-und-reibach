@@ -34,6 +34,8 @@ import {
   routeParkRueckVon,
   parkAusfahrt,
   anfahrtVomPlatz,
+  rangierAbsetzplatz,
+  absetzAusfahrt,
   neueAbladestelle,
   neueAbholstelle,
   alleAbholPlaetze,
@@ -126,6 +128,24 @@ export function fahrplaene(): Fahrplan[] {
           // nur ein paar Meter weit (`vehicles.weicheAus`).
           phasen: ["out", "nudging"],
         },
+      ],
+    });
+  }
+  /*
+   * DER ABSETZKIPPER (E-141): haelt 2,5 m vor dem Abladeplatz und setzt die
+   * Mulde hinter sich ab. Er ist kuerzer als der Kipper; geprueft wird mit
+   * seinem eigenen Umriss (Arme in Fahrstellung liegen darin).
+   */
+  {
+    const zug = rangierAbsetzplatz();
+    out.push({
+      name: "absetzer zum Absetzplatz",
+      kind: "absetzer",
+      etappen: [
+        { name: "Absetzer-Einfahrt", route: ROUTE_IN_FWD, rueckwaerts: false, tempo: SPEED, phasen: ["in"] },
+        { name: "Absetzer-Anfahrt", route: zug.anfahrt, rueckwaerts: false, tempo: SPEED, phasen: ["approach"] },
+        { name: "Absetzer-Rangieren", route: zug.rueckweg, rueckwaerts: true, tempo: RUECK_TEMPO, phasen: ["reverseIn"] },
+        { name: "Absetzer-Ausfahrt", route: absetzAusfahrt(), rueckwaerts: false, tempo: SPEED, phasen: ["out", "nudging"] },
       ],
     });
   }

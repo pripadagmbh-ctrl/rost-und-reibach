@@ -66,6 +66,83 @@ const VOLL_PRUEF_S = 0.25;
  * dem „Tara 0 kg" steht — richtig gerechnet und trotzdem falsch gelesen.
  */
 const ABHOLER_CONTAINER_KG = 1800;
+/*
+ * DER ABSETZKIPPER (E-141) — Tempi und Winkel, alle SW.
+ *
+ * Ein echter Absetzkipper braucht fuer Ab- und Aufnehmen je eine halbe
+ * Minute; im Spiel ist es etwa ein Drittel davon, damit man zusieht, aber
+ * nicht wartet.
+ */
+/** Schwenktempo der Arme (rad/s): 17 Grad/s, ein ganzer Schwenk rund 8 s. */
+const ARM_TEMPO = 0.3;
+/** Kipptempo der Mulde an den Ketten (rad/s): 100 Grad in 3,5 s. */
+const KIPP_TEMPO = 0.5;
+/**
+ * So weit kippt die Mulde (rad): 110 Grad — ueber die Senkrechte hinaus, der
+ * Boden haengt also ueber. Bei 100 Grad blieb gemessen ein Drittel der Stuecke
+ * liegen (Reibung 2,2, „Schrott verhakt sich"). Die Oberkante bleibt dabei
+ * 0,4 m ueber dem Boden (`muldenPose`).
+ */
+const MULDE_KIPP_MAX = (110 * Math.PI) / 180;
+/**
+ * Der Fahrer ruettelt die gekippte Mulde: bis 7 Grad zurueck, 1,5 Mal je
+ * Sekunde, 3,5 s lang (SW). Am Rand der Mulde (1,9 m vom Zapfen) sind das
+ * hoechstens 2,2 m/s — genug, dass verhakte Stuecke loskommen, zu wenig fuer
+ * einen Wurf. Gemessen (`tools/absetzlauf.ts`): 4 Grad liessen in zwei von
+ * drei Laeufen ein Viertel der Fuhre in der Mulde, 7 Grad 0 bis 20 %; das
+ * schnellste Stueck dabei 32 km/h (der Kipper: Median 19, Spitze 279).
+ */
+const RUETTEL_AMPL = (7 * Math.PI) / 180;
+const RUETTEL_HZ = 1.5;
+/**
+ * Armwinkel beim Auskippen (rad, gegen +z): 140 Grad. Die Mulde haengt dann
+ * hinter dem Wagen mit der Unterkante 1,3 m ueber dem Boden, und auch gekippt
+ * bleibt ihre Oberkante darueber (0,4 m) — gerechnet mit `muldenPose`.
+ */
+const KIPP_ARMWINKEL = (140 * Math.PI) / 180;
+/** So lange haengt die gekippte Mulde, bis auch das Nachrutschende draussen ist (s). */
+const MULDE_LEER_HALTEN_S = 3.5;
+
+/**
+ * EINE ABGESETZTE MULDE (E-141): Sie steht hinter dem Abladeplatz, bis der
+ * Spieler sie leer hat — dann holt ein Absetzkipper sie ab.
+ */
+export interface AbgesetzteMulde {
+  /** Rahmen der Mulde in der Szene (`absetzmulde.ts`), Netz darin. */
+  group: THREE.Group;
+  /** Ihr Koerper: kinematisch, steht still, fuenf Kollider. */
+  body: RAPIER.RigidBody;
+  /** Wem sie gehoert — derselbe Kunde holt sie wieder. */
+  kunde: CustomerProfile | null;
+  /** Wie lange sie steht (s). */
+  standS: number;
+  /** Wie lange sie schon leer ist (s). */
+  leerS: number;
+}
+
+/**
+ * Wie oft der Absetzkipper die Mulde absetzt statt sie auszukippen (E-141).
+ *
+ * SW 50 : 50. Beides gehoert zum Alltag eines Containerdienstes, und beides
+ * ist eine eigene Aufgabe am Bagger: Ausgekippt liegt die Fuhre als Haufen auf
+ * der Annahmeflaeche, abgesetzt muss man sie Stueck fuer Stueck aus einer
+ * engen Mulde greifen. Eine Regel „nach Ladung" (etwa: sortenrein absetzen)
+ * machte eine der beiden Aufgaben selten — und welche, haenge an der
+ * Kundschaft statt am Spiel.
+ */
+const ABSETZEN_ANTEIL = 0.5;
+/** So lange muss die abgesetzte Mulde leer sein, bevor sie geholt wird (s, SW). */
+const MULDE_LEER_WARTE_S = 4;
+/**
+ * Spaetestens dann wird sie geholt, auch wenn noch etwas darin liegt (s, SW:
+ * sechs Minuten). Solange sie steht, ist der Abladeplatz zu — ohne Frist
+ * stuende der Hof still, wenn niemand sie leert. Was dann noch drin liegt,
+ * faehrt mit ihr vom Hof (E-082: wer nicht abgeladen hat, nimmt mit).
+ */
+const MULDE_FRIST_S = 360;
+/** Bis zu dieser Masse gilt die Mulde als leer (kg) — wie `isUnloaded`. */
+const MULDE_LEER_KG = 20;
+
 /** Rueckwaertstempo beim Einparken (m/s) — Schrittgeschwindigkeit. */
 const PARK_RUECK_SPEED = 1.6;
 /*
@@ -114,7 +191,9 @@ import {
   brueckenKeilEcken,
   type Rad,
   type LenkRad,
+  type VehicleModelParts,
 } from "./vehicleModel";
+import { muldenPose, absetzSchwenk, imTrog, MULDE_BODEN } from "./absetzmulde";
 import { Federung, federungsDatenFuer } from "./federung";
 import {
   ANHAENGER_HALB_BREITE,
@@ -123,6 +202,9 @@ import {
   FUELL_KLASSEN,
   NUTZLAST,
   ladeHoeheGrenze,
+  ABSETZMULDE,
+  ABSETZ_HALB_BREITE,
+  ABSETZ_WAND,
   type Aufbau,
 } from "./fuellgrad";
 import { getMaterial } from "../materials/catalog";
@@ -137,7 +219,7 @@ import type { PlatzinventarPort } from "./platzinventarAbholung";
  * und fährt per Reibung mit.
  */
 
-export type DeliveryKind = "kipper" | "pritsche" | "wrack" | "abholer" | "pkw";
+export type DeliveryKind = "kipper" | "pritsche" | "wrack" | "abholer" | "pkw" | "absetzer";
 
 import {
   ROUTE_IN_FWD,
@@ -161,6 +243,8 @@ import {
   routeParkRueckVon,
   parkAusfahrt,
   anfahrtVomPlatz,
+  rangierAbsetzplatz,
+  absetzAusfahrt,
   PARK_TIME_S,
   SPEED,
   FIRST_DELAY_S,
@@ -201,7 +285,17 @@ type Phase =
   | "parkRueck"
   | "parked"
   | "ausfaedeln"
-  | "out";
+  | "out"
+  // Absetzkipper (E-141)
+  | "muldeHeben"
+  | "muldeRuhe"
+  | "muldeKippen"
+  | "muldeLeeren"
+  | "muldeSenken"
+  | "muldeLoesen"
+  | "armeEin"
+  | "muldeHolen"
+  | "muldeAufnehmen";
 
 interface Cargo {
   items: ScrapItem[];
@@ -265,6 +359,41 @@ class DeliveryVehicle {
   /** Anhänger des PKW — eigener Körper, Gelenk an der Kupplung */
   private trailer: THREE.Group | null = null;
   private trailerYawRel = 0;
+  /* ------------------------------------------- Absetzkipper (E-141) --- */
+  /** Arme, Ketten und Mulde — nur beim Absetzkipper. */
+  private absetz: VehicleModelParts["absetz"] = null;
+  /**
+   * Was dieser Absetzkipper mit seiner Mulde tut: auskippen, absetzen (der
+   * Spieler leert sie) oder eine abgesetzte holen. Gesetzt vom Fuhrpark.
+   */
+  absetzModus: "kippen" | "absetzen" | "holen" = "kippen";
+  /** Schwenk der Arme aus der Fahrstellung (rad). */
+  private armSchwenk = 0;
+  /** Kippwinkel der Mulde an den Ketten (rad). */
+  private muldeKipp = 0;
+  /** Haengt eine Mulde an den Ketten? */
+  private muldeDran = true;
+  /** Die abgesetzte Mulde, die dieser Wagen holt. */
+  private holMulde: AbgesetzteMulde | null = null;
+  /** Beim Holen: Ueberblendung von der Stand- in die Haengelage (0..1). */
+  private muldeAnheben = 1;
+  private muldeStandLage: { pos: THREE.Vector3; quat: THREE.Quaternion } | null = null;
+  /**
+   * Beim Absetzen: von der Haengelage auf den Boden (Wagenrahmen). Die
+   * Haengelage stimmt im Wagenrahmen, aber der Wagen federt und nickt unter
+   * der Last — gemessen schwebte die Mulde sonst 11 cm ueber dem Boden.
+   */
+  private muldeAufsetzen: { von: THREE.Vector3; vonQ: THREE.Quaternion; nach: THREE.Vector3; nachQ: THREE.Quaternion } | null = null;
+  /** Meldet die abgesetzte Mulde an den Fuhrpark. */
+  onMuldeAbgesetzt: ((m: AbgesetzteMulde) => void) | null = null;
+  /** Meldet, dass sie wieder am Haken haengt. */
+  onMuldeGeholt: (() => void) | null = null;
+
+  /** Ein Absetzkipper, der nur eine Mulde holt: kein Ankauf, keine Verhandlung. */
+  get holtNur(): boolean {
+    return this.absetz !== null && this.absetzModus === "holen";
+  }
+
   /** Ladekran der Händler — nur Bild, schwenkt beim Andocken zur Seite */
   private crane: THREE.Group | null = null;
   private craneSwing = 0;
@@ -413,6 +542,7 @@ class DeliveryVehicle {
     if (this.phase === "out" || this.phase === "nudging" || this.phase === "ausfaedeln") {
       return false;
     }
+    if (this.absetz && this.armSchwenk > 0) return false; // Arme draussen (E-141)
     this.nudgeReturn = this.phase;
     /*
      * Das Ziel bleibt, wo es war. Der Punkt, auf den `nearestS` zeigt, liegt
@@ -446,6 +576,153 @@ class DeliveryVehicle {
       r.mesh.position.x = r.achseX + r.versatz * c;
       r.mesh.position.z = r.z - r.versatz * sn;
     }
+  }
+
+  /**
+   * ARME, KETTEN UND MULDE NACH ARM- UND KIPPWINKEL STELLEN (E-141).
+   *
+   * Die Rechnung steht in `absetzmulde.muldenPose`: Arm um sein Lager, Kette
+   * senkrecht, Mulde um die Zapfen. Haengt keine Mulde an den Ketten
+   * (abgesetzt, oder noch nicht geholt), bewegen sich nur Arme und Ketten.
+   */
+  private stelleAbsetzanlage(): void {
+    const a = this.absetz;
+    if (!a) return;
+    const p = muldenPose(a.geo, this.armSchwenk, this.muldeKipp);
+    for (const arm of a.arme) arm.rotation.x = -(a.geo.winkel0 + this.armSchwenk);
+    a.ketten.forEach((k, i) => {
+      const sx = i === 0 ? -1 : 1;
+      k.position.set(sx * (ABSETZMULDE.breite / 2 + 0.04), p.spitzeY - a.geo.kette / 2, p.spitzeZ);
+      k.scale.set(1, a.geo.kette, 1);
+    });
+    if (!this.muldeDran) return;
+    const auf = this.muldeAufsetzen;
+    if (auf && this.phase === "muldeLoesen") {
+      // Langsam auf den Boden: 1,0 s fuer die paar Zentimeter, die der Wagen nickt
+      const w = Math.min(1, this.phaseT / 1.0);
+      this.bedGroup.position.lerpVectors(auf.von, auf.nach, w);
+      this.bedGroup.quaternion.slerpQuaternions(auf.vonQ, auf.nachQ, w);
+      return;
+    }
+    this.bedGroup.position.set(0, p.y, p.z);
+    this.bedGroup.rotation.set(-this.muldeKipp, 0, 0);
+    // Beim Holen: aus der Lage, in der sie stand, in die Haengelage
+    const st = this.muldeStandLage;
+    if (st && this.muldeAnheben < 1) {
+      const w = this.muldeAnheben;
+      this.bedGroup.position.lerpVectors(st.pos, this.bedGroup.position.clone(), w);
+      this.bedGroup.quaternion.slerpQuaternions(st.quat, this.bedGroup.quaternion.clone(), w);
+    }
+  }
+
+  /** Wo die Mulde auf dem Boden stehen wird — gerade, Kufen auf y 0 (Welt). */
+  private planeAufsetzen(): void {
+    this.group.updateWorldMatrix(true, true);
+    const g = this.bedGroup;
+    const pos = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    g.getWorldPosition(pos);
+    g.getWorldQuaternion(q);
+    pos.y = 0;
+    const gier = new THREE.Euler().setFromQuaternion(q, "YXZ").y;
+    const nachWelt = new THREE.Matrix4().compose(
+      pos,
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, gier, 0)),
+      new THREE.Vector3(1, 1, 1)
+    );
+    const lokal = new THREE.Matrix4().copy(this.group.matrixWorld).invert().multiply(nachWelt);
+    const nach = new THREE.Vector3();
+    const nachQ = new THREE.Quaternion();
+    lokal.decompose(nach, nachQ, new THREE.Vector3());
+    this.muldeAufsetzen = { von: g.position.clone(), vonQ: g.quaternion.clone(), nach, nachQ };
+  }
+
+  /**
+   * WAS NACH DEM KIPPEN NOCH IN DER MULDE LIEGT, FAEHRT VERRIEGELT MIT (E-141).
+   *
+   * Gemessen: Ohne das flogen Reste beim Zurueckschwenken und in der ersten
+   * Kurve heraus — bis 70 km/h, und sie lagen danach auf der Hofstrasse. Ein
+   * Fahrer faehrt nicht mit loser Ladung los. Gefragt wird nur die eigene
+   * Fuhre und nur der Trog selbst (`imTrog`), nicht das weite Fenster der
+   * Ladeflaeche — sonst fasste es den frisch gekippten Haufen dahinter mit.
+   * Die Reste wiegt die Ausfahrtswaage als Tara (nicht bezahlt), und sie
+   * fahren mit vom Hof.
+   */
+  private verriegeleReste(): void {
+    this.bedGroup.updateWorldMatrix(true, false);
+    const inv = new THREE.Matrix4().copy(this.bedGroup.matrixWorld).invert();
+    const hilf = new THREE.Vector3();
+    for (const it of this.cargo.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      if (!imTrog(inv, it.body.translation(), hilf)) continue;
+      this.lockToBed(it.body);
+      this.ladungFaehrtMit = true;
+    }
+  }
+
+  /**
+   * DIE MULDE BLEIBT STEHEN (E-141): Ketten aus, sie gehoert jetzt dem Platz.
+   *
+   * Ihr Rahmen wandert in die Szene (Weltlage bleibt), ihr Koerper bekommt
+   * ab jetzt keine Bewegung mehr und steht damit still. Der Wagen behaelt
+   * einen leeren Rahmen dort, wo sonst die Mulde steht — so wiegt die
+   * Ausfahrtswaage nichts, und alles, was an `bedGroup` haengt, laeuft weiter.
+   */
+  private gibMuldeAb(): void {
+    const geo = this.absetz!.geo;
+    const g = this.bedGroup;
+    this.scene.attach(g);
+    const m: AbgesetzteMulde = { group: g, body: this.bedBody, kunde: this.customer, standS: 0, leerS: 0 };
+    /*
+     * FEST STATT KINEMATISCH, solange sie steht. Gemessen
+     * (`tools/absetzlauf.ts`): Auf dem stehenden kinematischen Koerper schlief
+     * die Fuhre nicht ein — nach 10 s waren 9 von 9 Stuecken wach. Ein fester
+     * Koerper laesst sie schlafen. Beim Holen wird er wieder kinematisch.
+     */
+    m.body.setBodyType(RAPIER.RigidBodyType.Fixed, true);
+    this.bedGroup = new THREE.Group();
+    this.bedGroup.position.set(0, geo.muldeY, geo.muldeZ - ABSETZMULDE.laenge / 2);
+    this.group.add(this.bedGroup);
+    this.bedBody = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+    this.muldeDran = false;
+    this.onMuldeAbgesetzt?.(m);
+    this.onAnliefererlage?.("muldeAbgesetzt");
+  }
+
+  /**
+   * DIE ABGESETZTE MULDE WIEDER EINHAENGEN (E-141).
+   *
+   * Ihr Rahmen wandert in den Wagen (Weltlage bleibt). Der Wagen steht nicht
+   * auf den Zentimeter dort, wo der vorige stand; deshalb blendet
+   * `muldeAufnehmen` erst von ihrer Standlage in die Haengelage ueber — die
+   * Ketten ziehen sie die paar Zentimeter heran, statt dass sie springt.
+   * Was noch darin liegt (die Frist ist abgelaufen), faehrt mit und ist vom Hof.
+   */
+  private nimmMulde(): void {
+    const m = this.holMulde;
+    if (!m) return;
+    this.group.remove(this.bedGroup);
+    this.world.removeRigidBody(this.bedBody);
+    this.group.updateWorldMatrix(true, false);
+    this.group.attach(m.group);
+    this.bedGroup = m.group;
+    this.bedBody = m.body;
+    m.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
+    this.muldeStandLage = { pos: m.group.position.clone(), quat: m.group.quaternion.clone() };
+    this.muldeAnheben = 0;
+    this.muldeDran = true;
+    this.holMulde = null;
+    m.group.updateWorldMatrix(true, false);
+    const inv = new THREE.Matrix4().copy(m.group.matrixWorld).invert();
+    const hilf = new THREE.Vector3();
+    for (const it of this.itemQuelle?.items ?? []) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      if (!imTrog(inv, it.body.translation(), hilf)) continue;
+      this.cargo.items.push(it);
+      this.lockToBed(it.body);
+    }
+    this.ladungFaehrtMit = true;
+    this.onMuldeGeholt?.();
   }
 
   /** Die Lage des Wagens fuer das Einspurmodell. */
@@ -893,6 +1170,8 @@ class DeliveryVehicle {
 
   sendAway(): boolean {
     if (this.phase === "out") return false;
+    // Mit ausgeschwenkten Armen faehrt kein Absetzkipper los (E-141)
+    if (this.absetz && this.armSchwenk > 0) return false;
     // Ein Abholer wird abgerechnet, EGAL welcher Befehl ihn losschickt (E-086).
     this.abholerFaehrtRaus();
     // Was noch oben liegt, faehrt mit — sonst verliert der Wagen es unterwegs
@@ -1214,6 +1493,15 @@ class DeliveryVehicle {
       this.meineAusfahrt = pickupOut();
       return;
     }
+    if (this.absetz) {
+      // Der Absetzkipper haelt 2,5 m vor dem Abladeplatz (E-141)
+      neueAbladestelle();
+      const zug = rangierAbsetzplatz();
+      this.meineAnfahrt = zug.anfahrt;
+      this.meinRueckweg = zug.rueckweg;
+      this.meineAusfahrt = absetzAusfahrt();
+      return;
+    }
     const mulde = this.zielMulde;
     if (mulde) {
       this.meineAnfahrt = bayApproach(mulde);
@@ -1280,7 +1568,9 @@ class DeliveryVehicle {
     /** Wiegung bei Einfahrt (brutto) bzw. Ausfahrt (netto = brutto − tara) */
     private onWeighIn: ((kg: number) => void) | null = null,
     private onWeighOut: ((netKg: number) => void) | null = null,
-    customer: CustomerProfile | null = null
+    customer: CustomerProfile | null = null,
+    /** Absetzkipper: Diese abgesetzte Mulde holt er ab (E-141). */
+    holeMulde: AbgesetzteMulde | null = null
   ) {
     this.customer = kind === "abholer" ? null : (customer ?? rollCustomer());
     // Die Tabelle steht in routes.ts — dieselbe, gegen die die Waechter rechnen
@@ -1326,6 +1616,7 @@ class DeliveryVehicle {
       world: this.world,
       sideWalls: this.sideWalls,
       tailGate: null,
+      ohneMulde: holeMulde !== null,
     });
     this.tailGate = teile.tailGate;
     this.crane = teile.crane;
@@ -1333,6 +1624,12 @@ class DeliveryVehicle {
     this.raeder = teile.raeder;
     this.fahrwerk = teile.fahrwerk;
     this.lenkRaeder = teile.lenkRaeder;
+    this.absetz = teile.absetz;
+    if (holeMulde) {
+      this.holMulde = holeMulde;
+      this.absetzModus = "holen";
+      this.muldeDran = false;
+    }
     /*
      * DER HUND AUF DEM BEIFAHRERSITZ (15.09.2026).
      *
@@ -1438,9 +1735,14 @@ class DeliveryVehicle {
      * Vorn bleibt es bei 0,60 m — die Unterkante liegt dort weiter auf −0,56
      * und damit 4 cm über dem Rahmen; nach hinten wächst der Abstand.
      */
-    const keil = RAPIER.ColliderDesc.convexHull(brueckenKeilEcken(halfW, this.bedLen));
-    if (!keil) throw new Error("Kippbruecke: konvexe Huelle nicht baubar");
-    world.createCollider(keil, this.bedBody);
+    // Der Absetzkipper hat statt der Bruecke seine Mulde: fuenf Kollider im
+    // Muldenrahmen (`absetzmulde.ts`). Holt er nur, faehrt er ohne.
+    if (teile.absetz) {
+      for (const k of teile.absetz.mulde?.kollider ?? []) world.createCollider(k, this.bedBody);
+    }
+    const keil = teile.absetz ? null : RAPIER.ColliderDesc.convexHull(brueckenKeilEcken(halfW, this.bedLen));
+    if (keil) world.createCollider(keil, this.bedBody);
+    else if (!teile.absetz) throw new Error("Kippbruecke: konvexe Huelle nicht baubar");
     // Abhol-LKW trägt einen hohen Container, damit geladenes Material hält
     const wh = kind === "abholer" ? 1.25 : 0.32;
     // Seitenwände sind eigene bewegliche Körper (siehe buildMeshes) — hier nur
@@ -1449,12 +1751,17 @@ class DeliveryVehicle {
       [0, wh, this.bedLen, halfW, 0.05], // vordere Wand (zur Kabine)
     ];
     if (kind !== "kipper") walls.push([0, wh, 0, halfW, 0.05]); // Heckklappe nur bei Pritschen
-    for (const [wx, wy, wz, hx, hz] of walls) {
+    for (const [wx, wy, wz, hx, hz] of teile.absetz ? [] : walls) {
       world.createCollider(
         RAPIER.ColliderDesc.cuboid(hx, wh, hz).setTranslation(wx, wy, wz),
         this.bedBody
       );
     }
+    if (this.absetz && !this.muldeDran) {
+      // Holt er nur: der leere Rahmen steht dort, wo sonst die Mulde steht
+      this.bedGroup.position.set(0, this.absetz.geo.muldeY, this.absetz.geo.muldeZ - ABSETZMULDE.laenge / 2);
+    }
+    this.stelleAbsetzanlage();
     this.placeAt(this.routeIn, 0);
     this.wendeFederungAn();
     this.federLetztePos.copy(this.group.position);
@@ -1677,6 +1984,14 @@ class DeliveryVehicle {
    * Beide lesen jetzt dieselben Konstanten.
    */
   private laderaum(): { halbBreite: number; nutzLaenge: number; maxHoehe: number; raum: number } {
+    if (this.absetz) {
+      // Die Mulde (E-141): gepackt wird auf ihrem Boden, die Stirnwaende
+      // laufen nach aussen. Dieselbe Rechnung wie `fuellgrad.ladeVolumen`.
+      const halbBreite = ABSETZ_HALB_BREITE;
+      const nutzLaenge = ABSETZMULDE.laenge * ABSETZMULDE.bodenAnteil - 2 * LADE_RAND;
+      const maxHoehe = ladeHoeheGrenze(ABSETZ_WAND, !!this.customer?.einzelstueck);
+      return { halbBreite, nutzLaenge, maxHoehe, raum: halbBreite * 2 * nutzLaenge * maxHoehe };
+    }
     const anhaenger = this.kind === "pkw";
     const halbBreite = anhaenger ? ANHAENGER_HALB_BREITE : BED_HALF_W - 0.08;
     const nutzLaenge = this.bedLen - 2 * LADE_RAND;
@@ -1691,6 +2006,7 @@ class DeliveryVehicle {
     this.composites = composites;
     this.group.updateWorldMatrix(true, true);
     if (this.isPickup) return; // Abholer kommt leer — der Spieler belädt ihn
+    if (this.holtNur) return; // holt nur eine abgesetzte Mulde (E-141)
     if (this.kind === "wrack") {
       // E-135: Auch ein Wohnwagen kommt auf dem Abschlepper — rückwärts, der
       // Kasten an der Stirnwand, die Deichsel über das Heck (`ladeVersatz`).
@@ -2030,14 +2346,20 @@ class DeliveryVehicle {
       Math.PI / 2
     );
     const lage = new THREE.Quaternion();
+    // In der Mulde (E-141) liegt der Boden hoeher und beginnt hinter der
+    // schraegen Stirnwand; sonst wie auf jeder Ladeflaeche.
+    const boden = this.absetz ? MULDE_BODEN + 0.02 : LADE_BODEN;
+    const vorlauf = this.absetz
+      ? (ABSETZMULDE.laenge * (1 - ABSETZMULDE.bodenAnteil)) / 2 + LADE_RAND
+      : LADE_RAND;
     specs.forEach((sp, i) => {
       const platz = plaetze[i];
       if (!platz) return;
       sp.massKg = Math.max(1, Math.round(gewicht.get(i) ?? sp.massKg));
       const local = new THREE.Vector3(
         platz.x,
-        LADE_BODEN + platz.y + stuecke[i].hoehe / 2,
-        LADE_RAND + platz.z
+        boden + platz.y + stuecke[i].hoehe / 2,
+        vorlauf + platz.z
       );
       this.bedGroup.localToWorld(local);
       lage.copy(bedQuat);
@@ -2680,6 +3002,9 @@ class DeliveryVehicle {
              */
             this.taraKg = this.ladeflaecheKg() + ABHOLER_CONTAINER_KG;
             this.onTara?.(this.taraKg);
+          } else if (this.holtNur) {
+            // Er holt nur seine Mulde (E-141): nichts zu wiegen, nichts zu verhandeln
+            this.bruttoKg = 0;
           } else {
             this.bruttoKg = this.cargoMassKg();
             this.onWeighIn?.(this.bruttoKg); // kann awaitingDeal setzen
@@ -2730,8 +3055,14 @@ class DeliveryVehicle {
         // Pritschen klappen die Bordwände auf — der Schrott darf herunter.
         // Kipper braucht das nicht (er kippt), der Container bleibt zu.
         if (this.kind === "pritsche" || this.kind === "wrack") this.sideOpenTarget = 1;
-        if (!this.isPickup) this.releaseCargo();
+        // Der Absetzkipper gibt seine Fuhre erst frei, wenn die Mulde steht
+        if (!this.isPickup && !this.absetz) this.releaseCargo();
         // Gekippt wird erst, wenn der Ladekran aus dem Weg ist (`kranSteht`)
+        if (this.phaseT > 1.2 && this.absetz) {
+          this.phase = this.absetzModus === "holen" ? "muldeHolen" : "muldeHeben";
+          this.phaseT = 0;
+          break;
+        }
         if (this.phaseT > 1.2 && (this.kind !== "kipper" || this.isPickup || this.kranSteht)) {
           this.phase = this.isPickup ? "waitLoad" : this.kind === "kipper" ? "tipping" : "waitUnload";
           // Der Abholer funkt, sobald er steht — hier und nirgends sonst
@@ -2813,6 +3144,94 @@ class DeliveryVehicle {
             if (this.vollSeitS >= VOLL_WARTE_S) this.sendAway();
           }
         }
+        break;
+      case "muldeHeben": {
+        /*
+         * DIE ARME SCHWENKEN NACH HINTEN (E-141). Die Mulde haengt an den
+         * Ketten und bleibt dabei waagrecht; die Fuhre ist bis hierher
+         * verriegelt und faehrt kinematisch mit — kein Stueck kann sich am
+         * Rand verhaken, waehrend die Mulde ueber den Rahmen steigt.
+         */
+        const ziel =
+          this.absetzModus === "absetzen" ? absetzSchwenk(this.absetz!.geo) : KIPP_ARMWINKEL - this.absetz!.geo.winkel0;
+        this.armSchwenk = Math.min(this.armSchwenk + ARM_TEMPO * dt, ziel);
+        if (this.armSchwenk >= ziel - 1e-9) {
+          /*
+           * Freigeben erst im Stand. Die Lehre aus E-071: Die Paarung
+           * zwischen Mulde und Ladung muss neu entstehen, bevor sich die Mulde
+           * wieder bewegt — `releaseCargo` meldet die Kollider neu an, und
+           * `muldeRuhe` laesst ihnen 1,2 s.
+           */
+          this.releaseCargo();
+          if (this.absetzModus === "absetzen") this.planeAufsetzen();
+          this.phase = this.absetzModus === "absetzen" ? "muldeLoesen" : "muldeRuhe";
+          this.phaseT = 0;
+        }
+        break;
+      }
+      case "muldeRuhe":
+        if (this.phaseT > 1.2) {
+          this.phase = "muldeKippen";
+          this.phaseT = 0;
+        }
+        break;
+      case "muldeKippen":
+        // Um die Zapfen kippen, das hintere Ende nach unten. Die Fuhre liegt
+        // lose darin und rutscht ueber die Kante — sie wird nicht versetzt.
+        this.muldeKipp = Math.min(this.muldeKipp + KIPP_TEMPO * dt, MULDE_KIPP_MAX);
+        if (this.muldeKipp >= MULDE_KIPP_MAX - 1e-9) {
+          this.phase = "muldeLeeren";
+          this.phaseT = 0;
+        }
+        break;
+      case "muldeLeeren":
+        // Ruetteln — die Kurve beginnt und endet bei null, ohne Sprung
+        this.muldeKipp =
+          MULDE_KIPP_MAX - RUETTEL_AMPL * Math.sin(Math.PI * 2 * RUETTEL_HZ * this.phaseT) ** 2;
+        if (this.phaseT > MULDE_LEER_HALTEN_S) {
+          this.muldeKipp = MULDE_KIPP_MAX;
+          this.phase = "muldeSenken";
+          this.phaseT = 0;
+        }
+        break;
+      case "muldeSenken":
+        this.muldeKipp = Math.max(this.muldeKipp - KIPP_TEMPO * dt, 0);
+        if (this.muldeKipp <= 0) {
+          this.verriegeleReste();
+          this.phase = "armeEin";
+          this.phaseT = 0;
+        }
+        break;
+      case "muldeLoesen":
+        // Die Mulde steht auf dem Boden, die Fuhre liegt lose darin. Kurz
+        // warten, dann die Ketten aushaengen — ab da gehoert sie dem Platz.
+        if (this.phaseT > 1.2) {
+          this.gibMuldeAb();
+          this.phase = "armeEin";
+          this.phaseT = 0;
+        }
+        break;
+      case "armeEin":
+        this.armSchwenk = Math.max(this.armSchwenk - ARM_TEMPO * dt, 0);
+        if (this.armSchwenk <= 0) this.leaveUnloadingBay();
+        break;
+      case "muldeHolen": {
+        // Holen: Arme ausschwenken bis ueber die stehende Mulde, einhaengen
+        const ziel = absetzSchwenk(this.absetz!.geo);
+        this.armSchwenk = Math.min(this.armSchwenk + ARM_TEMPO * dt, ziel);
+        if (this.armSchwenk >= ziel - 1e-9) {
+          this.nimmMulde();
+          this.phase = "muldeAufnehmen";
+          this.phaseT = 0;
+        }
+        break;
+      }
+      case "muldeAufnehmen":
+        // Erst die Ketten straff ziehen (Ueberblendung in die Haengelage),
+        // dann die Mulde auf den Wagen schwenken
+        this.muldeAnheben = Math.min(1, this.muldeAnheben + dt / 1.2);
+        if (this.muldeAnheben >= 1) this.armSchwenk = Math.max(this.armSchwenk - ARM_TEMPO * dt, 0);
+        if (this.armSchwenk <= 0) this.leaveUnloadingBay();
         break;
       case "tipping":
         this.tip = Math.min(this.tip + dt / 4.2, 1);
@@ -3002,7 +3421,8 @@ class DeliveryVehicle {
           } else {
             // Ausfahrtswiegung: leer über die Brückenwaage → Netto steht fest
             const tara = this.cargoMassKg();
-            this.onWeighOut?.(Math.max(this.bruttoKg - tara, 0));
+            // Wer nur seine Mulde holt (E-141), bekommt nichts und zahlt nichts
+            if (!this.holtNur) this.onWeighOut?.(Math.max(this.bruttoKg - tara, 0));
           }
         }
         if (this.routeS >= this.routeLength(this.routeOut)) this.done = true;
@@ -3045,7 +3465,8 @@ class DeliveryVehicle {
     }
 
     // Kippwinkel: Fläche hebt sich vorn (Kabinenseite), Ladung rutscht hinten ab
-    this.bedGroup.rotation.x = -this.tip * TIP_ANGLE;
+    if (this.absetz) this.stelleAbsetzanlage();
+    else this.bedGroup.rotation.x = -this.tip * TIP_ANGLE;
 
     // Bordwände auf-/zuklappen
     const openStep = dt / 1.6; // ~1,6 s für den vollen Weg (SW)
@@ -3195,6 +3616,17 @@ export class VehicleManager {
    * leersteht (Wunsch 02.09.2026).
    */
   private parked: DeliveryVehicle[] = [];
+  /**
+   * DIE ABGESETZTE MULDE (E-141), solange eine hinter dem Abladeplatz steht.
+   * Dann kommt kein Anlieferer an den Abladeplatz, bis sie geholt ist.
+   */
+  private mulde: AbgesetzteMulde | null = null;
+  /** Eine Fuhre, die kommen sollte, waehrend die Mulde stand — sie faehrt danach. */
+  private nachMulde: { k: DeliveryKind; kunde: CustomerProfile } | null = null;
+  /** Fuer HUD und Waechter: steht eine Mulde, und wie lange schon? */
+  get abgesetzteMulde(): Readonly<AbgesetzteMulde> | null {
+    return this.mulde;
+  }
   private nextSpawnT = FIRST_DELAY_S;
   private t = 0;
   /** Anlieferungs-Zähler (für Tests/Statistik) */
@@ -3312,8 +3744,24 @@ export class VehicleManager {
     const gezogen = kunde ?? (kind ? rollCustomer() : rollAnlieferung());
     const k: DeliveryKind =
       kind ?? vehicleForCustomer(gezogen);
+    /*
+     * Steht eine Mulde am Abladeplatz (E-141), wartet jede Fuhre dorthin, bis
+     * sie geholt ist — auch der Nachschub auf Knopfdruck. Ins Silo darf man.
+     */
+    if (
+      this.mulde &&
+      k !== "abholer" &&
+      !faehrtInsSilo(k, lagerMuldeFuer(gezogen.sortedMaterial ?? null))
+    ) {
+      this.nachMulde = { k, kunde: gezogen };
+      return;
+    }
     const c = k === "abholer" ? null : gezogen;
     this.active = this.baueWagen(k, c);
+    if (k === "absetzer") {
+      // Kippen oder absetzen (E-141) — abgesetzt nur, wenn keine andere steht
+      this.active.absetzModus = !this.mulde && Math.random() < ABSETZEN_ANTEIL ? "absetzen" : "kippen";
+    }
     // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
     this.active.bestellung = k === "abholer" ? this.pickupOrder : null;
     /*
@@ -3363,7 +3811,11 @@ export class VehicleManager {
   }
 
   /** Ein Fahrzeug bauen und an den Fuhrpark anschliessen — fuer Tor und Warteplatz. */
-  private baueWagen(k: DeliveryKind, c: CustomerProfile | null): DeliveryVehicle {
+  private baueWagen(
+    k: DeliveryKind,
+    c: CustomerProfile | null,
+    holeMulde: AbgesetzteMulde | null = null
+  ): DeliveryVehicle {
     const v = new DeliveryVehicle(
       k,
       this.scene,
@@ -3372,7 +3824,8 @@ export class VehicleManager {
       () => this.onHonk?.(),
       (kg) => this.onWeighIn?.(kg),
       (kg) => this.onWeighOut?.(kg),
-      c
+      c,
+      holeMulde
     );
     v.itemQuelle = this.items;
     v.platzinventar = this.platzinventar;
@@ -3380,6 +3833,9 @@ export class VehicleManager {
     if (k !== "abholer") {
       v.onAnliefererlage = (lage) => this.onPickupFunk?.(v.customer?.name ?? "Fahrer", anliefererfunk(lage));
     }
+    // Die abgesetzte Mulde geht an den Fuhrpark (E-141)
+    v.onMuldeAbgesetzt = (m) => (this.mulde = m);
+    v.onMuldeGeholt = () => (this.mulde = null);
     return v;
   }
 
@@ -3438,6 +3894,11 @@ export class VehicleManager {
    * Verlust.
    */
   requestPickup(order?: string | null): "gerufen" | "abgefahren" | "vorgemerkt" {
+    // An den Abladeplatz kann er nicht, solange dort eine Mulde steht (E-141)
+    if (!this.active && this.mulde && !abholPlatzFuer(order ?? null).ziel) {
+      this.vorgemerkt = { order: order ?? null };
+      return "vorgemerkt";
+    }
     if (this.active) {
       if (this.active.kind === "abholer" && this.active.waitingForLoad) {
         this.active.requestRelease();
@@ -3464,6 +3925,12 @@ export class VehicleManager {
     this.active = null;
     for (const v of this.parked) v.despawn();
     this.parked.length = 0;
+    if (this.mulde) {
+      this.mulde.group.removeFromParent();
+      this.world.removeRigidBody(this.mulde.body);
+      this.mulde = null;
+    }
+    this.nachMulde = null;
     this.t = 0;
     this.nextSpawnT = FIRST_DELAY_S;
   }
@@ -3472,7 +3939,14 @@ export class VehicleManager {
   maneuveringTruck(): THREE.Vector3 | null {
     if (!this.active) return null;
     const p = this.active.phaseName;
-    if (p === "reverseIn" || p === "shiftPause" || p === "pauseBeforeUnload" || p === "tipping") {
+    if (
+      p === "reverseIn" ||
+      p === "shiftPause" ||
+      p === "pauseBeforeUnload" ||
+      p === "tipping" ||
+      p.startsWith("mulde") ||
+      p === "armeEin"
+    ) {
       return this.active.group.position;
     }
     return null;
@@ -3502,6 +3976,16 @@ export class VehicleManager {
     this.boxCache.length = 0;
     if (this.active) this.active.boxen(this.boxCache);
     for (const v of this.parked) v.boxen(this.boxCache);
+    // Die abgesetzte Mulde steht wie ein Fahrzeug im Weg (E-141)
+    if (this.mulde) {
+      const g = this.mulde.group;
+      g.updateWorldMatrix(true, false);
+      const mitte = new THREE.Vector3(0, 0, ABSETZMULDE.laenge / 2).applyMatrix4(g.matrixWorld);
+      const q = new THREE.Quaternion();
+      g.getWorldQuaternion(q);
+      const rot = new THREE.Euler().setFromQuaternion(q, "YXZ").y;
+      this.boxCache.push({ x: mitte.x, z: mitte.z, hw: ABSETZMULDE.breite / 2, hd: ABSETZMULDE.laenge / 2, rot });
+    }
     return this.boxCache;
   }
   private boxCache: Box[] = [];
@@ -3545,6 +4029,7 @@ export class VehicleManager {
     if (this.active) this.active.collectBodyHandles(out);
     // Auch die Wartenden stehen im Weg — der Arm darf nicht hindurchfahren
     for (const v of this.parked) v.collectBodyHandles(out);
+    if (this.mulde?.body.isValid()) out.add(this.mulde.body.handle);
     return out;
   }
 
@@ -3608,7 +4093,9 @@ export class VehicleManager {
       let kunde = kunden[n] ?? rollAnlieferung();
       // Hoechstens 20 Wuerfe (SW): Silo-Fuhren sind ein kleiner Teil der
       // Kundschaft; bleibt es danach eine, kippt er eben ins Silo.
+      // Und kein Absetzkipper (E-141): Seine Fahrt vom Warteplatz ist nicht gerechnet
       const insSilo = (c: CustomerProfile): boolean =>
+        vehicleForCustomer(c) === "absetzer" ||
         faehrtInsSilo(vehicleForCustomer(c), lagerMuldeFuer(c.sortedMaterial ?? null));
       for (let i = 0; i < 20 && !kunden[n] && insSilo(kunde); i++) kunde = rollAnlieferung();
       const v = this.baueWagen(vehicleForCustomer(kunde), kunde);
@@ -3626,8 +4113,46 @@ export class VehicleManager {
     return this.parked.filter((v) => v.stehtAn).length;
   }
 
+  /**
+   * DIE ABGESETZTE MULDE BEOBACHTEN (E-141): Wie lange steht sie, und wie
+   * lange ist sie schon leer? Leer heisst: hoechstens `MULDE_LEER_KG` in
+   * ihrem Trog — gefragt wird nur alle 0,25 s (wie `VOLL_PRUEF_S`).
+   */
+  private muldePruefT = 0;
+  private pruefeMulde(dt: number): void {
+    const m = this.mulde;
+    if (!m) return;
+    m.standS += dt;
+    this.muldePruefT -= dt;
+    if (this.muldePruefT > 0) return;
+    this.muldePruefT = 0.25;
+    m.group.updateWorldMatrix(true, false);
+    const inv = new THREE.Matrix4().copy(m.group.matrixWorld).invert();
+    const hilf = new THREE.Vector3();
+    let kg = 0;
+    for (const it of this.items.items) {
+      if (!it.body.isValid()) continue;
+      if (imTrog(inv, it.body.translation(), hilf)) kg += it.massKg;
+    }
+    m.leerS = kg <= MULDE_LEER_KG ? m.leerS + 0.25 : 0;
+  }
+
+  /** Ist die Mulde abholbereit — leer, oder ist ihre Frist um? */
+  private muldeAbholbereit(): boolean {
+    const m = this.mulde;
+    return !!m && (m.leerS >= MULDE_LEER_WARTE_S || m.standS >= MULDE_FRIST_S);
+  }
+
+  /** Ein Absetzkipper holt die abgesetzte Mulde (E-141) — derselbe Kunde. */
+  private holeMulde(): void {
+    const m = this.mulde!;
+    this.active = this.baueWagen("absetzer", m.kunde, m);
+    this.active.loadCargo(this.items, this.composites);
+  }
+
   update(dt: number): void {
     this.t += dt;
+    this.pruefeMulde(dt);
     // Wartende Fahrzeuge weiterlaufen lassen: Pause, dann Ausfahrt
     for (let i = this.parked.length - 1; i >= 0; i--) {
       const v = this.parked[i];
@@ -3638,12 +4163,38 @@ export class VehicleManager {
       }
     }
     if (!this.active) {
+      /*
+       * STEHT EINE MULDE (E-141), IST DER ABLADEPLATZ ZU. Sie steht genau
+       * dort, wo jeder andere Wagen zuruecksetzt. Geholt wird sie, sobald sie
+       * leer ist (oder ihre Frist um ist); bis dahin kommt kein Anlieferer,
+       * und ein Abholer nur, wenn er an ein Silo faehrt.
+       */
+      if (this.mulde) {
+        if (this.muldeAbholbereit()) {
+          this.holeMulde();
+          return;
+        }
+        const v = this.vorgemerkt;
+        if (v && abholPlatzFuer(v.order).ziel) {
+          this.pickupOrder = v.order;
+          this.vorgemerkt = null;
+          this.spawnNow("abholer");
+        }
+        return;
+      }
       // Vorrang: Eine vorgemerkte Abholung faehrt sofort, ohne Wartezeit und
       // auch dann, wenn die Einfahrt fuer Anlieferer gerade zu ist.
       if (this.vorgemerkt) {
         this.pickupOrder = this.vorgemerkt.order;
         this.vorgemerkt = null;
         this.spawnNow("abholer");
+        return;
+      }
+      // Was waehrend der Mulde warten musste, kommt jetzt (E-141)
+      if (this.nachMulde) {
+        const n = this.nachMulde;
+        this.nachMulde = null;
+        this.spawnNow(n.k, n.kunde);
         return;
       }
       if (this.acceptDeliveries && this.t >= this.nextSpawnT) {

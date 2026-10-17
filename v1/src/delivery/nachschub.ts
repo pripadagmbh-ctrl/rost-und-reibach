@@ -22,7 +22,14 @@ import type { Fahrzeugart } from "./fuellgrad";
  */
 export type NachschubArt = Fahrzeugart | "einzelstueck";
 
-export const NACHSCHUB_FOLGE: readonly NachschubArt[] = ["kipper", "pritsche", "wrack", "einzelstueck"];
+export const NACHSCHUB_FOLGE: readonly NachschubArt[] = [
+  "kipper",
+  "pritsche",
+  "wrack",
+  "einzelstueck",
+  // E-141: der Absetzkipper mit seiner Mulde — kippt sie aus oder setzt sie ab
+  "absetzer",
+];
 
 /**
  * So oft wird höchstens gewürfelt, bis das Fahrzeug passt.
@@ -39,6 +46,7 @@ export const NACHSCHUB_MELDUNG: Record<NachschubArt, string> = {
   wrack: "Nachschub: Ein Wrack ist unterwegs.",
   pkw: "Nachschub: Ein Anhänger ist unterwegs.",
   einzelstueck: "Nachschub: Ein Großteil ist unterwegs.",
+  absetzer: "Nachschub: Ein Absetzkipper mit Mulde ist unterwegs.",
 };
 
 /** Die Meldung zu einem fertigen Profil — ein Großteil kommt auf der Pritsche. */

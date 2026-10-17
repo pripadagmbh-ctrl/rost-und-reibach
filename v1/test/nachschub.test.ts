@@ -13,8 +13,8 @@ import { rollCustomer } from "../src/delivery/customers";
  * Großteil — ein Teil allein auf der flachen Pritsche.
  */
 describe("Nachschub", () => {
-  it("reihum Kipper, Pritsche, Wrack, Großteil", () => {
-    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack", "einzelstueck"]);
+  it("reihum Kipper, Pritsche, Wrack, Großteil, Absetzkipper (E-141)", () => {
+    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack", "einzelstueck", "absetzer"]);
   });
 
   it("das Profil hat das verlangte Fahrzeug — 50 Mal je Art", () => {
