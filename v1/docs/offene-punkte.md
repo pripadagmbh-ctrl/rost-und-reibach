@@ -554,6 +554,47 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 17.10.2026: voller Start, LKW-Wrack, Wohnwagen** — Patrick,
+      wörtlich: „am anfang sollen auch mehr schrott schon da sein, die zwei
+      autos, ein lkw wrack und ab und zu bringt jmd auch nen wohnwagen zum
+      verschrotten"
+
+      | # | Punkt |
+      |---|---|
+      | 1 | Am Anfang mehr Schrott auf dem Platz |
+      | 2 | Die zwei Autos bleiben |
+      | 3 | Ein LKW-Wrack steht von Anfang an da |
+      | 4 | Ab und zu bringt jemand einen Wohnwagen zum Verschrotten |
+
+
+- [ ] **Gerätebefund 17.10.2026: Krach, wenn gehaltener Schrott auf den Boden
+      schlägt** — Patrick, wörtlich: „schrott krach auch wenn ich mit der
+      spinne schrott auf den boden haue ohne loszulassen". Heute klingt nur
+      der Aufprall loser Teile (`items.onAufprall` → `schrott:aufprall`,
+      E-121); gegriffene Teile sind kinematisch und melden nichts — Paket Ton.
+
+
+- [ ] **Ansage 17.10.2026, Schilder und Pripada-Marke** — Patrick, wörtlich:
+      „Schilder ändern, Pripada prominent direkt an der waage und da wo
+      gearbeitet wird. Ansonsten Schilder von Rent4ring, glasklar-mg.de,
+      MecLight bzw. led.profi.de. Baue auch container auf dem schrottplatz
+      mit ein, aber mit pripada drauf, abholer und eigene LKW sollen auch
+      pripada Logo tragen" — dazu drei Bilder: Logo Rent4Ring, Logo
+      led-profi.de, ein grüner Absetzcontainer mit Firmenlogo als Vorlage.
+
+      | # | Punkt |
+      |---|---|
+      | 1 | Schilder ändern (die erfundenen Betriebe aus E-131 weichen) |
+      | 2 | Pripada groß direkt an der Waage |
+      | 3 | Pripada groß dort, wo gearbeitet wird |
+      | 4 | Rent4Ring (Logo geliefert: `public/logos/rent4ring.webp`) |
+      | 5 | glasklar-mg.de (kein Logo geliefert — vorerst Schrift) |
+      | 6 | MecLight bzw. led-profi.de (Logo geliefert: `public/logos/led-profi.jpg`) |
+      | 7 | Container auf dem Platz, mit Pripada drauf |
+      | 8 | Abholer mit Pripada-Logo |
+      | 9 | Eigene LKW mit Pripada-Logo |
+
+
 - [ ] **Gerätebefund 16.10.2026: Dauerton beim Greifen** — Patrick,
       wörtlich: „Ansonsten fällt mir beim greifen ein durchgängiger ton auf,
       der sollte nie durchgängig sein wie in einem ufo oder spaceship wo der
