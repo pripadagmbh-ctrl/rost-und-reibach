@@ -364,7 +364,9 @@ describe("Was der Name verspricht, haelt die Fraktion", () => {
     [/\bVA-|Edelstahl|V2A/i, ["va"], "Edelstahl"],
     [/Kupfer/i, ["copper", "mixed"], "Kupfer"],
     [/Messing/i, ["brass"], "Messing"],
-    [/Zink|Verzinkte/i, ["zinc", "mixed"], "Zink"],
+    // E-150: „verzinkt ist kein buntmetall" — „Verzinkte …" verspricht keinen Zink
+    // mehr. `\b`, damit „Verzinkt" nicht ueber das „zink" darin anschlaegt.
+    [/\bZink/i, ["zinc", "mixed"], "Zink"],
     [/Reifen(?!haufen)|Reifenhaufen/i, ["tires"], "Reifen"],
     [/Kunststoff|GFK/i, ["plastic", "mixed"], "Kunststoff"],
     [/Batterie|Starterbatterie/i, ["battery"], "Batterie"],

@@ -56,7 +56,8 @@ const STOFFWORT: Record<string, string[]> = {
   alu: ["alu"],
   copper: ["kupfer"],
   brass: ["messing"],
-  zinc: ["zink", "verzinkt"],
+  // E-150: „verzinkt" ist kein Zink, sondern Stahl- oder Mischschrott — darum nicht hier
+  zinc: ["zink"],
   cable: ["kabel"],
   battery: ["batterie", "akku"],
   wood: ["holz", "bohlen"],

@@ -111,7 +111,7 @@ describe("Was der Katalog daraus macht", () => {
    * Zahlen halten den Stand fest. Wandern sie, hat jemand den Katalog
    * umgebaut, und dann gehört die Bestandsaufnahme nachgezogen.
    */
-  it("337 erreichbare Einträge, davon 60 mit Stückliste", () => {
+  it("339 erreichbare Einträge, davon 64 mit Stückliste", () => {
     // 271 waren es bis E-042; neun massive Kleinteile sind dazugekommen
     // (Bremsscheibe, Bahnschwelle, Schienenabschnitt, Kurbelwelle …), weil
     // Patricks eigene Premium-Beispiele im Katalog fehlten.
@@ -138,19 +138,28 @@ describe("Was der Katalog daraus macht", () => {
     // Gerueste, kleine Bagger (Patrick, 06.10.2026). Fuenf davon haben eine
     // Stueckliste: Werkzeugcontainer (Holzboden), Geruestfeld (Bordbrett),
     // Raupenunterwagen (Gummiketten), Minibagger 1,5 t und Minibagger-Ausleger.
-    expect(ALLE.length).toBe(337);
-    expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(60);
+    //
+    // 337 waren es bis E-150. Verzinktes ist Stahl (Patrick, 17.10.2026:
+    // „verzinkt ist kein buntmetall"): Gitterroste, Leitungsrinnen,
+    // Geruestrahmen und Geruestrohre tragen jetzt die Stueckliste „Stahl 100 %"
+    // (fuer den Magneten, E-146), und zwei echte Zinkteile ersetzen die
+    // verlorenen (Kaminverwahrung, Zinkdruckguss) — ohne Stueckliste.
+    expect(ALLE.length).toBe(339);
+    expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(64);
   });
 
-  it("von den 60 werden 55 zu Mischschrott, genau 5 bleiben sortenrein", () => {
+  it("von den 64 werden 58 zu Mischschrott, genau 6 bleiben sortenrein", () => {
     const mitZus = ALLE.filter((s) => s.zusammensetzung);
-    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(55);
+    // E-150: Gitterroste, Leitungsrinnen, Geruestrahmen sind duennwandig -> Misch;
+    // die Geruestrohre (7,7 mm rechnerisch) sind Stahlschrott.
+    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(58);
     // E-123: Der Minibagger-Ausleger kommt dazu — 4 % Schlaeuche, massives Blech.
     // E-138: Beide Minibagger (14 % Fremdstoff, massiv) mit `VERBUND_BIS` 0,15
     // — Patrick, 17.10.2026: „Minibagger sind eher Stahl als Mischschrott."
     const rein = mitZus.filter((s) => s.materialId !== "mixed").map((s) => s.name);
     expect(rein.sort()).toEqual([
       "Baggerlöffel",
+      "Gerüstrohre verzinkt (Bund)",
       "Minibagger (ausgeschlachtet)",
       "Minibagger 1,5 t (ohne Arm/Dach)",
       "Minibagger-Ausleger mit Stiel",

@@ -75,7 +75,8 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "zinc", massKg: 14, kind: "box", dims: [0.25, 0.25, 2.4], bau: "buendel", name: "Zink-Dachrinne" },
   { materialId: "zinc", massKg: 22, kind: "box", dims: [0.6, 0.12, 1.8], bau: "platte", name: "Zinkblech-Tafel" },
   { materialId: "zinc", massKg: 31, kind: "box", dims: [0.45, 0.5, 0.9], bau: "buendel", name: "Fallrohr-Bund" },
-  { materialId: "zinc", massKg: 58, kind: "box", dims: [0.7, 0.6, 1.2], bau: "stapel", name: "Verzinkte Gitterroste" },
+  // E-150: verzinkt ist Stahl, kein Buntmetall (Patrick, 17.10.2026). 1,9 mm rechnerisch -> Mischschrott.
+  { materialId: "steel", massKg: 58, kind: "box", dims: [0.7, 0.6, 1.2], bau: "stapel", name: "Verzinkte Gitterroste", zusammensetzung: [{ materialId: "steel", anteil: 1 }] },
   /* --- Vier Zinksorten mehr (E-063) ------------------------------------
    * Titanzink hat 7140 kg/m³ (`FESTSTOFFDICHTE.zinc`). Alle vier Massen sind
    * daraus gerechnet, nicht geschaetzt; die Rechnung steht je Zeile.
@@ -85,13 +86,24 @@ export const KATALOG_SPECS: PileSpec[] = [
   // Verzinkte Leitungsrinnen, 2,2 m, gebuendelt: 0,198 m³ Huelle, 278 kg/m³.
   // Nicht „Kabelrinne": Das Wort Kabel im Namen verspricht die Fraktion Kabel,
   // und das Stueck ist verzinktes Blech (`test/bauart.test.ts`, NAMENSSTOFF).
-  { materialId: "zinc", massKg: 55, kind: "box", dims: [0.3, 0.3, 2.2], bau: "buendel", name: "Verzinkte Leitungsrinnen (Bund)" },
+  // E-150: verzinktes Blech ist Stahl — 2,5 mm rechnerisch -> Mischschrott.
+  { materialId: "steel", zusammensetzung: [{ materialId: "steel", anteil: 1 }], massKg: 55, kind: "box", dims: [0.3, 0.3, 2.2], bau: "buendel", name: "Verzinkte Leitungsrinnen (Bund)" },
   // Opferanoden vom Schiffsrumpf, massiver Zinkguss: 0,05 m³, 120 kg =
   // 2400 kg/m³ — ein Drittel Feststoff, der Rest Luft zwischen den Bloecken.
   { materialId: "zinc", massKg: 120, kind: "box", dims: [0.4, 0.25, 0.5], bau: "stapel", name: "Zink-Opferanoden (Stapel)" },
   // Regentonne aus Zinkblech, 0,8 mm: 1,2 m² Mantel x 0,0008 x 7140 = 7 kg,
   // mit Boden und Wulstrand 14 kg.
   { materialId: "zinc", massKg: 14, kind: "cyl", dims: [0.3, 0.5], bau: "tank", name: "Zink-Regentonne" },
+  /* --- Zwei echte Zinksorten fuer die zwei verzinkten (E-150) -----------
+   * Gitterroste und Leitungsrinnen sind seit E-150 Stahl. Ohne Ersatz haette
+   * Zink nur noch sechs Kleinteile — Patrick, 15.09.2026: „mindestens acht
+   * je Fraktion" (`test/gewicht.test.ts`).
+   */
+  // Kaminverwahrung aus Titanzink 0,7 mm, abgekantet: 2,0 m² x 0,0007 x 7140 = 10 kg.
+  { materialId: "zinc", massKg: 10, kind: "box", dims: [0.8, 0.15, 1.1], bau: "platte", name: "Zink-Kaminverwahrung" },
+  // Zinkdruckguss (Zamak): Tuergriffe, Armaturenkoerper, Vergasergehaeuse,
+  // gestapelt. 0,12 m³ Huelle bei rund 1500 kg/m³ loser Gussteile (SW) = 180 kg.
+  { materialId: "zinc", massKg: 180, kind: "box", dims: [0.5, 0.4, 0.6], bau: "stapel", name: "Zinkdruckguss-Teile (Stapel)" },
   /*
    * E-063: Die Akkus standen als GITTERRAHMEN da (`rahmenbox`) — ein Geflecht
    * aus Kanten und Draehten, durch das man hindurchsieht. Ein Bleiakku ist das
@@ -627,9 +639,11 @@ export const KATALOG_BIG: PileSpec[] = [
    * kg/m³), sonst Startwert (SW) aus der Groessenklasse. Die Fraktion rechnet
    * wie immer `fraktionVonTeil` aus — sie steht im Kommentar nur zum Lesen.
    *
-   * Verzinktes ist Zink: Das ist die Hausregel seit dem 12.09.2026 („Zink aus
-   * Dachrinnen, Fallrohren und Verzinktem", `materials/catalog.ts`) und gilt
-   * schon fuer die verzinkten Gitterroste und Leitungsrinnen.
+   * Verzinktes ist STAHL (E-150, Patrick 17.10.2026: „verzinkt ist kein
+   * buntmetall"). Die Zinkschicht ist wenige Mikrometer dick, unter 1 % der
+   * Masse. Bis E-150 galt hier die Hausregel „Verzinktes ist Zink" vom
+   * 12.09.2026 — sie ist zurueckgenommen. Ob Stahl- oder Mischschrott, sagt
+   * die eine Regel in `purity.fraktionVonTeil` (Wandstaerke, Verbund).
    * ====================================================================== */
 
   // --- Container ---
@@ -645,17 +659,20 @@ export const KATALOG_BIG: PileSpec[] = [
   // --- Gerueste ---
   // Stahl-Stellrahmen 0,73 × 2,00 m wiegt 18–19 kg (Rahmengeruest, Groessenordnung
   // der Herstellerkataloge); 18 Stueck flach gestapelt = 335 kg bei 0,9 m Hoehe.
-  { materialId: "zinc", massKg: 335, kind: "box", dims: [0.8, 0.9, 2.1], bau: "geruest", name: "Gerüstrahmen (Paket, verzinkt)" },
+  // E-150: Stahl, 5,0 mm rechnerisch -> Mischschrott (Rohrrahmen, kein Vollmaterial).
+  { materialId: "steel", massKg: 335, kind: "box", dims: [0.8, 0.9, 2.1], bau: "geruest", name: "Gerüstrahmen (Paket, verzinkt)", zusammensetzung: [{ materialId: "steel", anteil: 1 }] },
   // Alu-Rollgeruest, zerlegt: vier Rahmen, Plattform, Streben, Rollen —
   // rund 160 kg fuer ein Geruest mit 7 m Arbeitshoehe (SW).
   { materialId: "alu", massKg: 160, kind: "box", dims: [0.8, 0.6, 2.6], bau: "geruest", name: "Alu-Rollgerüst (zerlegt, Paket)" },
   // Geruestrohr 48,3 × 3,2 mm wiegt 3,56 kg/m (DIN EN 39); 20 Rohre à 4 m mit
   // Kupplungen = 285 + 15 kg. Liegt laengs auf jeder Pritsche (4,12 m mit Luft).
-  { materialId: "zinc", massKg: 300, kind: "box", dims: [0.3, 0.3, 4.0], bau: "buendel", name: "Gerüstrohre verzinkt (Bund)" },
+  // E-150: Stahl, 7,7 mm rechnerisch (dichtes Rohrbuendel) -> Stahlschrott.
+  { materialId: "steel", massKg: 300, kind: "box", dims: [0.3, 0.3, 4.0], bau: "buendel", name: "Gerüstrohre verzinkt (Bund)", zusammensetzung: [{ materialId: "steel", anteil: 1 }] },
   // Ein Feld, aus dem Verband gerissen und auf die Seite gelegt: zwei Rahmen
   // (je 18,5 kg), zwei Stahlboeden (je 19 kg), Diagonale, Gelaender, Bordbrett
   // aus Holz — 105 kg. Das Holz macht es zu Mischschrott.
-  { materialId: "zinc", massKg: 105, kind: "box", dims: [2.0, 0.75, 2.6], bau: "geruestfeld", name: "Gerüstfeld (ausgerissen)", zusammensetzung: [{ materialId: "zinc", anteil: 0.88 }, { materialId: "wood", anteil: 0.12 }] },
+  // E-150: Stahl statt Zink; 0,8 mm rechnerisch -> Mischschrott (wie vorher, jetzt aus Stahl).
+  { materialId: "steel", massKg: 105, kind: "box", dims: [2.0, 0.75, 2.6], bau: "geruestfeld", name: "Gerüstfeld (ausgerissen)", zusammensetzung: [{ materialId: "steel", anteil: 0.88 }, { materialId: "wood", anteil: 0.12 }] },
 
   // --- Kleine Bagger ---
   // Raupenunterwagen eines 1,5-t-Minibaggers: Kettenlaenge 1,55 m plus Schild,

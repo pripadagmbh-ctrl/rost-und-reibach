@@ -65,9 +65,10 @@ const NEU: Array<[string, string]> = [
   ["Werkzeugcontainer (Baustelle)", "mixed"],
   ["Kippbehälter (Stapler)", "mixed"],
   ["Absetzmulde 5 m³ (Klappdeckel)", "mixed"],
-  ["Gerüstrahmen (Paket, verzinkt)", "zinc"],
+  // E-150: verzinkt ist Stahl — die Regel macht duennwandige Rahmen zu Misch
+  ["Gerüstrahmen (Paket, verzinkt)", "mixed"],
   ["Alu-Rollgerüst (zerlegt, Paket)", "alu"],
-  ["Gerüstrohre verzinkt (Bund)", "zinc"],
+  ["Gerüstrohre verzinkt (Bund)", "steel"], // E-150: 7,7 mm rechnerisch
   ["Gerüstfeld (ausgerissen)", "mixed"],
   ["Minibagger-Raupenunterwagen", "mixed"],
   ["Minibagger-Ausleger mit Stiel", "steel"],

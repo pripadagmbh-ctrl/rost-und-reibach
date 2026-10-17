@@ -39,7 +39,8 @@ export const SCHUETTDICHTE: Record<string, number> = {
   // Messing: Armaturen, Hähne, Ventile — kompakte Vollteile, das schwerste,
   // was in normalen Mengen ankommt. SW.
   brass: 1400,
-  // Zink: Dachrinnen, Fallrohre, Verzinktes. Röhren und Bleche, viel Luft. SW.
+  // Zink: Dachrinnen, Fallrohre, Zinkblech (Verzinktes ist Stahl, E-150).
+  // Röhren und Bleche, viel Luft. SW.
   zinc: 350,
   // Bleiakkus stehen dicht an dicht auf der Palette, praktisch ohne Lücke.
   // Ein 60-Ah-Akku wiegt 16 kg bei rund 0,01 m³, macht 1.600 kg/m³.

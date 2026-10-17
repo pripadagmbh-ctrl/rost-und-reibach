@@ -54,7 +54,8 @@ export const MATERIALS: Record<string, MaterialClass> = {
   /*
    * Zink und Batterien kommen mit der neuen Platzordnung dazu (Ansage
    * 12.09.2026). Beide sind auf einem echten Schrottplatz eigene Stroeme:
-   * Zink aus Dachrinnen, Fallrohren und Verzinktem, Bleiakkus aus allem, was
+   * Zink aus Dachrinnen, Fallrohren und Zinkblech (Verzinktes ist Stahl,
+   * E-150: „verzinkt ist kein buntmetall"), Bleiakkus aus allem, was
    * einen Anlasser hat. Akkus sind ausserdem gefaehrlicher Abfall — sie
    * duerfen nicht in den Mischschrott, und genau deshalb lohnt die eigene
    * Mulde.
