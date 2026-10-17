@@ -259,7 +259,9 @@ import {
   BLOCK_GIVEUP_S,
   bedLenFor,
   faehrtInsSilo,
-  TIP_ANGLE,
+  KIPP_ABLAUF,
+  KIPP_ABLAUF_SILO,
+  type KippAblauf,
   TIP_CREEP_M,
   TIP_CREEP_SPEED,
   CRANE_SWING,
@@ -356,6 +358,18 @@ class DeliveryVehicle {
   private lenkRaeder: LenkRad[] = [];
   private phaseT = 0;
   private tip = 0;
+  /**
+   * Wie der Kipper seine Brücke leert (E-149). `null` heißt: wie im Spiel —
+   * am Abladeplatz `KIPP_ABLAUF`, im Lagersilo `KIPP_ABLAUF_SILO`. Feld wie
+   * `lenkrate`: Das Messwerkzeug fährt damit andere Abläufe und den alten
+   * als Gegenprobe. Im Spiel wird es nie gesetzt.
+   */
+  kippAblauf: KippAblauf | null = null;
+  private get ablauf(): Readonly<KippAblauf> {
+    return this.kippAblauf ?? (this.zielMulde ? KIPP_ABLAUF_SILO : KIPP_ABLAUF);
+  }
+  /** Um so viel ist die Brücke beim Rütteln gerade zurückgesunken (rad, ≥ 0). */
+  private ruettel = 0;
   cargo: Cargo = { items: [], car: null };
   /** Anhänger des PKW — eigener Körper, Gelenk an der Kupplung */
   private trailer: THREE.Group | null = null;
@@ -3250,18 +3264,32 @@ class DeliveryVehicle {
         if (this.armSchwenk <= 0) this.leaveUnloadingBay();
         break;
       case "tipping":
-        this.tip = Math.min(this.tip + dt / 4.2, 1);
+        this.tip = Math.min(this.tip + (dt * this.ablauf.tempo) / this.ablauf.winkel, 1);
         if (this.tip >= 1) {
           this.phase = "tipHold";
           this.phaseT = 0;
         }
         break;
-      case "tipHold":
-        if (this.phaseT > 2.2) {
+      case "tipHold": {
+        /*
+         * OBEN ABRÜTTELN (E-149). Der Fahrer lässt die Brücke ein paar Mal
+         * um wenige Grad zurücksinken und hebt sie wieder — wie ein echter
+         * Kipperfahrer, der verhakten Schrott abschlägt. Die Kurve
+         * sin²(π·f·t) beginnt und endet bei null und hat dort keine
+         * Steigung: kein Ruck, kein Sprung. Die Brücke BEWEGT sich, sie wird
+         * nie versetzt (Katapult-Lehre E-071).
+         */
+        const k = this.ablauf;
+        const t = this.phaseT - k.ruettelAbS;
+        const dauer = k.ruettelStoesse / k.ruettelHz;
+        this.ruettel = t > 0 && t < dauer ? k.ruettelAmpl * Math.sin(Math.PI * k.ruettelHz * t) ** 2 : 0;
+        if (this.phaseT > Math.max(k.haltS, k.ruettelAbS + dauer)) {
+          this.ruettel = 0;
           this.phase = "tipCreep";
           this.creepLeft = TIP_CREEP_M;
         }
         break;
+      }
       case "tipCreep": {
         // Gekippt ein Stueck geradeaus ziehen, bevor die Mulde sinkt (v2-Vorbild).
         // Senkt der LKW im Stand, bleibt Schrott auf der Flaeche liegen, sobald
@@ -3482,7 +3510,7 @@ class DeliveryVehicle {
 
     // Kippwinkel: Fläche hebt sich vorn (Kabinenseite), Ladung rutscht hinten ab
     if (this.absetz) this.stelleAbsetzanlage();
-    else this.bedGroup.rotation.x = -this.tip * TIP_ANGLE;
+    else this.bedGroup.rotation.x = -(this.tip * this.ablauf.winkel - this.ruettel);
 
     // Bordwände auf-/zuklappen
     const openStep = dt / 1.6; // ~1,6 s für den vollen Weg (SW)

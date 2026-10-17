@@ -30,9 +30,10 @@ import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
 import { EventBus } from "../src/core/events";
 import { brueckenKeilEcken } from "../src/delivery/vehicleModel";
-import { BED_HALF_W, bedLenFor } from "../src/delivery/routes";
+import { BED_HALF_W, bedLenFor, KIPP_ABLAUF, type KippAblauf } from "../src/delivery/routes";
 import type { CustomerProfile } from "../src/delivery/customers";
-import { lagerMuldeFuer } from "../src/world/containers";
+import { lagerMuldeFuer, ContainerManager } from "../src/world/containers";
+import { papierStattBrowser } from "./lambertlauf";
 
 /**
  * Wie tief unter der Ladefläche ein Stück als „durchgefallen" gilt (m,
@@ -136,6 +137,24 @@ export interface Stand {
    * misst man in drei von vier Laeufen etwas anderes als die Frage.
    */
   ohnePause?: boolean;
+  /**
+   * Anderer Kippablauf als der gebaute (E-149): Endwinkel, Haltezeit,
+   * Rütteln. `{ winkel: 58°, haltS: 2,2, ruettelStoesse: 0 }` ist der Stand
+   * vor E-149 — die Gegenprobe in `tools/kipper-leeren.ts`.
+   */
+  kippen?: Partial<KippAblauf>;
+  /**
+   * Die Mulden des Platzes mit ihren Betonlego-Wänden aufbauen (E-149).
+   *
+   * Ohne sie steht der Kipper vor einem Silo, das nur als Grundriss in der
+   * Zählung existiert. Bis E-149 fiel das nicht auf, weil fast die halbe
+   * Fuhre auf der Brücke liegen blieb — und die Brücke steht beim Kippen
+   * selbst über dem Silo, ihr Rest zählte also als „in der Mulde". Seit die
+   * Brücke wirklich frei wird, rutscht die Fuhre in den Raum, in dem die
+   * Rückwand stehen müsste, und landet dahinter. Dieselbe Lehre wie bei
+   * Lambert (E-109): „in die Mulde" prüft man mit einer Mulde.
+   */
+  mitMulden?: boolean;
 }
 
 /** Fester Zufall — die Ladung wird gewürfelt, sonst vergleicht man Rauschen. */
@@ -154,6 +173,10 @@ export function festerZufall(saat: number): () => void {
 export interface Lauf {
   /** Höchsttempo eines DYNAMISCHEN Stücks über den ganzen Zyklus (km/h). */
   vmaxKmh: number;
+  /** In welcher Phase des Wagens das schnellste Stück gemessen wurde (E-149). */
+  vmaxPhase: string;
+  /** Kippt diese Fuhre in ein Lagersilo statt am Abladeplatz? (E-149) */
+  insSilo: boolean;
   teile: number;
   masseKg: number;
   fuellgrad: number;
@@ -223,6 +246,10 @@ export function lauf(s: Stand, saat: number): Lauf {
       new CompositeManager(scene, world, items, new EventBus())
     );
     const c = s.kunde();
+    if (s.mitMulden) {
+      papierStattBrowser();
+      new ContainerManager(scene, world, new EventBus());
+    }
     m.spawnNow("kipper", c);
     const v = (m as unknown as { active: Record<string, unknown> }).active;
     const bedBody = (v as unknown as { bedBody: RAPIER.RigidBody }).bedBody;
@@ -233,6 +260,9 @@ export function lauf(s: Stand, saat: number): Lauf {
       (v as unknown as { faedeltAus: boolean }).faedeltAus = s.faedeltAus;
     }
     if (s.ohnePause) (v as unknown as { parkSpot: [number, number] | null }).parkSpot = null;
+    if (s.kippen) {
+      (v as unknown as { kippAblauf: KippAblauf }).kippAblauf = { ...KIPP_ABLAUF, ...s.kippen };
+    }
     let nachlauf = s.nachlaufS ?? 0;
     if (s.keil) {
       // Gebauten Kollider abschalten statt entfernen: `removeCollider`
@@ -243,6 +273,7 @@ export function lauf(s: Stand, saat: number): Lauf {
     }
     const dt = 1 / 60;
     let vmax = 0;
+    let vmaxPhase = "";
     let phase = "";
     let kippt = false;
     let amHalt: THREE.Vector3 | null = null;
@@ -274,7 +305,11 @@ export function lauf(s: Stand, saat: number): Lauf {
       for (const it of items.items) {
         if (!it.body.isDynamic()) continue;
         const lv = it.body.linvel();
-        vmax = Math.max(vmax, Math.hypot(lv.x, lv.y, lv.z));
+        const vv = Math.hypot(lv.x, lv.y, lv.z);
+        if (vv > vmax) {
+          vmax = vv;
+          vmaxPhase = p;
+        }
       }
       if (freigegeben) {
         bedGroup.updateWorldMatrix(true, false);
@@ -335,6 +370,8 @@ export function lauf(s: Stand, saat: number): Lauf {
     const n = Math.max(1, items.items.length);
     return {
       vmaxKmh: vmax * 3.6,
+      vmaxPhase,
+      insSilo: mulde !== null,
       teile: items.items.length,
       masseKg: items.items.reduce((a, it) => a + it.massKg, 0),
       fuellgrad: c.fuellgrad,

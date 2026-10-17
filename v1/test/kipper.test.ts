@@ -25,6 +25,14 @@
  * Wo eine Bewegung das Zweihundertfache ihres eigenen Energieinhalts abgibt,
  * ist nicht die Form schuld, sondern der Löser.
  *
+ * SEIT E-149 (65°, oben acht Mal um 4° abgerüttelt) dieselbe Rechnung: Die
+ * Vorderkante steht 1,05 + 6,00 · sin 65° = 6,49 m hoch; beim Heben bewegt
+ * sich die Fläche wie bisher mit 1,45 m/s (gleiches Tempo, 13,8°/s), beim
+ * Rütteln mit höchstens 4° · π · 1,5 Hz · 6,00 m = 1,97 m/s. Also
+ * √(2 · 9,81 · 6,49) + 1,97 = 13,3 m/s (48 km/h, 88 J/kg). Die Schranke
+ * MEDIAN_MAX = 40 km/h liegt weiter darunter: Ein Stück, das von oben
+ * herunterkollert, darf schnell sein — eine ganze Fuhre, die es tut, nicht.
+ *
  * DIESER WÄCHTER PRÜFT VIER EIGENSCHAFTEN, nicht den Weg dorthin:
  *   1. Die Fuhre fällt nicht durch die Brücke.
  *   2. Sie wird nicht geschleudert.
@@ -144,8 +152,21 @@ const DURCH_MAX = 0.1; // gemessen 0,00 (E-071), nach E-106 0,01 ueber 48 Saaten
  * Das ist eine Gestaltungsfrage — steilerer Winkel, weniger Reibung oder ein
  * Rüttler —, und sie steht in `docs/offene-punkte.md`. Wer diesen Wächter rot
  * sieht, hat also wahrscheinlich nicht seinen eigenen Umbau vor sich.
+ *
+ * ERLEDIGT MIT E-149 (17.10.2026), und zwar am Spiel, nicht an der Schranke:
+ * Der Kipper hebt auf 65° statt 58° und rüttelt die Brücke oben acht Mal um
+ * 4° ab (`routes.KIPP_ABLAUF`). Gemessen gepaart über 96 frische Saaten
+ * (`tools/kipper-leeren.ts`): siehe LIEGT_MAX unten und Log E-149.
  */
-const LIEGT_MAX = 0.45; // gemessen 0,31 (E-071), nach E-106 0,42 — siehe oben
+/*
+ * SEIT E-149: 30 % statt 45 % — enger, nicht weiter. Gemessen über 144
+ * frische Saaten (`tools/kipper-leeren.ts`, 20.000 Gruppen zu 48): Das
+ * Mittel einer 48er-Gruppe liegt bei 17,5 % (p99 25,1 %, höchste 30,7 %); über
+ * 30 % reisst es zufällig in 0,01 % der Ziehungen. Der Stand VOR E-149 läge
+ * mit p01 37,6 % in 100 % der Ziehungen darüber — ein Rückfall fällt also
+ * sicher auf. 25 % wäre zu knapp (1,1 % Fehlalarm, E-109).
+ */
+const LIEGT_MAX = 0.3; // gemessen 0,31 (E-071), nach E-106 0,42, vor E-149 0,44; seit E-149 0,18 (Mittel, 144 Saaten)
 /** Wie weit ein Stück am Ende höchstens vom LKW liegen darf (m). */
 const ABSTAND_MAX = 12; // gemessen 5,8 (E-071), nach E-106 7,2; vor E-071 27,0. Fehlalarm 0,00 %
 
@@ -205,7 +226,7 @@ function erfundeneReihe(x: Partial<Reihe>): Reihe {
     teile: 11,
     masseKg: 8479,
     fuellgrad: 0.7,
-    rest: 0.31,
+    rest: 0.18, // seit E-149 (vorher 0,31 aus E-071)
     durch: 0,
     durchFrueh: 0,
     abstandMax: 5.8,
@@ -316,6 +337,8 @@ describe("Kipper", () => {
 
   it("GEGENPROBE: eine volle Bruecke wird gemeldet", () => {
     expect(urteile.brueckeWirdFrei(erfundeneReihe({ rest: 0.6 })), "60 % durchgewinkt").toBe(false);
+    // Der Stand vor E-149 — fast die halbe Fuhre fuhr wieder vom Hof
+    expect(urteile.brueckeWirdFrei(erfundeneReihe({ rest: 0.44 })), "Stand vor E-149 durchgewinkt").toBe(false);
     expect(urteile.brueckeWirdFrei(erfundeneReihe({}))).toBe(true);
   });
 
@@ -338,6 +361,15 @@ describe("Kipper", () => {
         name: "sortenrein Alu",
         kunde: () =>
           pruefKunde({ fuellgrad: 0.85, sortenrein: "alu", vehicle: "kipper", aufbau: "flach" }),
+        /*
+         * MIT DEM SILO, nicht nur mit seinem Grundriss (E-149). Ohne Wände
+         * zählte, was noch auf der gekippten Brücke über dem Silo lag, als
+         * „in der Mulde" — gemessen bis zu 63 % einer Fuhre. Wurde die
+         * Brücke frei, rutschte die Fuhre durch den Raum, in dem die
+         * Rückwand steht, und lag dahinter (43 %). Dieselbe Lehre wie bei
+         * Lambert (E-109): „in die Mulde" prüft man mit einer Mulde.
+         */
+        mitMulden: true,
       },
       SAATEN.slice(0, 4)
     );

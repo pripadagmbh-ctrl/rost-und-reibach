@@ -1175,7 +1175,76 @@ export const WORK_ZONES: Array<[number, number, number]> = [
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */
 export const BLOCK_GIVEUP_S = 35;
 
-export const TIP_ANGLE = THREE.MathUtils.degToRad(58); // (SW) steil genug für sperrige Großteile
+/**
+ * WIE DER KIPPER SEINE BRÜCKE LEERT (E-149).
+ *
+ * Bis E-149 hob er auf 58° und hielt 2,2 s still. Schrott hat Reibung 2,2
+ * (`scrapItems.ts`, Regel MAX, „verhakt sich"), und tan 58° = 1,60 < 2,2:
+ * Ein ruhendes Stück rutscht auf dieser Neigung rechnerisch nicht. Gemessen
+ * blieb fast die halbe Fuhre oben (Median 47 % über 144 Saaten, E-140) —
+ * der Kipper fuhr mit halber Ladung wieder weg.
+ *
+ * Jetzt wie beim Absetzkipper (E-141) und wie ein echter Fahrer: steiler
+ * kippen und am Ende die Brücke abrütteln. Die Zahlen stehen einzeln dabei,
+ * die Messreihe in `tools/kipper-leeren.ts` und im Log E-149.
+ *
+ * Als Objekt und nicht als lose Konstanten, damit das Messwerkzeug je Lauf
+ * einen anderen Ablauf fahren kann (`kipperlauf.Stand.kippen`) — im Spiel
+ * wird er nie umgestellt.
+ */
+export interface KippAblauf {
+  /** Endwinkel der Brücke (rad). */
+  winkel: number;
+  /** Kipptempo (rad/s) — beim Heben gleichmäßig. */
+  tempo: number;
+  /** So lange steht die Brücke oben, bevor er anzieht (s); das Rütteln liegt darin. */
+  haltS: number;
+  /** Rütteln: so weit sinkt die Brücke je Stoß zurück (rad). */
+  ruettelAmpl: number;
+  /** Rütteln: Stöße je Sekunde. */
+  ruettelHz: number;
+  /** Rütteln: so viele Stöße (ganze Zahl, die Kurve endet bei null). */
+  ruettelStoesse: number;
+  /** Rütteln beginnt so lange nach dem Erreichen des Endwinkels (s). */
+  ruettelAbS: number;
+}
+
+export const KIPP_ABLAUF: Readonly<KippAblauf> = {
+  // SW (E-149): tan 65° = 2,14 — knapp an der Reibung 2,2, den Rest löst das
+  // Rütteln. 70° leerte nicht besser, schob aber an der Heckkante Stücke
+  // zwischen Brücke und Haufen (4 von 48 Fuhren über 100 km/h, bei 65°: 0)
+  winkel: THREE.MathUtils.degToRad(65),
+  tempo: THREE.MathUtils.degToRad(58) / 4.2, // wie bis E-149: 58° in 4,2 s (13,8°/s)
+  haltS: 2.2, // wie bis E-149 — Mindestzeit; mit dem Rütteln steht sie 5,8 s oben
+  ruettelAmpl: THREE.MathUtils.degToRad(4), // SW (E-149)
+  ruettelHz: 1.5, // SW (E-149), wie der Absetzkipper (E-141)
+  ruettelStoesse: 8, // SW (E-149): 4 Stöße ließen 20 % liegen, 8 Stöße 11 %, 12 Stöße 7 % (24 Saaten)
+  ruettelAbS: 0.5, // SW (E-149): erst rutscht, was von selbst rutscht
+};
+
+/**
+ * IM LAGERSILO KIPPT ER WIE VOR E-149: 58°, kein Rütteln.
+ *
+ * Dort steht die Heckkante 0,6 m vor der Rückwand (`MULDE_TIEFE_X/Z`), der
+ * Haufen wächst bis unter die Brücke, und jedes Rütteln drückt ihn gegen die
+ * Wand — ein Stück zwischen einem kinematischen und einem festen Körper
+ * befreit der Löser mit einem Stoß (E-029). Gemessen mit Wänden, 12 Saaten
+ * (`tools/kipper-leeren.ts --silo`): mit Rütteln Tempo-Median 46 km/h und
+ * 2 Fuhren über 100 km/h, so 18 km/h und keine. Die Fuhre liegt so oder so
+ * zu 100 % im Grundriss des Silos.
+ */
+export const KIPP_ABLAUF_SILO: Readonly<KippAblauf> = {
+  winkel: THREE.MathUtils.degToRad(58), // Stand vor E-149
+  tempo: KIPP_ABLAUF.tempo,
+  haltS: 2.2, // Stand vor E-149
+  ruettelAmpl: 0,
+  ruettelHz: KIPP_ABLAUF.ruettelHz,
+  ruettelStoesse: 0,
+  ruettelAbS: 0,
+};
+
+/** Endwinkel der Brücke am Abladeplatz — dieselbe Zahl wie `KIPP_ABLAUF.winkel`. */
+export const TIP_ANGLE = KIPP_ABLAUF.winkel;
 /**
  * Wie weit der Kipper mit oben stehender Mulde anzieht, bevor er sie senkt.
  * Senkt er im Stand, bleibt Schrott auf der Fläche liegen, sobald unten schon
