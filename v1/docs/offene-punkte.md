@@ -554,6 +554,15 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Gerätebefund 17.10.2026: schwere Großteile** — Patrick, wörtlich:
+      „extrem schwere bzw. grosse objekte lassen sich oft nicht greifen oder
+      verlangsamen den bager unnatürlich" (Stand live 16216bd, mit E-137)
+
+      | # | Punkt |
+      |---|---|
+      | 19a | Extrem schwere/große Objekte lassen sich oft nicht greifen |
+      | 19b | Sie verlangsamen den Bagger unnatürlich |
+
 - [ ] **Gerätebefund 17.10.2026: verzinkt** — Patrick, wörtlich: „verzinkt ist
       kein buntmetall". Betroffen: Gerüstrahmen (Paket, verzinkt), Gerüstrohre
       verzinkt (Bund), Gerüstfeld, Verzinkte Gitterroste, Verzinkte
