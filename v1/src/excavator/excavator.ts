@@ -3,6 +3,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { findeBox, type Box } from "../world/boxen";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Input } from "../core/input";
+import { Aufschlagmelder } from "./aufschlag";
 import { ExcavatorCollision, type ArmShape } from "./collision";
 import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver } from "./driver";
@@ -836,6 +837,23 @@ export class Excavator {
 
   /** Bodenkontakt der Zackenspitzen (Kap. 6.1: Boden ist immer harter Widerstand) */
   readonly groundContact = { active: false, intensity: 0, point: new THREE.Vector3() };
+
+  /**
+   * E-134: Senkgeschwindigkeit der Armspitze im letzten Schritt (m/s, nach
+   * unten positiv), gemessen VOR dem Bodenanschlag — im Anschlagschritt also
+   * das Tempo, mit dem sie ankam. Nur gelesen, nie geregelt.
+   */
+  spitzeAbwaerts = 0;
+  private spitzeYAlt: number | null = null;
+  private readonly aufschlag = new Aufschlagmelder();
+  /**
+   * E-134: Die Spinne schlaegt mit Last auf — auf tragenden Grund (Beton,
+   * Ladeflaeche, Muldenboden) oder auf losen Schrott (`aufSchrott`). Gemeldet
+   * wird nur der Einschlag, nicht das Aufliegen (`Aufschlagmelder`), und nur
+   * mit Last: Die leere Spinne hat Zuschnappen und Kehren. Wie in
+   * `onClawSnap`: Der Bagger kennt keinen Bus, main.ts macht das Ereignis.
+   */
+  onAufschlag: ((tempo: number, aufSchrott: boolean) => void) | null = null;
 
   /**
    * Körper, in die der Arm nicht eintauchen darf (LKW). Sie sind kinematisch,
@@ -2830,6 +2848,39 @@ export class Excavator {
     this.groundContact.intensity = this.groundContact.active
       ? Math.min(1, (Math.abs(this.cabVel) * 9 + Math.abs(this.driveVel) * 1.5) / 3)
       : 0;
+    // E-134: Aufschlag mit Last erkennen — liest nur, aendert nichts am Arm
+    this.spitzeAbwaerts = this.spitzeYAlt === null ? 0 : (this.spitzeYAlt - tipYJetzt) * 60;
+    this.spitzeYAlt = tipY();
+    const traegt = this.grippedHandles.size > 0;
+    const aufSchrott = traegt && !this.groundContact.active && this.ladungAufSchrott();
+    const tempo = this.aufschlag.schritt(1 / 60, traegt && (this.groundContact.active || aufSchrott), this.spitzeAbwaerts);
+    if (tempo !== null) this.onAufschlag?.(tempo, aufSchrott);
+  }
+
+  /**
+   * E-134: Beruehrt die Last gerade losen Schrott? Gefragt werden die
+   * Kontakte, die Rapier im letzten Schritt ohnehin berechnet hat (kinematisch
+   * gegen dynamisch) — keine zweite Kontaktrechnung. Nur lesen (v2 E-044).
+   */
+  private ladungAufSchrott(): boolean {
+    let ja = false;
+    for (const h of this.grippedHandles) {
+      const b = this.world.getRigidBody(h);
+      if (!b) continue;
+      for (let i = 0; i < b.numColliders() && !ja; i++) {
+        const c = b.collider(i);
+        this.world.contactPairsWith(c, (o) => {
+          if (ja) return;
+          const ob = o.parent();
+          if (!ob || !ob.isDynamic() || this.grippedHandles.has(ob.handle)) return;
+          this.world.contactPair(c, o, (m) => {
+            for (let k = 0; k < m.numContacts(); k++) if (m.contactDist(k) < 0.01) ja = true;
+          });
+        });
+      }
+      if (ja) break;
+    }
+    return ja;
   }
 
   private syncMeshes(): void {

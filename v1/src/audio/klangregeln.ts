@@ -245,6 +245,18 @@ export function aufprallPegel(wucht: number, massKg: number): number {
   return Math.pow(w, 0.7) * m;
 }
 
+/**
+ * Gehaltener Schrott schlaegt auf (E-134): Aus dem Senktempo der Armspitze
+ * (m/s) wird die Wucht fuer `schrott:aufprall`. Doppelt, weil der Arm
+ * nachdrueckt — ein Traeger, den der Bagger mit 2 m/s auf den Beton haut,
+ * kracht wie einer, der aus 3 m faellt. Nie unter `SCHLAG_AB_MS`: Was der
+ * Melder als Schlag erkannt hat, bekommt einen eigenen Schlag, kein Rasseln.
+ * SW: Faktor 2 (gemessen: voll 3,15 m/s, nur Ausleger 2,13 m/s).
+ */
+export function lastAufschlagWucht(tempo: number): number {
+  return Math.max(SCHLAG_AB_MS, 2 * tempo);
+}
+
 /** Ein fertiges Aufprall-Rezept: das Teil selbst plus der Untergrund. */
 export interface AufprallRezept {
   pegel: number;

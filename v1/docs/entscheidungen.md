@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-134 | 17.10.2026 | Gehaltener Schrott kracht, wenn die Spinne ihn aufschlägt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-132 | 16.10.2026 | Die Spinne pendelt frei, ein Wurf behält seinen Schwung | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-131 | 16.10.2026 | Pripada.de statt Rust’n’Reibach, Werbeschilder, drei Laster stehen zum Start an | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-130 | 16.10.2026 | Echte Aufnahmen statt Summen, kein Greifklang bleibt stehen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -146,6 +147,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-134 — Gehaltener Schrott kracht, wenn die Spinne ihn aufschlägt** (Augen zu, iPad-Lautsprecher)
+- Jemand greift einen Träger und haut ihn einmal auf den Beton, ohne loszulassen. Hörst du **einen** Krach, und klingt er nach Stahl auf Beton?
+- Er drückt danach zwei Sekunden auf. Bleibt es still?
+- Er setzt dasselbe Teil sachte ab. Bleibt es leise?
+- Er haut ein Teil in eine Mulde und eins auf einen Schrotthaufen. Hörst du, worauf es traf?
 
 **E-132 — Die Spinne pendelt frei, ein Wurf behält seinen Schwung** (iPad)
 - Zügig schwenken und anhalten: Schwingt die Spinne sichtbar durch (bis knapp 40°), und ist sie nach rund 4 s ruhig genug zum Absetzen?
