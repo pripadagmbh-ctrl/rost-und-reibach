@@ -293,8 +293,8 @@ function nurChassis(b: number, l: number, anbau: AnbauDef[]): KarosserieDef {
  *  - Räder: vorn je 100 kg (315/80 R22.5 auf Stahlfelge), hinten je 200 kg
  *    (Zwillingsräder, als EIN Teil).
  * Bleibt der Rumpf mit 4 990 kg: Rahmen, Achsen, Fahrerhaus. Er ist über der
- * Traglast der Spinne (3 500 kg, mit Ausbau 5 250 kg — `gripSystem.ts`) —
- * ganz geht der Lkw nicht hoch, und in die Presse (Kammer 4,05 x 4,20 m) passt
+ * Traglast nah an der Maschine (6,35 t mit Fünfschalengreifer, E-152,
+ * `excavator/traglast.ts`) — ganz geht der Lkw nicht hoch, und in die Presse (Kammer 4,05 x 4,20 m) passt
  * er mit 6 m auch nicht. Was mit ihm geschieht: zerdrücken und zerlegen.
  *
  * Kein Teil hat einen Kollider, solange es dranhängt (wie am Pkw); sie liegen

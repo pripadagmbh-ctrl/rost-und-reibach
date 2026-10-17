@@ -661,6 +661,12 @@ async function main(): Promise<void> {
   grip.onMagnetHaftet = (massKg) => bus.emit("magnet:haftet", { massKg });
   excavator.onMagnetAn = () => bus.emit("magnet:an", {});
   excavator.onMagnetAus = () => bus.emit("magnet:aus", {});
+  // Ueberlast nach Traglasttabelle (E-152): einmal je Hebeversuch, mit Grund
+  excavator.onUeberlast = (e) => bus.emit("greifer:ueberlast", e);
+  const tonnen = (kg: number): string => (kg / 1000).toFixed(1).replace(".", ",");
+  bus.on("greifer:ueberlast", (e) =>
+    hud.toast(`Zu schwer: ${tonnen(e.massKg)} t – hier hebt die Maschine ${tonnen(e.grenzeKg)} t. Näher heranziehen.`)
+  );
   /*
    * Aufschlaege: Der wichtigste Klang auf dem Platz. Ob es metallisch
    * wummert oder dumpf auf Beton klatscht, haengt daran, ob das Teil auf

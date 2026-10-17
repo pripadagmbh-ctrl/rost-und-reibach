@@ -835,8 +835,8 @@ const FLAT_SCALE_Y = 0.55;
  * Spinne ohne Ruecksicht auf sein Gewicht — beim Kehren spielt sie keine
  * Rolle. Sie spielt eine Rolle, wenn er losgelassen am Boden liegt (bei 680 kg
  * schiebt ihn nichts mehr weg, was auf dem Platz herumliegt) und beim
- * Traglimit der Spinne (`MAX_TOTAL_KG` 3500 kg — 680 kg sind 19 %, es bleibt
- * also Platz fuer weitere Teile, `MAX_ITEMS` 5).
+ * Traglimit der Spinne (seit E-152 nach Ausladung, `excavator/traglast.ts`,
+ * bei 8 m rund 2 t — 680 kg lassen Platz fuer weitere Teile, `MAX_ITEMS` 5).
  *
  * ## Warum Mischschrott und nicht Zink oder Stahl
  *
