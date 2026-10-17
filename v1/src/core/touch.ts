@@ -16,6 +16,8 @@
  *   ↺ / ↻          — Spinne links bzw. rechts drehen (Rotator)
  *   Greifen        — über den rechten Stick (oder festen Fingerdruck)
  *   Extras         — Doppeltipp rechts wechselt die Ansicht
+ *   Mittelstreifen — zwischen den Sticks (E-136): ein Finger dreht die Kamera,
+ *                    zwei Finger kneifen = Zoom, Doppeltipp = Ansicht zurück
  *   Rädchen        — die übrigen Funktionen, endlos drehbar
  *   Fünf Finger    — Debug-Overlay ein/aus (auf dem Tablet gibt es keine F3-Taste)
  *
@@ -31,6 +33,10 @@
  * verdeckt haben).
  */
 import { type ControlConfig, type AxisId, loadConfig } from "./controlConfig";
+import type { Input } from "./input";
+
+/** Was die Kamera-Geste in die Eingabe schreibt (main reicht `Input` durch). */
+export type KameraEingabe = Pick<Input, "orbitDX" | "orbitDY" | "zoomFactor" | "camReset">;
 
 export interface TouchAxes {
   cab: number;
@@ -103,6 +109,13 @@ const TAP_MAX_MOVE = 12;
 /** Zwei Tipps am selben Ort binnen dieser Zeit = Doppeltipp (Ansicht wechseln) */
 const DOUBLE_TAP_MS = 320;
 const DOUBLE_TAP_RADIUS = 60;
+/**
+ * Mittelstreifen (E-136): Fingerweg in px mal diesen Faktor = Kamera-Delta.
+ * Die Maus liefert 1:1; der Streifen ist aber nur 30 % breit (iPhone mini quer
+ * 244 px), mit 1,4 dreht ein Wisch über die ganze Breite gut 120°.
+ * // SW: Startwert zum Austesten, auf dem Gerät nachzujustieren
+ */
+const CAM_TOUCH_GAIN = 1.4;
 
 const clamp1 = (v: number): number => Math.max(-1, Math.min(1, v));
 
@@ -155,8 +168,13 @@ export class TouchControls {
   private radialHoldS = 0;
   private lastTapX = 0;
   private lastTapY = 0;
+  /** Finger im Mittelstreifen: Zeiger-ID → letzte Lage (höchstens zwei) */
+  private camZeiger = new Map<number, { x: number; y: number }>();
+  /** Der aktuelle Griff im Streifen könnte noch ein Tipp werden */
+  private camTipp: { t: number; x: number; y: number } | null = null;
+  private camLastTap = { t: 0, x: 0, y: 0 };
 
-  constructor(canvas: HTMLElement) {
+  constructor(canvas: HTMLElement, private kamera: KameraEingabe | null = null) {
     this.active = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
     const root = document.getElementById("touch");
     if (!root) return;
@@ -169,6 +187,7 @@ export class TouchControls {
     document.body.classList.add("touch");
     this.left = this.makeStick("touch-left", "zone-left", "links");
     this.right = this.makeStick("touch-right", "zone-right", "rechts");
+    this.bindKamera();
     this.bindPedale();
     this.bindSafety();
     this.bindDebugGeste();
@@ -335,6 +354,86 @@ export class TouchControls {
     return st;
   }
 
+  /**
+   * Kamera-Geste im Mittelstreifen zwischen den beiden Stick-Zonen (E-136,
+   * Gerätebefund 17.10.2026: „die Kamera drehen, ohne zwischen den Ansichten
+   * switchen zu müssen").
+   *
+   * Nur hier, nie über den Sticks: In v2 lösten Daumen neben den Sticks sonst
+   * Perspektivwechsel aus. Die Zonen grenzen nur aneinander — ein Finger, der
+   * auf einem Stick aufsetzt, gehört dem Stick, auch wenn er in den Streifen
+   * wandert (Pointer-Capture der Stick-Zone). Umgekehrt fängt der Streifen
+   * seine Finger ein.
+   *
+   * Ein Finger zieht = drehen/neigen, zwei Finger = Kneifen-Zoom (dann wird
+   * nicht gedreht, sonst wackelt das Bild beim Zoomen). Kurzer Doppeltipp am
+   * selben Ort = Ansicht auf ihren Startpunkt.
+   */
+  private bindKamera(): void {
+    const zone = document.getElementById("zone-mitte");
+    if (!zone) return;
+    zone.addEventListener(
+      "pointerdown",
+      (e) => {
+        e.preventDefault();
+        if (this.camZeiger.size >= 2) return;
+        this.camZeiger.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        zone.setPointerCapture(e.pointerId);
+        // Ein Tipp ist nur ein einzelner Finger; der zweite macht daraus Zoom
+        this.camTipp =
+          this.camZeiger.size === 1 ? { t: performance.now(), x: e.clientX, y: e.clientY } : null;
+      },
+      { passive: false }
+    );
+    zone.addEventListener(
+      "pointermove",
+      (e) => {
+        const p = this.camZeiger.get(e.pointerId);
+        if (!p) return;
+        e.preventDefault();
+        const k = this.kamera;
+        if (this.camZeiger.size === 1) {
+          if (k) {
+            k.orbitDX += (e.clientX - p.x) * CAM_TOUCH_GAIN;
+            k.orbitDY += (e.clientY - p.y) * CAM_TOUCH_GAIN;
+          }
+        } else {
+          const [a, b] = [...this.camZeiger.values()];
+          const vorher = Math.hypot(a.x - b.x, a.y - b.y);
+          p.x = e.clientX;
+          p.y = e.clientY;
+          const nachher = Math.hypot(a.x - b.x, a.y - b.y);
+          // Auseinander = näher heran. Unter 10 px Spanne ist das Verhältnis Rauschen
+          if (k && vorher > 10 && nachher > 10) k.zoomFactor *= vorher / nachher;
+        }
+        p.x = e.clientX;
+        p.y = e.clientY;
+      },
+      { passive: false }
+    );
+    zone.addEventListener("pointerup", (e) => {
+      if (!this.camZeiger.delete(e.pointerId)) return;
+      const t = this.camTipp;
+      this.camTipp = null;
+      if (!t) return;
+      const now = performance.now();
+      if (now - t.t >= TAP_MAX_MS || Math.hypot(e.clientX - t.x, e.clientY - t.y) >= TAP_MAX_MOVE) return;
+      const l = this.camLastTap;
+      if (now - l.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - l.x, e.clientY - l.y) < DOUBLE_TAP_RADIUS) {
+        if (this.kamera) this.kamera.camReset = true;
+        this.onTap?.();
+        l.t = 0;
+      } else {
+        this.camLastTap = { t: now, x: e.clientX, y: e.clientY };
+      }
+    });
+    const abbruch = (e: PointerEvent): void => {
+      if (this.camZeiger.delete(e.pointerId)) this.camTipp = null;
+    };
+    zone.addEventListener("pointercancel", abbruch);
+    zone.addEventListener("lostpointercapture", abbruch);
+  }
+
   /** Stick auf Null stellen und ausblenden. */
   private static resetStick(st: StickState): void {
     st.id = null;
@@ -418,6 +517,8 @@ export class TouchControls {
       if (st) TouchControls.resetStick(st);
     }
     this.held.clear();
+    this.camZeiger.clear();
+    this.camTipp = null;
     this.pressureGrab = false;
     if (this.radialOpen) {
       this.radialOpen = false;

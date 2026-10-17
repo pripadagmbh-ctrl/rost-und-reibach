@@ -7,9 +7,13 @@ export class Input {
   private pressedThisFrame = new Set<string>();
   /** Mausrad-Delta seit letztem Frame (in "Notches", + = weg vom Nutzer) */
   wheelDelta = 0;
-  /** Maus-Bewegungsdelta seit letztem Frame, nur solange MMB gehalten */
+  /** Kamera-Drehdelta in px seit letztem Frame: MMB-Ziehen oder Touch-Mittelstreifen (E-136) */
   orbitDX = 0;
   orbitDY = 0;
+  /** Kamera-Abstand mal diesen Faktor (Touch-Kneifen, E-136); 1 = unverändert */
+  zoomFactor = 1;
+  /** true genau in dem Frame, in dem die Ansicht zurückgesetzt werden soll (Doppeltipp Mittelstreifen) */
+  camReset = false;
   /** Maustasten: 0=links, 1=mitte, 2=rechts */
   private mouseDown = new Set<number>();
   shiftHeld = false;
@@ -87,5 +91,7 @@ export class Input {
     this.wheelDelta = 0;
     this.orbitDX = 0;
     this.orbitDY = 0;
+    this.zoomFactor = 1;
+    this.camReset = false;
   }
 }

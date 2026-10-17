@@ -269,12 +269,29 @@
          entsteht dort, wo der Daumen aufsetzt, und verschwindet beim Loslassen
          (Design 09.09.2026, Vorbild Bagerana/v2). Die Zonen liegen unter den
          Knoepfen, damit Rotator und Raedchen zuerst drankommen. */
+      /* E-136: Die Stick-Zonen sind nicht mehr je die halbe Breite, sondern je
+         35 % (SW). Dazwischen liegt der Mittelstreifen (30 %) fuer die Kamera:
+         ein Finger dreht, zwei kneifen = Zoom. Nur dort — Lehre aus v2:
+         Kamera-Gesten neben den Sticks loesten ungewollte Wechsel aus.
+         iPad quer: Zonen je 413 px, Streifen 354 px; iPhone mini quer:
+         284 / 244 px. Ob 35 % fuer die Daumen reichen, entscheidet der
+         Geraetetest (Daumenreichweite 14.09.: 478 px ab der Ecke). */
       #touch .zone {
-        position: absolute; top: 0; bottom: 0; width: 50%;
+        position: absolute; top: 0; bottom: 0; width: 35%;
         pointer-events: auto; touch-action: none; z-index: 0;
       }
       #zone-left { left: 0; }
       #zone-right { right: 0; }
+      #touch #zone-mitte { left: 35%; width: 30%; }
+      /* Hochformat: 35 % waeren auf dem iPhone mini nur 131 px — zu schmal,
+         damit der Funktionskranz (Halbmesser 112) irgendwo ganz sichtbar
+         aufklappt (test/funktionskranz.test.ts). Darum auf Telefonen hochkant
+         40/20/40 (dieselbe Abfrage wie oben fuers Hochformat); der Streifen
+         ist dann 75 px breit: Drehen geht, Kneifen wird eng. */
+      @media (max-width: 500px) and (min-height: 431px) {
+        #touch .zone { width: 40%; }
+        #touch #zone-mitte { left: 40%; width: 20%; }
+      }
       /* --- Fahrpedale (Ansage Patrick 14.09.2026) ---
          Zwei Pedale nebeneinander, unten links. Sie sind der
          Umschalter und die Anzeige, nicht die Steuerung: Ein Tipp macht den
@@ -963,6 +980,8 @@
     <div id="touch">
       <div class="zone" id="zone-left"></div>
       <div class="zone" id="zone-right"></div>
+      <!-- E-136: Kamera drehen/zoomen, nur zwischen den Sticks -->
+      <div class="zone" id="zone-mitte"></div>
       <div class="pad" id="touch-left" hidden><div class="knob"></div></div>
       <div class="pad" id="touch-right" hidden><div class="knob"></div></div>
       <!-- Zwei Pedale unten links. Sie schalten das Fahren ein und
@@ -1045,6 +1064,7 @@
           Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
           Pedale unten links: Fahren an/aus — dann fährt der linke Stick<br />
           ↺ ↻ Spinne drehen · Doppeltipp rechts: Ansicht<br />
+          Bildmitte ziehen: Kamera drehen · zwei Finger: Zoom<br />
           Rechten Daumen stillhalten: Funktionskranz
         </p>
       </div>

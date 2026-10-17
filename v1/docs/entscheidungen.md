@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-136 | 17.10.2026 | Kamera dreht in jeder Ansicht, Tablet: Finger in der Bildmitte | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-135 | 17.10.2026 | Voller Start, LKW-Wrack an der Ostmauer, ab und zu ein Wohnwagen | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-134 | 17.10.2026 | Gehaltener Schrott kracht, wenn die Spinne ihn aufschlägt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-133 | 17.10.2026 | Pripada an Waage und Arbeitsplatz, echte Firmenschilder, Pripada-Mulden, Abholer-Logo | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -149,6 +150,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-136 — Kamera drehen ohne Ansichtswechsel** (iPad quer, dann iPhone mini quer)
+- Einen Finger in die Bildmitte und langsam ziehen: Dreht die Kamera um den Bagger, ohne dass Arm oder Spinne zucken? Tempo angenehm, zu schnell, zu träge?
+- Mit beiden Daumen baggern und weit zur Mitte rutschen: Bleibt alles beim Stick, springt die Kamera nie?
+- In Draufsicht und Seite mit einem Finger drehen, mit zwei kneifen; Doppeltipp in die Mitte: Dreht, zoomt und springt es zurück auf den Start?
+- Reicht die schmalere Stick-Fläche (je gut ein Drittel), oder kommt beim Aufsetzen manchmal die Kamera statt des Sticks?
 
 **E-135 — Voller Start, LKW-Wrack, Wohnwagen** (iPad, dann iPhone mini)
 - SANDKASTEN starten: Liegt der Haufen im Mischschrott, stehen die zwei Autos nebeneinander in der Stahlhalde, und siehst du rechts vorn an der Ostmauer das LKW-Wrack mit dem Fahrerhaus zu dir?

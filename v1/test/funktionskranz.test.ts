@@ -345,11 +345,13 @@ describe("Funktionskranz: sieben Eintraege, und was der achte bis zehnte kosten"
       const breit = r + (w * s) / 2;
       const bandH = f.h - f.sa.t - f.sa.b - 2 * hoch;
       /*
-       * Die rechte Zone ist die halbe Bildbreite (`#touch .zone: width 50%`),
-       * der Daumen setzt also zwischen w/2 und dem rechten sicheren Rand auf.
+       * Die rechte Zone ist seit E-136 35 % der Bildbreite (`#touch .zone:
+       * width 35%`, davor 50 %; dazwischen liegt der Kamera-Mittelstreifen),
+       * der Daumen setzt also zwischen 0,65 w und dem rechten sicheren Rand auf.
+       * Telefon hochkant: 40 % (Regel `max-width: 500px and min-height: 431px`), ab 0,6 w.
        * Sichtbar bleibt der Kranz, wo auch links noch Platz ist.
        */
-      const bandB = f.w - f.sa.r - breit - Math.max(f.w / 2, f.sa.l + breit);
+      const bandB = f.w - f.sa.r - breit - Math.max(f.w * (f.h > f.w ? 0.6 : 0.65), f.sa.l + breit);
       expect(
         bandH,
         `${f.name}: kein Streifen, in dem der Kranz ganz sichtbar ist ` +
