@@ -216,12 +216,20 @@ describe("E-146 — der Magnet nimmt Eisen und Stahl, sonst nichts", () => {
     a.world.free();
   }, 60_000);
 
-  it("Traglast: von drei 1,5-t-Platten kommen zwei mit (3 500 kg)", () => {
+  it("Traglast (E-152): weit draussen zieht er keine 1,5-t-Platte hoch und meldet Ueberlast; leichte gehen", () => {
+    /*
+     * Bei rund 8 m Ausladung hebt die Maschine mit dem 1,7-t-Magneten nur
+     * gut 1 t (`traglast.ts`). Eine 1,5-t-Platte zieht er nicht hoch; liegt
+     * die Scheibe auf, haftet sie, und das Heben meldet Ueberlast.
+     */
     const a = aufbau();
-    const p = [-0.4, 0, 0.4].map((dx) => lege(a, { material: "steel", kg: 1500, dx, groesse: 0.35 }));
+    const meldungen: number[] = [];
+    a.bagger.onUeberlast = (e) => meldungen.push(e.massKg);
+    expect(a.bagger.traglastKg, "Nutzlast hier (kg)").toBeLessThan(1500);
+    const platte = lege(a, { material: "steel", kg: 1500, groesse: 0.5 });
     hebe(a);
-    expect(a.grip.totalMassKg).toBeLessThanOrEqual(3500);
-    expect(p.filter(gehoben).length).toBe(2);
+    expect(gehoben(platte), "1,5 t bleibt unten").toBe(false);
+    expect(meldungen.length, "Ueberlast gemeldet, einmal").toBe(1);
     a.world.free();
   }, 60_000);
 

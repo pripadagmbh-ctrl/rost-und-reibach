@@ -470,6 +470,11 @@ export const FUENFSCHALEN: Greiferform = {
    * Was sie nicht kann, steht im Kopf dieser Datei.
    */
   kolliderRadius: SICHELKRALLE.kolliderRadius,
+  /**
+   * SW: 1 100 kg. Fuenfschalen-Polypgreifer um 0,6 m³ fuer die 20-t-Klasse
+   * wiegen nach Herstellerangaben rund 1,0–1,3 t; nicht einzeln belegt.
+   */
+  eigengewichtKg: 1100,
   baue(): Greiferbau {
     const g = baueGreifer(stoffe());
     // Die Grabtiefe an DIESEM Modell abgreifen, statt dafuer ein zweites zu

@@ -4,8 +4,9 @@ import { findeBox, type Box } from "../world/boxen";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Input } from "../core/input";
 import { Aufschlagmelder, SPINNE_WUCHT_VOLL_MS, DRUECK_AB, DRUECK_PAUSE_S, DRUECK_WEG_M } from "./aufschlag";
-import { ExcavatorCollision, type ArmShape } from "./collision";
+import { ExcavatorCollision, PROBE_R, type ArmShape } from "./collision";
 import type { GripSystem } from "../physics/gripSystem";
+import { nutzlastKg } from "./traglast";
 import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver, fahrerArme } from "./driver";
 import { baueRad, radGeometrien, radStoffe, RAD_R } from "./wheelParts";
@@ -462,6 +463,15 @@ const BODEN_SPERRE_S = 0.2;
 const BODEN_FREI_M = 0.04;
 /** So lange haelt eine einmal gefundene Sperre, statt neu zu regeln (s) */
 const EINDRING_HALT_S = 0.35;
+/**
+ * E-152: So tief darf die Magnetscheibe in ein Teil sinken, bevor der Arm
+ * anhaelt (m). SW: Kontaktabstand plus Einfedern. Ein Magnet beisst nicht —
+ * er liegt auf. Vorher drueckte die kinematische Scheibe Teile unter 350 kg
+ * durch den Boden (gemessen: 210-kg-Teil 0,20 m unter dem Beton).
+ */
+const MAGNET_AUFLAGE_M = 0.03;
+/** E-152: Ab dieser Winkelaenderung (rad je Bild) gilt Heben/Ausfahren als versucht — Rechenrauschen darunter */
+const UEBERLAST_TOT_RAD = 1e-6;
 /** Wie weit die Schalen beim Anschlag zurueckfedern (rad) */
 const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
 /** Wie lange der Rueckprall nachschwingt (s) */
@@ -903,6 +913,15 @@ export class Excavator {
    * `setzeGreifer`. Ohne es gibt es keine Wandsperre fuer gehaltene Teile.
    */
   greifsystem: GripSystem | null = null;
+  /**
+   * E-152: Ueberlast. `ueberlast` steht, solange die gehaltene Last schwerer
+   * ist, als die Traglasttabelle bei dieser Ausladung erlaubt (fuers HUD).
+   * `onUeberlast` meldet einmal je Versuch, eine gesperrte Bewegung zu fahren
+   * — main legt es auf den Bus (`greifer:ueberlast`).
+   */
+  ueberlast = false;
+  onUeberlast: ((e: GameEvents["greifer:ueberlast"]) => void) | null = null;
+  private ueberlastGemeldet = false;
   /** E-146: Ist der Lasthebemagnet eingeschaltet? */
   magnetAn = false;
   /** E-146: Magnet ein- bzw. ausgeschaltet — main legt es auf den Bus (`magnet:an`, `magnet:aus`). */
@@ -1798,6 +1817,8 @@ export class Excavator {
       grippedHandles: this.grippedHandles,
       getStaffPos: () => this.getStaffPos?.() ?? null,
       selfHandles: this.selfHandles,
+      // E-152: am Magneten endet die Pruefkugel an der Scheibe
+      pruefTiefe: () => (this.form.magnet ? this.form.magnet.unten - PROBE_R : 1.35),
     });
 
     for (const b of [this.chassisBody, this.bladeBody, this.boomBody, this.stickBody]) {
@@ -2208,6 +2229,9 @@ export class Excavator {
       this.armBlocked = false;
       col.armFree = true;
     }
+
+    // E-152: Ueberlastsperre — schwerer als die Tabelle hier erlaubt: nicht heben, nicht ausfahren
+    this.ueberlastSperre(prevBoom, prevStick, prevPos, traegt);
 
     /*
      * Räder rollen — nach der Kollisionsprüfung, und aus der WIRKLICH
@@ -2797,6 +2821,25 @@ export class Excavator {
         const b = col.parent();
         if (!b || !b.isDynamic()) return true;
         if (this.selfHandles.has(b.handle) || this.grippedHandles.has(b.handle)) return true;
+        const m = this.form.magnet;
+        if (m) {
+          /*
+           * E-152: Der Magnet hat keine Spitzen, er hat eine Unterseite — und
+           * er liegt auf ALLEM auf, auch auf leichten Teilen (nichts wird
+           * beiseitegeschoben, eine Scheibe drueckt flach nach unten). Geprueft
+           * werden Mitte und acht Punkte am Rand der Unterseite.
+           */
+          for (let k = 0; k <= 8; k++) {
+            const a = (k / 8) * Math.PI * 2;
+            const r = k === 8 ? 0 : m.radius * 0.9;
+            this.clawA.set(Math.sin(a) * r, -m.unten, Math.cos(a) * r).applyMatrix4(this.grappleGroup.matrixWorld);
+            const pr = col.projectPoint({ x: this.clawA.x, y: this.clawA.y, z: this.clawA.z }, false);
+            if (!pr || !pr.isInside) continue;
+            const d = Math.hypot(pr.point.x - this.clawA.x, pr.point.y - this.clawA.y, pr.point.z - this.clawA.z);
+            if (d > tiefste) tiefste = d;
+          }
+          return true;
+        }
         // Was sich schieben laesst, wird geschoben — nicht umfahren
         if (b.mass() < EINDRING_SCHWER_KG) return true;
         for (let c = 0; c < this.form.schalen; c++) {
@@ -2899,7 +2942,7 @@ export class Excavator {
       minTipY = Math.max(minTipY, this.eindringGrenze);
     } else {
       const tief = this.eindringtiefe(splay);
-      if (tief > EINDRING_OK) {
+      if (tief > (this.form.magnet ? MAGNET_AUFLAGE_M : EINDRING_OK)) {
         this.eindringGrenze = tipYJetzt;
         this.eindringHaltS = EINDRING_HALT_S;
         minTipY = Math.max(minTipY, this.eindringGrenze);
@@ -3272,6 +3315,77 @@ export class Excavator {
 
   private qPendel = new THREE.Quaternion();
   private pendelEuler = new THREE.Euler();
+
+  /** E-152: waagrechter Abstand Stielende ↔ Drehmitte (m) — die Ausladung der Traglasttabelle. */
+  get ausladungM(): number {
+    const g = this.grappleGroup.position;
+    return Math.hypot(g.x - this.position.x, g.z - this.position.z);
+  }
+
+  /**
+   * E-152: Was jetzt an den Greifer darf (kg) — Traglasttabelle bei dieser
+   * Ausladung und Hoehe des Stielendes, mal Ausbau, minus Anbaugeraet
+   * (`traglast.ts`). Die Tabelle gilt fuer die 4-Punkt-abgestuetzte Maschine;
+   * ob frei stehend weniger gelten soll, ist offen (E-152).
+   */
+  get traglastKg(): number {
+    return nutzlastKg(
+      this.ausladungM,
+      this.grappleGroup.position.y,
+      this.form.eigengewichtKg,
+      this.greifsystem?.getCapacityBonus?.() ?? 1
+    );
+  }
+
+  /**
+   * E-152: Die Ueberlastsperre einer echten Umschlagmaschine (EN 474-5).
+   *
+   * Haengt mehr in der Spinne, als die Tabelle hier erlaubt, stoppt die
+   * Hydraulik Ausleger-Heben und Stiel-Ausfahren. Absenken, Heranziehen,
+   * Schwenken und Fahren bleiben: So holt man eine schwere Last naeher an die
+   * Maschine und hebt sie dort. Zurueckgenommen werden nur Ausleger und
+   * Stiel, auf die Stellung des letzten Bildes.
+   *
+   * Vorher (E-137-Stand): Die Spinne griff ein Teil ueber 3,5 t gar nicht erst
+   * und sagte nichts — „beim heben passiert nichts".
+   */
+  private ueberlastSperre(prevBoom: number, prevStick: number, prevPos: THREE.Vector3, traegt: boolean): void {
+    const last = this.carriedMassKg;
+    if (!traegt || last <= 0) {
+      this.ueberlast = false;
+      this.ueberlastGemeldet = false;
+      return;
+    }
+    const grenze = this.traglastKg;
+    this.ueberlast = last > grenze;
+    /*
+     * Gesperrt wird je Achse, wie an der Maschine: der Ausleger HEBT nicht
+     * (Winkel steigt), der Stiel FAEHRT NICHT AUS (Winkel steigt). Ausleger
+     * senken und Stiel heranziehen gehen immer — auch wenn das Heranziehen
+     * das Stielende dabei etwas hebt; das Kippmoment wird kleiner.
+     */
+    const hebt = this.boomAngle > prevBoom + UEBERLAST_TOT_RAD;
+    const aus = this.stickAngle > prevStick + UEBERLAST_TOT_RAD;
+    if (!this.ueberlast || (!hebt && !aus)) {
+      this.ueberlastGemeldet = false;
+      return;
+    }
+    const h = this.halt;
+    const rAlt = Math.hypot(h.gPos.x - prevPos.x, h.gPos.z - prevPos.z);
+    if (hebt) {
+      this.boomAngle = prevBoom;
+      this.boomVel = 0;
+    }
+    if (aus) {
+      this.stickAngle = prevStick;
+      this.stickVel = 0;
+    }
+    this.armBlocked = true;
+    this.syncMeshes();
+    if (this.ueberlastGemeldet) return;
+    this.ueberlastGemeldet = true;
+    this.onUeberlast?.({ massKg: last, grenzeKg: grenze, ausladungM: rAlt });
+  }
 
   /**
    * E-145: Gehaltene Teile bleiben an Waenden.

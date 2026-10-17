@@ -164,6 +164,12 @@ export interface Greiferform {
   readonly rate: number;
   /** Radius der Kapseln, die eine Schale physisch nachbilden (m). */
   readonly kolliderRadius: number;
+  /**
+   * Eigengewicht des Anbaugeraets (kg) — wird von der Traglast abgezogen
+   * (E-152, `traglast.ts`): Die Tabelle gilt am Stielende, der Greifer haengt
+   * dort mit.
+   */
+  readonly eigengewichtKg: number;
   /** Ein neues Modell bauen — je Bagger eines, nicht wiederverwendbar. */
   baue(): Greiferbau;
   /**
@@ -455,6 +461,12 @@ export const SICHELKRALLE: Greiferform = {
    * haengen; er steht hier, weil die zweite Form ihn ebenfalls braucht.
    */
   kolliderRadius: 0.09,
+  /**
+   * SW: 900 kg. Groessenordnung eines Mehrschalen-Schrottgreifers um 0,4 m³
+   * fuer 20-t-Umschlagbagger nach Herstellerangaben (0,8–1,0 t); nicht
+   * einzeln belegt.
+   */
+  eigengewichtKg: 900,
   baue(): Greiferbau {
     const s = baueSpinne();
     const a = new THREE.Vector3();

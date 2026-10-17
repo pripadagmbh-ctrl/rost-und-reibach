@@ -1023,7 +1023,12 @@ describe("Besen: die Spinne bekommt ihn", () => {
       "die Spinne verweigert die Rolle"
     ).toBe(true);
 
-    // Gegenprobe: vier Tonnen werden abgelehnt — die Grenze gibt es.
+    /*
+     * Gegenprobe: Auch vier Tonnen nimmt die Spinne ans Gelenk — seit E-152
+     * gibt es beim Greifen keine Massengrenze mehr; ob es hochgeht,
+     * entscheidet der Arm nach der Traglasttabelle (`test/traglast.test.ts`).
+     * Vorher: `MAX_TOTAL_KG` 3 500 kg lehnte hier ab.
+     */
     const { physics: p2, items: i2 } = platz();
     const brocken = i2.spawnScrap(
       "steel",
@@ -1037,8 +1042,8 @@ describe("Besen: die Spinne bekommt ihn", () => {
     );
     expect(
       new GripSystem(p2.world, g2).attachBody(brocken.body),
-      "Aufbau: vier Tonnen muessten zu schwer sein"
-    ).toBe(false);
+      "vier Tonnen: Greifen geht, Heben entscheidet der Arm"
+    ).toBe(true);
   });
 
   it("schwenkt sie am Arm, ohne an den Unterwagen zu schlagen — quer ja, laengs knapp nicht", () => {

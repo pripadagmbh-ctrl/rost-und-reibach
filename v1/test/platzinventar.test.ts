@@ -30,6 +30,8 @@ import {
 import { abstandVomStand, SCHWENK_INNEN, SCHWENK_AUSSEN } from "../src/world/baggerstand";
 import { ABLADE_SPUR_X } from "../src/delivery/routes";
 import { getMaterial } from "../src/materials/catalog";
+import { nutzlastKg } from "../src/excavator/traglast";
+import { FUENFSCHALEN } from "../src/excavator/greiferFuenfschalen";
 
 beforeAll(async () => {
   await initPhysics();
@@ -41,8 +43,13 @@ const DICHTE = 300;
 /** Kufe und Boden, wie sie dort gebaut werden */
 const KUFE = 0.22;
 const WAND_T = 0.09;
-/** Deckel des Greifsystems (`physics/gripSystem.ts`) */
-const MAX_TOTAL_KG = 3500;
+/**
+ * Was der Fuenfschalengreifer heben darf — seit E-152 nach Ausladung
+ * (`excavator/traglast.ts`), nicht mehr eine feste Zahl. Nah: kleinste
+ * Ausladung des Arms (3,7 m), weit: 9 m; Hoehe des Stielendes 3 m.
+ */
+const NAH_KG = nutzlastKg(3.7, 3, FUENFSCHALEN.eigengewichtKg);
+const WEIT_KG = nutzlastKg(9, 3, FUENFSCHALEN.eigengewichtKg);
 
 describe("Der Müllcontainer ist ein Container, kein Bauwerk", () => {
   it("er ist beweglich — und der Greifer hebt ihn leer gerade noch", () => {
@@ -61,10 +68,11 @@ describe("Der Müllcontainer ist ein Container, kein Bauwerk", () => {
     const leerKg = (boden + waende) * DICHTE;
     expect(MUELL.kind, "der MUELL ist kein Absetzcontainer").toBe("rolloff");
     expect(leerKg, `${leerKg.toFixed(0)} kg leer`).toBeCloseTo(1781, 0);
-    expect(leerKg, "leer schon zu schwer für den Greifer").toBeLessThan(MAX_TOTAL_KG);
-    // Und voll wird er von selbst zu schwer — dafür braucht es keine Abfrage:
-    // das Ladegewicht kommt als Zusatzmasse an den Körper (`wiegeLadung`).
-    expect(MAX_TOTAL_KG - leerKg, "Zuladung bis zum Anschlag").toBeLessThan(1800);
+    expect(leerKg, "leer schon zu schwer für den Greifer, auch nah").toBeLessThan(NAH_KG);
+    // E-152: Leer hebt ihn die Maschine nah, weit draussen nicht mehr — und
+    // voll wird er von selbst schwerer: Das Ladegewicht kommt als
+    // Zusatzmasse an den Körper (`wiegeLadung`), die Ueberlastsperre greift.
+    expect(leerKg, "weit draussen hebt sie ihn leer nicht mehr").toBeGreaterThan(WEIT_KG);
   });
 
   it("er kommt zur Ruhe und bleibt liegen — sonst zittert der Platz die ganze Zeit", () => {

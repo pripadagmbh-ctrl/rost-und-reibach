@@ -17,8 +17,10 @@ import { MAGNET_AB } from "../excavator/magnet";
  * KEINE Stueckzahlgrenze (E-052, 15.09.2026).
  *
  * Hier stand `MAX_ITEMS`: erst 5, dann kurz 24. Ansage Patrick: „Deckel ganz
- * weg." Was gehalten wird, kommt mit — die einzige Grenze ist die Traglast
- * (`MAX_TOTAL_KG`), und die ist Tragfaehigkeit, keine Auswahl.
+ * weg." Was gehalten wird, kommt mit. Die Traglast ist seit E-152 keine
+ * Grenze beim Greifen mehr, sondern eine beim HEBEN, und sie haengt an der
+ * Ausladung (`excavator/traglast.ts`): Gefasst wird, was im Korb liegt; ob
+ * es hochgeht, entscheidet der Arm (Ueberlastsperre in `Excavator`).
  *
  * Der Grund, warum vorher noch ein Notnagel von 24 dastand, war nicht das
  * Spiel, sondern die Sorge vor einem kuenftigen Fehler: Wenn die Greifbedingung
@@ -31,7 +33,12 @@ import { MAGNET_AB } from "../excavator/magnet";
  * 250 kg, aus 105 bis 123 echten Teilen. Wenn dort je deutlich mehr haengen,
  * faellt der Test auf und sagt, dass die Bedingung kaputt ist.
  */
-const MAX_TOTAL_KG = 3500; // (SW) — eine ganze Karosse muss hochgehen
+/*
+ * E-152: Hier stand `MAX_TOTAL_KG = 3500` (SW). Gefasst wurde nur, was in die
+ * Summe passte — ein schwereres Teil blieb ohne jede Rueckmeldung liegen
+ * (Patrick: „beim heben passiert nichts"). Jetzt greift die Spinne zu, und
+ * der Arm hebt nur, was die Traglasttabelle bei dieser Ausladung erlaubt.
+ */
 // Greif-Fenster: solange die Spinne schließt und noch nicht ganz zu ist, wird
 // kontinuierlich zugepackt — so lassen sich fallende Objekte auffangen.
 const GRAB_WINDOW_START = 0.6;
@@ -210,8 +217,15 @@ export class GripSystem {
    */
   getViolence: (() => number) | null = null;
 
-  /** Traglast-Faktor aus dem Baggerausbau — von main gesetzt */
+  /** Traglast-Faktor aus dem Baggerausbau — von main gesetzt; der Bagger liest ihn fuer die Traglasttabelle */
   getCapacityBonus: (() => number) | null = null;
+  /**
+   * E-152: Was der Arm in seiner jetzigen Stellung heben darf (kg), schon ohne
+   * Anbaugeraet. Verbunden in `setzeGreifer`. Der Magnet zieht nur, was er
+   * auch heben koennte — ein zu schweres Teil haftet erst, wenn die Scheibe
+   * aufliegt, und dann meldet der Arm beim Heben die Ueberlast.
+   */
+  getTraglastKg: (() => number) | null = null;
 
   /** Hooks für Events (Audio/HUD) — von main verdrahtet, kein Modul-Import nötig */
   onGrabbed: ((bodies: RAPIER.RigidBody[]) => void) | null = null;
@@ -399,7 +413,7 @@ export class GripSystem {
     // Mitte der Unterseite und Richtung „nach unten" der Scheibe
     const unten = this.tmpB.set(0, -1, 0).applyQuaternion(this.tmpQ);
     const mitte = this.tmpA.copy(unten).multiplyScalar(m.unten).add(new THREE.Vector3(g.x, g.y, g.z));
-    const kapazitaet = MAX_TOTAL_KG * (this.getCapacityBonus?.() ?? 1);
+    const kapazitaet = this.getTraglastKg?.() ?? Infinity;
     const gesehen = new Set<number>();
     const ziehen: Array<{ body: RAPIER.RigidBody; dx: number; dy: number; dz: number }> = [];
     const heften: RAPIER.RigidBody[] = [];
@@ -412,7 +426,6 @@ export class GripSystem {
         if (!body || !body.isDynamic() || gesehen.has(body.handle)) return true;
         gesehen.add(body.handle);
         if ((this.ferroAnteil?.(body) ?? 0) < MAGNET_AB) return true;
-        if (this.totalMassKg + body.mass() > kapazitaet) return true;
         // naechster Punkt des Teils zur Mitte der Unterseite, ueber alle Kollider
         let best = Infinity;
         let px = 0;
@@ -434,7 +447,10 @@ export class GripSystem {
         if (this.insideGrapple && !this.insideGrapple(this.probe)) return true;
         const spalt = (px - mitte.x) * unten.x + (py - mitte.y) * unten.y + (pz - mitte.z) * unten.z;
         if (spalt <= MAGNET_HAFT_M || this.liegtAnHaftendem(body)) heften.push(body);
-        else ziehen.push({ body, dx: mitte.x - px, dy: mitte.y - py, dz: mitte.z - pz });
+        // E-152: hochziehen nur, was der Arm hier auch heben koennte — liegt die
+        // Scheibe auf, haftet es trotzdem, und der Arm meldet die Ueberlast
+        else if (this.totalMassKg + body.mass() <= kapazitaet)
+          ziehen.push({ body, dx: mitte.x - px, dy: mitte.y - py, dz: mitte.z - pz });
         return true;
       }
     );
@@ -562,9 +578,8 @@ export class GripSystem {
      * von schwereren Nachbarn verdraengt (gemessen 0 von 5).
      *
      * Sortiert wird jetzt danach, wie sicher das Teil gehalten wird. Das
-     * entscheidet nichts mehr darueber, WAS mitkommt (es kommt alles mit),
-     * sondern nur noch, wen die Traglastgrenze abschneidet, wenn sie greift:
-     * Dann bleibt liegen, was ohnehin am lockersten sass.
+     * entscheidet nichts mehr darueber, WAS mitkommt (es kommt alles mit,
+     * seit E-152 auch ueber der Traglast — die prueft der Arm beim Heben).
      */
     candidates.sort((a, b) => b.halt - a.halt);
 
@@ -719,11 +734,9 @@ export class GripSystem {
 
   /** Körper per Fixed Joint an den Greifer koppeln (auch von der Reiß-Mechanik genutzt). */
   attachBody(body: RAPIER.RigidBody): boolean {
-    // Keine Stueckzahlgrenze mehr (E-052). Was gehalten wird, kommt mit; die
-    // einzige Grenze ist die Traglast.
+    // Keine Stueckzahlgrenze (E-052) und seit E-152 keine Massengrenze beim
+    // Greifen: Ob es hochgeht, entscheidet der Arm nach der Traglasttabelle.
     if (this.items.some((it) => it.body.handle === body.handle)) return false; // schon gegriffen
-    if (this.totalMassKg + body.mass() > MAX_TOTAL_KG * (this.getCapacityBonus?.() ?? 1))
-      return false;
 
     const gPos = this.grappleBody.translation();
     const gRot = this.grappleBody.rotation();

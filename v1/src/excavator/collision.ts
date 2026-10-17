@@ -51,6 +51,13 @@ export interface CollisionContext {
   getStaffPos: () => THREE.Vector3 | null;
   /** Die eigenen Koerper des Baggers — gegen sie stoesst eine Last nicht an (E-145) */
   selfHandles: Set<number>;
+  /**
+   * E-152: Tiefe der Pruefkugel unter dem Gelenk (m). Spinne: 1,35 (Korbmitte).
+   * Magnet: so, dass die Kugel an der Unterseite der Scheibe endet — sonst
+   * hielt sie den Arm 0,37 m ueber jedem Brocken an, und die Scheibe kam nie
+   * an ihn heran.
+   */
+  pruefTiefe?: () => number;
 }
 
 /** Ein gehaltenes Teil mit seiner Pose relativ zur Spinne (`GripSystem.gehalten`) */
@@ -119,7 +126,7 @@ const ARM_PAD = 0.2;
  */
 const GRAPPLE_PAD = 0.25;
 /** Radius der Prüfkugel im Schalenkorb */
-const PROBE_R = 0.62;
+export const PROBE_R = 0.62;
 /**
  * Radius, in dem die Spinne Material verdrängt. Größer als die Prüfkugel:
  * Beim Pflügen durch einen Haufen schiebt sie auch, was sie nur streift.
@@ -155,6 +162,33 @@ const PLOW_KONTAKT = 0.01;
  * entgegensetzt — und eine Tonne haelt einen Ausleger fast auf.
  */
 const PLOW_HALF_KG = 500;
+/*
+ * E-152: ZWEI KUENSTLICHE BREMSEN AN GROSSEN TEILEN.
+ *
+ * Gemessen (`tools/lastbremse.ts`): Auf einem 2,2-t-Seecontainer aufgesetzt
+ * schwenkte die Maschine je nach Lauf mit 7,8 bis 30 °/s statt 30,7, der
+ * Pflugfaktor fiel bis 0,20 — obwohl die Spinne nur auf dem Dach lag und der
+ * Container sich nicht bewegte. Zwei Ursachen:
+ *  1. Das Tor (`beruehrt`) liess jeden Kontakt durch, dessen Normale auch nur
+ *     ein bisschen in Bewegungsrichtung zeigte. Wer auf einem Dach schwenkt,
+ *     hat eine fast senkrechte Normale und eine waagrechte Bewegung — das ist
+ *     Gleiten, kein Schieben.
+ *  2. Die Kugel zaehlte dann die ganze Masse aller Koerper darin, auch die,
+ *     die sich gar nicht bewegten.
+ * Jetzt: Das Tor verlangt, dass die Bewegung wirklich in den Koerper geht
+ * (`PLOW_RICHTUNG_COS`), und ein Brocken ueber `HEAVY_BLOCK_KG` zaehlt nur,
+ * wenn er tatsaechlich mitgeht (`PLOW_BEWEGT_MS`). Zieht eine Schale einen
+ * Container mit, bremst er wie bisher; liegt die Spinne nur auf, bremst er
+ * nicht. Der Haufen aus Kleinteilen zaehlt wie am 11.09. abgestimmt ganz —
+ * gemessen: nur Bewegtes zu zaehlen haette ihn von 26,9 auf 29,7 °/s (frei
+ * 30,7) leichtgaengig gemacht. Seitlich an einen Brocken anfahren haelt
+ * die Spinne an (`grappleSchiebtBrocken`): Vorher schob sie einen
+ * 2,2-t-Container 1,3 m weit — gebremst, aber mit unendlicher Kraft.
+ */
+/** SW: cos 72° — so steil muss die Bewegung in den Koerper zeigen, damit es Schieben ist und nicht Gleiten */
+const PLOW_RICHTUNG_COS = 0.3;
+/** SW: Ab diesem Tempo (m/s) weicht ein Koerper — darunter liegt er (Zittern im Haufen bleibt darunter) */
+const PLOW_BEWEGT_MS = 0.15;
 /** So langsam wird es hoechstens — darunter steht die Maschine praktisch */
 const PLOW_MIN = 0.2;
 /** Ab dieser Masse ist ein Brocken nicht mehr wegzuschieben */
@@ -246,6 +280,9 @@ export class ExcavatorCollision {
       if (!b || !b.isDynamic()) return true;
       // Was in der Spinne hängt, zählt separat als Traglast
       if (this.ctx.grippedHandles.has(b.handle)) return true;
+      // E-152: ein ruhender Brocken ist kein Pflugmaterial — er zaehlt erst, wenn er mitgeht
+      const v = b.linvel();
+      if (b.mass() > HEAVY_BLOCK_KG && Math.hypot(v.x, v.y, v.z) < PLOW_BEWEGT_MS) return true;
       masse += b.mass();
       return true;
     });
@@ -264,6 +301,8 @@ export class ExcavatorCollision {
     const g = this.ctx.grappleBody();
     const world = this.ctx.world;
     let ja: RAPIER.RigidBody | null = null;
+    // E-152: Bewegung muss steiler als PLOW_RICHTUNG_COS in den Koerper gehen
+    const schwelle = PLOW_RICHTUNG_COS * Math.hypot(vx, vy, vz);
     for (let i = 0; i < g.numColliders() && !ja; i++) {
       const c = g.collider(i);
       if (!c.isEnabled()) continue;
@@ -275,7 +314,8 @@ export class ExcavatorCollision {
           for (let k = 0; k < m.numContacts(); k++) if (m.contactDist(k) < PLOW_KONTAKT) beruehrt = true;
           // Die Normale zeigt vom ersten Kollider zum zweiten
           const n = m.normal();
-          if (beruehrt && (!nurInRichtung || (n.x * vx + n.y * vy + n.z * vz) * (flipped ? -1 : 1) > 0)) ja = b;
+          if (!beruehrt) return;
+          if (!nurInRichtung || (n.x * vx + n.y * vy + n.z * vz) * (flipped ? -1 : 1) > schwelle) ja = b;
         });
       });
     }
@@ -314,6 +354,7 @@ export class ExcavatorCollision {
   armHits(): boolean {
     if (this.grappleHitsBuilding()) return true;
     if (this.grappleHitsBody()) return true;
+    if (this.grappleSchiebtBrocken()) return true;
     if (this.armHitsBuilding()) return true;
     if (this.armHitsStaff()) return true;
     return this.ctx.obstacleBodies.size > 0 && this.armHitsVehicle();
@@ -425,7 +466,7 @@ export class ExcavatorCollision {
   private grappleHitsBody(): boolean {
     probe ??= new RAPIER.Ball(PROBE_R);
     this.ctx.grappleGroup.getWorldPosition(this.pos);
-    this.pos.y -= 1.35; // Mitte des Schalenkorbs
+    this.pos.y -= this.ctx.pruefTiefe?.() ?? 1.35; // Mitte des Schalenkorbs
     let hit = false;
     this.ctx.world.intersectionsWithShape(this.pos, IDENT_QUAT, probe, (collider) => {
       const b = collider.parent();
@@ -444,6 +485,55 @@ export class ExcavatorCollision {
       return true;
     });
     return hit;
+  }
+
+  /**
+   * E-152: Stoesst die Spinne seitlich an einen Brocken und faehrt weiter
+   * hinein? Dann haelt der Arm an — wie an einer Wand.
+   *
+   * Ein Brocken ist, was mehr als `HEAVY_BLOCK_KG` wiegt („nicht mehr
+   * wegzuschieben", dieselbe Zahl wie in `grappleHitsBody`). Gezaehlt wird
+   * nur die WAAGRECHTE Bewegung der Spinne, und sie muss steil in den Brocken
+   * gehen (`PLOW_RICHTUNG_COS`). Von oben auf einen Brocken senken bleibt
+   * damit Sache der Brocken-Sperre im Bodenanschlag (E-137) — dort ist „ein
+   * Stueck Biss" gewollt —, und flach ueber ein Dach gleiten bleibt frei
+   * (die Normale steht dort fast senkrecht). Steckt eine Schale im Dach und
+   * zieht den Brocken mit, kippt die Normale zur Seite: Das haelt an.
+   * Ob der Brocken mitlaeuft, zaehlt hier bewusst NICHT: Beim Abheben laeuft
+   * ein eingehakter Brocken immer ein Stueck mit, und das Abheben muss gehen
+   * (gemessen: Heben vom Container 1,77 → 0,67 m in 1 s, solange es zaehlte).
+   * Rapier-Kontakte des letzten Schritts, nur gelesen (v2 E-044). Wegfahren
+   * und Heben gehen durch: Das ist der Fluchtweg.
+   */
+  private grappleSchiebtBrocken(): boolean {
+    this.ctx.grappleGroup.getWorldPosition(this.pos);
+    const vx = this.pos.x - this.lastGrapple.x;
+    const vz = this.pos.z - this.lastGrapple.z;
+    // Abheben ist immer der Fluchtweg — auch wenn der Ausleger das Ende dabei etwas heranzieht
+    if (this.pos.y > this.lastGrapple.y) return false;
+    const schwelle = PLOW_RICHTUNG_COS * Math.hypot(vx, vz);
+    if (schwelle <= 0) return false;
+    const g = this.ctx.grappleBody();
+    const world = this.ctx.world;
+    let ja = false;
+    for (let i = 0; i < g.numColliders() && !ja; i++) {
+      const c = g.collider(i);
+      if (!c.isEnabled()) continue;
+      world.contactPairsWith(c, (o) => {
+        const b = o.parent();
+        if (ja || !b || !b.isDynamic() || b.mass() <= HEAVY_BLOCK_KG) return;
+        if (this.ctx.grippedHandles.has(b.handle)) return;
+        world.contactPair(c, o, (m, flipped) => {
+          const s = flipped ? -1 : 1;
+          const n = m.normal();
+          let beruehrt = false;
+          for (let k = 0; k < m.numContacts(); k++) if (m.contactDist(k) < PLOW_KONTAKT) beruehrt = true;
+          if (!beruehrt) return;
+          if ((n.x * vx + n.z * vz) * s > schwelle) ja = true;
+        });
+      });
+    }
+    return ja;
   }
 
   /** Ausleger und Stiel an mehreren Punkten entlang abtasten. */

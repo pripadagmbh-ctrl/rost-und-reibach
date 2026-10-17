@@ -24,6 +24,12 @@ import { GripSystem } from "../src/physics/gripSystem";
 import { initPhysics } from "../src/physics/physicsWorld";
 import { ItemManager, SPECS, BIG_SPECS, HUGE_SPECS } from "../src/world/scrapItems";
 import type { PileSpec } from "../src/world/objektkatalog";
+import { CompositeManager } from "../src/dismantle/composites";
+import type { WrackArt } from "../src/dismantle/carDef";
+import { EventBus } from "../src/core/events";
+import { setzeGreifer } from "../src/excavator/greiferwahl";
+import type { Greiferform } from "../src/excavator/greiferform";
+import { ferroAnteilVon } from "../src/excavator/magnet";
 
 const DT = 1 / 60;
 
@@ -66,6 +72,32 @@ export interface GrossteilMessung {
   gehoben: number;
   /** schnellstes Tempo des Teils waehrend des ganzen Laufs (m/s) */
   vMax: number;
+  /**
+   * E-152: Wie weit kam das Teil im Greifweg? 0 = Sensor erreicht es nicht,
+   * 1 = im Sensor, aber der naechste Punkt liegt nicht im Korb (Magnet: nicht
+   * im Wirkfeld), 2 = im Korb, aber zu wenig Schalen (Magnet: zu wenig
+   * Stahl), 3 = Bedingung erfuellt, aber nie im Greiffenster, 4 = erfuellt
+   * im Fenster.
+   */
+  stufe: number;
+  /** E-152: ob statt des Teils eine Baugruppe gerissen wurde (Wracks) */
+  reisst: boolean;
+  /** E-152: Bilder, in denen der Arm beim Senken/Greifen blockiert war */
+  armBlockiert: number;
+  /** E-152: kleinster Pflugfaktor beim Senken/Greifen (1 = ungebremst) */
+  pflugMin: number;
+  /** E-152: Hubtempo des gehaltenen Teils in der zweiten Hebe-Sekunde (m/s) */
+  hubMs: number;
+  /** E-152: Bilder mit Ueberlast beim Heben (dann zieht der Lauf den Stiel heran) */
+  ueberlast: number;
+}
+
+/** E-152: Was gemessen wird — Teil aus dem Katalog oder ein Wrack. */
+export interface MessOptionen {
+  /** Greifer; ohne Angabe die Sichelkralle (Grundzustand, wie E-137 gemessen) */
+  form?: Greiferform;
+  /** statt `sp` ein Wrack (Pkw, Wohnwagen, LKW) */
+  wrack?: WrackArt;
 }
 
 function form(sp: PileSpec) {
@@ -83,7 +115,8 @@ async function einLauf(
   sp: PileSpec,
   spur?: (phase: string, bagger: Excavator, teil: RAPIER.RigidBody | null) => void,
   /** Teil so weit neben die Spinnenmitte legen (m, Welt) */
-  versatz = { x: 0, z: 0 }
+  versatz = { x: 0, z: 0 },
+  opt: MessOptionen = {}
 ): Promise<GrossteilMessung & { endeX: number; endeZ: number; teilX: number; teilZ: number }> {
   let phase = "vorbereiten";
   leinwandAttrappe();
@@ -103,6 +136,47 @@ async function einLauf(
     const it = items.itemByBody(b);
     return !it || !items.isCrushable(it);
   };
+  // E-152: wie main.ts — Wracks mit Baugruppen, Magnet mit Stahlanteil
+  const comps = new CompositeManager(scene, world, items, new EventBus());
+  grip.partResolver = (pos) => comps.findPartNear(pos);
+  grip.ferroAnteil = (b) => ferroAnteilVon(b, items, comps.cars);
+  if (opt.form) setzeGreifer(bagger, grip, opt.form);
+  let stufe = 0;
+  let reisst = false;
+  let armBlockiert = 0;
+  let pflugMin = 1;
+  const diag = (): void => {
+    if (!teil || !teil.isValid()) return;
+    const f = bagger.greiferform;
+    const s = bagger.getSensorPosition(new THREE.Vector3());
+    let best = Infinity;
+    const q = new THREE.Vector3();
+    for (let i = 0; i < teil.numColliders(); i++) {
+      const pr = teil.collider(i).projectPoint(s, true);
+      if (!pr) continue;
+      const d = Math.hypot(pr.point.x - s.x, pr.point.y - s.y, pr.point.z - s.z);
+      if (d < best) {
+        best = d;
+        q.set(pr.point.x, pr.point.y, pr.point.z);
+      }
+    }
+    let st = 0;
+    if (best <= f.sensorRadius) st = 1;
+    if (st === 1 && bagger.isInsideGrapple(q)) st = 2;
+    if (st === 2) {
+      if (f.magnet) {
+        if ((grip.ferroAnteil?.(teil) ?? 0) >= 0.5) st = 3;
+      } else {
+        const m = teil.translation();
+        const mittig = bagger.isInsideGrapple(new THREE.Vector3(m.x, m.y, m.z));
+        const noetig = mittig ? 0 : (grip as unknown as { noetigeKrallen(b: RAPIER.RigidBody): number }).noetigeKrallen(teil);
+        if (bagger.krallenKontakte(teil) >= noetig) st = 3;
+      }
+    }
+    if (st === 3 && (f.magnet || (bagger.closure >= 0.6 && bagger.closure <= 0.98))) st = 4;
+    stufe = Math.max(stufe, st);
+    if (grip.tearing) reisst = true;
+  };
   const tasten = new Tasten();
   const sensor = new THREE.Vector3();
   let teil: RAPIER.RigidBody | null = null;
@@ -117,6 +191,11 @@ async function einLauf(
     bagger.grippedHandles.clear();
     for (const b of grip.grippedBodies) bagger.grippedHandles.add(b.handle);
     spur?.(phase, bagger, teil);
+    if (phase === "greifen") diag();
+    if (phase === "absenken" || phase === "korrigieren" || phase === "greifen") {
+      if (bagger.armBlocked) armBlockiert++;
+      pflugMin = Math.min(pflugMin, (bagger as unknown as { plowFactor: number }).plowFactor);
+    }
     if (teil) {
       const v = teil.linvel();
       vMax = Math.max(vMax, Math.hypot(v.x, v.y, v.z));
@@ -133,14 +212,17 @@ async function einLauf(
   tasten.down.clear();
   for (let i = 0; i < 30; i++) takt();
   const gp = bagger.grappleGroup.position.clone();
-  const h = hoehe(sp);
-  const it = items.spawnScrap(sp.materialId, sp.massKg, form(sp), new THREE.Vector3(gp.x + versatz.x, h / 2 + 0.02, gp.z + versatz.z));
-  teil = it.body;
+  if (opt.wrack) {
+    teil = comps.spawnCar(new THREE.Vector3(gp.x + versatz.x, 0.02, gp.z + versatz.z), opt.wrack, 0).body;
+  } else {
+    const h = hoehe(sp);
+    teil = items.spawnScrap(sp.materialId, sp.massKg, form(sp), new THREE.Vector3(gp.x + versatz.x, h / 2 + 0.02, gp.z + versatz.z)).body;
+  }
   for (let i = 0; i < 60; i++) takt(); // liegt
   // oberste Kante messen: Strahl von oben
   const ray = new RAPIER.Ray({ x: gp.x, y: 20, z: gp.z }, { x: 0, y: -1, z: 0 });
   const hit = world.castRay(ray, 40, true, undefined, undefined, undefined, undefined, (c) => c.parent()?.handle === teil!.handle);
-  const oben = hit ? 20 - hit.timeOfImpact : h;
+  const oben = hit ? 20 - hit.timeOfImpact : 0;
 
   // 2. auf das Teil zufahren
   phase = "absenken";
@@ -176,12 +258,32 @@ async function einLauf(
   const gefasst = grip.grippedCount;
   const y0 = teil.translation().y;
   tasten.down.add("KeyR");
-  for (let i = 0; i < 90; i++) takt();
+  // E-152: wie ein Spieler — meldet der Arm Ueberlast, Stiel heranziehen (G), dann hebt er
+  let ueberlast = 0;
+  const heben = (): void => {
+    if (bagger.ueberlast) {
+      ueberlast++;
+      tasten.down.add("KeyG");
+    }
+    takt();
+  };
+  for (let i = 0; i < 60; i++) heben();
+  const yMitte = teil.isValid() ? teil.translation().y : 0;
+  for (let i = 0; i < 60; i++) heben();
+  const hubMs = teil.isValid() ? teil.translation().y - yMitte : 0;
+  for (let i = 0; i < 30; i++) heben();
   const gehoben = teil.isValid() ? teil.translation().y - y0 : 0;
+  const massKg = teil.isValid() ? teil.mass() : sp.massKg;
   world.free();
   return {
-    name: sp.name ?? sp.bau ?? "?",
-    massKg: sp.massKg,
+    name: opt.wrack ? `Wrack ${opt.wrack}` : sp.name ?? sp.bau ?? "?",
+    massKg,
+    stufe,
+    reisst,
+    ueberlast,
+    armBlockiert,
+    pflugMin,
+    hubMs,
     oben,
     spitzeAbgesenkt,
     stiegBeimSenken: stieg,
@@ -205,8 +307,9 @@ async function einLauf(
 export async function messeGrossteil(
   sp: PileSpec,
   spur?: (phase: string, bagger: Excavator, teil: RAPIER.RigidBody | null) => void,
-  versatz = { x: 0, z: 0 }
+  versatz = { x: 0, z: 0 },
+  opt: MessOptionen = {}
 ): Promise<GrossteilMessung> {
-  const a = await einLauf(sp);
-  return einLauf(sp, spur, { x: a.endeX - a.teilX + versatz.x, z: a.endeZ - a.teilZ + versatz.z });
+  const a = await einLauf(sp, undefined, { x: 0, z: 0 }, opt);
+  return einLauf(sp, spur, { x: a.endeX - a.teilX + versatz.x, z: a.endeZ - a.teilZ + versatz.z }, opt);
 }

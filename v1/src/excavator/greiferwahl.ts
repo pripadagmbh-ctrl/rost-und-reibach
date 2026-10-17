@@ -105,6 +105,8 @@ export function setzeGreifer(
    * main.ts noetig.
    */
   bagger.greifsystem = grip;
+  // E-152: Der Magnet zieht nur, was der Arm hier heben darf
+  grip.getTraglastKg = () => bagger.traglastKg;
   if (!bagger.setGreifer(form)) return bagger.greiferform;
   /*
    * Die Sensorkugel gehoert dem Greifsystem und wird neu angelegt: Eine

@@ -204,6 +204,16 @@ export interface GameEvents {
    * Meldung). Fuer den Ton: der dumpfe Klonk, lauter mit der Masse.
    */
   "magnet:haftet": { massKg: number };
+  /**
+   * E-152: Ueberlast wie an einer echten Maschine (Ueberlastwarneinrichtung
+   * nach EN 474-5). Was in der Spinne haengt, ist schwerer, als die
+   * Traglasttabelle bei dieser Ausladung erlaubt — Heben und Ausfahren
+   * stoppen, Absenken, Heranziehen und Schwenken gehen weiter. Einmal je
+   * Versuch, nicht je Bild: neu erst, wenn der Spieler die gesperrte Bewegung
+   * losgelassen hat. `massKg` = gehaltene Last, `grenzeKg` = Traglast hier
+   * (Anbaugeraet abgezogen), `ausladungM` = waagrechter Abstand zur Drehmitte.
+   */
+  "greifer:ueberlast": { massKg: number; grenzeKg: number; ausladungM: number };
 }
 
 type Handler<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;

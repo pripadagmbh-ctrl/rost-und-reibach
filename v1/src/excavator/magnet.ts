@@ -59,10 +59,9 @@ export const MAGNET_AB = 0.5;
  * Eigengewicht des Magneten (kg). SW 1 700 kg: Datenblaetter runder
  * Lasthebemagnete um Ø 1,3 m nennen 1,5–2 t (Auftrag „SW ~1,5–2 t").
  *
- * WIRKT NICHT auf die Bewegung — auch das Eigengewicht der Spinne steht
- * nirgends in der Rechnung. Pendel und Arm bleiben damit Ziffer fuer Ziffer
- * wie mit der Spinne (Regel 2). Ob er sich schwerer anfuehlen soll, ist
- * Patricks Entscheidung (Bericht E-146).
+ * Seit E-152 geht es von der Traglast ab (`traglast.ts`): Mit dem Magneten
+ * hebt die Maschine 0,6 t weniger als mit dem Fuenfschalengreifer. Auf Pendel
+ * und Armtempo wirkt es weiterhin nicht (Regel 2).
  */
 export const MAGNET_EIGEN_KG = 1700;
 
@@ -112,6 +111,7 @@ export const MAGNET: Greiferform = {
   ladungOffen: 0,
   rate: 1,
   kolliderRadius: 0,
+  eigengewichtKg: MAGNET_EIGEN_KG,
   magnet: { radius: MAGNET_R, hoehe: MAGNET_H, unten: MAGNET_UNTEN },
   baue: baueMagnet,
 };

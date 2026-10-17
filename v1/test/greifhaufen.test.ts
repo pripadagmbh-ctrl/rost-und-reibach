@@ -335,12 +335,8 @@ function starthaufenGriff(saat: number): {
 }
 
 /**
- * Zwei schwere Teile, von denen nur eines an den Haken passt.
- *
- * Seit die Stueckzahlgrenze weg ist (E-052), ist die **Traglast** der einzige
- * Abschneider. Dieser Aufbau bringt sie zum Greifen: zwei Brocken von je
- * 2000 kg, zusammen 4000 kg — `MAX_TOTAL_KG` sind 3500. Einer bleibt liegen,
- * und die Sortierung nach Haltwert entscheidet, welcher.
+ * Zwei schwere Teile, zusammen 4000 kg — mehr als die alte feste Grenze
+ * `MAX_TOTAL_KG` (3500, bis E-152). Seit E-152 werden beide gefasst.
  *
  * `versatzB` legt den zweiten Brocken weiter nach aussen; beide liegen mit dem
  * Schwerpunkt im Korb, der zweite aber lockerer.
@@ -571,30 +567,21 @@ describe("Greifen im Haufen — worauf du zielst, das bekommst du", () => {
   );
 });
 
-describe("Traglast — der einzige Abschneider, seit der Deckel weg ist (E-052)", () => {
+describe("Traglast — seit E-152 keine Grenze beim Greifen mehr", () => {
   it(
-    "schneidet ab, wenn zwei Brocken zusammen zu schwer sind",
-    () => {
-      const r = traglastProbe(0.5);
-      expect(r.korb, "einer der beiden Brocken haengt").toBe(1);
-      expect(r.kg, "und die Traglast ist eingehalten").toBeLessThanOrEqual(3500);
-    },
-    120000
-  );
-
-  it(
-    "und laesst dabei das liegen, was lockerer sass",
+    "zwei 2-t-Brocken im Korb: beide werden gefasst",
     () => {
       /*
-       * Wenn die Traglast abschneidet, entscheidet die Reihenfolge — und die
-       * geht seit E-045 nach Haltwert, nicht nach Gewicht. Beide Brocken sind
-       * hier gleich schwer, beide liegen mit dem Schwerpunkt im Korb; der
-       * zweite nur weiter aussen. Mitkommen muss der, der tiefer im Korb
-       * liegt.
+       * Bis E-152 schnitt `MAX_TOTAL_KG` (3 500 kg) hier einen der beiden ab,
+       * und welcher, entschied der Haltwert. Patrick, 17.10.2026: „beim heben
+       * passiert nichts … ein umschlagbagger kann definitiv mehr heben". Jetzt
+       * greift die Spinne alles, was im Korb liegt; ob es hochgeht, entscheidet
+       * der Arm nach der Traglasttabelle (`test/traglast.test.ts`).
        */
       const r = traglastProbe(0.5);
-      expect(r.aGefasst, "der Brocken unter der Achse blieb liegen").toBe(true);
-      expect(r.bGefasst, "statt seiner kam der aeussere mit").toBe(false);
+      expect(r.korb, "beide Brocken haengen").toBe(2);
+      expect(r.aGefasst && r.bGefasst).toBe(true);
+      expect(r.kg).toBeCloseTo(4000, -1);
     },
     120000
   );
