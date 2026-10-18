@@ -575,6 +575,12 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 21f | Ton beim Pressen (Schere) klingt wie ein lallender Betrunkener |
       | 21g | Viele gute Elemente — bleiben |
 
+      Antworten 18.10.: „Alles auf einmal" (Hörparcours, Tonhöhe ±5 %, kein
+      Gleiten beim Pressen, AAC, neue Aufnahmen — E-159). Eigene Aufnahmen auf
+      einem Schrottplatz: „Nein". Freesound (CC0, Anmeldung nötig, Patrick lädt
+      selbst): „Ja, alle sechs" — #587442, #587443, #378670, #167917, #530209,
+      #532874. Alu noch ohne Kandidat.
+
 - [ ] **Ansage 18.10.2026, Boden** — Patrick, wörtlich: „auch soll es nicht
       mehr möglich sien, das körper im boden versinken können, wie aktuell bei
       autos der fall" (E-158; bekannt aus E-145: die Wandsperre zählt den Boden
