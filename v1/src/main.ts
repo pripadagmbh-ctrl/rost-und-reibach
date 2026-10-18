@@ -34,6 +34,7 @@ import { installAbrechnung } from "./ui/abrechnung";
 import { Tutorial } from "./ui/tutorial";
 import { installRadio, radioWeiter } from "./ui/radio";
 import { installTonregler } from "./ui/tonregler";
+import { installHoerprobe } from "./ui/hoerprobe";
 import { Funkzentrale } from "./ui/funk";
 import { Reputation } from "./economy/reputation";
 import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
@@ -997,6 +998,14 @@ async function main(): Promise<void> {
   });
   // Lautstaerke je Gruppe im Pausenmenue (E-139)
   installTonregler({ audio, verlassePause: () => setPaused(false) });
+  // Hörparcours (E-159): Knopf im Lautstärke-Feld, am PC zusätzlich F4
+  const hoerprobe = installHoerprobe({ audio, bus });
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "F4" && !e.repeat) {
+      e.preventDefault();
+      hoerprobe();
+    }
+  });
 
   /*
    * Das Funkgeraet (E-100). Mario, Janine und Lambert melden sich ueber
