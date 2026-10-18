@@ -1,3 +1,6 @@
+import type RAPIER from "@dimforge/rapier3d-compat";
+import { hitsObstacle } from "../world/obstacles";
+
 /**
  * GEHALTENER SCHROTT SCHLAEGT AUF (E-134, 17.10.2026).
  *
@@ -68,4 +71,34 @@ export class Aufschlagmelder {
     this.abwaertsAlt = abwaerts;
     return schlag ? tempo : null;
   }
+}
+
+/**
+ * E-157: Worauf ein Anschlag trifft — Beton oder Stahl, Schrott oder Wrack.
+ * Aus dem getroffenen Koerper (`Excavator.onAnschlag`):
+ *  - ein Wrack → "wrack"; ein Schrottteil → "schrott";
+ *  - kinematisch (Laster samt Bordwand und Mulde, Streifenwagen,
+ *    Pressstempel) → "stahl";
+ *  - sonst dynamisch (bewegliche Mulden und Container) → "stahl";
+ *  - fest oder ein Bauwerk der Hindernisliste: Presse → "stahl"; liegt der
+ *    Punkt in einer Stahlmulde oder auf einer Ladeflaeche (`stahlPunkt`, aus
+ *    main) → "stahl"; sonst Betonlego und Mauer → "beton".
+ */
+export function anschlagUntergrund(
+  a: { koerper: RAPIER.RigidBody | null; label: string | null; x: number; y: number; z: number },
+  w: {
+    istWrack: (handle: number) => boolean;
+    istSchrott: (handle: number) => boolean;
+    stahlPunkt: (x: number, y: number, z: number) => boolean;
+  }
+): "beton" | "stahl" | "schrott" | "wrack" {
+  const k = a.koerper;
+  if (k && k.isValid()) {
+    if (w.istWrack(k.handle)) return "wrack";
+    if (k.isKinematic()) return "stahl";
+    if (k.isDynamic()) return w.istSchrott(k.handle) ? "schrott" : "stahl";
+  }
+  const label = a.label ?? hitsObstacle(a.x, a.z, 0.4, a.y)?.label ?? "";
+  if (label.startsWith("Presse")) return "stahl";
+  return w.stahlPunkt(a.x, a.y, a.z) ? "stahl" : "beton";
 }

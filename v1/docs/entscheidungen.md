@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-157 | 18.10.2026 | Jedes Anschlagen klingt: Last und Spinne an Wand, Schere, Laster, Container | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-156 | 18.10.2026 | Große Schrottmaschine: nah 10 t, bei 8 m 5,5 t | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-155 | 18.10.2026 | Sichelkralle aus dem Spiel, Fünfschalengreifer ist Grundausstattung | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-154 | 18.10.2026 | Ohne Pratzen hebt die Maschine ein Drittel weniger | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -170,6 +171,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-157 — Anschlagen klingt**
+- Auto greifen, gegen Betonbox und gegen die Schere schwenken: Kracht es einmal, Beton bzw. Stahl?
+- Leere Spinne seitlich gegen Laster und Container: klingt es nach Stahl?
+- Langsam anlehnen und an der Wand entlangdrücken: bleibt es ruhig, ohne Rattern?
 
 **E-156 — Große Schrottmaschine**
 - Ohne Pratzen bei 6–9 m Container, Motoren, Maschinen (1–2,6 t) greifen: Gehen sie hoch?

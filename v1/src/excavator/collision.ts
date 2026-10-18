@@ -60,6 +60,19 @@ export interface CollisionContext {
   pruefTiefe?: () => number;
 }
 
+/**
+ * E-157: Woran die Spinne oder ein gehaltenes Teil gerade angeschlagen ist —
+ * fuer den Klang. `koerper`: der getroffene Koerper (null bei Bauwerken aus
+ * der Hindernisliste), `label`: deren Name, `punkt`: ungefaehrer Ort,
+ * `tempoMs`: wie schnell die Bewegung ging, die gestoppt wurde.
+ */
+export interface Anschlag {
+  koerper: RAPIER.RigidBody | null;
+  label: string | null;
+  punkt: THREE.Vector3;
+  tempoMs: number;
+}
+
 /** Ein gehaltenes Teil mit seiner Pose relativ zur Spinne (`GripSystem.gehalten`) */
 export interface GehaltenesTeil {
   body: RAPIER.RigidBody;
@@ -350,8 +363,30 @@ export class ExcavatorCollision {
     return false;
   }
 
+  /**
+   * E-157: Der zuletzt erkannte Anschlag der Spinne (aus `armHits`) bzw. eines
+   * gehaltenen Teils (aus `gehaltenesStoesstAn`). Nur gueltig im selben
+   * Schritt, in dem die Abfrage `true` ergab.
+   */
+  readonly anschlag: Anschlag = { koerper: null, label: null, punkt: new THREE.Vector3(), tempoMs: 0 };
+  /** E-157: Hat die letzte Abfrage (`armHits`/`gehaltenesStoesstAn`) einen Anschlag gemerkt? */
+  anschlagFrisch = false;
+  private merkeAnschlag(koerper: RAPIER.RigidBody | null, label: string | null, x: number, y: number, z: number, tempoMs: number): void {
+    this.anschlagFrisch = true;
+    this.anschlag.koerper = koerper;
+    this.anschlag.label = label;
+    this.anschlag.punkt.set(x, y, z);
+    this.anschlag.tempoMs = tempoMs;
+  }
+  /** Tempo der Spinne im versuchten Schritt (m/s) — fuer den Anschlag */
+  private spinnenTempo(): number {
+    this.ctx.grappleGroup.getWorldPosition(this.pos);
+    return this.pos.distanceTo(this.lastGrapple) * 60;
+  }
+
   /** Ragt irgendein Teil des Arms in etwas hinein, wo es nicht hingehört? */
   armHits(): boolean {
+    this.anschlagFrisch = false;
     if (this.grappleHitsBuilding()) return true;
     if (this.grappleHitsBody()) return true;
     if (this.grappleSchiebtBrocken()) return true;
@@ -381,12 +416,22 @@ export class ExcavatorCollision {
     jetztPos: THREE.Vector3,
     jetztQuat: THREE.Quaternion
   ): boolean {
+    this.anschlagFrisch = false;
     for (const t of gehalten) {
       if (!t.body.isValid()) continue;
       const neu = this.tiefeBei(t, gehalten, jetztPos, jetztQuat);
       if (neu <= HALT_EINFEDERN_M) continue;
+      const fx = this.hPos.x;
+      const fy = this.hPos.y;
+      const fz = this.hPos.z;
+      const fk = this.tiefeFund.koerper;
+      const fp = this.tiefeFund.punkt.clone();
       const alt = this.tiefeBei(t, gehalten, vorherPos, vorherQuat);
-      if (neu > Math.max(alt, HALT_EINFEDERN_M) + HALT_RAUSCHEN_M) return true;
+      if (neu > Math.max(alt, HALT_EINFEDERN_M) + HALT_RAUSCHEN_M) {
+        // E-157: Anschlag merken — Tempo des Teils im versuchten Schritt
+        this.merkeAnschlag(fk, null, fp.x, fp.y, fp.z, Math.hypot(fx - this.hPos.x, fy - this.hPos.y, fz - this.hPos.z) * 60);
+        return true;
+      }
     }
     return false;
   }
@@ -400,6 +445,8 @@ export class ExcavatorCollision {
    *
    * Treffer erst sammeln, dann messen (v2 E-044).
    */
+  /** E-157: tiefster Fund der letzten `tiefeBei`-Rechnung (Koerper, Kontaktpunkt) */
+  private tiefeFund = { koerper: null as RAPIER.RigidBody | null, punkt: new THREE.Vector3() };
   private tiefeBei(
     t: GehaltenesTeil,
     gehalten: ReadonlyArray<GehaltenesTeil>,
@@ -407,6 +454,7 @@ export class ExcavatorCollision {
     gQuat: THREE.Quaternion
   ): number {
     const body = t.body;
+    this.tiefeFund.koerper = null;
     // Pose des Teils an dieser Spinnenstellung: Spinne · von (wie `carryHeld`)
     this.hPos.copy(t.vonPos).applyQuaternion(gQuat).add(gPos);
     this.hQuat.copy(gQuat).multiply(t.vonQuat);
@@ -445,7 +493,11 @@ export class ExcavatorCollision {
       );
       for (const o of treffer) {
         const k = o.contactShape(c.shape, this.hcPos, this.hcQuat, 0);
-        if (k && k.distance < 0) tiefe = Math.max(tiefe, -k.distance);
+        if (k && k.distance < 0 && -k.distance > tiefe) {
+          tiefe = -k.distance;
+          this.tiefeFund.koerper = o.parent();
+          this.tiefeFund.punkt.set(k.point1.x, k.point1.y, k.point1.z);
+        }
       }
     }
     return tiefe;
@@ -454,7 +506,9 @@ export class ExcavatorCollision {
   /** Spinne gegen Mauern, Mulden und Schere. */
   private grappleHitsBuilding(): boolean {
     this.ctx.grappleGroup.getWorldPosition(this.pos);
-    return hitsObstacle(this.pos.x, this.pos.z, GRAPPLE_PAD, this.pos.y - 1.2) !== null;
+    const o = hitsObstacle(this.pos.x, this.pos.z, GRAPPLE_PAD, this.pos.y - 1.2);
+    if (o) this.merkeAnschlag(null, o.label, this.pos.x, this.pos.y - 1.2, this.pos.z, this.spinnenTempo());
+    return o !== null;
   }
 
   /**
@@ -468,6 +522,7 @@ export class ExcavatorCollision {
     this.ctx.grappleGroup.getWorldPosition(this.pos);
     this.pos.y -= this.ctx.pruefTiefe?.() ?? 1.35; // Mitte des Schalenkorbs
     let hit = false;
+    let wer: RAPIER.RigidBody | null = null;
     this.ctx.world.intersectionsWithShape(this.pos, IDENT_QUAT, probe, (collider) => {
       const b = collider.parent();
       // Nie vorzeitig abbrechen: Rapier hält die Welt während der Abfrage
@@ -476,14 +531,20 @@ export class ExcavatorCollision {
       if (!b || hit) return true;
       if (this.ctx.obstacleBodies.has(b.handle)) {
         hit = true; // Fahrzeug auf dem Platz
+        wer = b;
         return true;
       }
       if (this.ctx.grippedHandles.has(b.handle)) return true; // eigene Ladung
       // Feste Körper (Bauten) blockieren, nur der Boden zählt nicht mit
       if (b.isFixed() && collider.translation().y > -0.05) hit = true;
       else if (b.isDynamic() && b.mass() > HEAVY_BLOCK_KG) hit = true;
+      if (hit) wer = b;
       return true;
     });
+    if (hit) {
+      const p = this.pos.clone();
+      this.merkeAnschlag(wer, null, p.x, p.y, p.z, this.spinnenTempo());
+    }
     return hit;
   }
 
@@ -516,6 +577,7 @@ export class ExcavatorCollision {
     const g = this.ctx.grappleBody();
     const world = this.ctx.world;
     let ja = false;
+    let wer: RAPIER.RigidBody | null = null;
     for (let i = 0; i < g.numColliders() && !ja; i++) {
       const c = g.collider(i);
       if (!c.isEnabled()) continue;
@@ -529,9 +591,16 @@ export class ExcavatorCollision {
           let beruehrt = false;
           for (let k = 0; k < m.numContacts(); k++) if (m.contactDist(k) < PLOW_KONTAKT) beruehrt = true;
           if (!beruehrt) return;
-          if ((n.x * vx + n.z * vz) * s > schwelle) ja = true;
+          if ((n.x * vx + n.z * vz) * s > schwelle) {
+            ja = true;
+            wer = b;
+          }
         });
       });
+    }
+    if (ja) {
+      const p = this.pos.clone();
+      this.merkeAnschlag(wer, null, p.x, p.y - 1.35, p.z, this.spinnenTempo());
     }
     return ja;
   }

@@ -4,7 +4,7 @@ import { findeBox, type Box } from "../world/boxen";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Input } from "../core/input";
 import { Aufschlagmelder, SPINNE_WUCHT_VOLL_MS, DRUECK_AB, DRUECK_PAUSE_S, DRUECK_WEG_M } from "./aufschlag";
-import { ExcavatorCollision, PROBE_R, type ArmShape } from "./collision";
+import { ExcavatorCollision, PROBE_R, type Anschlag, type ArmShape } from "./collision";
 import type { GripSystem } from "../physics/gripSystem";
 import { nutzlastKg } from "./traglast";
 import { FUENFSCHALEN } from "./greiferFuenfschalen";
@@ -925,6 +925,45 @@ export class Excavator {
   ueberlast = false;
   onUeberlast: ((e: GameEvents["greifer:ueberlast"]) => void) | null = null;
   private ueberlastGemeldet = false;
+  /**
+   * E-157: JEDES ANSCHLAGEN KLINGT. Patrick, 18.10.2026: „anschlagen soll immer
+   * geräusche erzeugen, also auto vor schere oder wand" und „greifer vor lkw
+   * container wand".
+   *
+   * Gemeldet wird, wenn eine Bewegung GESTOPPT wird: die Spinne an Mauer,
+   * Mulde, Presse (Hindernisliste), an einem Fahrzeug oder seitlich an einem
+   * Brocken (`armHits`), oder ein gehaltenes Teil an Festem (`haltAnWand`,
+   * E-145). Einmal je Anschlag, nach derselben Regel wie E-134
+   * (`Aufschlagmelder`: ab 0,8 m/s, neu erst nach 0,15 s frei) — leichtes
+   * Anlehnen bleibt still, Entlangschrammen rattert nicht. Hat im selben Bild
+   * schon `onAufschlag` oder `onSpinneAufschlag` gemeldet, schweigt dieser
+   * Haken: kein Doppelknall.
+   *
+   * `tempoMs`: Tempo der gestoppten Bewegung (Spinne bzw. gehaltenes Teil),
+   * `traegt`: haengt etwas in der Spinne, `koerper`/`label`: was getroffen
+   * wurde (Koerper oder Bauwerk aus der Hindernisliste) — main entscheidet
+   * daraus Beton oder Stahl.
+   */
+  onAnschlag:
+    | ((e: { tempoMs: number; traegt: boolean; koerper: RAPIER.RigidBody | null; label: string | null; x: number; y: number; z: number }) => void)
+    | null = null;
+  private readonly anschlagMelder = new Aufschlagmelder();
+  private anschlagLast: Anschlag | null = null;
+  /** E-157: Hat in diesem Bild schon ein Aufschlag (E-134/E-137) geklungen? */
+  private schlagDiesesBild = false;
+  private anschlagTempoAlt = new THREE.Vector3();
+
+  private meldeAnschlag(a: Anschlag | null, traegt: boolean): void {
+    const g = this.grappleGroup.position;
+    const frei = g.distanceTo(this.anschlagTempoAlt) * 60;
+    this.anschlagTempoAlt.copy(g);
+    const tempo = this.anschlagMelder.schritt(1 / 60, a !== null, a ? a.tempoMs : frei);
+    const schlug = this.schlagDiesesBild;
+    this.schlagDiesesBild = false;
+    if (tempo === null || a === null || schlug) return;
+    this.onAnschlag?.({ tempoMs: tempo, traegt, koerper: a.koerper, label: a.label, x: a.punkt.x, y: a.punkt.y, z: a.punkt.z });
+  }
+
   /** E-146: Ist der Lasthebemagnet eingeschaltet? */
   magnetAn = false;
   /** E-146: Magnet ein- bzw. ausgeschaltet — main legt es auf den Bus (`magnet:an`, `magnet:aus`). */
@@ -2214,8 +2253,11 @@ export class Excavator {
     // wirklich einmal fest, werden Bewegungen wieder durchgelassen — sonst
     // verkantet er sich unrettbar, weil auch die befreiende Bewegung
     // zurückgenommen würde.
+    // E-157: Woran die Spinne in diesem Bild anschlaegt — fuer den Klang
+    let anschlagSpinne: Anschlag | null = null;
     if (col.armHits()) {
       this.armBlocked = true;
+      if (col.anschlagFrisch) anschlagSpinne = kopiereAnschlag(col.anschlag);
       if (col.armFree) {
         this.boomAngle = prevBoom;
         this.stickAngle = prevStick;
@@ -2256,7 +2298,9 @@ export class Excavator {
 
     this.integratePendulum(dt);
     this.lastAnWand = false;
+    this.anschlagLast = null;
     if (traegt) this.haltAnWand(prevBoom, prevStick, prevCabYaw, prevPos);
+    this.meldeAnschlag(anschlagSpinne ?? this.anschlagLast, traegt);
     this.rotatorOk = this.rotatorYaw;
     this.syncBodies();
 
@@ -3032,7 +3076,10 @@ export class Excavator {
     const traegt = this.grippedHandles.size > 0;
     const aufSchrott = traegt && !this.groundContact.active && this.ladungAufSchrott();
     const tempo = this.aufschlag.schritt(1 / 60, traegt && (this.groundContact.active || aufSchrott), this.spitzeAbwaerts);
-    if (tempo !== null) this.onAufschlag?.(tempo, aufSchrott);
+    if (tempo !== null) {
+      this.onAufschlag?.(tempo, aufSchrott);
+      this.schlagDiesesBild = true;
+    }
     if (!traegt) this.meldeSpinne(tipDepth);
   }
 
@@ -3050,6 +3097,7 @@ export class Excavator {
     const tempo = this.spinnenSchlag.schritt(dt, kontakt, this.spitzeAbwaerts);
     if (tempo !== null) {
       this.onSpinneAufschlag?.(Math.min(tempo / SPINNE_WUCHT_VOLL_MS, 1), koerper?.handle ?? null, ort);
+      this.schlagDiesesBild = true;
     }
     this.drueckPauseS = Math.max(0, this.drueckPauseS - dt);
     // Gedrueckt wird auf lose Teile; tragender Grund gibt nicht nach — dort bleibt es still
@@ -3437,6 +3485,8 @@ export class Excavator {
       );
     if (!stoesstAn()) return;
     this.lastAnWand = true;
+    // E-157: erste Abfrage — woran die Last anschlaegt und wie schnell sie ging
+    if (this.collision.anschlagFrisch) this.anschlagLast = kopiereAnschlag(this.collision.anschlag);
     // Stufe 1: das Pendel steht, die Last lehnt an
     this.swing.copy(h.swing);
     this.swingVel.set(0, 0);
@@ -3793,4 +3843,9 @@ function clamp1(v: number): number {
 /** Zwei Tastenpaare auf eine Achse summieren (Haupt- + Zweitbelegung). */
 function axis2(input: Input, n1: string, p1: string, n2: string, p2: string): number {
   return THREE.MathUtils.clamp(input.axis(n1, p1) + input.axis(n2, p2), -1, 1);
+}
+
+/** E-157: Anschlag festhalten — die Vorlage in `ExcavatorCollision` wird beim naechsten Abfragen ueberschrieben. */
+function kopiereAnschlag(a: Anschlag): Anschlag {
+  return { koerper: a.koerper, label: a.label, punkt: a.punkt.clone(), tempoMs: a.tempoMs };
 }
