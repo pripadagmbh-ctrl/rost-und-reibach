@@ -291,7 +291,7 @@ try {
     // Ladezeit wie im Spiel: alle Dateien parallel holen, dann bei 48 kHz dekodieren
     const namen = auftrag.analyse;
     const t0 = performance.now();
-    const bytes = await Promise.all(namen.map((n) => fetch("/ton/" + n + ".wav").then((r) => r.arrayBuffer())));
+    const bytes = await Promise.all(namen.map((n) => fetch("/ton/" + n).then((r) => r.arrayBuffer())));
     const t1 = performance.now();
     const ctx = new OfflineAudioContext(1, 1, 48000);
     const bufs = await Promise.all(bytes.map((b) => ctx.decodeAudioData(b)));

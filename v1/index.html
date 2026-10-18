@@ -254,6 +254,14 @@
          Fassung hat deshalb nie gewirkt, und ein sicherer Rand haette dort
          ebensowenig gewirkt. Alles Ruhende steht jetzt hier; das Skript setzt
          nur noch `opacity`. */
+      #hoerprobe-zeile {
+        position: fixed; z-index: 15; left: 50%; transform: translateX(-50%);
+        top: max(16px, calc(var(--sa-t) + 8px));
+        padding: 8px 14px; border-radius: 9px; pointer-events: none;
+        background: rgba(12,14,16,0.82); color: #f0d060;
+        font: 600 16px "Consolas", monospace; white-space: nowrap;
+      }
+      #hoerprobe-zeile[hidden] { display: none; }
       #toast {
         top: max(56px, calc(var(--sa-t) + 8px));
         left: 50%; transform: translateX(-50%);
@@ -1001,6 +1009,8 @@
       <div id="load" class="hud"></div>
     </div>
     <div id="toast" class="hud"></div>
+    <!-- Hörparcours (E-159): welche Station gerade klingt — Nummer zum Benoten -->
+    <div id="hoerprobe-zeile" hidden></div>
     <div id="touch">
       <div class="zone" id="zone-left"></div>
       <div class="zone" id="zone-right"></div>
@@ -1158,6 +1168,8 @@
         <label class="regler" for="laut-bagger">Bagger<input type="range" id="laut-bagger" data-gruppe="bagger" min="0" max="100" step="5" /><output id="laut-bagger-wert">100 %</output></label>
         <label class="regler" for="laut-metall">Metall<input type="range" id="laut-metall" data-gruppe="metall" min="0" max="100" step="5" /><output id="laut-metall-wert">100 %</output></label>
         <label class="regler" for="laut-musik">Musik<input type="range" id="laut-musik" data-gruppe="musik" min="0" max="100" step="5" /><output id="laut-musik-wert">100 %</output></label>
+        <!-- Hörparcours (E-159): alle wichtigen Klänge je 3×, mit Nummer oben im Bild -->
+        <button id="ton-hoerprobe">Hörprobe: alle Klänge, je 3×</button>
         <button id="ton-close">Zurück</button>
       </div>
     </div>

@@ -10,6 +10,7 @@
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "pretest": "npm run typecheck:test",
     "test": "vitest run",
+    "ton:werkzeug": "node tools/tonwerk/werkzeug-einrichten.mjs",
     "icons": "node ../tools/make-icons.mjs",
     "android:add": "npm run build && npx cap add android",
     "android:sync": "npm run build && npx cap sync android",

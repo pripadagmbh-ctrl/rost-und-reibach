@@ -50,6 +50,25 @@ export const QUELLEN = {
     lizenz: "Pixabay Content License — Einbau ins Spiel erlaubt, Weitergabe der Datei für sich allein nicht",
     lizenzUrl: "https://pixabay.com/service/license-summary/",
   },
+  // E-159: von Patrick am 18.10.2026 freigegeben, vom Orchestrator geladen
+  S: {
+    name: "BigSoundBank #2358, #2359, #2360 (Metal barrier: Closure #1–#3, grosse Metallschranke schlaegt zu) und #1774 (Falling sheet steel bar #4)",
+    url: "https://bigsoundbank.com/grinding-metal-barrier-closure-1-s2358.html · https://bigsoundbank.com/grinding-metal-barrier-closure-2-s2359.html · https://bigsoundbank.com/grinding-metal-barrier-closure-3-s2360.html · https://bigsoundbank.com/falling-sheet-steel-bar-4-s1774.html",
+    lizenz: "CC0 1.0",
+    lizenzUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+  },
+  T: {
+    name: "BigSoundBank #0971 Car door #1 (Peugeot 107, mehrere Schlaege) und #1524 Car door 3",
+    url: "https://bigsoundbank.com/car-door-1-s0971.html · https://bigsoundbank.com/car-door-3-s1524.html",
+    lizenz: "CC0 1.0",
+    lizenzUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+  },
+  U: {
+    name: "OpenGameArt, rubberduck: 75 CC0 breaking / falling / hit sfx",
+    url: "https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx",
+    lizenz: "CC0 1.0",
+    lizenzUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+  },
   // E-148: von Patrick am 17.10.2026 freigegeben, vom Orchestrator geladen
   J: { name: "BigSoundBank #2721 Truck Horn (LKW-Drucklufthupe)", url: "https://bigsoundbank.com/truck-horn-s2721.html", lizenz: "CC0 1.0", lizenzUrl: "https://creativecommons.org/publicdomain/zero/1.0/" },
   K: { name: "BigSoundBank #1269 Industrial Doorbell #1 (elektrische Werksklingel)", url: "https://bigsoundbank.com/industrial-doorbell-s1269.html", lizenz: "CC0 1.0", lizenzUrl: "https://creativecommons.org/publicdomain/zero/1.0/" },
@@ -61,6 +80,10 @@ const H = "H/freesound_community-grua-recicladora-48744.mp3";
 
 const k = (n, mehr = {}) => ({ q: `A/x/Audio/${n}.ogg`, ...mehr });
 const o = (n, mehr = {}) => ({ q: `I/x/${n}.ogg`, ...mehr });
+/** U: OpenGameArt rubberduck „75 CC0 breaking / falling / hit sfx" (E-159) */
+const u = (n, mehr = {}) => ({ q: `U/x/bfh1_${n}.ogg`, ...mehr });
+/** Schlagstellen in T/0971 (Autotuer zugeschlagen, Spitzen bei 0,32 / 4,42 / 8,45 / 12,68 s) */
+const TUER = [0.27, 4.37, 8.4, 12.63];
 
 export const REZEPTE = [
   /* ------------------------------------------------------------ Greifen -- */
@@ -118,69 +141,99 @@ export const REZEPTE = [
     // H 33,98–34,4 s (E-130, ersetzt OpenGameArt metal_hit_04): zweiter Klack des Krans
     schichten: [{ q: H, von: 33.98, dauer: 0.42, ein: 0.002, aus: 0.15 }, o("metal_hit_04", { gain: 0.35 })],
   },
+  /*
+   * Biss (E-159): keine Dose mehr (F #0118 klang nach „Coladose"). Das
+   * Knirschen kommt aus dem echten Greifkran im Schrott (H 141–145 s, dieselbe
+   * Strecke wie `rassel`), der Anschlag aus einem schweren Metallschlag (U).
+   */
   {
     name: "biss_1",
     wofuer: "Zudrücken beißt ins Material: Knirschen",
     art: "einmal",
-    // F/0118 0,38–0,95 s: erster Quetscher der Dose, tiefer gelegt
-    schichten: [{ q: "F/0118.ogg", von: 0.38, dauer: 0.57, rate: 0.75 }, k("impactMetal_heavy_002", { gain: 0.6 })],
+    schichten: [{ q: H, von: 141.6, dauer: 0.45, hp: 200, aus: 0.2 }, u("metal_hit_04", { gain: 0.6 })],
   },
   {
     name: "biss_2",
     wofuer: "Zudrücken beißt ins Material (zweite Fassung)",
     art: "einmal",
-    schichten: [{ q: "F/0118.ogg", von: 2.5, dauer: 0.5, rate: 0.75 }, k("impactMetal_heavy_004", { gain: 0.6 })],
+    schichten: [{ q: H, von: 142.7, dauer: 0.42, hp: 200, aus: 0.2 }, u("metal_hit_05", { gain: 0.6 })],
   },
   {
     name: "biss_3",
     wofuer: "Zudrücken beißt ins Material (dritte Fassung)",
     art: "einmal",
-    schichten: [{ q: "F/0118.ogg", von: 6.35, dauer: 0.55, rate: 0.75 }, k("impactMetal_heavy_000", { gain: 0.5 })],
+    schichten: [{ q: H, von: 143.8, dauer: 0.45, hp: 200, aus: 0.2 }, u("metal_hit_02", { gain: 0.5 })],
   },
 
   /* ----------------------------------------------------- Blech knautschen -- */
+  /*
+   * Knautschen (E-159, Befund 18.10.: „Autos fallen lassen, das muss wie blech
+   * klingen und nicht wie eine Coladose" und an der Schere „wie ein lallender
+   * Betrunkener"): Die Dose #0118 (tief gelegt) und das gleitende Stoehnen aus
+   * H 61 s sind raus. Jetzt: ein echter Karosserieschlag (Autotuer T #0971),
+   * darunter eine schwere Metallschranke (S), Blechschlaege (I) und das
+   * Knirschen des Greifkrans im Schrott (H 141 s). Kein Ton gleitet.
+   */
   {
     name: "knautsch_1",
-    wofuer: "Blech wird zerdrückt (Presse, Quetschen, Knautschen): Dose tief + Metallschläge + Metall stöhnt",
+    wofuer: "Blech wird zerdrückt (Presse, Auto fällt, Quetschen): Karosserie + Schranke + Blech + Knirschen",
     art: "einmal",
-    dauer: 3.0,
+    dauer: 2.6,
     schichten: [
-      { q: "F/0118.ogg", von: 0.3, dauer: 2.7, rate: 0.6, aus: 0.4 },
-      k("impactPlate_heavy_001", { gain: 0.8 }),
-      k("impactMetal_heavy_001", { gain: 0.6, versatz: 0.35 }),
-      k("impactMetal_heavy_003", { gain: 0.5, versatz: 1.1 }),
-      // H 61,3–62,9 s (E-130, neu): Metall stoehnt unter Last — gleitende Toene
-      // 300 Hz–2 kHz. Darunter faltet das Auto hoerbar, nicht nur die Dose.
-      { q: H, von: 61.3, dauer: 1.6, rate: 0.85, gain: 0.6, versatz: 0.2, ein: 0.05, aus: 0.4 },
+      { q: "T/0971.ogg", von: TUER[0], dauer: 0.7, aus: 0.3 },
+      { q: "S/2360.ogg", von: 0.08, dauer: 2.2, gain: 0.55, versatz: 0.12, aus: 1.0 },
+      o("metal_sheet_03", { gain: 0.6, versatz: 0.45 }),
+      o("metal_sheet_05", { gain: 0.5, versatz: 1.0 }),
+      { q: H, von: 141.5, dauer: 2.0, hp: 200, gain: 0.45, versatz: 0.2, ein: 0.05, aus: 0.6 },
     ],
   },
   {
     name: "knautsch_2",
     wofuer: "Blech wird zerdrückt (zweite Fassung)",
     art: "einmal",
-    dauer: 2.4,
+    dauer: 2.2,
     schichten: [
-      { q: "F/0118.ogg", von: 5.15, dauer: 1.85, rate: 0.65, aus: 0.3 },
-      k("impactPlate_heavy_004", { gain: 0.8 }),
-      k("impactMetal_heavy_003", { gain: 0.6, versatz: 0.5 }),
+      { q: "T/0971.ogg", von: TUER[1], dauer: 0.7, aus: 0.3 },
+      { q: "S/2359.ogg", von: 0.93, dauer: 1.9, gain: 0.55, versatz: 0.1, aus: 0.9 },
+      o("metal_sheet_06", { gain: 0.6, versatz: 0.5 }),
+      { q: H, von: 143.0, dauer: 1.6, hp: 200, gain: 0.45, versatz: 0.15, ein: 0.05, aus: 0.5 },
     ],
   },
   { name: "glas_1", wofuer: "Scheibe birst", art: "einmal", schichten: [{ q: "F/0148.ogg", dauer: 1.6 }] },
   { name: "glas_2", wofuer: "Scheibe birst (Scherben)", art: "einmal", schichten: [{ q: "F/0771.ogg", von: 1.7, dauer: 0.9 }] },
 
   /* ---------------------------------------------- Aufprall nach Material -- */
+  /*
+   * Familien (E-159): Keine Aufnahme ist im Tonwerk schneller oder langsamer
+   * gelegt (vorher Kupfer ×0,9, Stahl ×0,8, Kunststoff ×1,3) — jede klingt in
+   * ihrer eigenen Tonhoehe.
+   */
   { name: "stahl_1", wofuer: "Aufprall massiver Stahl", art: "einmal", schichten: [{ q: "E/1771.ogg" }, k("impactPlate_heavy_000", { gain: 0.5 })] },
-  { name: "stahl_2", wofuer: "Aufprall massiver Stahl (2)", art: "einmal", schichten: [k("impactMetal_heavy_003"), k("impactPlate_heavy_002", { gain: 0.6 })] },
-  { name: "stahl_3", wofuer: "Aufprall massiver Stahl (3)", art: "einmal", schichten: [{ q: "E/1776.ogg", dauer: 0.9, rate: 0.8 }, k("impactMetal_heavy_000", { gain: 0.5 })] },
+  { name: "stahl_2", wofuer: "Aufprall massiver Stahl (2): schwerer Schlag", art: "einmal", schichten: [u("metal_hit_04"), u("metal_hit_05", { gain: 0.7 })] },
+  { name: "stahl_3", wofuer: "Aufprall massiver Stahl (3)", art: "einmal", schichten: [{ q: "E/1776.ogg", dauer: 0.9, aus: 0.3 }, k("impactMetal_heavy_000", { gain: 0.5 })] },
+  // S #1774: Stahlstange faellt — 0,8 s, danach klingt sie zu lang (wie eine Glocke)
+  { name: "stahl_4", wofuer: "Aufprall massiver Stahl (4): Stahlstange", art: "einmal", schichten: [{ q: "S/1774.ogg", dauer: 0.8, aus: 0.3 }] },
+  // Kleines Eisen (E-159): echte fallende Metallteile, mit Nachspringen — nicht Alu, nicht Blech
+  { name: "kleineisen_1", wofuer: "Aufprall kleines Eisenteil", art: "einmal", schichten: [u("metal_falling_01")] },
+  { name: "kleineisen_2", wofuer: "Aufprall kleines Eisenteil (2)", art: "einmal", schichten: [u("metal_falling_02")] },
+  { name: "kleineisen_3", wofuer: "Aufprall kleines Eisenteil (3)", art: "einmal", schichten: [u("metal_hit_06")] },
   { name: "blech_1", wofuer: "Aufprall Blech, scheppert", art: "einmal", schichten: [o("metal_sheet_01")] },
   { name: "blech_2", wofuer: "Aufprall Blech (2)", art: "einmal", schichten: [o("metal_sheet_02")] },
   { name: "blech_3", wofuer: "Aufprall Blech (3)", art: "einmal", schichten: [o("metal_sheet_06")] },
+  { name: "blech_4", wofuer: "Aufprall Blech (4)", art: "einmal", schichten: [o("metal_sheet_03")] },
   { name: "va_1", wofuer: "Aufprall Edelstahl, klingt lang", art: "einmal", schichten: [{ q: "E/1776.ogg", dauer: 1.4 }] },
   { name: "va_2", wofuer: "Aufprall Edelstahl (2)", art: "einmal", schichten: [{ q: "E/0235.ogg" }] },
-  { name: "alu_1", wofuer: "Aufprall Alu, hell und kurz", art: "einmal", schichten: [k("impactMetal_light_000")] },
-  { name: "alu_2", wofuer: "Aufprall Alu (2)", art: "einmal", schichten: [k("impactMetal_light_002")] },
-  { name: "kupfer_1", wofuer: "Aufprall Kupfer/Messing/Zink, warm", art: "einmal", schichten: [k("impactMetal_medium_000", { rate: 0.9 })] },
-  { name: "kupfer_2", wofuer: "Aufprall Kupfer (2)", art: "einmal", schichten: [k("impactMetal_medium_003", { rate: 0.9 })] },
+  /*
+   * Alu (E-159): hell und TROCKEN — kurze, klappernde Leichtmetallschlaege
+   * (Abklingen 0,08–0,17 s, Schwerpunkt 5,5–6,6 kHz) ohne Nachklingen. Vorher
+   * Kenney „impactMetal_light": ein heller, stehender Ton — das klang nach
+   * Glöckchen und war das „kindliche".
+   */
+  { name: "alu_1", wofuer: "Aufprall Alu, hell und trocken", art: "einmal", schichten: [u("metal_falling_04")] },
+  { name: "alu_2", wofuer: "Aufprall Alu (2)", art: "einmal", schichten: [u("metal_falling_05")] },
+  { name: "alu_3", wofuer: "Aufprall Alu (3)", art: "einmal", schichten: [u("metal_hit_01")] },
+  { name: "kupfer_1", wofuer: "Aufprall Kupfer/Messing/Zink, warm", art: "einmal", schichten: [k("impactMetal_medium_000")] },
+  { name: "kupfer_2", wofuer: "Aufprall Kupfer (2)", art: "einmal", schichten: [k("impactMetal_medium_003")] },
   {
     name: "kabel_1",
     wofuer: "Aufprall Kabelbund: dumpf, raschelt",
@@ -192,9 +245,22 @@ export const REZEPTE = [
   { name: "holz_2", wofuer: "Aufprall Holz (2)", art: "einmal", schichten: [k("impactPlank_medium_001"), k("impactWood_light_002", { gain: 0.5 })] },
   { name: "reifen_1", wofuer: "Aufprall Reifen: weicher Plumps", art: "einmal", schichten: [k("impactSoft_heavy_002"), k("impactGeneric_light_002", { gain: 0.5 })] },
   { name: "kunststoff_1", wofuer: "Aufprall Kunststoff: hohles Klacken", art: "einmal", schichten: [k("impactGeneric_light_000")] },
-  { name: "kunststoff_2", wofuer: "Aufprall Kunststoff (2)", art: "einmal", schichten: [k("impactWood_light_004", { rate: 1.3 })] },
+  { name: "kunststoff_2", wofuer: "Aufprall Kunststoff (2)", art: "einmal", schichten: [k("impactWood_light_004")] },
   { name: "geroell_1", wofuer: "Aufprall Bauschutt", art: "einmal", schichten: [k("impactMining_000"), k("footstep_concrete_000", { gain: 0.8 })] },
   { name: "geroell_2", wofuer: "Aufprall Bauschutt (2)", art: "einmal", schichten: [k("impactMining_002"), k("footstep_concrete_003", { gain: 0.8 })] },
+
+  /* ------------------------------------------ Koerper: Masse klingt mit (E-159) -- */
+  // Hohler Blechkoerper (Karosserie, Tank, Fass): echte Autotuer, voller Schlag
+  ...TUER.map((von, i) => ({
+    name: `koerper_blech_${i + 1}`,
+    wofuer: `Schwerer Blechkörper schlägt auf (Auto, Tank) (${i + 1})`,
+    art: "einmal",
+    schichten: [{ q: "T/0971.ogg", von, dauer: 0.75, aus: 0.35 }],
+  })),
+  // Schwerer Stahl auf Stahl: grosse Metallschranke, nur der Schlag (ohne das Quietschen davor)
+  { name: "koerper_stahl_1", wofuer: "Schweres Metall auf Stahl: dröhnt nach", art: "einmal", schichten: [{ q: "S/2360.ogg", von: 0.08, dauer: 2.2, aus: 1.0 }] },
+  { name: "koerper_stahl_2", wofuer: "Schweres Metall auf Stahl (2)", art: "einmal", schichten: [{ q: "S/2358.ogg", von: 1.68, dauer: 2.0, aus: 0.9 }] },
+  { name: "koerper_stahl_3", wofuer: "Schweres Metall auf Stahl (3)", art: "einmal", schichten: [{ q: "S/2359.ogg", von: 0.93, dauer: 1.9, aus: 0.9 }] },
 
   /* ------------------------------------------------- Untergrund klingt mit -- */
   { name: "grund_beton", wofuer: "Untergrund Beton: trockener Klatsch", art: "einmal", schichten: [k("impactPunch_medium_000"), k("footstep_concrete_001", { gain: 0.9 })] },

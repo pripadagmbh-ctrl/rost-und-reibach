@@ -39,7 +39,7 @@ import {
 } from "../src/audio/klangregeln";
 import { LAUT_START, leseLautstaerken } from "../src/audio/lautstaerke";
 import { FEIERABEND_KLANG } from "../src/audio/audioManager";
-import { klonkPegel, KLONK_ABSTAND_S } from "../src/audio/klangregeln";
+import { klonkPegel, KLONK_ABSTAND_S, TEMPO_STREU } from "../src/audio/klangregeln";
 
 // ---------------------------------------------------------------- Attrappen
 
@@ -357,12 +357,11 @@ describe("Zudruecken: haerter = lauter", () => {
     expect(zweit).toBe(0);
   });
 
-  it("das Stoehnen wird mit der Kraft lauter und hoeher", () => {
+  it("das Stoehnen wird mit der Kraft lauter und heller (E-159: nicht hoeher)", () => {
     const a = stoehnen(0.2);
     const b = stoehnen(0.8);
     expect(b.laut).toBeGreaterThan(a.laut);
-    // E-130: auf der Aufnahme heisst „hoeher" schnelleres Abspielen (vorher Oszillator-Hz)
-    expect(b.rate).toBeGreaterThan(a.rate);
+    expect(b.filterHz).toBeGreaterThan(a.filterHz);
     expect(stoehnen(0).laut).toBe(0);
   });
 });
@@ -420,13 +419,13 @@ describe("Aufprall-Regeln", () => {
       aufprallKlang({ materialId: m, massKg: kg, wucht: 5, blech, untergrund: "stahl" })!;
     expect(familieVon("steel", 200, false)).toBe("stahl");
     expect(familieVon("steel", 200, true)).toBe("blech");
-    expect(familieVon("steel", 10, false)).toBe("blech");
+    expect(familieVon("steel", 10, false)).toBe("kleineisen"); // E-159: kleines Eisen ist kein Blech
     expect(r("steel").teil.proben[0]).toMatch(/^stahl_/);
     expect(r("steel", 200, true).teil.proben[0]).toMatch(/^blech_/);
     expect(r("alu").teil.proben[0]).toMatch(/^alu_/);
     expect(r("copper").teil.proben[0]).toMatch(/^kupfer_/);
-    expect(r("brass").rate).toBeGreaterThan(r("zinc").rate); // Messing heller, Zink dumpfer
-    expect(r("steel", 800).rate).toBeLessThan(r("steel", 20).rate); // schwerer = tiefer
+    // E-159: keine Tonhoehe nach Masse — schwerer heisst lauter, nicht tiefer
+    expect(r("steel", 800).pegel).toBeGreaterThan(r("steel", 20).pegel);
   });
 });
 
@@ -482,7 +481,7 @@ async function starteMitAufnahmen(): Promise<{ mgr: AudioManager; bus: EventBus 
   const alt = g.fetch;
   g.fetch = async (url: string) => ({
     ok: true,
-    arrayBuffer: async () => new TextEncoder().encode(String(url).replace(/^.*\/(.+)\.wav$/, "$1")).buffer,
+    arrayBuffer: async () => new TextEncoder().encode(String(url).replace(/^.*\/(.+)\.(wav|m4a)$/, "$1")).buffer,
   });
   const r = starte(false); // die Aufnahmen kommen hier ueber fetch und decodeAudioData
   g.fetch = alt;
@@ -587,12 +586,11 @@ describe("Kein Greifklang bleibt stehen (E-130, Befund 16.10.2026)", () => {
 });
 
 describe("Knautschen (E-130)", () => {
-  it("mehr Zuwachs = lauter, laenger, tiefer, dichter", () => {
+  it("mehr Zuwachs = lauter, laenger, dichter", () => {
     const biss = knautschKlang(0.17);
     const presse = knautschKlang(1);
     expect(presse.pegel).toBeGreaterThan(biss.pegel);
     expect(presse.dauer).toBeGreaterThan(biss.dauer);
-    expect(presse.rate).toBeLessThan(biss.rate);
     expect(presse.schlaege).toBeGreaterThan(biss.schlaege);
   });
 
@@ -904,15 +902,16 @@ describe("Lasthebemagnet: Klacken, Klonk, kein Brummen (E-151)", () => {
 
   it("solange der Magnet an ist, zieht der Generator am Diesel (statt eines Brummtons)", async () => {
     const { mgr, bus } = await starteMitAufnahmen();
-    const motor = (mgr as unknown as { motorQuelle: { playbackRate: Param } }).motorQuelle;
+    // E-159: heller (Tiefpass) und lauter — nicht hoeher
+    const motor = (mgr as unknown as { motorFilter: { frequency: Param } }).motorFilter;
     mgr.updateEngine(0, 0);
-    const aus = motor.playbackRate.ziel;
+    const aus = motor.frequency.ziel;
     bus.emit("magnet:an", {});
     mgr.updateEngine(0, 0);
-    expect(motor.playbackRate.ziel).toBeGreaterThan(aus);
+    expect(motor.frequency.ziel).toBeGreaterThan(aus);
     bus.emit("magnet:aus", {});
     mgr.updateEngine(0, 0);
-    expect(motor.playbackRate.ziel).toBeCloseTo(aus);
+    expect(motor.frequency.ziel).toBeCloseTo(aus);
   });
 
   it("haftet: Stahl-Klonk, schwerer = lauter, und kein Maschinengewehr", async () => {
@@ -1012,5 +1011,90 @@ describe("Nur Aufnahmen, nichts Gerechnetes (E-153, Patrick 17.10.2026)", () => 
   it("im Quelltext: kein Oszillator und kein gerechneter Puffer im Ton (ausser dem Radio)", () => {
     const q = fs.readFileSync(path.resolve(__dirname, "../src/audio/audioManager.ts"), "utf8");
     expect(q).not.toMatch(/createOscillator|createBuffer\(|Math\.random\(\) \* 2 - 1/);
+  });
+});
+
+// ------------------------------------- 12. Feste Tonhoehe (E-159, 18.10.2026)
+
+describe("Keine Micky-Maus, kein Lallen: feste Tonhoehe (E-159)", () => {
+  /*
+   * Patrick: „Metallarten klingen … kindlich manchmal" und an der Schere
+   * „eher wie ein lallender betrunkener". Ursache: Kleinteile liefen bis zu
+   * 30 % schneller (hoeher), die Hydraulik glitt mit der Kraft 0,8…1,2.
+   * Jetzt: jede Quelle spielt im Tempo 1 ± TEMPO_STREU, und kein Tempo wird
+   * waehrend des Spielens verschoben.
+   */
+  it("jede Quelle spielt zwischen 0,95 und 1,05, und kein Tempo gleitet", () => {
+    expect(TEMPO_STREU).toBeLessThanOrEqual(0.05);
+    const { mgr, bus } = starte();
+    for (const m of ["steel", "alu", "copper", "brass", "zinc", "va", "cable", "tires"]) {
+      for (const kg of [1, 20, 400, 3000]) {
+        ctx.currentTime += 0.5;
+        bus.emit("schrott:aufprall", aufprall(m, 6, "stahl", kg));
+      }
+    }
+    for (let i = 0; i < 120; i++) {
+      ctx.currentTime += 1 / 60;
+      mgr.setGreifer(i < 60 ? 1 : 0, Math.min(1, i / 40)); // Schere: Kraft steigt
+      mgr.setScrape(i / 120, (["beton", "stahl", "schrott"] as const)[i % 3]);
+      mgr.updateEngine(i / 120, 0.5);
+    }
+    bus.emit("wrack:geknautscht", { handle: 1, grad: 1, zuwachs: 1, x: 0, y: 0, z: 0 });
+    mgr.playCrash(1);
+    mgr.playTear();
+    mgr.playClawSnap(0.2);
+    mgr.playGrab("alu");
+    hieb(bus, 1, "beton");
+    druck(bus, 1, "wrack");
+    expect(ctx.alleQuellen.length).toBeGreaterThan(40);
+    for (const q of ctx.alleQuellen) {
+      const p = q.playbackRate as Param;
+      // Schleifen (Motor, Hydraulik, Kehren) setzen gar kein Tempo: Browser-Standard 1
+      const tempo = q.loop ? (p.value === 0 ? 1 : p.value) : p.value;
+      expect(tempo, (q.buffer as { name?: string })?.name).toBeGreaterThanOrEqual(0.95);
+      expect(tempo).toBeLessThanOrEqual(1.05);
+      // automatisiert wurde nie (ziel/max bleiben 0, nur value ist gesetzt)
+      expect(p.ziel, "Tempo gleitet").toBe(0);
+      expect(p.max, "Tempo gleitet").toBe(0);
+    }
+  });
+
+  it("im Quelltext: kein playbackRate ausser der einen Streuung in spiele()", () => {
+    const q = fs.readFileSync(path.resolve(__dirname, "../src/audio/audioManager.ts"), "utf8");
+    expect(q.match(/playbackRate/g) ?? []).toHaveLength(1);
+  });
+});
+
+describe("Schichtung nach Profi-Art: Anschlag + Koerper + Untergrund (E-159)", () => {
+  const schicht = async (m: string, kg: number, u: "beton" | "stahl" | "schrott", blech = false): Promise<string[]> => {
+    const { bus } = await starteMitAufnahmen();
+    ctx.currentTime += 2;
+    return gespielt(() => bus.emit("schrott:aufprall", { materialId: m, massKg: kg, wucht: 6, blech, untergrund: u, x: 0, y: 0, z: 0 }));
+  };
+
+  it("schwerer Stahl auf Stahl droehnt (Schranke), auf Beton bleibt es trocken", async () => {
+    const stahl = await schicht("steel", 400, "stahl");
+    expect(stahl.some((n) => n.startsWith("stahl_"))).toBe(true);
+    expect(stahl.some((n) => n.startsWith("koerper_stahl_"))).toBe(true);
+    expect(stahl.some((n) => n.startsWith("grund_stahl_"))).toBe(true);
+    const beton = await schicht("steel", 400, "beton");
+    expect(beton.some((n) => n.startsWith("koerper_"))).toBe(false);
+    expect(beton).toContain("grund_beton");
+  });
+
+  it("ein schwerer Blechkoerper (Auto, Tank) klingt nach Karosserie, auf jedem Untergrund", async () => {
+    for (const u of ["beton", "stahl"] as const) {
+      const n = await schicht("steel", 900, u, true);
+      expect(n.some((x) => x.startsWith("blech_")), u).toBe(true);
+      expect(n.some((x) => x.startsWith("koerper_blech_")), u).toBe(true);
+    }
+  });
+
+  it("Kleinteile: kein Koerper; kleines Eisen ist weder Blech noch Alu", async () => {
+    const klein = await schicht("steel", 8, "beton");
+    expect(klein.some((n) => n.startsWith("kleineisen_"))).toBe(true);
+    expect(klein.some((n) => n.startsWith("koerper_"))).toBe(false);
+    const alu = await schicht("alu", 8, "beton");
+    expect(alu.some((n) => n.startsWith("alu_"))).toBe(true);
   });
 });

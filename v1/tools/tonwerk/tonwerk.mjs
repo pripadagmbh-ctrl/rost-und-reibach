@@ -1,7 +1,8 @@
 /**
  * TONWERK (E-130, 16.10.2026) — schneidet die Rohaufnahmen zu Spiel-Ausschnitten.
  *
- *     node tools/tonwerk/tonwerk.mjs schneiden          → public/ton/*.wav + QUELLEN.md
+ *     node tools/tonwerk/tonwerk.mjs schneiden          → public/ton/*.m4a (Einzelklaenge), *.wav (Schleifen) + QUELLEN.md
+ *     npm run ton:werkzeug                              → einmalig: ffmpeg fuer die AAC-Kodierung (E-159)
  *     node tools/tonwerk/tonwerk.mjs analyse <ordner>   → Spektrogramme und Kennzahlen
  *
  * Warum ein Browser und kein ffmpeg: Auf dem Arbeitsrechner gibt es kein
@@ -22,6 +23,47 @@ import { resolve, dirname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { REZEPTE, QUELLEN, ABTASTRATE } from "./rezepte.mjs";
+import { createRequire } from "node:module";
+import { spawnSync } from "node:child_process";
+import { unlinkSync } from "node:fs";
+
+/*
+ * AAC (E-159): Einzelklaenge werden als AAC in M4A ausgeliefert, rund
+ * fuenfmal kleiner als WAV — so passen mehr echte Aufnahmen in dieselbe
+ * Ladezeit. iOS-Safari dekodiert AAC in `decodeAudioData` nativ, Chromium
+ * ebenso (gemessen: gleiche Laenge, gleicher Einsatz wie die WAV). Schleifen
+ * bleiben WAV: Eine verlustbehaftete Naht kann bei jeder Runde knacken.
+ *
+ * Kodiert wird mit ffmpeg aus dem npm-Paket `ffmpeg-static` — nur als
+ * Werkzeug, in `tools/tonwerk/werkzeug/` (nicht im Repository, nicht im
+ * Spiel, nicht im Deploy). Einrichten: `npm run ton:werkzeug`.
+ */
+export const AAC_KBPS = 64; // SW: mono, fuer Schlaege ohne hoerbaren Verlust
+const WERKZEUG = resolve(dirname(fileURLToPath(import.meta.url)), "werkzeug");
+function findeFfmpeg() {
+  try {
+    return createRequire(join(WERKZEUG, "package.json"))("ffmpeg-static");
+  } catch {
+    return null;
+  }
+}
+/** Name der ausgelieferten Datei: Schleifen WAV, alles andere M4A. */
+const dateiname = (r) => `${r.name}.${r.art === "schleife" ? "wav" : "m4a"}`;
+
+/** Einzelklaenge von WAV nach AAC/M4A; die WAV verschwindet. */
+function komprimiere() {
+  const ff = findeFfmpeg();
+  if (!ff || !existsSync(ff)) throw new Error("ffmpeg fehlt — einmal \"npm run ton:werkzeug\" ausfuehren");
+  for (const r of REZEPTE) {
+    if (r.art === "schleife") continue;
+    const wav = join(ziel, `${r.name}.wav`);
+    if (!existsSync(wav)) continue;
+    const m4a = join(ziel, dateiname(r));
+    const e = spawnSync(ff, ["-hide_banner", "-loglevel", "error", "-y", "-i", wav, "-c:a", "aac", "-b:a", `${AAC_KBPS}k`, m4a]);
+    if (e.status !== 0) throw new Error(`ffmpeg ${r.name}: ${e.stderr}`);
+    unlinkSync(wav);
+  }
+}
 
 const HIER = dirname(fileURLToPath(import.meta.url));
 const V1 = resolve(HIER, "../..");
@@ -100,7 +142,10 @@ const server = http.createServer((req, res) => {
         console.error("FEHLER: " + body.toString("utf8"));
         fertig(1);
       } else if (url === "/fertig") {
-        if (modus === "schneiden") schreibeQuellen(JSON.parse(body.toString("utf8")));
+        if (modus === "schneiden") {
+          komprimiere();
+          schreibeQuellen(JSON.parse(body.toString("utf8")));
+        }
         console.log("fertig.");
         fertig(0);
       } else if (url.startsWith("/out/")) {
@@ -122,7 +167,7 @@ function schreibeQuellen(bericht) {
   z.push("");
   z.push("Alle Dateien in diesem Ordner sind **Ausschnitte** aus den unten genannten Aufnahmen,");
   z.push(`geschnitten, gefiltert und gemischt mit \`tools/tonwerk/\` (Rezepte: \`tools/tonwerk/rezepte.mjs\`).`);
-  z.push(`Format: WAV, 16 bit, mono, ${ABTASTRATE} Hz (wo in der Tabelle nicht anders angegeben). Die Rohdateien liegen nicht im Repository (\`v1/ton-roh/\`, siehe .gitignore).`);
+  z.push(`Format (E-159): Einzelklänge AAC in M4A, ${AAC_KBPS} kbit/s, mono; Schleifen WAV, 16 bit, mono. Abtastrate ${ABTASTRATE} Hz, wo in der Tabelle nicht anders angegeben. Die Rohdateien liegen nicht im Repository (\`v1/ton-roh/\`, siehe .gitignore).`);
   z.push("");
   z.push("## Rohquellen");
   z.push("");
@@ -140,10 +185,10 @@ function schreibeQuellen(bericht) {
       .map((s) => `${s.q.replace("A/x/Audio/", "A/").replace("I/x/", "I/")} ab ${(s.von ?? 0).toFixed(2)} s, ${s.dauer != null ? s.dauer.toFixed(2) + " s" : "ganz"}${s.rate && s.rate !== 1 ? `, Tempo ×${s.rate}` : ""}`)
       .concat(r.streu ? [`Streuung aus ${r.streu.quellen.map((s) => s.q.replace("A/x/Audio/", "A/")).join(", ")} (${r.streu.anzahl} Schläge)`] : [])
       .join("; ");
-    z.push(`| ${r.name}.wav | ${b ? b.dauer.toFixed(2) + " s" + (b.rate !== ABTASTRATE ? `, ${b.rate / 1000} kHz` : "") : "?"} | ${r.wofuer} | ${herkunft} |`);
+    z.push(`| ${dateiname(r)} | ${b ? b.dauer.toFixed(2) + " s" + (b.rate !== ABTASTRATE ? `, ${b.rate / 1000} kHz` : "") : "?"} | ${r.wofuer} | ${herkunft} |`);
   }
   z.push("");
-  z.push("Kürzel in der Spalte „Herausgeschnitten aus“: `A/…` Kenney Impact Sounds, `I/…` OpenGameArt 100 CC0 metal and wood SFX, `B/`–`F/` und `J/`–`L/` BigSoundBank (Nummer = Dateiname), `H/…` Pixabay-Greifkran (Pixabay Content License: Einbau ins Spiel erlaubt, die Datei für sich allein darf nicht weitergegeben werden — deshalb liegen hier nur Ausschnitte, gemischt mit anderen Klängen).");
+  z.push("Kürzel in der Spalte „Herausgeschnitten aus“: `A/…` Kenney Impact Sounds, `I/…` OpenGameArt 100 CC0 metal and wood SFX, `B/`–`F/`, `J/`–`L/`, `S/`, `T/` BigSoundBank (Nummer = Dateiname), `U/…` OpenGameArt rubberduck, `H/…` Pixabay-Greifkran (Pixabay Content License: Einbau ins Spiel erlaubt, die Datei für sich allein darf nicht weitergegeben werden — deshalb liegen hier nur Ausschnitte, gemischt mit anderen Klängen).");
   z.push("");
   writeFileSync(join(ziel, "QUELLEN.md"), z.join("\n"));
 }

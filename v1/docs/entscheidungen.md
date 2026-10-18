@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-159 | 18.10.2026 | Feste Tonhöhe, Blech statt Dose, Schichtung, AAC, Hörparcours | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-158 | 18.10.2026 | Nichts versinkt mehr im Boden: gehaltene und gedrückte Wracks bleiben oben | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-157 | 18.10.2026 | Jedes Anschlagen klingt: Last und Spinne an Wand, Schere, Laster, Container | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-156 | 18.10.2026 | Große Schrottmaschine: nah 10 t, bei 8 m 5,5 t | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -172,6 +173,13 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-159 — Klangqualität: feste Tonhöhe, Blech statt Dose, Hörparcours** (iPad, dann iPhone mini)
+- Pause → Lautstärke → Hörprobe ganz durchhören und `docs/messungen/hoerparcours.md` ausfüllen (Noten 1–5).
+- Auto greifen, auf Beton und auf eine Ladefläche schlagen: trocken gegen Dröhnen hörbar?
+- Auto in die Schere: Blech und Maschine, kein „Lallen“?
+- Kleine Eisenteile und Alu fallen lassen: Eisen nach Eisen, Alu leicht und trocken, kein Glöckchen?
+- iPhone: Schlagen die Klänge sofort an (erster Test mit AAC)?
 
 **E-158 — Nichts versinkt im Boden**
 - Auto greifen, auf den Boden absenken und weiter drücken: setzt es auf und bleibt oben?

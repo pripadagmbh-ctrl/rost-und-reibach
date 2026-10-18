@@ -24,6 +24,7 @@ import {
   aufprallKlang,
   AUFSCHLAG_ABSTAND_S,
   bissPegel,
+  dateiVon,
   dauerVon,
   DRUECK_ABSTAND_S,
   DRUECK_STREU_S,
@@ -42,7 +43,9 @@ import {
   VOLLE_KRAFT_KN,
   KLONK_ABSTAND_S,
   klonkPegel,
-  MAGNET_DREHZAHL,
+  MAGNET_HELL_HZ,
+  MOTOR_HZ_LEER,
+  TEMPO_STREU,
   MAGNET_LAUT,
   type AufprallRezept,
   type Schlag,
@@ -109,6 +112,7 @@ export class AudioManager {
   private engineGain: GainNode | null = null;
   /** Motor als Aufnahme (E-130); solange sie fehlt, schweigt er (E-153) */
   private motorQuelle: AudioBufferSourceNode | null = null;
+  private motorFilter: BiquadFilterNode | null = null;
   /**
    * AUFNAHMEN (E-130). Die Bytes werden schon beim Seitenaufruf geholt — dafuer
    * braucht es keine Geste —, dekodiert wird, sobald der Tonkanal steht. Ein
@@ -121,8 +125,6 @@ export class AudioManager {
   /** Ladebericht fuer Overlay und Messung: ms bis alles geholt bzw. dekodiert ist */
   private holMs = -1;
   private dekodierMs = -1;
-  private druckQuelle: AudioBufferSourceNode | null = null;
-  private fahrtQuelle: AudioBufferSourceNode | null = null;
   /** Letzte Achsbewegung und Schalentempo: beide speisen das Oelstroemen */
   private arm = 0;
   private schalenTempo = 0;
@@ -139,7 +141,6 @@ export class AudioManager {
   private readonly laut: Lautstaerken = ladeLautstaerken();
   /** Kehren: je Untergrund ein eigener Klangweg (E-121) */
   private kehr: Record<Untergrund, { gain: GainNode; filter: BiquadFilterNode }> | null = null;
-  private kornQuelle: AudioBufferSourceNode | null = null;
   private rasselQuelle: AudioBufferSourceNode | null = null;
   private bettGain: GainNode | null = null;
   /** Greifen: Druckaufbau unter Last, Ventilzischen, Oelstroemen beim Bewegen */
@@ -285,7 +286,7 @@ export class AudioManager {
       if (--offen === 0) this.holMs = performance.now() - this.ladeStart;
     };
     for (const n of namen) {
-      fetch(`${TON_ORDNER}${n}.wav`)
+      fetch(`${TON_ORDNER}${dateiVon(n)}`)
         .then((r) => (r.ok ? r.arrayBuffer() : null))
         .then((b) => {
           if (b) {
@@ -344,17 +345,19 @@ export class AudioManager {
    * gewaehlt. Liefert false, wenn sie (noch) nicht da ist — dann bleibt der
    * Klang still (E-153). `anteil` < 1 blendet frueher aus (Beton daempft),
    * `dauer` schneidet nach Sekunden ab, `tp` legt einen Tiefpass darueber.
+   * E-159: Das Tempo kann niemand von aussen setzen. Jede Aufnahme spielt in
+   * ihrem eigenen Tempo, gestreut um ±TEMPO_STREU — nie hoeher oder tiefer gezogen.
    */
   private spiele(
     namen: readonly string[],
     gain: number,
-    opt: { rate?: number; delay?: number; anteil?: number; dauer?: number; tp?: number; bagger?: boolean } = {}
+    opt: { delay?: number; anteil?: number; dauer?: number; tp?: number; bagger?: boolean } = {}
   ): boolean {
     const ctx = this.ctx;
     if (!ctx || !this.sfx || namen.length === 0) return false;
     const buf = this.proben.get(namen[Math.floor(Math.random() * namen.length)]!);
     if (!buf) return false;
-    const rate = opt.rate ?? 1;
+    const rate = 1 + TEMPO_STREU * (2 * Math.random() - 1);
     const t = ctx.currentTime + (opt.delay ?? 0);
     const q = ctx.createBufferSource();
     q.buffer = buf;
@@ -381,9 +384,8 @@ export class AudioManager {
   }
 
   /** Ein Schlag aus der Familie als Aufnahme; laedt sie noch, bleibt es still (E-153). */
-  private schlagAufnahme(s: Schlag, pegel: number, rate = 1, anteil = 1): void {
-    const streu = 1 + (Math.random() - 0.5) * s.streu;
-    this.spiele(s.proben, AUFNAHME_LAUT * s.laut * pegel, { rate: rate * streu, anteil });
+  private schlagAufnahme(s: Schlag, pegel: number, anteil = 1): void {
+    this.spiele(s.proben, AUFNAHME_LAUT * s.laut * pegel, { anteil });
   }
 
   /**
@@ -540,15 +542,20 @@ export class AudioManager {
     this.engineGain = ctx.createGain();
     this.engineGain.gain.value = 0.05;
     this.engineGain.connect(this.baggerBus);
-    // E-130: Diesel im Stand als Aufnahme (BigSoundBank #2147), Tempo folgt der Bedienung.
+    // E-130: Diesel im Stand als Aufnahme (BigSoundBank #2147).
     // E-153: Solange sie laedt, schweigt der Motor — vorher sprang ein Saegezahn ein.
+    // E-159: Tempo fest; die Bedienung macht ihn lauter und heller (Tiefpass), nicht hoeher.
+    this.motorFilter = ctx.createBiquadFilter();
+    this.motorFilter.type = "lowpass";
+    this.motorFilter.frequency.value = MOTOR_HZ_LEER;
+    this.motorFilter.connect(this.engineGain);
     const motor = this.proben.get(SCHLEIFEN.motor);
     const motorQuellen: AudioScheduledSourceNode[] = [];
     if (motor) {
       this.motorQuelle = ctx.createBufferSource();
       this.motorQuelle.buffer = motor;
       this.motorQuelle.loop = true;
-      this.motorQuelle.connect(this.engineGain);
+      this.motorQuelle.connect(this.motorFilter);
       this.motorQuelle.start();
       motorQuellen.push(this.motorQuelle);
     }
@@ -609,7 +616,7 @@ export class AudioManager {
     beton.filter.connect(beton.gain);
     stahl.filter.connect(stahl.gain);
     schrott.filter.connect(schrott.gain);
-    this.kornQuelle = schleife(SCHLEIFEN.kehrBeton, beton.filter);
+    schleife(SCHLEIFEN.kehrBeton, beton.filter);
     schleife(SCHLEIFEN.kehrStahl, stahl.filter);
     this.rasselQuelle = schleife(SCHLEIFEN.rassel, schrott.filter);
     this.kehr = { beton, stahl, schrott };
@@ -622,7 +629,7 @@ export class AudioManager {
     this.stoehnFilter = band(900, 0.7, "lowpass");
     this.stoehnGain = stumm(this.baggerBus);
     this.stoehnFilter.connect(this.stoehnGain);
-    this.druckQuelle = schleife(SCHLEIFEN.druck, this.stoehnFilter);
+    schleife(SCHLEIFEN.druck, this.stoehnFilter);
     // Druckbegrenzungsventil: Zischen, wenn die Spinne am Ende ist
     this.ventilGain = stumm(this.baggerBus);
     const ventilFilter = band(3500, 0.7, "highpass");
@@ -632,7 +639,7 @@ export class AudioManager {
     this.schalenGain = stumm(this.baggerBus);
     const fahrtFilter = band(8000, 0.7, "lowpass");
     fahrtFilter.connect(this.schalenGain);
-    this.fahrtQuelle = schleife(SCHLEIFEN.fahrt, fahrtFilter);
+    schleife(SCHLEIFEN.fahrt, fahrtFilter);
 
     return quellen;
   }
@@ -654,16 +661,14 @@ export class AudioManager {
     this.dauerquellen = [];
     this.engineGain = null;
     this.motorQuelle = null;
+    this.motorFilter = null;
     this.kehr = null;
-    this.kornQuelle = null;
     this.rasselQuelle = null;
     this.bettGain = null;
     this.stoehnFilter = null;
     this.stoehnGain = null;
     this.ventilGain = null;
     this.schalenGain = null;
-    this.druckQuelle = null;
-    this.fahrtQuelle = null;
   }
 
   /** Pro Frame: activity 0..1 (Achsbewegung), load 0..1 (Traglast-Anteil). */
@@ -671,10 +676,14 @@ export class AudioManager {
     if (!this.ctx || !this.engineGain) return;
     const t = this.ctx.currentTime;
     if (this.motorQuelle) {
-      // E-130, SW: Drehzahl als Abspieltempo 0,9…1,3; die Aufnahme liegt bei −3 dBFS
-      // E-151: Ist der Magnet an, zieht der Generator am Diesel — er dreht etwas hoeher und lauter
+      // E-159, SW: Last = lauter und heller (Tiefpass oeffnet), das Tempo bleibt fest.
+      // E-151: Ist der Magnet an, zieht der Generator am Diesel — etwas lauter und heller.
       const gen = this.magnetAn ? 1 : 0;
-      this.motorQuelle.playbackRate.setTargetAtTime(0.9 + 0.3 * activity + 0.1 * load + MAGNET_DREHZAHL * gen, t, 0.15);
+      this.motorFilter?.frequency.setTargetAtTime(
+        MOTOR_HZ_LEER + 3500 * activity + 1000 * load + MAGNET_HELL_HZ * gen,
+        t,
+        0.15
+      );
       this.engineGain.gain.setTargetAtTime(0.06 + 0.07 * activity + 0.02 * load + MAGNET_LAUT * gen, t, 0.15);
     }
     this.arm = activity;
@@ -686,7 +695,6 @@ export class AudioManager {
     if (!this.schalenGain) return;
     const o = oelFluss(this.schalenTempo, this.arm);
     this.schalenGain.gain.setTargetAtTime(o.laut, t, 0.06);
-    this.fahrtQuelle?.playbackRate.setTargetAtTime(o.rate, t, 0.08);
   }
 
   /**
@@ -705,17 +713,13 @@ export class AudioManager {
       weg.gain.gain.setTargetAtTime(g === untergrund ? k.laut : 0, t, g === untergrund ? 0.06 : 0.08);
       if (g === untergrund) weg.filter.frequency.setTargetAtTime(hz, t, 0.06);
     }
-    // Schneller schleifen = dichter koernen. Die Rasselquelle teilt sich das
-    // Kehren auf Schrott mit dem Rasselbett — beide werden dann lebhafter.
-    if (untergrund === "beton") this.kornQuelle?.playbackRate.setTargetAtTime(k.rate, t, 0.1);
-    if (untergrund === "schrott") this.rasselQuelle?.playbackRate.setTargetAtTime(k.rate, t, 0.1);
   }
 
   /**
    * Pro Frame: die Spinne (E-121). `schalenTempo` 0..1 = wie schnell die
    * Schalen gerade fahren (Oel fliesst), `kraft` 0..1 = Schliesskraft durch
    * Hoechstkraft (Zylinder steht unter Druck). Beides darf gleichzeitig sein.
-   * Seit E-130 beides auf Aufnahmen: Lautstaerke, Tempo und Tiefpass.
+   * Seit E-130 beides auf Aufnahmen: Lautstaerke und Tiefpass (E-159: kein Tempo mehr).
    */
   setGreifer(schalenTempo: number, kraft: number): void {
     if (!this.ctx || !this.stoehnGain || !this.stoehnFilter || !this.ventilGain || !this.schalenGain) return;
@@ -723,7 +727,6 @@ export class AudioManager {
     // E-130: an der Aenderung der Kraft, nicht an ihrem Wert — wer zuhaelt, hoert Stille
     const s = this.druckaufbau.schritt(t, kraft);
     this.stoehnGain.gain.setTargetAtTime(s.laut, t, 0.05);
-    this.druckQuelle?.playbackRate.setTargetAtTime(s.rate, t, 0.12);
     this.stoehnFilter.frequency.setTargetAtTime(s.filterHz, t, 0.1);
     this.ventilGain.gain.setTargetAtTime(s.zischen, t, 0.05);
     this.schalenTempo = Math.min(1, Math.max(0, schalenTempo));
@@ -769,7 +772,8 @@ export class AudioManager {
 
   /** Teil und Untergrund eines Aufpralls (E-130: Aufnahmen, sonst Teiltoene). */
   private aufprallAufnahme(r: AufprallRezept): void {
-    this.schlagAufnahme(r.teil, r.pegel, r.rate, r.daempf);
+    this.schlagAufnahme(r.teil, r.pegel, r.daempf);
+    if (r.koerper) this.schlagAufnahme(r.koerper, r.pegel, r.daempf); // E-159: die Masse klingt mit
     this.schlagAufnahme(r.grund, r.pegel);
   }
 
@@ -784,12 +788,12 @@ export class AudioManager {
     if (!this.ctx || !(zuwachs > 0)) return;
     const k = knautschKlang(zuwachs);
     this.letzterKnautsch = this.ctx.currentTime;
-    if (!this.spiele(EINZEL.knautsch, 0.75 * k.pegel, { rate: k.rate, dauer: k.dauer })) return;
+    if (!this.spiele(EINZEL.knautsch, 0.75 * k.pegel, { dauer: k.dauer })) return;
     // Metallschlaege ueber die Dauer verteilt: je mehr Zuwachs, desto dichter
     const stahl = aufprallKlang({ materialId: "steel", massKg: 300, wucht: 6, blech: false, untergrund: "beton" })!;
     for (let i = 0; i < k.schlaege; i++) {
       const d = ((i + 0.3 + Math.random() * 0.4) / k.schlaege) * k.dauer * 0.8;
-      this.spiele(stahl.teil.proben, 0.35 * k.pegel, { rate: 0.75 + Math.random() * 0.15, delay: d });
+      this.spiele(stahl.teil.proben, 0.35 * k.pegel, { delay: d, tp: 3000 });
     }
   }
 
@@ -807,7 +811,7 @@ export class AudioManager {
     // E-130: Dose zerdrueckt (BigSoundBank #0118), tiefer gelegt, mit Metallschlag.
     // Haerter = lauter und etwas tiefer. SW: Pegel 0,55, Tempo 1,05 → 0,9
     const k = Math.min(1, kraftKN / VOLLE_KRAFT_KN);
-    this.spiele(EINZEL.biss, 0.55 * p, { rate: 1.05 - 0.15 * k });
+    this.spiele(EINZEL.biss, 0.55 * p, { tp: 4000 + 6000 * (1 - k) });
   }
 
   /**
@@ -819,7 +823,7 @@ export class AudioManager {
     const ctx = this.ctx;
     const t = ctx.currentTime;
     // E-130: das Zischen aus der Ventil-Aufnahme, der Klack als Metallanschlag
-    this.spiele(EINZEL.anschlag, 0.12, { rate: 1.25, delay: 0.02, tp: 3000, bagger: true });
+    this.spiele(EINZEL.anschlag, 0.12, { delay: 0.02, tp: 3000, bagger: true });
     const ventil = this.proben.get(SCHLEIFEN.ventil);
     if (!ventil) return; // E-153: laedt noch — dann nur der Klack, kein Rauschen
     const src = ctx.createBufferSource();
@@ -849,7 +853,7 @@ export class AudioManager {
   playClawSnap(haerte = 1, _typ?: string): void {
     const h = Math.max(0.15, Math.min(haerte, 1));
     // E-130: Stahl auf Stahl als Aufnahme; weich gedaempft = leiser, tiefer, dumpfer (SW)
-    this.spiele(EINZEL.anschlag, 0.2 + 0.35 * h, { rate: 0.85 + 0.2 * h, tp: 1500 + 8000 * h });
+    this.spiele(EINZEL.anschlag, 0.2 + 0.35 * h, { tp: 1500 + 8000 * h });
   }
 
   playGrab(materialId?: string): void {
@@ -859,7 +863,7 @@ export class AudioManager {
     // SW: wie ein Aufprall mit 4 m/s, auf Pegel 0,35 gedeckelt.
     if (!materialId) return;
     const r = aufprallKlang({ materialId, massKg: 50, wucht: 4, blech: false, untergrund: "schrott" });
-    if (r) this.schlagAufnahme(r.teil, Math.min(r.pegel, 0.35), r.rate);
+    if (r) this.schlagAufnahme(r.teil, Math.min(r.pegel, 0.35));
   }
 
   /**
@@ -868,7 +872,7 @@ export class AudioManager {
    */
   playDrop(materialId: string): void {
     const r = aufprallKlang({ materialId, massKg: 80, wucht: 5, blech: false, untergrund: "stahl" });
-    if (r) this.spiele(r.teil.proben, AUFNAHME_LAUT * r.teil.laut * 0.7, { rate: r.rate });
+    if (r) this.spiele(r.teil.proben, AUFNAHME_LAUT * r.teil.laut * 0.7, {});
   }
 
   /**
@@ -890,8 +894,8 @@ export class AudioManager {
    * ein Laser-„Piu", kein Metall.
    */
   playTear(): void {
-    this.spiele([SCHLEIFEN.kehrStahl], 0.35, { rate: 0.7 + Math.random() * 0.1, dauer: 0.45 });
-    this.spiele(FAMILIE_BLECH, 0.5, { rate: 0.85 + Math.random() * 0.1, delay: 0.05 });
+    this.spiele([SCHLEIFEN.kehrStahl], 0.35, { dauer: 0.45 });
+    this.spiele(FAMILIE_BLECH, 0.5, { delay: 0.05 });
   }
 
   /** Schwerer Blech-Crash (Quetschstufe). */
@@ -961,8 +965,8 @@ export class AudioManager {
    */
   playMagnet(an: boolean): void {
     this.magnetAn = an;
-    this.spiele(EINZEL_KLICK, an ? 0.45 : 0.35, { rate: an ? 0.8 : 0.95, bagger: true }); // SW
-    this.spiele(EINZEL.anschlag, an ? 0.12 : 0.08, { rate: 0.7, tp: 2000, delay: 0.005, bagger: true }); // SW
+    this.spiele(EINZEL_KLICK, an ? 0.45 : 0.35, { tp: an ? 3000 : 5000, bagger: true }); // SW
+    this.spiele(EINZEL.anschlag, an ? 0.12 : 0.08, { tp: 2000, delay: 0.005, bagger: true }); // SW
   }
 
   /**
@@ -980,9 +984,8 @@ export class AudioManager {
       return;
     }
     this.letzterKlonk = t;
-    const r = 0.8 + Math.random() * 0.1; // SW: tief, ±5 %
-    this.spiele(FAMILIE_STAHL, AUFNAHME_LAUT * 0.25 * p, { rate: r, tp: 2500 });
-    this.spiele(GRUND_STAHL, AUFNAHME_LAUT * 0.2 * p, { rate: r });
+    this.spiele(FAMILIE_STAHL, AUFNAHME_LAUT * 0.25 * p, { tp: 2500 });
+    this.spiele(GRUND_STAHL, AUFNAHME_LAUT * 0.2 * p, {});
   }
 
   playHupe(): void {
@@ -1000,7 +1003,7 @@ export class AudioManager {
     const jetzt = this.ctx?.currentTime ?? 0;
     const ab = Math.max(0.95, this.feierabendBis - jetzt + 0.2); // SW: 0,2 s Luft
     for (let i = 0; i < Math.max(0, Math.min(3, anzahl)); i++) {
-      this.spiele(FAMILIE_STAHL, 0.55, { rate: 0.95 + Math.random() * 0.06, delay: ab + i * 0.32 }); // SW
+      this.spiele(FAMILIE_STAHL, 0.55, { delay: ab + i * 0.32 }); // SW
     }
   }
 
@@ -1017,7 +1020,7 @@ export class AudioManager {
    * Kunststoff-Klacken (E-139: Aufnahme statt zwei Pieptönen). Bewusst leise.
    */
   playTick(): void {
-    this.spiele(EINZEL_KLICK, 0.15, { rate: 1.5 + Math.random() * 0.1, tp: 5000, bagger: true }); // SW
+    this.spiele(EINZEL_KLICK, 0.15, { tp: 5000, bagger: true }); // SW
   }
 
   /**
@@ -1026,7 +1029,7 @@ export class AudioManager {
    * Eine Hupe gibt es im Bestand nicht (offen für Patrick).
    */
   playWrong(): void {
-    this.spiele(GRUND_STAHL, 0.9, { rate: 0.6, tp: 700 }); // SW
+    this.spiele(GRUND_STAHL, 0.9, { tp: 700 }); // SW
   }
 
   private letzterHieb = -1;
@@ -1042,7 +1045,7 @@ export class AudioManager {
     if (t - this.letzterHieb < AUFSCHLAG_ABSTAND_S) return;
     this.letzterHieb = t;
     for (const s of spinnenAufschlag(wucht, grund)) {
-      this.spiele(s.proben, AUFNAHME_LAUT * 0.3 * s.pegel, { rate: s.rate, dauer: s.dauer, tp: s.tp });
+      this.spiele(s.proben, AUFNAHME_LAUT * 0.3 * s.pegel, { dauer: s.dauer, tp: s.tp });
     }
     if (grund === "schrott") this.rassle(t, 0.3 * wucht); // SW: der Haufen rutscht nach
   }
@@ -1057,7 +1060,7 @@ export class AudioManager {
     if (t < this.naechsterDruck) return;
     this.naechsterDruck = t + DRUECK_ABSTAND_S + Math.random() * DRUECK_STREU_S;
     const s = spinnenDruecken(staerke, grund);
-    this.spiele(s.proben, AUFNAHME_LAUT * 0.3 * s.pegel, { rate: s.rate, dauer: s.dauer, tp: s.tp });
+    this.spiele(s.proben, AUFNAHME_LAUT * 0.3 * s.pegel, { dauer: s.dauer, tp: s.tp });
   }
 
   /** Gruppe Bagger: Motor, Hydraulik, Greifer-Mechanik, Kabine (E-139). */

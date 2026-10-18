@@ -17,6 +17,15 @@
  * deshalb an jeder Aufnahme selbst, dass genug davon ueber 300 Hz liegt.
  */
 
+/**
+ * TONHOEHE (E-159, Befund Patrick 18.10.: „kindlich", „lallend"): Jede
+ * Aufnahme spielt in ihrem eigenen Tempo, gestreut um hoechstens ±4 % je
+ * Anschlag — damit kein Schlag wie der vorige klingt. Kein Klang wird nach
+ * Masse oder Kraft hoeher oder tiefer gezogen, und kein Tempo gleitet. Groesse
+ * und Kraft wirken ueber Pegel, Filter, Dauer und Aufnahmewahl.
+ */
+export const TEMPO_STREU = 0.04;
+
 /** Worauf ein Teil faellt oder worueber die Spinne schleift. */
 export type Untergrund = "beton" | "stahl" | "schrott";
 
@@ -24,11 +33,9 @@ export type Untergrund = "beton" | "stahl" | "schrott";
 export interface Schlag {
   /** Grundlautstaerke vor dem Pegel */
   laut: number;
-  /** Streuung der Tonhoehe je Anschlag (Anteil) */
-  streu: number;
   /** Wie lange ein Schlag klingt (s) — fuer die Stimmenzaehlung. Aus den alten Abklingzeiten uebernommen. */
   dauer: number;
-  /** Aufnahmen dieser Familie (Dateiname ohne .wav in public/ton/), zufaellig gewaehlt (E-130) */
+  /** Aufnahmen dieser Familie (Dateiname ohne Endung in public/ton/, s. `dateiVon`), zufaellig gewaehlt (E-130) */
   proben: string[];
 }
 
@@ -41,91 +48,87 @@ export const FAMILIEN: Record<string, Schlag> = {
   // Massiver Stahl: tief, kurz, schwer.
   stahl: {
     laut: 0.3,
-    streu: 0.06,
     dauer: 0.35,
-    proben: ["stahl_1", "stahl_2", "stahl_3"],
+    proben: ["stahl_1", "stahl_2", "stahl_3", "stahl_4"],
+  },
+  // Kleines Eisen (E-159): Eisenteile unter 40 kg — echte fallende Metallteile
+  // mit Nachspringen. Vorher klangen sie als Blech, hoeher gezogen: „wie Alu".
+  kleineisen: {
+    laut: 0.25,
+    dauer: 0.5,
+    proben: ["kleineisen_1", "kleineisen_2", "kleineisen_3"],
   },
   // Blech: hell, es scheppert.
   blech: {
     laut: 0.22,
-    streu: 0.08,
     dauer: 0.37,
-    proben: ["blech_1", "blech_2", "blech_3"],
+    proben: ["blech_1", "blech_2", "blech_3", "blech_4"],
   },
   // Edelstahl: klar und lange nachklingend — aber kuerzer als der alte
   // Abwurfklang (1,25 s), sonst singt ein Haufen.
   va: {
     laut: 0.2,
-    streu: 0.03,
     dauer: 0.65,
     proben: ["va_1", "va_2"],
   },
   // Alu: leicht, hell, kurz, ein Nachklappern.
   alu: {
     laut: 0.2,
-    streu: 0.05,
     dauer: 0.26,
-    proben: ["alu_1", "alu_2"],
+    proben: ["alu_1", "alu_2", "alu_3"],
   },
   // Kupfer: hell, aber warm, mit tragendem Nachklang.
   kupfer: {
     laut: 0.2,
-    streu: 0.04,
     dauer: 0.47,
     proben: ["kupfer_1", "kupfer_2"],
   },
   // Kabelbund: dumpf, mit Rascheln.
   kabel: {
     laut: 0.16,
-    streu: 0.09,
     dauer: 0.17,
     proben: ["kabel_1"],
   },
   // Akku, Kunststoffgehaeuse mit Blei: ein Klotz ohne Klang.
   klotz: {
     laut: 0.18,
-    streu: 0.05,
     dauer: 0.13,
     proben: ["klotz_1"],
   },
   // Holz: kurzes Klopfen.
   holz: {
     laut: 0.2,
-    streu: 0.06,
     dauer: 0.12,
     proben: ["holz_1", "holz_2"],
   },
   // Reifen: tiefer, weicher Plumps.
   reifen: {
     laut: 0.22,
-    streu: 0.05,
     dauer: 0.23,
     proben: ["reifen_1"],
   },
   // Kunststoff: hohles Klacken.
   kunststoff: {
     laut: 0.14,
-    streu: 0.06,
     dauer: 0.1,
     proben: ["kunststoff_1", "kunststoff_2"],
   },
   // Bauschutt: Brocken und Geroell, kaum Ton.
   geroell: {
     laut: 0.12,
-    streu: 0.1,
     dauer: 0.11,
     proben: ["geroell_1", "geroell_2"],
   },
 };
 
-/** Stahl unter dieser Masse klingt als Blech. SW: 40 kg (Tuer, Haube, Fass). */
+/** Massiver Stahl unter dieser Masse klingt als kleines Eisen (E-159; vorher als Blech). SW: 40 kg. */
 const BLECH_BIS_KG = 40;
 
 /** Welche Klangfamilie ein Material hat. Unbekanntes klingt als Blech. */
 export function familieVon(materialId: string, massKg: number, blech: boolean): string {
   switch (materialId) {
     case "steel":
-      return blech || massKg < BLECH_BIS_KG ? "blech" : "stahl";
+      return blech ? "blech" : massKg < BLECH_BIS_KG ? "kleineisen" : "stahl";
     case "mixed":
       return "blech";
     case "va":
@@ -153,8 +156,6 @@ export function familieVon(materialId: string, massKg: number, blech: boolean): 
   }
 }
 
-/** Messing klingt heller als Kupfer, Zink dumpfer. Faktor aufs Abspieltempo. */
-const TONHOEHE: Record<string, number> = { brass: 1.15, zinc: 0.85 };
 
 /**
  * Unter dieser Wucht (m/s Tempoverlust) gibt es keinen eigenen Schlag, nur
@@ -188,16 +189,37 @@ export function lastAufschlagWucht(tempo: number): number {
   return Math.max(SCHLAG_AB_MS, 2 * tempo);
 }
 
-/** Ein fertiges Aufprall-Rezept: das Teil selbst plus der Untergrund. */
+/**
+ * Ein fertiges Aufprall-Rezept, geschichtet wie im Tonstudio (E-159):
+ * ANSCHLAG (`teil`, das Material) + KOERPER (`koerper`, die Masse — nur bei
+ * schweren Teilen) + UNTERGRUND (`grund`).
+ */
 export interface AufprallRezept {
   pegel: number;
-  /** Abspieltempo der Aufnahme: groesser = tiefer (E-130), Messing heller, Zink dumpfer */
-  rate: number;
   /** Anteil der Aufnahme, der ausklingen darf: Beton daempft (E-130) */
   daempf: number;
   teil: Schlag;
+  /** Schwere Teile: der Koerper klingt mit (hohles Blech oder Stahl auf Stahl), sonst null */
+  koerper: Schlag | null;
   grund: Schlag;
 }
+
+/** Ab dieser Masse klingt der Koerper mit. SW: 150 kg (Tuer, Motorblock, Traeger). */
+export const KOERPER_AB_KG = 150;
+
+/*
+ * DER KOERPER (E-159): Was schwer ist, klingt nicht nur nach seinem Material.
+ *  - Blech (Karosserie, Tank, Fass): eine echte zugeschlagene Autotuer —
+ *    voll, hohl, dumpf. Auf jedem Untergrund.
+ *  - Schweres Metall auf Stahl (Ladeflaeche, Mulde, Container): eine grosse
+ *    Metallschranke schlaegt zu und droehnt bis zu 2 s nach. Auf Beton nicht —
+ *    da bleibt es trocken.
+ */
+export const KOERPER: Record<"blech" | "stahl", Schlag> = {
+  blech: { laut: 0.3, dauer: 0.5, proben: ["koerper_blech_1", "koerper_blech_2", "koerper_blech_3", "koerper_blech_4"] },
+  stahl: { laut: 0.3, dauer: 1.5, proben: ["koerper_stahl_1", "koerper_stahl_2", "koerper_stahl_3"] },
+};
+const METALLISCH = new Set(["stahl", "kleineisen", "va", "kupfer"]);
 
 /*
  * DER UNTERGRUND klingt mit (SW):
@@ -209,19 +231,17 @@ export interface AufprallRezept {
 export const GRUND: Record<Untergrund, Schlag> = {
   beton: {
     laut: 0.1,
-    streu: 0.1,
     dauer: 0.1,
     proben: ["grund_beton"],
   },
   stahl: {
-    laut: 0.18,
-    streu: 0.03,
+    // E-159: lauter (0,18 → 0,28) — Metall auf Metall soll man am Untergrund hoeren. SW
+    laut: 0.28,
     dauer: 0.55,
     proben: ["grund_stahl_1", "grund_stahl_2"],
   },
   schrott: {
     laut: 0.1,
-    streu: 0.12,
     dauer: 0.22,
     proben: ["grund_schrott_1", "grund_schrott_2"],
   },
@@ -245,17 +265,19 @@ export function aufprallKlang(e: {
   if (!(e.wucht >= SCHLAG_AB_MS)) return null;
   const pegel = aufprallPegel(e.wucht, e.massKg);
   // Späne rascheln wie Draht (E-147), obwohl sie als Mischschrott sonst Blech wären
-  const fam = FAMILIEN[e.spaene ? "kabel" : familieVon(e.materialId, e.massKg, e.blech)]!;
-  // Groesser klingt tiefer: 80 kg ist die Mitte, gedeckelt auf ±30 %.
-  const hoehe =
-    (TONHOEHE[e.materialId] ?? 1) *
-    Math.min(1.3, Math.max(0.7, Math.pow(80 / Math.max(e.massKg, 1), 0.12)));
+  const name = e.spaene ? "kabel" : familieVon(e.materialId, e.massKg, e.blech);
+  const fam = FAMILIEN[name]!;
+  const schwer = !e.spaene && e.massKg >= KOERPER_AB_KG;
+  const koerper =
+    schwer && name === "blech" ? KOERPER.blech : schwer && METALLISCH.has(name) && e.untergrund === "stahl" ? KOERPER.stahl : null;
+  // E-159: keine Tonhoehe nach Masse mehr (±30 % klang bei Kleinteilen nach Micky Maus).
+  // Masse wirkt ueber Pegel und Aufnahmewahl, nie ueber das Abspieltempo.
   const daempf = e.untergrund === "beton" ? BETON_DAEMPFT : 1;
   return {
     pegel,
-    rate: hoehe,
     daempf,
     teil: { ...fam, dauer: fam.dauer * daempf },
+    koerper,
     grund: GRUND[e.untergrund],
   };
 }
@@ -280,20 +302,20 @@ export function bissPegel(kraftKN: number): number {
 }
 
 /**
- * Der Druckaufbau beim Zudruecken, je Kraftanteil 0..1: lauter, hoeher und
- * heller, je haerter. Ab 85 % zischt das Druckbegrenzungsventil — das hoert
+ * Der Druckaufbau beim Zudruecken, je Kraftanteil 0..1: lauter und heller,
+ * je haerter. Ab 85 % zischt das Druckbegrenzungsventil — das hoert
  * man an jeder echten Maschine, wenn der Zylinder am Ende ist. SW.
  *
- * Seit E-130 auf einer Aufnahme (Pumpe unter Last, `hyd_druck`): `rate` ist
- * das Abspieltempo (hoeher = die Pumpe singt hoeher), `filterHz` ein Tiefpass
- * (leicht gedrueckt klingt dumpf, voll offen). Vorher zwei Saegezaehne —
- * genau die klangen fuer Patrick nach Summen.
+ * Seit E-130 auf einer Aufnahme (Pumpe unter Last, `hyd_druck`): `filterHz`
+ * ist ein Tiefpass (leicht gedrueckt klingt dumpf, voll offen). Das
+ * Abspieltempo bleibt fest (E-159): Ein Tempo, das mit der Kraft gleitet,
+ * zieht die Tonhoehe mit — Patrick hoerte an der Schere „einen lallenden
+ * Betrunkenen".
  */
-export function stoehnen(k01: number): { laut: number; rate: number; filterHz: number; zischen: number } {
+export function stoehnen(k01: number): { laut: number; filterHz: number; zischen: number } {
   const k = Math.min(1, Math.max(0, k01));
   return {
     laut: 0.22 * Math.pow(k, 0.8), // SW: Aufnahme auf −3 dBFS geschnitten, darum hoeher als die alte 0,1
-    rate: 0.8 + 0.4 * k, // SW
     filterHz: 900 + 5000 * k, // SW
     zischen: k > 0.85 ? 0.1 * ((k - 0.85) / 0.15) : 0,
   };
@@ -327,7 +349,7 @@ export class Druckaufbau {
   private ventilScharf = true;
 
   /** Ein Bild: Zeit `t` (s) und Kraftanteil 0..1. Liefert Pegel von Druck und Ventil. */
-  schritt(t: number, kraft01: number): { laut: number; rate: number; filterHz: number; zischen: number } {
+  schritt(t: number, kraft01: number): { laut: number; filterHz: number; zischen: number } {
     const k = Math.min(1, Math.max(0, kraft01));
     const dt = this.tAlt < 0 ? 0 : Math.min(0.1, Math.max(0, t - this.tAlt));
     const s = stoehnen(k);
@@ -343,7 +365,7 @@ export class Druckaufbau {
     if (k < 0.8) this.ventilScharf = true;
     this.kraftAlt = k;
     this.tAlt = t;
-    return { laut: 0.22 * this.huelle * (0.4 + 0.6 * k), rate: s.rate, filterHz: s.filterHz, zischen: 0.1 * this.ventil };
+    return { laut: 0.22 * this.huelle * (0.4 + 0.6 * k), filterHz: s.filterHz, zischen: 0.1 * this.ventil };
   }
 }
 
@@ -353,12 +375,12 @@ export class Druckaufbau {
  * bewegt, hoert die Hydraulik leiser als beim Greifen. Eine Quelle fuer beides,
  * damit nicht zwei Kopien derselben Aufnahme gegeneinander schweben. SW.
  */
-export function oelFluss(schalen: number, arm: number): { laut: number; rate: number } {
+export function oelFluss(schalen: number, arm: number): { laut: number } {
   // Unter 3 % ist es Messrauschen, keine Bewegung — sonst haenge ein Hauch Oel
   // am Zuhalten (E-130). SW.
   const s = schalen < 0.03 ? 0 : Math.min(1, schalen);
   const a = arm < 0.03 ? 0 : Math.min(1, arm * 1.6);
-  return { laut: Math.max(0.14 * s, 0.06 * a), rate: 0.9 + 0.25 * Math.max(s, a) };
+  return { laut: Math.max(0.14 * s, 0.06 * a) };
 }
 
 /* ---------------------------------------------------- Knautschen (E-130) -- */
@@ -366,15 +388,14 @@ export function oelFluss(schalen: number, arm: number): { laut: number; rate: nu
 /**
  * Das Wrack knautscht (`wrack:geknautscht`). `zuwachs` ist, um wie viel der
  * mittlere Knautschgrad gestiegen ist: ein voller Biss etwa 0,17, die Presse
- * bis 1. Groesser heisst lauter, laenger, tiefer und dichter — die Presse
+ * bis 1. Groesser heisst lauter, laenger und dichter — die Presse
  * faltet das ganze Auto hoerbar auf einmal, ein Biss knirscht kurz. SW.
  */
-export function knautschKlang(zuwachs: number): { pegel: number; dauer: number; rate: number; schlaege: number } {
+export function knautschKlang(zuwachs: number): { pegel: number; dauer: number; schlaege: number } {
   const z = Math.min(1, Math.max(0, zuwachs));
   return {
     pegel: 0.35 + 0.65 * Math.sqrt(z),
     dauer: 0.6 + 2.4 * z,
-    rate: 1.1 - 0.25 * z,
     schlaege: Math.round(4 * z),
   };
 }
@@ -401,38 +422,40 @@ export const DRUECK_DAUER_S = 0.18;
 export interface Schicht {
   proben: readonly string[];
   pegel: number;
-  rate: number;
   /** Abschneiden nach Sekunden (mit Ausblende); fehlt = ganz */
   dauer?: number;
   /** Tiefpass in Hz (dumpfer); fehlt = offen */
   tp?: number;
 }
 
-/** ±`anteil` Zufall um 1 — kein Schlag klingt wie der vorige. */
+/** ±`anteil` Zufall um 1 — fuer Pegel und Dauer (die Tonhoehe streut `spiele` selbst, ±TEMPO_STREU). */
 const streu = (anteil: number): number => 1 + (Math.random() - 0.5) * 2 * anteil;
 
 /**
  * Die Spinne schlägt auf (`spinne:aufschlag`): schwerer Stahl (die Spinne
- * selbst, gut eine Tonne, darum tiefer als ein fallender Träger) plus der
- * Untergrund. Wrack: dumpf geknautschtes Blech statt Stahlklang. Lautstärke
- * folgt der Wucht, Tonhöhe streut ±6 %. Alle Pegel SW.
+ * selbst, gut eine Tonne) plus der Untergrund. Wrack: dumpf geknautschtes
+ * Blech statt Stahlklang. Lautstärke folgt der Wucht. Alle Pegel SW.
  */
 export function spinnenAufschlag(wucht01: number, grund: SpinnenGrund): Schicht[] {
   const w = Math.min(1, Math.max(0, wucht01));
   const p = 0.15 + 0.85 * Math.pow(w, 0.8);
-  const stahl: Schicht = { proben: FAMILIEN.stahl!.proben, pegel: 0.75 * p, rate: 0.78 * streu(0.06) };
+  const stahl: Schicht = { proben: FAMILIEN.stahl!.proben, pegel: 0.75 * p };
   switch (grund) {
     case "beton":
-      return [stahl, { proben: GRUND.beton.proben, pegel: 0.5 * p, rate: 0.9 * streu(0.06) }];
-    case "stahl":
-      return [stahl, { proben: GRUND.stahl.proben, pegel: 0.6 * p, rate: 0.9 * streu(0.05) }];
+      return [stahl, { proben: GRUND.beton.proben, pegel: 0.5 * p }];
+    case "stahl": {
+      // E-159: Ein kraeftiger Hieb auf Stahl droehnt nach (Metallschranke)
+      const s: Schicht[] = [stahl, { proben: GRUND.stahl.proben, pegel: 0.6 * p }];
+      if (w > 0.5) s.push({ proben: KOERPER.stahl.proben, pegel: 0.5 * p });
+      return s;
+    }
     case "schrott":
-      return [stahl, { proben: GRUND.schrott.proben, pegel: 0.5 * p, rate: streu(0.1) }, { proben: FAMILIEN.blech!.proben, pegel: 0.35 * p, rate: streu(0.08) }];
+      return [stahl, { proben: GRUND.schrott.proben, pegel: 0.5 * p }, { proben: FAMILIEN.blech!.proben, pegel: 0.35 * p }];
     case "wrack":
       return [
-        { proben: EINZEL.knautsch, pegel: 0.4 * p, rate: (1.05 - 0.15 * w) * streu(0.05), dauer: 0.35 + 0.4 * w },
-        { proben: FAMILIEN.blech!.proben, pegel: 0.5 * p, rate: 0.8 * streu(0.06), tp: 2500 },
-        { proben: FAMILIEN.stahl!.proben, pegel: 0.3 * p, rate: 0.75 * streu(0.06), tp: 1800 },
+        { proben: EINZEL.knautsch, pegel: 0.4 * p, dauer: 0.35 + 0.4 * w },
+        { proben: FAMILIEN.blech!.proben, pegel: 0.5 * p, tp: 2500 },
+        { proben: FAMILIEN.stahl!.proben, pegel: 0.3 * p, tp: 1800 },
       ];
   }
 }
@@ -440,24 +463,23 @@ export function spinnenAufschlag(wucht01: number, grund: SpinnenGrund): Schicht[
 /**
  * Die Spinne drückt (`spinne:druecken`): ein kurzer Stoß Knirschen oder
  * Ächzen, je Untergrund eine andere Aufnahme — Beton knirscht wie Schutt,
- * Stahl ächzt (Kreischen aus der Ladefläche, tief gelegt), Schrott und Wrack
- * geben nach wie eine Dose. Härter = lauter und tiefer. Höchstens
+ * Stahl ächzt (Kreischen aus der Ladefläche), Schrott und Wrack geben nach.
+ * Härter = lauter. Höchstens
  * `DRUECK_DAUER_S` lang, nie länger. Alle Pegel SW.
  */
 export function spinnenDruecken(staerke01: number, grund: SpinnenGrund): Schicht {
   const s = Math.min(1, Math.max(0, staerke01));
   const pegel = (0.12 + 0.5 * s) * streu(0.2);
-  const tiefer = 1 - 0.15 * s;
   const d = DRUECK_DAUER_S * (0.7 + 0.3 * Math.random()); // nie über DRUECK_DAUER_S
   switch (grund) {
     case "beton":
-      return { proben: FAMILIEN.geroell!.proben, pegel, rate: 0.75 * tiefer * streu(0.08), dauer: d };
+      return { proben: FAMILIEN.geroell!.proben, pegel, dauer: d };
     case "stahl":
-      return { proben: [SCHLEIFEN.kehrStahl], pegel: 0.8 * pegel, rate: 0.65 * tiefer * streu(0.08), dauer: d, tp: 3500 };
+      return { proben: [SCHLEIFEN.kehrStahl], pegel: 0.8 * pegel, dauer: d, tp: 3500 };
     case "schrott":
-      return { proben: EINZEL.biss, pegel, rate: 0.95 * tiefer * streu(0.08), dauer: d };
+      return { proben: EINZEL.biss, pegel, dauer: d };
     case "wrack":
-      return { proben: EINZEL.knautsch, pegel: 1.2 * pegel, rate: tiefer * streu(0.08), dauer: d };
+      return { proben: EINZEL.knautsch, pegel: 1.2 * pegel, dauer: d };
   }
 }
 
@@ -465,8 +487,10 @@ export function spinnenDruecken(staerke01: number, grund: SpinnenGrund): Schicht
 
 /** Viele Teile schlagen kurz nacheinander an: ein Klonk je so viel Zeit. SW: 0,12 s. */
 export const KLONK_ABSTAND_S = 0.12;
-/** Magnet an: der Generator zieht am Diesel — so viel mehr Drehzahl (Abspieltempo) und Pegel. SW. */
-export const MAGNET_DREHZAHL = 0.06;
+/** Motor-Tiefpass im Leerlauf (Hz); Bedienung oeffnet ihn (E-159: statt hoeherer Drehzahl). SW. */
+export const MOTOR_HZ_LEER = 1500;
+/** Magnet an: der Generator zieht am Diesel — so viel heller (Hz) und lauter. SW. */
+export const MAGNET_HELL_HZ = 800;
 export const MAGNET_LAUT = 0.015;
 
 /**
@@ -505,11 +529,21 @@ export const EINZEL = {
   klingel: ["klingel"],
 } as const;
 
+/**
+ * Dateiname einer Aufnahme in public/ton/ (E-159): Schleifen sind WAV (eine
+ * verlustbehaftete Naht koennte bei jeder Runde knacken), alle Einzelklaenge
+ * AAC in M4A — rund fuenfmal kleiner, iOS-Safari dekodiert es nativ.
+ */
+export function dateiVon(name: string): string {
+  return (Object.values(SCHLEIFEN) as string[]).includes(name) ? `${name}.wav` : `${name}.m4a`;
+}
+
 /** Alle Aufnahmen, die das Spiel laedt — Familien, Untergruende, Schleifen, Einzelklaenge. */
 export function alleProben(): string[] {
   const alle = [
     ...Object.values(FAMILIEN).flatMap((f) => f.proben),
     ...Object.values(GRUND).flatMap((g) => g.proben),
+    ...Object.values(KOERPER).flatMap((g) => g.proben),
     ...Object.values(SCHLEIFEN),
     ...Object.values(EINZEL).flat(),
   ];
@@ -521,20 +555,20 @@ export function alleProben(): string[] {
 /**
  * Das Schleifen der Spinne, je Tempo 0..1 und Untergrund. Jeder Untergrund hat
  * seinen eigenen Klangweg im Manager; hier steht nur, wie laut und wie hell.
- * Schneller = lauter, heller und dichter. SW.
+ * Schneller = lauter und heller (das Tempo der Aufnahme bleibt fest, E-159). SW.
  */
-export function kehrKlang(tempo01: number, grund: Untergrund): { laut: number; hz: number; rate: number } {
+export function kehrKlang(tempo01: number, grund: Untergrund): { laut: number; hz: number } {
   const t = Math.min(1, Math.max(0, tempo01));
   switch (grund) {
     case "beton":
       // raues Schaben: breites Band, dichte Koernung
-      return { laut: 0.16 * t, hz: 800 + 700 * t, rate: 0.7 + 0.9 * t };
+      return { laut: 0.16 * t, hz: 800 + 700 * t };
     case "stahl":
       // Kreischen: enges, hohes Band, wandert mit dem Tempo
-      return { laut: 0.09 * t, hz: 2100 + 900 * t, rate: 1 };
+      return { laut: 0.09 * t, hz: 2100 + 900 * t };
     case "schrott":
       // Klappern und Rutschen: lose Schlaege, lauter je schneller
-      return { laut: 0.2 * t, hz: 1300 + 500 * t, rate: 0.6 + 1.0 * t };
+      return { laut: 0.2 * t, hz: 1300 + 500 * t };
   }
 }
 
