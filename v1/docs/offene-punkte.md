@@ -580,6 +580,10 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       einem Schrottplatz: „Nein". Freesound (CC0, Anmeldung nötig, Patrick lädt
       selbst): „Ja, alle sechs" — #587442, #587443, #378670, #167917, #530209,
       #532874. Alu noch ohne Kandidat.
+      Nachtrag: Freesound-Anmeldung gerade nicht möglich → freigegeben und geladen
+      (CC0, ohne Anmeldung): BigSoundBank #2358–#2360, #1774 (ton-roh/S),
+      #0971, #1524 Autotüren (T); OpenGameArt „75 CC0 breaking/falling/hit"
+      (U), „Wood and Metal Vol. 2" (V). Freesound bleibt für später.
 
 - [ ] **Ansage 18.10.2026, Boden** — Patrick, wörtlich: „auch soll es nicht
       mehr möglich sien, das körper im boden versinken können, wie aktuell bei
