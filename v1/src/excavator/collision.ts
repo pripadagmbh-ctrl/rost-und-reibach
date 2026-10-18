@@ -200,6 +200,14 @@ const PLOW_HALF_KG = 500;
  */
 /** SW: cos 72° — so steil muss die Bewegung in den Koerper zeigen, damit es Schieben ist und nicht Gleiten */
 const PLOW_RICHTUNG_COS = 0.3;
+/**
+ * E-158: So tief darf ein loser Koerper unter der Spinne in Festes gedrueckt
+ * sein, bevor der Arm anhaelt (m). SW: ueber dem Einfedern eines ruhenden
+ * Teils (gemessen 0,5 cm), unter jedem sichtbaren Versinken.
+ */
+const EINSINK_M = 0.03;
+/** E-158: Ab dieser Masse haelt ein aufliegendes Teil die Spinne von oben an (kg) — dieselbe Grenze wie die Brocken-Sperre (`EINDRING_SCHWER_KG` im Bagger, 350) */
+const SCHWER_AUFLIEGEND_KG = 350;
 /** SW: Ab diesem Tempo (m/s) weicht ein Koerper — darunter liegt er (Zittern im Haufen bleibt darunter) */
 const PLOW_BEWEGT_MS = 0.15;
 /** So langsam wird es hoechstens — darunter steht die Maschine praktisch */
@@ -438,9 +446,10 @@ export class ExcavatorCollision {
 
   /**
    * Wie tief stuende ein gehaltenes Teil in Festem, wenn die Spinne an
-   * (gPos, gQuat) haengt? Fest heisst: feste Koerper ausser dem Boden
-   * (dieselbe Regel wie `eindringtiefeInBauwerk` in `world/obstacles.ts`) und
-   * fremde kinematische — Laster samt Bordwand, Streifenwagen, Pressstempel.
+   * (gPos, gQuat) haengt? Fest heisst: feste Koerper EINSCHLIESSLICH des Bodens
+   * (E-158, Patrick 18.10.2026: „es soll nicht mehr möglich sein, dass körper
+   * im boden versinken können") und fremde kinematische — Laster samt
+   * Bordwand, Streifenwagen, Pressstempel.
    * Lose Teile und bewegliche Mulden sind dynamisch und werden geschoben.
    *
    * Treffer erst sammeln, dann messen (v2 E-044).
@@ -482,7 +491,7 @@ export class ExcavatorCollision {
           if (!b || o.isSensor() || b.isDynamic()) return true;
           if (this.ctx.selfHandles.has(b.handle)) return true;
           if (gehalten.some((g) => g.body.handle === b.handle)) return true;
-          if (b.isFixed() && istBoden(o)) return true;
+          // E-158: auch der Boden zaehlt — ein gehaltenes Auto setzt auf, statt einzusinken
           treffer.push(o);
           return true;
         },
@@ -501,6 +510,70 @@ export class ExcavatorCollision {
       }
     }
     return tiefe;
+  }
+
+  /**
+   * E-158: Drueckt die Spinne einen losen Koerper in den Boden?
+   *
+   * Gemessen (Pkw und Wohnwagen am Boden, Fuenfschalengreifer und Magnet von
+   * oben): Die kinematische Spinne drueckte ein liegendes Wrack bis 1,6 m in
+   * den Beton, einmal ganz hindurch. Die Brocken-Sperre (E-137) sah das nicht:
+   * Sie prueft die Krallenspitzen gegen die Kollider des Teils, und ein Wrack
+   * ist seit E-124 hohl — die Spitzen stehen im leeren Innenraum und schieben
+   * den Wagenboden vor sich her.
+   *
+   * Jetzt: Beruehrt die Spinne (Korb, Schalen, Magnetscheibe) einen losen
+   * Koerper, und steckt DIESER tiefer als `EINSINK_M` in Festem (Boden, Box-
+   * oder Muldenboden), haelt der Arm an wie an einem Brocken. Rapier-Kontakte
+   * des letzten Schritts, nur gelesen (v2 E-044).
+   */
+  drueckeInBoden(): RAPIER.RigidBody | null {
+    const g = this.ctx.grappleBody();
+    const world = this.ctx.world;
+    let ja = false;
+    let wer: RAPIER.RigidBody | null = null;
+    const geprueft = new Set<number>();
+    for (let i = 0; i < g.numColliders() && !ja; i++) {
+      const c = g.collider(i);
+      if (!c.isEnabled()) continue;
+      world.contactPairsWith(c, (o) => {
+        const b = o.parent();
+        if (ja || !b || !b.isDynamic() || geprueft.has(b.handle) || this.ctx.grippedHandles.has(b.handle)) return;
+        // Drueckt die Spinne von OBEN in den Koerper (Normale nach unten), und wie tief?
+        let vonOben = 0;
+        world.contactPair(c, o, (m, flipped) => {
+          const ny = m.normal().y * (flipped ? -1 : 1);
+          if (ny > -0.5) return;
+          for (let n = 0; n < m.numContacts(); n++) vonOben = Math.max(vonOben, -m.contactDist(n));
+        });
+        geprueft.add(b.handle);
+        // Liegt er auf Festem auf — und steckt er schon darin?
+        let liegt = false;
+        for (let k = 0; k < b.numColliders() && !ja; k++) {
+          const bc = b.collider(k);
+          world.contactPairsWith(bc, (f) => {
+            if (ja || !f.parent()?.isFixed()) return;
+            world.contactPair(bc, f, (m) => {
+              for (let n = 0; n < m.numContacts(); n++) {
+                const d = m.contactDist(n);
+                if (d < PLOW_KONTAKT) liegt = true;
+                if (d < -EINSINK_M && vonOben > 0) ja = true; // nur wenn die Spinne von OBEN drueckt — seitlich ist Sache von `grappleSchiebtBrocken`
+              }
+            });
+          });
+        }
+        /*
+         * Zweite Regel: Ein schweres Teil, das aufliegt, wird nicht mehr
+         * gedrueckt, sobald die Spinne von oben `EINSINK_M` in ihm steckt —
+         * sonst drueckt der Loeser es zwischen Spinne und Boden in den Beton
+         * (gemessen beim Haemmern auf einen Pkw: Spinne 8–11 cm im Wagen, Wagen
+         * 0,31 m im Boden). Leichte Teile schiebt sie weiter beiseite.
+         */
+        if (!ja && liegt && b.mass() >= SCHWER_AUFLIEGEND_KG && vonOben > EINSINK_M) ja = true;
+        if (ja) wer = b;
+      });
+    }
+    return wer;
   }
 
   /** Spinne gegen Mauern, Mulden und Schere. */
@@ -648,12 +721,3 @@ export class ExcavatorCollision {
   }
 }
 
-/**
- * Der Boden: ein fester Quader, dessen Oberkante auf Hoehe 0 liegt — dieselbe
- * Regel wie `istBoden` in `world/obstacles.ts` (dort nicht exportiert).
- */
-function istBoden(c: RAPIER.Collider): boolean {
-  if (c.shapeType() !== RAPIER.ShapeType.Cuboid) return false;
-  const he = c.halfExtents();
-  return Math.abs(c.translation().y + he.y) < 0.02 && he.x > 20;
-}

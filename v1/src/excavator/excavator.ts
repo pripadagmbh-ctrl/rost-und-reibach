@@ -2989,7 +2989,21 @@ export class Excavator {
       minTipY = Math.max(minTipY, this.eindringGrenze);
     } else {
       const tief = this.eindringtiefe(splay);
-      if (tief > (this.form.magnet ? MAGNET_AUFLAGE_M : EINDRING_OK)) {
+      // E-158: oder die Spinne drueckt ein Teil in den Boden — dann haelt sie an wie an einem Brocken
+      // nur beim Senken — wer schwenkt, drueckt nichts in den Boden (sonst haengt die Spinne beim Seitwaertsschwenken an Daechern fest: gemessen 1,9 → 8,0 m geschobener Container)
+      const gedrueckt = this.senkBefehl > 0 || this.spitzeAbwaerts > 0 ? this.collision.drueckeInBoden() : null;
+      if (gedrueckt) {
+        /*
+         * Und das Teil faellt nicht weiter: Die kinematische Spinne hat ihm
+         * beim Aufschlag ihr Tempo mitgegeben, und der weiche Bodenkontakt
+         * faengt das erst nach Zentimetern ab (gemessen beim Haemmern auf
+         * einen Pkw 0,31 m tief). Nur die Abwaertsfahrt wird genommen — per
+         * Impuls, nie angehoben (v2 E-045).
+         */
+        const v = gedrueckt.linvel();
+        if (v.y < 0) gedrueckt.applyImpulse({ x: 0, y: -v.y * gedrueckt.mass(), z: 0 }, true);
+      }
+      if (tief > (this.form.magnet ? MAGNET_AUFLAGE_M : EINDRING_OK) || gedrueckt) {
         this.eindringGrenze = tipYJetzt;
         this.eindringHaltS = EINDRING_HALT_S;
         minTipY = Math.max(minTipY, this.eindringGrenze);
