@@ -556,6 +556,8 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 - [ ] **Ansage 18.10.2026, Anschlagen** — Patrick, wörtlich: „anschlagen soll
       immer geräusche erzeigen, also auto vor schere oder wand" (E-157)
+      Nachtrag: „greifer vor lkw container wand" — Greifer gegen
+      LKW-Bordwand und Containerwand klingt ebenfalls.
 
 - [ ] **Gerätebefund 18.10.2026, Traglast** — Patrick, wörtlich: „also die
       leistungsgrenzen,dass scheint nicht so zu funktionieren, ein
