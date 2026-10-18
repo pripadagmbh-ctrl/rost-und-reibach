@@ -53,6 +53,12 @@ describe("Die Tabelle", () => {
     expect(maschinenTraglastKg(9, 3)).toBeLessThan(3000);
   });
 
+  it("frei stehend zwei Drittel der abgestuetzten Traglast (E-154, Patrick 18.10.2026)", () => {
+    for (const r of [3.7, 5, 8, 9.5]) {
+      expect(nutzlastKg(r, 3, 0, 1, false)).toBeCloseTo((nutzlastKg(r, 3, 0) * 2) / 3, 6);
+    }
+  });
+
   it("das Anbaugeraet geht ab: Magnet (1,7 t) hebt 600 kg weniger als der Fuenfschalengreifer (1,1 t)", () => {
     expect(nutzlastKg(5, 3, FUENFSCHALEN.eigengewichtKg) - nutzlastKg(5, 3, MAGNET.eigengewichtKg)).toBeCloseTo(600, 6);
   });
@@ -159,15 +165,37 @@ describe("Ueberlast wie an der echten Maschine (EN 474-5)", () => {
     s.world.free();
   }, 60_000);
 
-  it("6 t nah an der Maschine geht hoch", () => {
+  it("6 t nah an der Maschine: frei stehend Ueberlast, abgestuetzt geht sie hoch — und wieder eingefahren sperrt es (E-154)", () => {
     // Arm heran: Ausleger fast ganz hoch (Luft bis zum Anschlag), Stiel ganz herein
     const s = mitLast(6000, [["KeyR", 80], ["KeyG", 300]]);
     const b = s.bagger;
     expect(b.ausladungM).toBeLessThan(4.2);
-    expect(b.traglastKg, `Traglast bei ${b.ausladungM.toFixed(2)} m`).toBeGreaterThan(6000);
-    const y0 = b.grappleGroup.position.y;
-    s.fahre("KeyR", 60);
-    expect(b.grappleGroup.position.y - y0, "nah hebt der Ausleger").toBeGreaterThan(0.3);
+    // frei stehend: zwei Drittel der Tabelle — 6 t sind zu viel
+    expect(b.abgestuetzt).toBe(false);
+    expect(b.traglastKg, `frei bei ${b.ausladungM.toFixed(2)} m`).toBeLessThan(6000);
+    let y0 = b.grappleGroup.position.y;
+    s.fahre("KeyR", 30);
+    expect(b.grappleGroup.position.y - y0, "frei hebt er nicht").toBeLessThan(0.002);
+    expect(s.meldungen.length).toBe(1);
+    expect(s.meldungen[0]!.abgestuetzt, "die Meldung sagt: nicht abgestuetzt").toBe(false);
+    // Pratzen aus, waehrend die Last haengt: Grenze wechselt, Heben geht
+    b.toggleOutriggers();
+    s.fahre("KeyZ", 150);
+    expect(b.abgestuetzt).toBe(true);
+    expect(b.traglastKg, `abgestuetzt bei ${b.ausladungM.toFixed(2)} m`).toBeGreaterThan(6000);
+    y0 = b.grappleGroup.position.y;
+    s.fahre("KeyR", 30);
+    expect(b.grappleGroup.position.y - y0, "abgestuetzt hebt der Ausleger").toBeGreaterThan(0.1);
+    expect(s.meldungen.length, "abgestuetzt keine neue Meldung").toBe(1);
+    // Pratzen wieder ein (Ausleger steht still): sofort gesperrt, eine Meldung fuer den naechsten Versuch
+    s.fahre("KeyZ", 30);
+    b.toggleOutriggers();
+    s.fahre("KeyZ", 30);
+    expect(b.abgestuetzt, "auf halbem Weg traegt das Fahrwerk").toBe(false);
+    y0 = b.grappleGroup.position.y;
+    s.fahre("KeyR", 40);
+    expect(b.grappleGroup.position.y - y0, "eingefahren hebt er nicht").toBeLessThan(0.002);
+    expect(s.meldungen.length).toBe(2);
     s.world.free();
   }, 60_000);
 

@@ -37,7 +37,20 @@
  *
  * Abgezogen wird das Anbaugeraet (`Greiferform.eigengewichtKg`): Die Tabelle
  * gilt am Stielende, und der Greifer haengt dort mit.
+ *
+ * E-154: Die Tabelle gilt ABGESTUETZT (Pratzen draussen, Taste O). Frei
+ * stehend hebt die Maschine `FREI_FAKTOR` davon.
  */
+
+/**
+ * E-154: Frei stehend hebt die Maschine zwei Drittel der abgestuetzten Last.
+ * SW: Patricks Entscheidung vom 18.10.2026 („Ohne Pratzen ein Drittel
+ * weniger"). Die Groessenordnung entspricht dem Verhaeltnis „frei" zu
+ * „4-Punkt abgestuetzt" in Datenblaettern von Umschlagbaggern; die Spalte
+ * „nicht abgestuetzt" des MHL 250 F liegt hier nicht vor, darum keine
+ * hergeleitete Zahl.
+ */
+export const FREI_FAKTOR = 2 / 3;
 
 /** SW: Streckung der Ausladung, Reichweite MHL 320 / MHL 250 = 10,4 / 9,0 */
 const STRECKE_R = 10.4 / 9.0;
@@ -79,9 +92,17 @@ export function maschinenTraglastKg(ausladungM: number, hoeheM: number): number 
 }
 
 /**
- * Was an den Greifer gehaengt werden darf (kg): Maschinentraglast mal
- * Ausbau-Faktor, minus Eigengewicht des Anbaugeraets. Nie unter null.
+ * Was an den Greifer gehaengt werden darf (kg): Maschinentraglast (frei
+ * stehend × `FREI_FAKTOR`) mal Ausbau-Faktor, minus Eigengewicht des
+ * Anbaugeraets. Nie unter null.
  */
-export function nutzlastKg(ausladungM: number, hoeheM: number, anbauKg: number, ausbau = 1): number {
-  return Math.max(0, maschinenTraglastKg(ausladungM, hoeheM) * ausbau - anbauKg);
+export function nutzlastKg(
+  ausladungM: number,
+  hoeheM: number,
+  anbauKg: number,
+  ausbau = 1,
+  abgestuetzt = true
+): number {
+  const stand = abgestuetzt ? 1 : FREI_FAKTOR;
+  return Math.max(0, maschinenTraglastKg(ausladungM, hoeheM) * stand * ausbau - anbauKg);
 }

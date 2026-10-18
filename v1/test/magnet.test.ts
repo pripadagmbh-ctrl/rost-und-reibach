@@ -96,6 +96,13 @@ function aufbau() {
     }
   };
   for (let i = 0; i < 10; i++) takt();
+  /*
+   * E-154: Abgestuetzt, wie ein Magnetbagger arbeitet. Frei stehend hebt die
+   * Maschine bei 8 m Ausladung mit 1,7 t Magnet nur noch rund 0,4 t — das
+   * Pkw-Wrack (950 kg) bliebe unten (`test/traglast.test.ts`).
+   */
+  bagger.toggleOutriggers();
+  for (let i = 0; i < 150; i++) takt();
   return { world, items, comps, bagger, grip, tasten, takt, haftet, schalter, vMax: () => vMax };
 }
 

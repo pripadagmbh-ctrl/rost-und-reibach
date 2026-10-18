@@ -3333,8 +3333,20 @@ export class Excavator {
       this.ausladungM,
       this.grappleGroup.position.y,
       this.form.eigengewichtKg,
-      this.greifsystem?.getCapacityBonus?.() ?? 1
+      this.greifsystem?.getCapacityBonus?.() ?? 1,
+      this.abgestuetzt
     );
+  }
+
+  /**
+   * E-154: Steht die Maschine auf den Pratzen? Erst ganz ausgefahren — auf
+   * halbem Weg traegt noch das Fahrwerk. Die Grenze wechselt damit in einem
+   * Bild, und weil die Ueberlastsperre jedes Bild neu rechnet (kein
+   * gespeicherter Zustand), wird beim Ausfahren sofort mehr frei und beim
+   * Einfahren sofort gesperrt.
+   */
+  get abgestuetzt(): boolean {
+    return this.outriggerDown >= 1 - 1e-6;
   }
 
   /**
@@ -3384,7 +3396,7 @@ export class Excavator {
     this.syncMeshes();
     if (this.ueberlastGemeldet) return;
     this.ueberlastGemeldet = true;
-    this.onUeberlast?.({ massKg: last, grenzeKg: grenze, ausladungM: rAlt });
+    this.onUeberlast?.({ massKg: last, grenzeKg: grenze, ausladungM: rAlt, abgestuetzt: this.abgestuetzt });
   }
 
   /**

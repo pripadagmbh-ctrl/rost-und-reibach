@@ -211,9 +211,11 @@ export interface GameEvents {
    * stoppen, Absenken, Heranziehen und Schwenken gehen weiter. Einmal je
    * Versuch, nicht je Bild: neu erst, wenn der Spieler die gesperrte Bewegung
    * losgelassen hat. `massKg` = gehaltene Last, `grenzeKg` = Traglast hier
-   * (Anbaugeraet abgezogen), `ausladungM` = waagrechter Abstand zur Drehmitte.
+   * (Anbaugeraet abgezogen), `ausladungM` = waagrechter Abstand zur Drehmitte,
+   * `abgestuetzt` = Pratzen ganz draussen (E-154; frei stehend gilt 2/3 der
+   * Tabelle — ist es false, hilft Abstuetzen mit Taste O).
    */
-  "greifer:ueberlast": { massKg: number; grenzeKg: number; ausladungM: number };
+  "greifer:ueberlast": { massKg: number; grenzeKg: number; ausladungM: number; abgestuetzt: boolean };
 }
 
 type Handler<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;
