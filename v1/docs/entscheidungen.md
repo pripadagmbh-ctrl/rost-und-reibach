@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-155 | 18.10.2026 | Sichelkralle aus dem Spiel, Fünfschalengreifer ist Grundausstattung | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-154 | 18.10.2026 | Ohne Pratzen hebt die Maschine ein Drittel weniger | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-152 | 17.10.2026 | Traglast nach Ausladung statt 3,5 t, Überlast meldet sich, keine Kunstbremse | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-153 | 17.10.2026 | Nur echte Aufnahmen, kein gerechneter Klang, auch nicht beim Laden | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -168,6 +169,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-155 — Sichelkralle aus dem Spiel**
+- Pausenmenü: Schaltet der Knopf nur noch zwischen Fünfschalengreifer und Lasthebemagnet?
+- Alter Spielstand (falls mit Sichelkralle gespeichert): Hängt der Fünfschalengreifer?
+- Mit dem Fünfschalengreifer durch einen Schrotthaufen schwenken: zäh genug, oder wie durch Luft? (Gemessen bremst der Haufen ihn kaum.)
 
 **E-154 — Ohne Pratzen ein Drittel weniger**
 - Ohne Pratzen einen Container greifen und heben: Kommt „Zu schwer“? Pratzen ausfahren (O), nochmal: Geht es hoch?

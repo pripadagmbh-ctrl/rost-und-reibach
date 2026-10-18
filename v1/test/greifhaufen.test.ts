@@ -626,6 +626,12 @@ describe("Greifen im echten Starthaufen — es kommt kein halber Haufen mit", ()
        * STUECKZAHL (8) ist der belastbare Teil und bleibt, wo er war — er sass
        * beim Nachmessen mit 7 von 8 knapp, und das ist ein ehrliches Signal.
        *
+       * NACHGEMESSEN am 18.10.2026 (E-155) mit dem Fuenfschalengreifer, der
+       * jetzt die Grundausstattung ist (vorher Sichelkralle): 3 bis 5 Koerper
+       * erfuellen die Bedingung, 3 bis 10 kommen mit, 304 bis 770 kg, aus 125
+       * bis 143 Teilen. Sein Korb ist groesser — darum steht der Deckel auf
+       * der Stueckzahl jetzt bei 12 statt 8; die Kandidaten bleiben unter 8.
+       *
        * Die Schwellen liegen beim Doppelten des Gemessenen. Wer sie reissen
        * sieht, sucht den Fehler nicht hier, sondern in der Greifbedingung:
        * Sensorkugel, `insideGrapple`, `noetigeKrallen`.
@@ -640,7 +646,7 @@ describe("Greifen im echten Starthaufen — es kommt kein halber Haufen mit", ()
         expect(
           r.korb,
           `${r.korb} von ${r.teile} Teilen auf einmal gegriffen (${r.kg.toFixed(0)} kg)`
-        ).toBeLessThanOrEqual(8);
+        ).toBeLessThanOrEqual(12);
         expect(
           r.kg,
           `${r.kg.toFixed(0)} kg an einem Griff — gemessen sind 480 bis 740 (E-061)`

@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import type { TearTarget } from "../dismantle/composites";
 import { SICHELKRALLE, type Greiferform } from "../excavator/greiferform";
 import { MAGNET_AB } from "../excavator/magnet";
+import { FUENFSCHALEN } from "../excavator/greiferFuenfschalen";
 
 /**
  * Greifsystem nach Briefing Kap. 6.2:
@@ -193,12 +194,14 @@ export class GripSystem {
    * Die angehaengte Greiferform (E-057). Von ihr kommen Sensorradius und
    * Schalenluecke; alles andere am Greifsystem ist formunabhaengig.
    *
-   * Vorgabe ist die Sichelkralle. Wer den Greifer wechselt, setzt sie ueber
-   * `setForm` — die Sensorkugel wird dabei neu angelegt, denn eine
-   * `RAPIER.Ball` laesst ihren Radius nicht nachtraeglich aendern.
+   * Vorgabe ist seit E-155 der Fuenfschalengreifer, dieselbe Grundausstattung
+   * wie am Bagger (die Sichelkralle ist aus dem Spiel). Wer den Greifer
+   * wechselt, setzt sie ueber `setForm` — die Sensorkugel wird dabei neu
+   * angelegt, denn eine `RAPIER.Ball` laesst ihren Radius nicht nachtraeglich
+   * aendern.
    */
-  private form: Greiferform = SICHELKRALLE;
-  private sensorShape = new RAPIER.Ball(SICHELKRALLE.sensorRadius);
+  private form: Greiferform = FUENFSCHALEN;
+  private sensorShape = new RAPIER.Ball(FUENFSCHALEN.sensorRadius);
 
   /** Greiferform wechseln — Sensorkugel und Schalenluecke wandern mit. */
   setForm(form: Greiferform): void {

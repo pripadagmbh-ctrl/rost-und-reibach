@@ -24,7 +24,7 @@ import { leinwandAttrappe } from "../tools/leinwand-attrappe";
 import { Excavator } from "../src/excavator/excavator";
 import { GripSystem } from "../src/physics/gripSystem";
 import { initPhysics } from "../src/physics/physicsWorld";
-import { CLAW_MAX_DEPTH, CLAW_OPEN_SPLAY, clawTipDepth } from "../src/excavator/clawGeometry";
+import { FUENFSCHALEN } from "../src/excavator/greiferFuenfschalen";
 
 class Tasten {
   down = new Set<string>();
@@ -99,12 +99,12 @@ function absetzenUndZupacken(): Absetzlauf {
     const p = bagger.grappleGroup.position;
     hoch = Math.max(hoch, p.y);
     seitwaerts = Math.max(seitwaerts, Math.hypot(p.x - ab.x, p.z - ab.z));
-    tiefsteSpitze = Math.min(tiefsteSpitze, p.y - clawTipDepth(bagger.splay));
+    tiefsteSpitze = Math.min(tiefsteSpitze, p.y - bagger.greiferform.tiefe(bagger.splay));
   }
   world.free();
   return {
     absetzhoehe: ab.y,
-    spitzenOffen: ab.y - clawTipDepth(CLAW_OPEN_SPLAY),
+    spitzenOffen: ab.y - bagger.greiferform.tiefe(bagger.greiferform.offen),
     hub: hoch - ab.y,
     seitwaerts,
     tiefsteSpitze,
@@ -144,7 +144,7 @@ describe("Bodenanschlag — die Spinne steht still, waehrend sie zupackt", () =>
   );
 
   it(
-    "der Preis, als Zahl: die offene Spinne haengt gut einen halben Meter hoeher",
+    "der Preis, als Zahl: die offene Spinne haengt um den Unterschied offen ↔ tiefste Stellung hoeher",
     () => {
       /*
        * Kein Fehler, sondern die andere Seite derselben Entscheidung — und
@@ -153,9 +153,14 @@ describe("Bodenanschlag — die Spinne steht still, waehrend sie zupackt", () =>
        * die OFFENE Spinne genau um den Unterschied hoeher, den offen und
        * tiefste Stellung ausmachen.
        */
+      /*
+       * E-155: gemessen am Fuenfschalengreifer, der Grundausstattung. Mit der
+       * Sichelkralle waren es 0,557 m, mit ihm sind es 0,527 m.
+       */
       const r = absetzenUndZupacken();
-      const erwartet = CLAW_MAX_DEPTH - clawTipDepth(CLAW_OPEN_SPLAY);
-      expect(erwartet).toBeCloseTo(0.557, 2);
+      const f = FUENFSCHALEN;
+      const erwartet = f.maxTiefe - f.tiefe(f.offen);
+      expect(erwartet).toBeCloseTo(0.527, 2);
       expect(
         r.spitzenOffen,
         `die offenen Spitzen stehen ${r.spitzenOffen.toFixed(3)} m ueber dem Beton`

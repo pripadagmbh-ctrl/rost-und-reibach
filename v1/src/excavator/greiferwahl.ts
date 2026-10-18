@@ -1,6 +1,6 @@
 import type { GripSystem } from "../physics/gripSystem";
 import type { Excavator } from "./excavator";
-import { SICHELKRALLE, type Greiferform, type GreiferId } from "./greiferform";
+import type { Greiferform, GreiferId } from "./greiferform";
 import { FUENFSCHALEN } from "./greiferFuenfschalen";
 import { MAGNET } from "./magnet";
 
@@ -16,11 +16,17 @@ import { MAGNET } from "./magnet";
  */
 
 /**
- * Alle Greifer, die es gibt — in der Reihenfolge des Durchschaltens. Der
- * Lasthebemagnet ist der dritte (E-146); der Knopf im Pausenmenue schaltet
- * reihum.
+ * Alle Greifer, die der Spieler bekommt — in der Reihenfolge des
+ * Durchschaltens: Fuenfschalengreifer ↔ Lasthebemagnet (E-146).
+ *
+ * E-155, Patrick 18.10.2026: „sichelkralle aus spiel entfernen". Sie steht
+ * hier nicht mehr. Ein Spielstand mit „sichel" laedt ueber `formZu` als
+ * Vorgabe, also als Fuenfschalengreifer. Im Code bleibt `SICHELKRALLE` als
+ * Rechengrundlage: Der Fuenfschalengreifer leitet seine Schliesszahlen als
+ * Anteil an ihrem Weg ab (`ANTEIL`), und die Platzplanung rechnet mit ihrer
+ * Tiefe (`hoechsteKrallenspitze`).
  */
-export const GREIFERFORMEN: Greiferform[] = [SICHELKRALLE, FUENFSCHALEN, MAGNET];
+export const GREIFERFORMEN: Greiferform[] = [FUENFSCHALEN, MAGNET];
 
 /**
  * Womit eine NEUE Runde anfaengt (Ansage Patrick, 17.09.2026: „ansonsten
@@ -29,12 +35,10 @@ export const GREIFERFORMEN: Greiferform[] = [SICHELKRALLE, FUENFSCHALEN, MAGNET]
  * Bis dahin war es die Sichelkralle, und der Fuenfschalengreifer musste im
  * Pausenmenue gewaehlt werden (E-059). Jetzt andersherum.
  *
- * DAS IST DIE VORGABE DES SPIELS, nicht der Grundzustand der Maschine.
- * `Excavator` selbst haengt sich weiterhin die Sichelkralle an — an ihr
- * haengen die Planungszahlen des Platzes (`hoechsteKrallenspitze`) und rund
- * hundert Waechter, die eine Maschine bauen und sofort messen. Wer die
- * Vorgabe aendern will, aendert diese eine Zeile; wer den Grundzustand
- * aendert, verschiebt den Platz.
+ * Seit E-155 ist sie auch der Grundzustand der Maschine: `Excavator` baut
+ * den Fuenfschalengreifer gleich mit, die Sichelkralle wird im Spiel nie
+ * gebaut. Gemessen: 8 von 165 Waechterdateien hingen an ihr; sie sind auf
+ * den Fuenfschalengreifer umgezogen.
  */
 export const STANDARD_GREIFER: Greiferform = FUENFSCHALEN;
 

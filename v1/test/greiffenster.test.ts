@@ -26,7 +26,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { leinwandAttrappe } from "../tools/leinwand-attrappe";
 import { Excavator } from "../src/excavator/excavator";
-import { GripSystem, SENSOR_RADIUS, SENSOR_UNTER_SPINNE } from "../src/physics/gripSystem";
+import { GripSystem, SENSOR_UNTER_SPINNE } from "../src/physics/gripSystem";
 import { initPhysics } from "../src/physics/physicsWorld";
 
 /** Tastatur-Attrappe: nur `isDown` und `axis` werden vom Bagger gebraucht. */
@@ -212,12 +212,14 @@ describe("Sensorkugel — Herkunft der Zahl", () => {
       }
       noetig = Math.max(noetig, sensor.y - tiefster);
     }
+    // E-155: die Kugel der Form, die haengt (Grundausstattung: Fuenfschalengreifer)
+    const radius = s.bagger.greiferform.sensorRadius;
     expect(
-      SENSOR_RADIUS,
-      `die Kugel muesste ${noetig.toFixed(3)} m weit reichen, misst aber nur ${SENSOR_RADIUS.toFixed(3)} m`
+      radius,
+      `die Kugel muesste ${noetig.toFixed(3)} m weit reichen, misst aber nur ${radius.toFixed(3)} m`
     ).toBeGreaterThanOrEqual(noetig);
     // und sie soll nicht unnoetig gross sein — sonst sammelt sie den halben Haufen ein
-    expect(SENSOR_RADIUS, "die Kugel ist deutlich groesser als noetig").toBeLessThan(noetig + 0.1);
+    expect(radius, "die Kugel ist deutlich groesser als noetig").toBeLessThan(noetig + 0.1);
     s.world.free();
   });
 });

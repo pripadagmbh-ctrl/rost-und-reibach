@@ -7,6 +7,7 @@ import { Aufschlagmelder, SPINNE_WUCHT_VOLL_MS, DRUECK_AB, DRUECK_PAUSE_S, DRUEC
 import { ExcavatorCollision, PROBE_R, type ArmShape } from "./collision";
 import type { GripSystem } from "../physics/gripSystem";
 import { nutzlastKg } from "./traglast";
+import { FUENFSCHALEN } from "./greiferFuenfschalen";
 import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver, fahrerArme } from "./driver";
 import { baueRad, radGeometrien, radStoffe, RAD_R } from "./wheelParts";
@@ -781,9 +782,11 @@ export class Excavator {
    *
    * Sie ist die einzige Stelle, an der der Bagger etwas ueber den Greifer
    * weiss: Schalenzahl, Anschlaege, Mittellinie, Korb, Sensorkugel. Vorgabe
-   * ist die Sichelkralle des Prototyps.
+   * ist seit E-155 der Fuenfschalengreifer (Patrick, 18.10.2026:
+   * „sichelkralle aus spiel entfernen") — die Sichelkralle wird nie gebaut,
+   * also auch nicht fuer ein Bild beim Start.
    */
-  private form: Greiferform = SICHELKRALLE;
+  private form: Greiferform = FUENFSCHALEN;
   /** Das gebaute Modell der aktiven Form — Schalen drehen, Zylinder fuehren. */
   private greiferbau!: Greiferbau;
   /**
@@ -2347,7 +2350,7 @@ export class Excavator {
    * Zaehnen steckte. Jede Kralle hat jetzt ihren eigenen Weg: Was blockiert
    * ist, bleibt stehen, der Rest geht weiter zu.
    */
-  private clawSplayIst: number[] = new Array(SICHELKRALLE.schalen).fill(SICHELKRALLE.offen);
+  private clawSplayIst: number[] = new Array(FUENFSCHALEN.schalen).fill(FUENFSCHALEN.offen);
   /**
    * Schonfrist nach dem Loslassen: Solange sie laeuft, sind die Krallen-Kollider
    * abgeschaltet. Beim Oeffnen sind die Zacken noch fast zu und die Spinne sinkt
@@ -2356,11 +2359,11 @@ export class Excavator {
    */
   private clawGraceS = 0;
   /** Verbleibendes Nachdruecken je Kralle, damit sie nicht schlagartig steht */
-  private clawReserve: number[] = new Array(SICHELKRALLE.schalen).fill(
-    SICHELKRALLE.nachdrueckReserve
+  private clawReserve: number[] = new Array(FUENFSCHALEN.schalen).fill(
+    FUENFSCHALEN.nachdrueckReserve
   );
   /** Was jeder Zahn zuletzt vorgefunden hat: 0 frei, 1 weich, 2 hart. */
-  private clawArt: Array<0 | 1 | 2> = new Array(SICHELKRALLE.schalen).fill(0);
+  private clawArt: Array<0 | 1 | 2> = new Array(FUENFSCHALEN.schalen).fill(0);
   private blockTmp = new THREE.Vector3();
   // Feine Tastkugel: Mit 0,14 blieb der Zahn sichtbar auf Abstand stehen,
   // als griffe er ins Leere. Er soll bis fast an das Teil heran.

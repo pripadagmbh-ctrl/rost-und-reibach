@@ -134,10 +134,10 @@ function hebe(a: ReturnType<typeof aufbau>): void {
 const gehoben = (it: ScrapItem): boolean => it.body.translation().y > 0.8;
 
 describe("E-146 — der Magnet nimmt Eisen und Stahl, sonst nichts", () => {
-  it("steht als dritter Greifer im Pausenmenue und wird reihum geschaltet", () => {
-    expect(GREIFERFORMEN.map((f) => f.id)).toEqual(["sichel", "fuenfschalen", "magnet"]);
+  it("steht im Pausenmenue neben dem Fuenfschalengreifer und wird hin und her geschaltet (E-155: ohne Sichelkralle)", () => {
+    expect(GREIFERFORMEN.map((f) => f.id)).toEqual(["fuenfschalen", "magnet"]);
     expect(naechsteForm("fuenfschalen").id).toBe("magnet");
-    expect(naechsteForm("magnet").id).toBe("sichel");
+    expect(naechsteForm("magnet").id).toBe("fuenfschalen");
   });
 
   it("Stahl wird angezogen und gehoben", () => {

@@ -191,7 +191,7 @@ describe("Lotrecht ist nichts anders — Ziffer fuer Ziffer", () => {
   for (const { form, soll } of ANSCHLAG) {
     it(`${form.name}: der Bodenanschlag steht lotrecht auf ${(soll * 100).toFixed(2)} cm`, () => {
       const { bagger, world } = baueBagger();
-      if (form !== SICHELKRALLE) expect(bagger.setGreifer(form)).toBe(true);
+      if (bagger.greiferform !== form) expect(bagger.setGreifer(form)).toBe(true);
       const hoehe = absetzen(bagger, world);
       /*
        * Und der Greifer haengt dabei WIRKLICH lotrecht — sonst waere die Zahl
@@ -271,7 +271,7 @@ describe("Die Ausladung stimmt mit dem gezeichneten Netz", () => {
   for (const form of [SICHELKRALLE, FUENFSCHALEN] as Greiferform[]) {
     it(`${form.name}: der Bodenanschlag liegt nie unter dem gezeichneten Netz`, () => {
       const { bagger } = baueBagger();
-      if (form !== SICHELKRALLE) expect(bagger.setGreifer(form)).toBe(true);
+      if (bagger.greiferform !== form) expect(bagger.setGreifer(form)).toBe(true);
       let zuFlach = 0;
       let zuHoch = 0;
       /*
@@ -295,7 +295,7 @@ describe("Die Ausladung stimmt mit dem gezeichneten Netz", () => {
 
     it(`${form.name}: GEGENPROBE — ohne den Zuschlag sinkt der Greifer ein`, () => {
       const { bagger } = baueBagger();
-      if (form !== SICHELKRALLE) expect(bagger.setGreifer(form)).toBe(true);
+      if (bagger.greiferform !== form) expect(bagger.setGreifer(form)).toBe(true);
       /*
        * Dieselbe Rechnung wie `maxAusladungVon`, nur ohne `KIPP_ZUSCHLAG`.
        * Dass hier ein Fehlbetrag herauskommt, ist der Grund, warum es den
@@ -314,7 +314,7 @@ describe("Die Ausladung stimmt mit dem gezeichneten Netz", () => {
 
     it(`${form.name}: GEGENPROBE — die alte Rechnung (maxTiefe) faellt durch`, () => {
       const { bagger } = baueBagger();
-      if (form !== SICHELKRALLE) expect(bagger.setGreifer(form)).toBe(true);
+      if (bagger.greiferform !== form) expect(bagger.setGreifer(form)).toBe(true);
       /*
        * So sah der Bodenanschlag vor E-085 aus: eine feste Tiefe, egal wie
        * der Greifer haengt. Bei 90 Grad liegt er um rund einen Meter daneben.

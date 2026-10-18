@@ -26,6 +26,7 @@ import { GripSystem, noetigeKrallenFuer } from "../src/physics/gripSystem";
 import { initPhysics } from "../src/physics/physicsWorld";
 import { SICHELKRALLE } from "../src/excavator/greiferform";
 import { FUENFSCHALEN } from "../src/excavator/greiferFuenfschalen";
+import { MAGNET } from "../src/excavator/magnet";
 import {
   GREIFERFORMEN,
   formZu,
@@ -182,7 +183,7 @@ function greifversuch(
 }
 
 describe("Der Schalter", () => {
-  it("drei Greifer reihum, und der Fuenfschalengreifer ist die Vorgabe (E-105, E-146)", () => {
+  it("Fuenfschalengreifer und Magnet reihum, die Sichelkralle ist aus dem Spiel (E-105, E-146, E-155)", () => {
     /*
      * Ansage Patrick, 17.09.2026: „ansonsten fuenfschalengreifer als default".
      * Bis dahin war es die Sichelkralle (E-059).
@@ -191,27 +192,34 @@ describe("Der Schalter", () => {
      *
      *   - `STANDARD_GREIFER` ist die Vorgabe DES SPIELS. Damit faengt eine
      *     neue Runde an, und darauf faellt eine unbekannte Kennung zurueck.
-     *   - `new Excavator(...)` haengt sich weiter die SICHELKRALLE an. Das ist
-     *     der Grundzustand der Maschine, und an ihm haengen die Planungszahlen
-     *     des Platzes (`hoechsteKrallenspitze`) und rund hundert Waechter, die
-     *     einen Bagger bauen und sofort messen. Wer das verschiebt, verschiebt
-     *     den Platz.
+     *   - `new Excavator(...)` haengt sich seit E-155 ebenfalls den
+     *     Fuenfschalengreifer an (Patrick, 18.10.2026: „sichelkralle aus spiel
+     *     entfernen"). Die Sichelkralle wird im Spiel nie gebaut.
      *
      * `main.ts` setzt die Vorgabe beim Start; welcher Greifer beim Laden eines
      * alten Standes haengt, steht dort.
      */
-    // E-146: der Lasthebemagnet ist der dritte; der Knopf schaltet reihum
-    expect(GREIFERFORMEN.map((f) => f.id)).toEqual(["sichel", "fuenfschalen", "magnet"]);
-    expect(naechsteForm("sichel")).toBe(FUENFSCHALEN);
+    // E-155: nur noch Fuenfschalengreifer und Magnet; der Knopf schaltet hin und her
+    expect(GREIFERFORMEN.map((f) => f.id)).toEqual(["fuenfschalen", "magnet"]);
+    expect(GREIFERFORMEN).not.toContain(SICHELKRALLE);
     expect(naechsteForm("fuenfschalen").id).toBe("magnet");
-    expect(naechsteForm("magnet")).toBe(SICHELKRALLE);
-    // Was im Spielstand steht und was nicht
+    expect(naechsteForm("magnet")).toBe(FUENFSCHALEN);
+    // Was im Spielstand steht und was nicht — ein alter Stand mit der Sichelkralle laedt als Fuenfschalengreifer
     expect(formZu("fuenfschalen")).toBe(FUENFSCHALEN);
-    expect(formZu("sichel")).toBe(SICHELKRALLE);
+    expect(formZu("sichel"), "alter Spielstand mit Sichelkralle").toBe(FUENFSCHALEN);
+    expect(naechsteForm("sichel"), "auch der Knopf kommt von „sichel“ zum Fuenfschalengreifer").toBe(FUENFSCHALEN);
     expect(STANDARD_GREIFER, "die Vorgabe ist nicht der Fuenfschalengreifer").toBe(FUENFSCHALEN);
     expect(formZu("gibtsnicht"), "unbekannt → Vorgabe").toBe(STANDARD_GREIFER);
     const s = aufbau();
-    expect(s.bagger.greiferform, "der Grundzustand der Maschine ist verrutscht").toBe(SICHELKRALLE);
+    expect(s.bagger.greiferform, "der Grundzustand der Maschine ist verrutscht").toBe(FUENFSCHALEN);
+    // nicht einmal unsichtbar in der Szene: die Sichelkralle wird nie gebaut
+    const gebaut = [...(s.bagger as unknown as { greifer: Map<string, unknown> }).greifer.keys()];
+    expect(gebaut, "gebaute Greifermodelle").toEqual(["fuenfschalen"]);
+    let sichelSpitze = false;
+    s.bagger.grappleGroup.traverse((o) => {
+      if (o.name === "tineTip") sichelSpitze = true; // Zinkenspitze der Sichelkralle (grappleParts.ts)
+    });
+    expect(sichelSpitze, "ein Sichelkrallen-Netz haengt am Bagger").toBe(false);
     s.world.free();
   });
 
@@ -240,9 +248,9 @@ describe("Der Schalter", () => {
     const netzeVorher = zaehleSichtbareNetze(s.bagger.grappleGroup);
     const kolliderVorher = s.bagger.grappleBody.numColliders();
 
-    expect(wechsleGreifer(s.bagger, s.grip)).toBe(FUENFSCHALEN);
-    expect(s.bagger.greiferform).toBe(FUENFSCHALEN);
-    expect(s.grip.greiferform).toBe(FUENFSCHALEN);
+    expect(wechsleGreifer(s.bagger, s.grip)).toBe(MAGNET);
+    expect(s.bagger.greiferform).toBe(MAGNET);
+    expect(s.grip.greiferform).toBe(MAGNET);
 
     // Beide haengen in der Szene, der inaktive unsichtbar.
     let gruppen = 0;
@@ -250,15 +258,15 @@ describe("Der Schalter", () => {
     expect(gruppen, "beide Greifer bleiben in der Szene").toBeGreaterThanOrEqual(2);
     const netzeNachher = zaehleSichtbareNetze(s.bagger.grappleGroup);
     /*
-     * 105 bzw. 58 Netze des Greifers, dazu sieben fuer die Kardanaufhaengung
+     * 58 bzw. 3 Netze des Greifers, dazu sieben fuer die Kardanaufhaengung
      * (Stumpf und zwei Gabeln) — die gehoeren zum Stiel und haengen an
-     * beiden Formen gleich.
+     * beiden Formen gleich. (Bis E-155 stand hier Sichelkralle 105 + 7.)
      */
-    expect(netzeVorher, "Sichelkralle 105 + 7 Netze").toBe(112);
-    expect(netzeNachher, "Fuenfschalengreifer 58 + 7 Netze").toBe(65);
+    expect(netzeVorher, "Fuenfschalengreifer 58 + 7 Netze").toBe(65);
+    expect(netzeNachher, "Lasthebemagnet 3 + 7 Netze").toBe(10);
 
-    // Kollider: dieselbe Zahl (beide haben fuenf Schalen), aber neu angelegt.
-    expect(s.bagger.grappleBody.numColliders()).toBe(kolliderVorher);
+    // Kollider: zehn Schalenkapseln weg, eine Scheibe dazu — neu angelegt.
+    expect(s.bagger.grappleBody.numColliders()).toBe(kolliderVorher - 10 + 1);
     // Und der Greifer laeuft weiter, ohne dass etwas durchschlaegt.
     for (let i = 0; i < 60; i++) takt(s);
     expect(Number.isFinite(s.bagger.grappleGroup.position.y)).toBe(true);
@@ -280,9 +288,9 @@ describe("Der Schalter", () => {
     const st = knopfstand(s.bagger);
     expect(st.moeglich).toBe(false);
     expect(st.grund).toBe("erst ablegen");
-    expect(st.text).toContain("Fünfschalengreifer");
+    expect(st.text).toContain("Lasthebemagnet");
     // Der Wechsel passiert NICHT — und die Ladung haengt unveraendert weiter.
-    expect(wechsleGreifer(s.bagger, s.grip)).toBe(SICHELKRALLE);
+    expect(wechsleGreifer(s.bagger, s.grip)).toBe(FUENFSCHALEN);
     expect(s.grip.grippedCount).toBeGreaterThan(0);
 
     // Loslassen, Spinne aufmachen — dann geht es.
@@ -290,7 +298,7 @@ describe("Der Schalter", () => {
     for (let i = 0; i < 90; i++) takt(s);
     expect(s.grip.grippedCount).toBe(0);
     expect(s.bagger.greiferWechselBereit, "nach dem Ablegen ist der Knopf frei").toBe(true);
-    expect(wechsleGreifer(s.bagger, s.grip)).toBe(FUENFSCHALEN);
+    expect(wechsleGreifer(s.bagger, s.grip)).toBe(MAGNET);
     s.world.free();
   }, 60000);
 

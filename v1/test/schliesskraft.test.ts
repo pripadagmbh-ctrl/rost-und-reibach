@@ -213,7 +213,8 @@ describe("Schliesskraft der Spinne", () => {
     for (let i = 0; i < 120; i++) s.takt();
     const liegt = teil.translation();
 
-    expect(griffweite * GRAD).toBeCloseTo(54.5336, 2);
+    // E-155: Fuenfschalengreifer (Grundausstattung); Sichelkralle war 54,5336°
+    expect(griffweite * GRAD).toBeCloseTo(40.9238, 2);
     expect(haltedauer).toBe(256);
     /*
      * ZWEI ZAHLEN SIND AM 22.09.2026 ABSICHTLICH GEWANDERT (E-115): Patrick
@@ -236,8 +237,14 @@ describe("Schliesskraft der Spinne", () => {
      *   Griffweite    54,5336°  ->  54,5336°   (gleich, Greifen unberuehrt)
      *   Haltedauer    256       ->  256        (gleich)
      */
-    expect(Math.hypot(liegt.x - losX, liegt.z - losZ)).toBeCloseTo(4.2764, 2);
-    expect(pendel * GRAD).toBeCloseTo(36.9631, 2);
+    /*
+     * E-155 (18.10.2026): Die Grundausstattung ist der Fuenfschalengreifer —
+     * gemessen mit `npx vite-node tools/greifzyklus.ts`, Sichelkralle →
+     * Fuenfschalen: Griffweite 54,5336° → 40,9238°, Haltedauer 256 → 256,
+     * Wurfweite 4,2764 → 4,4715 m, Pendelwinkel 36,9631° → 37,0428°.
+     */
+    expect(Math.hypot(liegt.x - losX, liegt.z - losZ)).toBeCloseTo(4.4715, 2);
+    expect(pendel * GRAD).toBeCloseTo(37.0428, 2);
     s.world.free();
   });
 });
