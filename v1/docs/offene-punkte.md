@@ -573,6 +573,13 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 19a | Extrem schwere/große Objekte lassen sich oft nicht greifen |
       | 19b | Sie verlangsamen den Bagger unnatürlich |
 
+      Nachtrag Patrick (17.10.): „entweder kann ich mehr als 3,5 tonnen heben oder
+      es sollten keine teile über 3,5 tonnen ankommen … hat eh was mit dem winkel
+      zu tun und ein umschlagbagger kann definitiv mehr heben" → E-152
+      Traglasttabelle nach Ausladung (Fuchs MHL 250 F, auf MHL-320-Klasse
+      gestreckt), Überlastmeldung, Pflugbremse nur noch echt; live 33207b4.
+      Antwort 18.10.: ohne Pratzen ein Drittel weniger (E-154, in Arbeit).
+
 - [ ] **Gerätebefund 17.10.2026: verzinkt** — Patrick, wörtlich: „verzinkt ist
       kein buntmetall". Betroffen: Gerüstrahmen (Paket, verzinkt), Gerüstrohre
       verzinkt (Bund), Gerüstfeld, Verzinkte Gitterroste, Verzinkte
