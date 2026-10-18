@@ -554,6 +554,27 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Gerätebefund 18.10.2026, Klangqualität** — Patrick, wörtlich: „Also
+      das anschlagen klingt jetzt, nur sind die Geräusche manchmal wenig
+      realistisch. es klingt anders, wenn man gegen beton schlägt vs metal auf
+      metall. Auch die Metallarten klingen oft nicht realistisch und kindlich
+      manchmal. Aluminium klingt natürlich leicht aber eben nicht wie fallende
+      kleine eisen. Autos falle lassen, dass muss wie blech klingen und nicht
+      wie eine Coladose, die zerdrückt wird. Auch gibt es einen Ton beim
+      pressen (Schere) was eher wie ein lallender betrunkener klingt. Drum gibt
+      es noch ein paar Schwachstellen bei der SOund kullise aber auch viele
+      gute Elemente."
+
+      | # | Punkt |
+      |---|---|
+      | 21a | Anschlag klingt jetzt (bestätigt) |
+      | 21b | Beton und Metall-auf-Metall müssen klar verschieden klingen |
+      | 21c | Metallarten klingen oft unecht, teils kindlich |
+      | 21d | Aluminium: leicht, aber nicht wie fallende kleine Eisenteile |
+      | 21e | Auto fallen lassen: Blech, nicht zerdrückte Coladose |
+      | 21f | Ton beim Pressen (Schere) klingt wie ein lallender Betrunkener |
+      | 21g | Viele gute Elemente — bleiben |
+
 - [ ] **Ansage 18.10.2026, Boden** — Patrick, wörtlich: „auch soll es nicht
       mehr möglich sien, das körper im boden versinken können, wie aktuell bei
       autos der fall" (E-158; bekannt aus E-145: die Wandsperre zählt den Boden
