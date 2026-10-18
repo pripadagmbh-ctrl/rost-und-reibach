@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-160 | 19.10.2026 | Ein Wrack, das aufschlägt, klingt — auch ohne Knautschen | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-159 | 18.10.2026 | Feste Tonhöhe, Blech statt Dose, Schichtung, AAC, Hörparcours | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-158 | 18.10.2026 | Nichts versinkt mehr im Boden: gehaltene und gedrückte Wracks bleiben oben | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-157 | 18.10.2026 | Jedes Anschlagen klingt: Last und Spinne an Wand, Schere, Laster, Container | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -173,6 +174,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-160 — Wrack-Aufschlag klingt** (iPad-Lautsprecher, nach Einbau in main.ts)
+- Auto 1–2 m heben und loslassen: ein schwerer Blechschlag wie eine Autotür, keine Coladose, kein Rattern?
+- Aus 4 m: Kracht es und knirscht dazu, ohne doppelten Schlag?
+- Auto auf eine Ladefläche fallen lassen: dröhnt es nach Stahl?
 
 **E-159 — Klangqualität: feste Tonhöhe, Blech statt Dose, Hörparcours** (iPad, dann iPhone mini)
 - Pause → Lautstärke → Hörprobe ganz durchhören und `docs/messungen/hoerparcours.md` ausfüllen (Noten 1–5).

@@ -55,6 +55,37 @@ interface AttachedPart {
   attached: boolean;
 }
 
+/**
+ * Ab diesem Tempoverlust in einem Schritt meldet ein Wrack einen Aufprall
+ * (m/s, E-160). Dieselbe Zahl, ab der der Ton ueberhaupt einen Schlag spielt
+ * (`SCHLAG_AB_MS` in `audio/klangregeln.ts`): Darunter waere ein Ereignis
+ * ohne Klang.
+ */
+export const WRACK_AUFPRALL_AB_MS = 1.5;
+/**
+ * So viele Schritte (60 Hz) nach einem Aufprall bleibt ein Wrack still. SW:
+ * 0,4 s — ein Auto federt nach und rutscht nach; das soll EIN Schlag sein,
+ * kein Rattern. Lose Teile haben 0,18 s (`scrapItems.ts`), ein Auto ist
+ * schwerer und schwingt laenger.
+ */
+export const WRACK_AUFPRALL_PAUSE = 24;
+
+/**
+ * Worauf ein Wrack aufschlaegt (E-160). `stahlGrund` ist die Funktion aus
+ * `main.ts` (Ladeflaechen, Mulden). Gefragt wird knapp ueber der Unterkante
+ * (der Ursprung des Wracks liegt an der Unterkante). Liegt die Unterkante
+ * hoeher als 0,5 m und nicht auf Stahl, liegt es auf Schrott oder einem
+ * anderen Wrack. // SW: 0,5 m
+ */
+export function wrackUntergrund(
+  car: CarComposite,
+  stahlGrund: (x: number, y: number, z: number) => boolean
+): "beton" | "stahl" | "schrott" {
+  const p = car.body.translation();
+  if (stahlGrund(p.x, p.y + 0.1, p.z)) return "stahl";
+  return p.y > 0.5 ? "schrott" : "beton";
+}
+
 const SETTLE_GRACE_STEPS = 90; // nach Spawn keine Aufprall-Events (Setzen des Wracks)
 
 /* ------------------------------------------------------------------------- */
@@ -455,6 +486,12 @@ export class CarComposite {
   crushStage = 0;
   private prevVel = new THREE.Vector3();
   private grace = SETTLE_GRACE_STEPS;
+  /** Schritte seit dem letzten gemeldeten Aufprall (E-160). */
+  private seitAufprall = Infinity;
+  /** War der Koerper im letzten Schritt kinematisch (Spinne, Pritsche)? (E-160) */
+  private warKinematisch = false;
+  /** Wucht des Aufpralls in diesem Schritt, 0 = keiner. Abgeholt von `CompositeManager.update` (E-160). */
+  aufprallWucht = 0;
   private currentMassKg: number;
   /**
    * Was die Karosse jetzt noch wiegt.
@@ -1015,9 +1052,12 @@ export class CarComposite {
     this.group.position.set(p.x, p.y, p.z);
     this.group.quaternion.set(r.x, r.y, r.z, r.w);
 
+    this.aufprallWucht = 0;
+    this.seitAufprall++;
     // Während der kinematischen Anlieferung (auf der Pritsche): keine Aufprall-Logik
     if (this.body.isKinematic()) {
       this.prevVel.set(0, 0, 0);
+      this.warKinematisch = true;
       return;
     }
 
@@ -1027,9 +1067,27 @@ export class CarComposite {
     const dv = Math.hypot(v.x - this.prevVel.x, v.y - this.prevVel.y, v.z - this.prevVel.z);
     const impactDir = this.prevVel.clone(); // Bewegungsrichtung VOR dem Aufprall
     this.prevVel.set(v.x, v.y, v.z);
+    const ebenLosgelassen = this.warKinematisch;
+    this.warKinematisch = false;
     if (this.grace > 0) {
       this.grace--;
       return;
+    }
+
+    /*
+     * DER AUFSCHLAG KLINGT (E-160, Patrick 18.10.2026: „Autos fallen lassen,
+     * das muss wie Blech klingen und nicht wie eine Coladose"). Bis hierher
+     * meldete ein Wrack nur `wrack:geknautscht` — wer hart aufschlug, aber
+     * nicht knautschte, war stumm. Gemessen wird wie bei losen Teilen der
+     * Tempoverlust in einem Schritt; gemeldet wird einmal je Aufschlag.
+     *
+     * Nicht im ersten Schritt nach dem Loslassen: Waehrend das Wrack in der
+     * Spinne hing, stand `prevVel` auf 0 — der Wurf selbst saehe sonst aus
+     * wie ein Aufprall. Gehaltene Wracks meldet der Bagger (E-134/E-157).
+     */
+    if (!ebenLosgelassen && dv >= WRACK_AUFPRALL_AB_MS && this.seitAufprall >= WRACK_AUFPRALL_PAUSE) {
+      this.seitAufprall = 0;
+      this.aufprallWucht = dv;
     }
 
     if (dv > 3 && impactDir.length() > 2) {
@@ -1581,8 +1639,18 @@ export class CompositeManager {
     return `${form ? form.name : "Bestand (zwei Quader)"} — ${neu} Wrack(s) neu gebaut`;
   }
 
+  /**
+   * Ein loses Wrack schlaegt auf (E-160): fallen gelassen, umgekippt, gegen
+   * Wand oder Fahrzeug gerutscht. `wucht` ist der Tempoverlust in m/s, wie bei
+   * `ItemManager.onAufprall`. `main.ts` macht daraus `schrott:aufprall` —
+   * dort steht die eine Quelle fuer den Untergrund (`stahlGrund`).
+   */
+  onAufprall: ((car: CarComposite, wucht: number) => void) | null = null;
+
   update(): void {
     for (const car of this.cars) car.update();
+    // Erst alle Wracks rechnen, dann melden (v2 E-044)
+    for (const car of this.cars) if (car.aufprallWucht > 0) this.onAufprall?.(car, car.aufprallWucht);
   }
 
   findPartNear(pos: THREE.Vector3): TearTarget | null {
