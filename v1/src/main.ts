@@ -43,6 +43,7 @@ import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
 import { START_HAUFEN, START_AUTOS, START_STREU, START_LKW } from "./world/startplatz";
 import { lastAufschlagWucht } from "./audio/klangregeln";
+import { anschlagUntergrund, SPINNE_WUCHT_VOLL_MS } from "./excavator/aufschlag";
 import { findeBox } from "./world/boxen";
 import { OfficeBuilding, BUERO_TUER } from "./world/office";
 import { Police } from "./world/police";
@@ -746,6 +747,33 @@ async function main(): Promise<void> {
     bus.emit("spinne:aufschlag", { wucht, untergrund: spinnenGrund(h, p), x: p.x, y: p.y, z: p.z });
   excavator.onSpinneDruecken = (staerke, h, p) =>
     bus.emit("spinne:druecken", { staerke, untergrund: spinnenGrund(h, p), x: p.x, y: p.y, z: p.z });
+  // E-157: Jedes Anschlagen klingt — gehaltene Last als Schrott-Aufprall, die leere Spinne als Spinnen-Schlag
+  excavator.onAnschlag = (e) => {
+    const untergrund = anschlagUntergrund(e, {
+      istWrack: (h) => composites.cars.some((c) => c.body.handle === h),
+      istSchrott: (h) => items.items.some((i) => i.body.handle === h),
+      stahlPunkt: stahlGrund,
+    });
+    if (!e.traegt) {
+      bus.emit("spinne:aufschlag", { wucht: Math.min(e.tempoMs / SPINNE_WUCHT_VOLL_MS, 1), untergrund, x: e.x, y: e.y, z: e.z });
+      return;
+    }
+    let it: ReturnType<typeof items.itemByBody>;
+    for (const b of grip.grippedBodies) {
+      const x = items.itemByBody(b);
+      if (x && (!it || x.massKg > it.massKg)) it = x;
+    }
+    bus.emit("schrott:aufprall", {
+      materialId: it?.materialId ?? "steel",
+      massKg: grip.totalMassKg,
+      wucht: lastAufschlagWucht(e.tempoMs),
+      blech: it ? items.isCrushable(it) : true,
+      untergrund: untergrund === "wrack" ? "schrott" : untergrund,
+      x: e.x,
+      y: e.y,
+      z: e.z,
+    });
+  };
   /*
    * Zudruecken richtet Schaden an (E-112 baut die Kraft, E-114 die Wirkung).
    * Der Bagger kennt keinen Bus, deshalb ein Haken wie `onClawSnap`; wer
