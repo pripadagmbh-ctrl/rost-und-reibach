@@ -665,7 +665,7 @@ async function main(): Promise<void> {
   excavator.onUeberlast = (e) => bus.emit("greifer:ueberlast", e);
   const tonnen = (kg: number): string => (kg / 1000).toFixed(1).replace(".", ",");
   bus.on("greifer:ueberlast", (e) =>
-    hud.toast(`Zu schwer: ${tonnen(e.massKg)} t – hier hebt die Maschine ${tonnen(e.grenzeKg)} t. Näher heranziehen.`)
+    hud.toast(`Zu schwer: ${tonnen(e.massKg)} t – hier hebt die Maschine ${tonnen(e.grenzeKg)} t. ${e.abgestuetzt ? "Näher heranziehen." : "Näher heranziehen oder abstützen (O)."}`)
   );
   /*
    * Aufschlaege: Der wichtigste Klang auf dem Platz. Ob es metallisch

@@ -68,13 +68,11 @@ export interface SaveData {
   /** Gewaehlter Radiosender (ab Schema 2) */
   radio?: RadioState;
   /**
-   * Welcher Greifer haengt — „sichel" oder „fuenfschalen" (E-059).
+   * Welcher Greifer haengt — „fuenfschalen" oder „magnet" (E-059, E-146).
    *
-   * Optional und ohne Schemawechsel: Ein Stand ohne dieses Feld ist ein Stand
-   * mit der Sichelkralle, so wie jeder Stand vor E-059. Das gilt weiter, auch
-   * seit der Fuenfschalengreifer die Vorgabe fuer NEUE Runden ist (E-105) —
-   * wer mit der Sichelkralle gespielt hat, laedt mit der Sichelkralle.
-   * `main.ts` traegt diese Unterscheidung, nicht `formZu`.
+   * Optional und ohne Schemawechsel. Seit E-155 (18.10.2026: „sichelkralle aus
+   * spiel entfernen") laedt ein Stand mit „sichel" oder ohne dieses Feld mit
+   * dem Fuenfschalengreifer.
    */
   greifer?: string;
   items: SavedItem[];
