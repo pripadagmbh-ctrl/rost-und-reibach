@@ -554,6 +554,9 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 18.10.2026** — Patrick, wörtlich: „sichelkralle aus spiel
+      entfernen" (E-155)
+
 - [ ] **Ansage 17.10.2026, Ton** — Patrick, wörtlich: „ton agent nochmal
       anschmeissen, möglichst nur realistische töne verwenden und so wenig wie
       möglich selbst komponierte die unrealistisch klingen und sich nicht mit
