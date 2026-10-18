@@ -554,6 +554,11 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 18.10.2026, Boden** — Patrick, wörtlich: „auch soll es nicht
+      mehr möglich sien, das körper im boden versinken können, wie aktuell bei
+      autos der fall" (E-158; bekannt aus E-145: die Wandsperre zählt den Boden
+      nicht, ein gehaltenes Auto lässt sich in den Beton senken)
+
 - [ ] **Ansage 18.10.2026, Anschlagen** — Patrick, wörtlich: „anschlagen soll
       immer geräusche erzeigen, also auto vor schere oder wand" (E-157)
       Nachtrag: „greifer vor lkw container wand" — Greifer gegen
