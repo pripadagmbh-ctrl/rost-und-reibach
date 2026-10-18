@@ -554,6 +554,13 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Gerätebefund 18.10.2026, Traglast** — Patrick, wörtlich: „also die
+      leistungsgrenzen,dass scheint nicht so zu funktionieren, ein
+      umschlagbagger sollte grundsätzlich mit mehreren Tonnen klarkommen".
+      Antworten: „Große Schrottmaschine" (MHL 335/340-Klasse: nah ~10 t, bei
+      8 m ~5–6 t mit Pratzen), Pratzen-Regel bleibt (ohne ein Drittel
+      weniger). → E-156, dazu Prüfung, ob die Sperre falsch greift.
+
 - [ ] **Ansage 18.10.2026** — Patrick, wörtlich: „sichelkralle aus spiel
       entfernen" (E-155)
 
