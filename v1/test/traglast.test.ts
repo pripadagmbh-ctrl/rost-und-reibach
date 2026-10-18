@@ -33,41 +33,39 @@ beforeAll(async () => {
 });
 
 describe("Die Tabelle", () => {
-  it("faellt mit der Ausladung, in beiden Hoehen, und haelt die Herleitung ein", () => {
-    for (const h of [1.5, 2.2, 3, 6]) {
-      let alt = Infinity;
-      for (let r = 2; r <= 10.5; r += 0.25) {
-        const t = maschinenTraglastKg(r, h);
-        expect(t, `r ${r} h ${h}`).toBeLessThanOrEqual(alt + 1e-9);
-        alt = t;
-      }
+  it("faellt mit der Ausladung und trifft Patricks Ziele (E-156: grosse Schrottmaschine, MHL-335/340-Klasse)", () => {
+    let alt = Infinity;
+    for (let r = 2; r <= 10.5; r += 0.25) {
+      const t = maschinenTraglastKg(r);
+      expect(t, `r ${r}`).toBeLessThanOrEqual(alt + 1e-9);
+      alt = t;
     }
-    // Stuetzstellen: MHL 250 F (6,0 t bei 3,0 m, 2,2 t bei 7,5 m, Hoehe 3 m), gestreckt auf die MHL-320-Klasse
-    expect(maschinenTraglastKg(3.0 * (10.4 / 9), 3)).toBeCloseTo(6000 * (21 / 16), 6);
-    expect(maschinenTraglastKg(7.5 * (10.4 / 9), 3)).toBeCloseTo(2200 * (21 / 16), 6);
-    expect(maschinenTraglastKg(3.0 * (10.4 / 9), 1.5)).toBeCloseTo(5000 * (21 / 16), 6);
-    // Auftrag: nah an der Maschine rund 7–8 t, bei 9 m rund 2,5–3 t
-    expect(maschinenTraglastKg(3.0, 3)).toBeGreaterThan(7000);
-    expect(maschinenTraglastKg(3.0, 3)).toBeLessThan(8000);
-    expect(maschinenTraglastKg(9, 3)).toBeGreaterThan(2500);
-    expect(maschinenTraglastKg(9, 3)).toBeLessThan(3000);
+    const f = FUENFSCHALEN.eigengewichtKg;
+    // Patrick, 18.10.2026: nah etwa 10 t, bei 8 m etwa 5–6 t, mit Pratzen — netto mit dem Fuenfschalengreifer
+    expect(nutzlastKg(3.7, f)).toBeCloseTo(10000, 6);
+    expect(nutzlastKg(5, f)).toBeCloseTo(8000, 6);
+    expect(nutzlastKg(8, f)).toBeGreaterThanOrEqual(5000);
+    expect(nutzlastKg(8, f)).toBeLessThanOrEqual(6000);
+    expect(nutzlastKg(9, f)).toBeGreaterThanOrEqual(4500);
+    expect(nutzlastKg(9, f)).toBeLessThanOrEqual(5000);
   });
 
-  it("frei stehend zwei Drittel der abgestuetzten Traglast (E-154, Patrick 18.10.2026)", () => {
+  it("frei stehend zwei Drittel (E-154, Patrick 18.10.2026: „ohne Pratzen ein Drittel weniger“)", () => {
     for (const r of [3.7, 5, 8, 9.5]) {
-      expect(nutzlastKg(r, 3, 0, 1, false)).toBeCloseTo((nutzlastKg(r, 3, 0) * 2) / 3, 6);
+      const f = FUENFSCHALEN.eigengewichtKg;
+      expect(nutzlastKg(r, f, 1, false)).toBeCloseTo((nutzlastKg(r, f) * 2) / 3, 6);
     }
   });
 
   it("das Anbaugeraet geht ab: Magnet (1,7 t) hebt 600 kg weniger als der Fuenfschalengreifer (1,1 t)", () => {
-    expect(nutzlastKg(5, 3, FUENFSCHALEN.eigengewichtKg) - nutzlastKg(5, 3, MAGNET.eigengewichtKg)).toBeCloseTo(600, 6);
+    expect(nutzlastKg(5, FUENFSCHALEN.eigengewichtKg) - nutzlastKg(5, MAGNET.eigengewichtKg)).toBeCloseTo(600, 6);
   });
 
-  it("kein Katalogteil ist schwerer, als die Maschine nah an sich heben kann", () => {
-    // kleinste Ausladung des Arms: 3,7 m (gemessen am gebauten Bagger, Stiel ganz heran), Hoehe ueber 3 m
-    const nahMagnet = nutzlastKg(3.7, 3, MAGNET.eigengewichtKg);
+  it("kein Katalogteil ist schwerer, als die Maschine nah heben kann — auch frei stehend mit dem Magneten", () => {
+    // kleinste Ausladung des Arms: 3,7 m (gemessen am gebauten Bagger, Stiel ganz heran)
+    const nahMagnetFrei = nutzlastKg(3.7, MAGNET.eigengewichtKg, 1, false);
     const schwerstes = Math.max(...[...SPECS, ...BIG_SPECS, ...HUGE_SPECS].map((s) => s.massKg));
-    expect(schwerstes, `schwerstes Katalogteil ${schwerstes} kg, nah mit Magnet ${Math.round(nahMagnet)} kg`).toBeLessThan(nahMagnet);
+    expect(schwerstes, `schwerstes Katalogteil ${schwerstes} kg, nah frei mit Magnet ${Math.round(nahMagnetFrei)} kg`).toBeLessThan(nahMagnetFrei);
   });
 });
 
@@ -162,17 +160,24 @@ describe("Ueberlast wie an der echten Maschine (EN 474-5)", () => {
     const r1 = b.ausladungM;
     s.fahre("KeyG", 60);
     expect(b.ausladungM, "Heranziehen geht").toBeLessThan(r1 - 0.5);
+    // E-156: Nach dem Loslassen haengt keine Sperre nach
+    s.grip.releaseAll();
+    s.fahre("KeyZ", 5);
+    expect(b.ueberlast, "nach dem Loslassen keine Ueberlast mehr").toBe(false);
+    const y2 = b.grappleGroup.position.y;
+    s.fahre("KeyR", 30);
+    expect(b.grappleGroup.position.y, "leer hebt der Ausleger sofort").toBeGreaterThan(y2 + 0.2);
     s.world.free();
   }, 60_000);
 
-  it("6 t nah an der Maschine: frei stehend Ueberlast, abgestuetzt geht sie hoch — und wieder eingefahren sperrt es (E-154)", () => {
+  it("8 t nah an der Maschine: frei stehend Ueberlast, abgestuetzt geht sie hoch — und wieder eingefahren sperrt es (E-154)", () => {
     // Arm heran: Ausleger fast ganz hoch (Luft bis zum Anschlag), Stiel ganz herein
-    const s = mitLast(6000, [["KeyR", 80], ["KeyG", 300]]);
+    const s = mitLast(8000, [["KeyR", 80], ["KeyG", 300]]);
     const b = s.bagger;
     expect(b.ausladungM).toBeLessThan(4.2);
-    // frei stehend: zwei Drittel der Tabelle — 6 t sind zu viel
+    // frei stehend: zwei Drittel der Tabelle — 8 t sind zu viel (E-156: nah 10 t, frei 6,7 t)
     expect(b.abgestuetzt).toBe(false);
-    expect(b.traglastKg, `frei bei ${b.ausladungM.toFixed(2)} m`).toBeLessThan(6000);
+    expect(b.traglastKg, `frei bei ${b.ausladungM.toFixed(2)} m`).toBeLessThan(8000);
     let y0 = b.grappleGroup.position.y;
     s.fahre("KeyR", 30);
     expect(b.grappleGroup.position.y - y0, "frei hebt er nicht").toBeLessThan(0.002);
@@ -182,7 +187,7 @@ describe("Ueberlast wie an der echten Maschine (EN 474-5)", () => {
     b.toggleOutriggers();
     s.fahre("KeyZ", 150);
     expect(b.abgestuetzt).toBe(true);
-    expect(b.traglastKg, `abgestuetzt bei ${b.ausladungM.toFixed(2)} m`).toBeGreaterThan(6000);
+    expect(b.traglastKg, `abgestuetzt bei ${b.ausladungM.toFixed(2)} m`).toBeGreaterThan(8000);
     y0 = b.grappleGroup.position.y;
     s.fahre("KeyR", 30);
     expect(b.grappleGroup.position.y - y0, "abgestuetzt hebt der Ausleger").toBeGreaterThan(0.1);
@@ -196,6 +201,36 @@ describe("Ueberlast wie an der echten Maschine (EN 474-5)", () => {
     s.fahre("KeyR", 40);
     expect(b.grappleGroup.position.y - y0, "eingefahren hebt er nicht").toBeLessThan(0.002);
     expect(s.meldungen.length).toBe(2);
+    s.world.free();
+  }, 60_000);
+
+  it("Spielablauf (E-156): bei 8 m ohne Pratzen geht ein 2-t-Teil hoch", () => {
+    const s = mitLast(2000, []);
+    expect(s.bagger.ausladungM).toBeGreaterThan(7.8);
+    expect(s.bagger.abgestuetzt).toBe(false);
+    const y0 = s.bagger.grappleGroup.position.y;
+    s.fahre("KeyR", 60);
+    expect(s.bagger.grappleGroup.position.y - y0, "2 t bei 8 m, frei").toBeGreaterThan(0.5);
+    expect(s.meldungen.length).toBe(0);
+    s.world.free();
+  }, 60_000);
+
+  it("Spielablauf (E-156): bei 8 m ein 4-t-Teil — ohne Pratzen Ueberlast, mit Pratzen geht es hoch", () => {
+    const s = mitLast(4000, []);
+    const b = s.bagger;
+    expect(b.ausladungM).toBeGreaterThan(7.8);
+    let y0 = b.grappleGroup.position.y;
+    s.fahre("KeyR", 40);
+    expect(b.grappleGroup.position.y - y0, "frei hebt er nicht").toBeLessThan(0.002);
+    expect(s.meldungen.length).toBe(1);
+    expect(s.meldungen[0]!.abgestuetzt).toBe(false);
+    b.toggleOutriggers();
+    s.fahre("KeyZ", 150);
+    expect(b.abgestuetzt).toBe(true);
+    y0 = b.grappleGroup.position.y;
+    s.fahre("KeyR", 40);
+    expect(b.grappleGroup.position.y - y0, "mit Pratzen geht es hoch").toBeGreaterThan(0.3);
+    expect(s.meldungen.length).toBe(1);
     s.world.free();
   }, 60_000);
 

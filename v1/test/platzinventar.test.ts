@@ -46,10 +46,10 @@ const WAND_T = 0.09;
 /**
  * Was der Fuenfschalengreifer heben darf — seit E-152 nach Ausladung
  * (`excavator/traglast.ts`), nicht mehr eine feste Zahl. Nah: kleinste
- * Ausladung des Arms (3,7 m), weit: 9 m; Hoehe des Stielendes 3 m.
+ * Ausladung des Arms (3,7 m), weit: 9 m (E-156: grosse Schrottmaschine).
  */
-const NAH_KG = nutzlastKg(3.7, 3, FUENFSCHALEN.eigengewichtKg);
-const WEIT_KG = nutzlastKg(9, 3, FUENFSCHALEN.eigengewichtKg);
+const NAH_KG = nutzlastKg(3.7, FUENFSCHALEN.eigengewichtKg);
+const WEIT_KG = nutzlastKg(9, FUENFSCHALEN.eigengewichtKg);
 
 describe("Der Müllcontainer ist ein Container, kein Bauwerk", () => {
   it("er ist beweglich — und der Greifer hebt ihn leer gerade noch", () => {
@@ -69,10 +69,11 @@ describe("Der Müllcontainer ist ein Container, kein Bauwerk", () => {
     expect(MUELL.kind, "der MUELL ist kein Absetzcontainer").toBe("rolloff");
     expect(leerKg, `${leerKg.toFixed(0)} kg leer`).toBeCloseTo(1781, 0);
     expect(leerKg, "leer schon zu schwer für den Greifer, auch nah").toBeLessThan(NAH_KG);
-    // E-152: Leer hebt ihn die Maschine nah, weit draussen nicht mehr — und
-    // voll wird er von selbst schwerer: Das Ladegewicht kommt als
-    // Zusatzmasse an den Körper (`wiegeLadung`), die Ueberlastsperre greift.
-    expect(leerKg, "weit draussen hebt sie ihn leer nicht mehr").toBeGreaterThan(WEIT_KG);
+    // E-156: Leer hebt ihn die grosse Schrottmaschine ueberall, auch weit
+    // draussen ohne Pratzen (zwei Drittel). Voll wird er von selbst schwerer:
+    // Das Ladegewicht kommt als Zusatzmasse an den Körper (`wiegeLadung`),
+    // und die Ueberlastsperre greift, sobald es zu viel ist.
+    expect(leerKg, "weit draussen ohne Pratzen hebt sie ihn leer").toBeLessThan((WEIT_KG * 2) / 3);
   });
 
   it("er kommt zur Ruhe und bleibt liegen — sonst zittert der Platz die ganze Zeit", () => {

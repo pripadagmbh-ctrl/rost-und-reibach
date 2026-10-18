@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-156 | 18.10.2026 | Große Schrottmaschine: nah 10 t, bei 8 m 5,5 t | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-155 | 18.10.2026 | Sichelkralle aus dem Spiel, Fünfschalengreifer ist Grundausstattung | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-154 | 18.10.2026 | Ohne Pratzen hebt die Maschine ein Drittel weniger | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-152 | 17.10.2026 | Traglast nach Ausladung statt 3,5 t, Überlast meldet sich, keine Kunstbremse | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -169,6 +170,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-156 — Große Schrottmaschine**
+- Ohne Pratzen bei 6–9 m Container, Motoren, Maschinen (1–2,6 t) greifen: Gehen sie hoch?
+- Ein richtig schweres Teil weit draußen ohne Pratzen: Kommt „Zu schwer … abstützen (O)", und mit Pratzen geht es?
+- Fühlt sich die Maschine wie ein großer Schrottbagger an, oder ist sie zu stark?
 
 **E-155 — Sichelkralle aus dem Spiel**
 - Pausenmenü: Schaltet der Knopf nur noch zwischen Fünfschalengreifer und Lasthebemagnet?

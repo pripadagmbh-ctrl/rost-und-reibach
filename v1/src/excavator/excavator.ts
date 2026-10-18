@@ -3326,15 +3326,14 @@ export class Excavator {
   }
 
   /**
-   * E-152: Was jetzt an den Greifer darf (kg) — Traglasttabelle bei dieser
-   * Ausladung und Hoehe des Stielendes, mal Ausbau, minus Anbaugeraet
-   * (`traglast.ts`). Die Tabelle gilt fuer die 4-Punkt-abgestuetzte Maschine;
-   * ob frei stehend weniger gelten soll, ist offen (E-152).
+   * E-152/E-156: Was jetzt an den Greifer darf (kg) — Traglasttabelle bei
+   * dieser Ausladung, mal Ausbau, minus Anbaugeraet; frei stehend zwei
+   * Drittel davon (E-154). Ausladung: Stielende (Kardangelenk, an dem die
+   * Last haengt) zur Drehmitte (`traglast.ts`).
    */
   get traglastKg(): number {
     return nutzlastKg(
       this.ausladungM,
-      this.grappleGroup.position.y,
       this.form.eigengewichtKg,
       this.greifsystem?.getCapacityBonus?.() ?? 1,
       this.abgestuetzt
