@@ -24,7 +24,7 @@ import { ContainerAbholung } from "./delivery/platzinventarAbholung";
 import { AudioManager } from "./audio/audioManager";
 import { Hud, type Zahlungslage } from "./ui/hud";
 import { Particles } from "./world/particles";
-import { CompositeManager, type WrackArt } from "./dismantle/composites";
+import { CompositeManager, wrackUntergrund, type WrackArt } from "./dismantle/composites";
 import { FenceManager } from "./world/fence";
 import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
@@ -712,6 +712,20 @@ async function main(): Promise<void> {
       spaene: item.shape?.spaene !== undefined,
       // ponytail: "auf Schrott" nach Hoehe der Teilmitte (ueber 0,7 m); Strahl nach unten, falls es falsch klingt
       untergrund: stahlGrund(p.x, p.y, p.z) ? "stahl" : p.y > 0.7 ? "schrott" : "beton",
+      x: p.x,
+      y: p.y,
+      z: p.z,
+    });
+  };
+  // E-160: Ein loses Wrack schlaegt auf — derselbe Vertrag wie lose Teile. Gehaltene meldet onAnschlag.
+  composites.onAufprall = (car, wucht) => {
+    const p = car.body.translation();
+    bus.emit("schrott:aufprall", {
+      materialId: "steel",
+      massKg: car.body.mass(),
+      wucht,
+      blech: true,
+      untergrund: wrackUntergrund(car, stahlGrund),
       x: p.x,
       y: p.y,
       z: p.z,
