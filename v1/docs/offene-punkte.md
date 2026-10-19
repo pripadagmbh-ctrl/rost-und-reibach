@@ -610,6 +610,12 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 28c | Autos haben Innenausstattung |
       | 29 | Müll-Mulde direkt vor dem Bagger an der Wand zum Buntmetall |
 
+      Zerstörungskonzept (v1/docs/zerstoerung-konzept.md), Antworten 20.10.:
+      Motor + Getriebe „als ein Block"; Haube „erster Biss springt auf, zweiter
+      reißt ab"; ausgeweidete Karosse „bleibt Mischschrott"; Ruck „nur am Teil,
+      Kamera ruhig". Vorgaben (Empfehlung): Innenausstattung in 1.0 sichtbar,
+      herausholbar erst 1.1; Reifen überall mit Felge.
+
       Antworten 20.10.: Store-Name „Rost & Reibach" (Pripada GmbH als Anbieter);
       auf dem Platz wird ALLES Rost & Reibach (Mulden, Abholer, Waage, Halle);
       Verladen = Schrott mit dem Bagger auf den Abholer UND Wracks (LKW-Wrack,
