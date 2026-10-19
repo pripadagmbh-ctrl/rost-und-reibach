@@ -581,6 +581,12 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 28c | Autos haben Innenausstattung |
       | 29 | Müll-Mulde direkt vor dem Bagger an der Wand zum Buntmetall |
 
+      Antworten 20.10.: Store-Name „Rost & Reibach" (Pripada GmbH als Anbieter);
+      auf dem Platz wird ALLES Rost & Reibach (Mulden, Abholer, Waage, Halle);
+      Verladen = Schrott mit dem Bagger auf den Abholer UND Wracks (LKW-Wrack,
+      Autos) auf den Abholer; hebbar: „alle elemente die nicht fest verankert
+      sind wie gebäude und mauern" + Mulde vom Absetzkipper.
+
 - [ ] **Ziel 19.10.2026: App Store in vier Wochen** — Patrick, wörtlich:
       „Stelle dir vor du bist Profi Spiele publisher, Ziel ist es eine Version
       zu bekommen, die ap live in den app store zu bekommen. Wie würdest du das
