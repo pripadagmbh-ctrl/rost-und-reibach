@@ -611,6 +611,19 @@
       }
       #pause h1, #pause .hint, #pause .grund { grid-column: 1 / -1; }
       #pause .panel button { margin: 0; }
+      /* E-171: Datenschutz/Lizenzen/Support — ganze Flaeche, Zurueck oben links */
+      #seite {
+        display: none; position: fixed; inset: 0; z-index: 24; background: #1a1c1e;
+        flex-direction: column; align-items: flex-start; box-sizing: border-box;
+        padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
+      }
+      #seite.open { display: flex; }
+      #seite iframe { flex: 1; width: 100%; border: 0; background: #1a1c1e; }
+      #seite-zu {
+        flex: 0 0 auto; min-height: 44px; margin: 8px; padding: 10px 24px; cursor: pointer;
+        background: rgba(46,52,57,0.95); color: #e8e8e4; font: 600 15px "Consolas", monospace;
+        border: 2px solid rgba(255,255,255,0.22); border-radius: 9px; touch-action: manipulation;
+      }
       /* --- Steuerungsmenü: eigenständige Tafel neben dem Pausenfeld --- */
       #controls-menu {
         display: none;
@@ -1108,6 +1121,11 @@
         <!-- Sprache (E-170): beide Woerter, damit man den Knopf in jeder
              Sprache findet. Beschriftung setzt ui/seiten.ts. -->
         <button id="pause-sprache" translate="no">Sprache · Language</button>
+        <!-- E-171: Seiten liegen in public/ und damit im App-Paket — offline,
+             relativ verlinkt. ui/seiten.ts zeigt sie im Rahmen #seite. -->
+        <button id="pause-datenschutz" data-seite="datenschutz.html">Datenschutz</button>
+        <button id="pause-lizenzen" data-seite="lizenzen.html">Lizenzen</button>
+        <button id="pause-support" data-seite="support.html">Support</button>
         <p class="hint">
           Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
           Pedale unten links: Fahren an/aus — dann fährt der linke Stick<br />
@@ -1172,6 +1190,13 @@
         <button id="radio-power">Radio ausschalten</button>
         <button id="radio-close">Zurück</button>
       </div>
+    </div>
+    <!-- Datenschutz, Lizenzen, Support (E-171): Seite aus dem App-Paket im
+         Rahmen, damit das Spiel weiterlaeuft und kein Browser im Spiel steckt.
+         Fremde Adressen in den Seiten oeffnen mit target="_blank" Safari. -->
+    <div id="seite">
+      <button id="seite-zu">Zurück</button>
+      <iframe id="seite-rahmen" title="Datenschutz"></iframe>
     </div>
     <!-- Lautstaerke je Gruppe (E-139): Bagger, Metall, Musik. Verdrahtet in ui/tonregler.ts. -->
     <div id="ton">

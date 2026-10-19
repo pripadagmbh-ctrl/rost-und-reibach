@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-171 | 19.10.2026 | Datenschutz, Lizenzen, Support als Seiten im App-Paket | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-170 | 19.10.2026 | Englisch im Spiel: Sprache vom Gerät, umschaltbar im Pausenmenü | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-161 | 19.10.2026 | iOS-App ohne Mac: Capacitor 8, Cloud-Bau, TestFlight vorbereitet | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-160 | 19.10.2026 | Ein Wrack, das aufschlägt, klingt — auch ohne Knautschen | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -176,6 +177,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-171 — Datenschutz, Lizenzen, Support** (iPad, dann iPhone mini)
+- Pause → Datenschutz: Seite öffnet, scrollt mit dem Finger, „Zurück“ führt ins Pausenmenü?
+- Auf Englisch → Privacy: englischer Teil steht oben?
+- Lizenzen → Tonquelle antippen: Safari bzw. neuer Tab, Spiel bleibt erhalten?
+- Nach dem Deploy die drei Adressen auf dem Telefon öffnen; Platzhalter in [Klammern] ausfüllen lassen (Telefon, Anschrift, Name, Datum).
 
 **E-170 — Englisch im Spiel** (iPad, dann iPhone mini)
 - Pause → „Sprache: Deutsch“ antippen (oder Gerät auf Englisch): alles englisch, auch Muldenschilder und Griff-Info?
