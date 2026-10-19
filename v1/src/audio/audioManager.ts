@@ -17,6 +17,7 @@
  * bei dem es gar keine Geste gibt, an der man sich festhalten koennte.
  */
 import { Music } from "./music";
+import { folgeStummschalter } from "./stummschalter";
 import { findeSender, STANDARD_SENDER, type Song } from "./songs";
 import { brauchtNeuaufbau, brauchtWeckruf, istHoerbar, type Tondiagnose } from "./tonzustand";
 import {
@@ -476,6 +477,7 @@ export class AudioManager {
 
   private baueKanal(): void {
     try {
+      folgeStummschalter(); // E-172: lautlos = still, fremde Musik läuft weiter
       const ctx = new AudioContext();
       this.ctx = ctx;
       this.master = ctx.createGain();

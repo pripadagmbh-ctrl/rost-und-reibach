@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-172 | 19.10.2026 | Stummschalter auf lautlos: Spiel still, fremde Musik läuft weiter | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-171 | 19.10.2026 | Datenschutz, Lizenzen, Support als Seiten im App-Paket | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-170 | 19.10.2026 | Englisch im Spiel: Sprache vom Gerät, umschaltbar im Pausenmenü | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-161 | 19.10.2026 | iOS-App ohne Mac: Capacitor 8, Cloud-Bau, TestFlight vorbereitet | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
@@ -177,6 +178,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-172 — Stummschalter „ambient“** (iPhone mini)
+- Safari, Live-Adresse: lautlos → Spinne zupacken still? Schalter zurück → Ton wieder da?
+- App über TestFlight: Musik-App läuft, Spiel öffnen → Musik läuft weiter, Spiel darüber hörbar?
+- Kopfhörer und lautlos: Hört man das Spiel? (nur notieren)
 
 **E-171 — Datenschutz, Lizenzen, Support** (iPad, dann iPhone mini)
 - Pause → Datenschutz: Seite öffnet, scrollt mit dem Finger, „Zurück“ führt ins Pausenmenü?
