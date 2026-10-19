@@ -584,6 +584,8 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       Englisch zum Start „ja, wenn bis 09.11. übersetzt"; Stummschalter →
       Spiel still (ambient); ab iOS 16; Datenschutz/Support auf GitHub Pages;
       Kontakt im Store: Büro-Festnetz + kontakt@pripada.de.
+      Antworten 19.10. (Englisch, E-170): Schild „BUNT + VA" auf Englisch
+      „NON-FERROUS + SS"; Hörprobe vor dem Einreichen raus (bleibt bis dahin).
 
 - [ ] **Gerätebefund 18.10.2026, Klangqualität** — Patrick, wörtlich: „Also
       das anschlagen klingt jetzt, nur sind die Geräusche manchmal wenig
