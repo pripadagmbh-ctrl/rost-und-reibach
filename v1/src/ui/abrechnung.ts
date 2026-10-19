@@ -27,8 +27,12 @@ import { platzwache } from "../world/platzinventar";
 import { zufriedenheit, type Shift, type Tagesbilanz } from "../economy/shift";
 import { reinheitsUrteil } from "./hud";
 import type { EventBus, GameEvents } from "../core/events";
-import { erfuellt, type ChallengeMessung, type Schwellen } from "../challenges/challenge";
-import { nochmal, zumMenue } from "./hauptmenue";
+import { erfuellt, type ChallengeWertung } from "../challenges/challenge";
+import { CHALLENGES } from "../challenges/katalog";
+import { sprache, waehle, type Sprache } from "../challenges/texte";
+import { leseChallenges } from "../core/save";
+import { naechsteFreieAufgabe, nochmal, zumMenue } from "./hauptmenue";
+import { MESSGROESSEN, sterneText, uhr as stoppuhr, wort, type Messgroesse } from "./aufgabentexte";
 
 /** Eine Zeile der Abrechnung: links das Wort, rechts die Zahl. */
 export interface Abrechnungszeile {
@@ -53,9 +57,9 @@ function euro(eur: number): string {
  * Die Sternzeile: Zeichen UND Wort (Briefing Kap. 20 — Farbe und Symbol sind
  * nie der einzige Kanal, und drei Sternchen sind auf einem Handy klein).
  */
-export function sterneZeile(sterne: number): string {
-  const wort = ["kein", "ein", "zwei", "drei"][Math.max(0, Math.min(3, sterne))]!;
-  return `${"★".repeat(sterne)}${"☆".repeat(3 - sterne)}  ${wort} von drei Sternen`;
+export function sterneZeile(sterne: number, s: Sprache = "de"): string {
+  // Eine Stelle fuer Feierabend und Aufgaben (E-162: auch Englisch)
+  return sterneText(sterne, s);
 }
 
 /**
@@ -86,44 +90,48 @@ export function abrechnungszeilen(b: Tagesbilanz): Abrechnungszeile[] {
   ];
 }
 
-/** Minuten:Sekunden, wie auf einer Stoppuhr. */
-function uhr(s: number): string {
-  const r = Math.round(s);
-  return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")} min`;
-}
-
 /**
- * Je Messgroesse ein Name und eine Schreibweise (E-125). Die Namen sind die
- * der Fahrkuenste (E-119); `wort` steht nur hinter dem eigenen Wert, nicht
- * hinter der Schwelle — sonst wird die Zeile zu breit fuers iPhone mini.
+ * Je Messgroesse ein Name und eine Schreibweise (E-125, neue Groessen mit
+ * E-162). `wort` steht nur hinter dem eigenen Wert, nicht hinter der
+ * Schwelle — sonst wird die Zeile zu breit fuers iPhone mini.
  */
-const KRITERIEN: Record<keyof ChallengeMessung, { name: string; zahl: (v: number) => string; wort: string }> = {
-  zeitS: { name: "Zeit", zahl: uhr, wort: "" },
-  ruheGrad: { name: "Ruhe", zahl: (v) => `${Math.round(v)}°`, wort: " Pendel" },
-  praezisionCm: { name: "Präzision", zahl: (v) => `${Math.round(v)} cm`, wort: " daneben" },
+const KRITERIEN: Record<
+  Messgroesse,
+  { name: { de: string; en: string }; zahl: (v: number) => string; wort?: { de: string; en: string } }
+> = {
+  zeitS: { name: { de: "Zeit", en: "Time" }, zahl: (v) => `${stoppuhr(v)} min` },
+  fehlwuerfe: { name: { de: "Fehlwürfe", en: "Misses" }, zahl: (v) => String(Math.round(v)) },
+  praezisionCm: {
+    name: { de: "Präzision", en: "Precision" },
+    zahl: (v) => `${Math.round(v)} cm`,
+    wort: { de: " daneben", en: " off" },
+  },
+  harteAufschlaege: { name: { de: "Harte Aufschläge", en: "Hard drops" }, zahl: (v) => String(Math.round(v)) },
+  ueberlasten: { name: { de: "Überlast", en: "Overloads" }, zahl: (v) => String(Math.round(v)) },
+  fremdteile: { name: { de: "Fremdteile", en: "Wrong parts" }, zahl: (v) => String(Math.round(v)) },
 };
 
 /**
- * Die Zahlen einer Challenge als Zeilen — ohne DOM, damit sie prüfbar bleiben.
- * Eine Zeile je Messgroesse, nach der die Challenge wertet; dahinter, was es
+ * Die Zahlen einer Aufgabe als Zeilen — ohne DOM, damit sie prüfbar bleiben.
+ * Eine Zeile je Messgroesse, nach der die Aufgabe wertet; dahinter, was es
  * für drei Sterne braucht. Ob eine Schwelle erfuellt ist, entscheidet
  * `erfuellt` aus `challenges/challenge.ts` — hier wird nichts nachgerechnet.
  * Zeichen UND Farbe (Kap. 20): ✓ reicht für drei Sterne, ✗ nicht einmal für zwei.
  */
-export function challengeZeilen(e: GameEvents["challenge:geschafft"]): Abrechnungszeile[] {
+export function challengeZeilen(e: GameEvents["challenge:geschafft"], s: Sprache = sprache()): Abrechnungszeile[] {
   const { zwei, drei } = e.wertung;
-  const arten = (Object.keys(KRITERIEN) as Array<keyof ChallengeMessung>).filter(
-    (k) => k in zwei || k in drei
-  );
+  const arten = MESSGROESSEN.filter((k) => zwei[k] !== undefined || drei[k] !== undefined);
   return arten.map((k) => {
     const v = e.messung[k];
     const kr = KRITERIEN[k];
-    if (v === null) return { name: kr.name, wert: "✗ nicht gemessen", farbe: "#e08a5a" };
-    const wert = `${kr.zahl(v)}${kr.wort}${drei[k] === undefined ? "" : ` (★★★ bis ${kr.zahl(drei[k]!)})`}`;
-    const nur = (s: Schwellen): Schwellen => ({ [k]: s[k] });
-    if (k in drei && erfuellt(nur(drei), e.messung)) return { name: kr.name, wert: `✓ ${wert}`, farbe: "#7ec96a" };
-    if (k in zwei && !erfuellt(nur(zwei), e.messung)) return { name: kr.name, wert: `✗ ${wert}`, farbe: "#e08a5a" };
-    return { name: kr.name, wert };
+    const name = waehle(kr.name, s);
+    if (v === null || v === undefined) return { name, wert: `✗ ${wort("nichtGemessen", s)}`, farbe: "#e08a5a" };
+    const ziel = drei[k] === undefined ? "" : ` (${wort("dreiBis", s)} ${kr.zahl(drei[k]!)})`;
+    const wert = `${kr.zahl(v)}${kr.wort ? waehle(kr.wort, s) : ""}${ziel}`;
+    const nur = (sw: ChallengeWertung["zwei"]): ChallengeWertung["zwei"] => ({ [k]: sw[k] });
+    if (drei[k] !== undefined && erfuellt(nur(drei), e.messung)) return { name, wert: `✓ ${wert}`, farbe: "#7ec96a" };
+    if (zwei[k] !== undefined && !erfuellt(nur(zwei), e.messung)) return { name, wert: `✗ ${wert}`, farbe: "#e08a5a" };
+    return { name, wert };
   });
 }
 
@@ -158,10 +166,10 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
   let offen = false;
 
   /** Kopf, Sternzeile und Zahlen in die Tafel — fuer Feierabend und Challenge (E-125). */
-  const fuelle = (kopfText: string, sterne: number, zeilen: Abrechnungszeile[]): boolean => {
+  const fuelle = (kopfText: string, sterne: number, zeilen: Abrechnungszeile[], s: Sprache = "de"): boolean => {
     if (!feld || !kopf || !sterneEl || !zahlen) return false;
     kopf.textContent = kopfText;
-    sterneEl.textContent = sterneZeile(sterne);
+    sterneEl.textContent = sterneZeile(sterne, s);
     zahlen.innerHTML = "";
     for (const z of zeilen) {
       const zeile = document.createElement("div");
@@ -191,28 +199,59 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
   };
 
   /*
-   * Das Ende einer Challenge (E-125) — dieselbe Tafel, keine zweite Art
-   * Abschlussbild. WEITER heisst hier NOCHMAL, darunter steht ZUM MENÜ.
-   * Ohne Glocke: Es ist kein Feierabend, nur die Sterntöne.
+   * Das Ende einer Aufgabe (E-125, E-162) — dieselbe Tafel, keine zweite Art
+   * Abschlussbild. WEITER heisst hier NOCHMAL; darunter NÄCHSTE AUFGABE (nur
+   * wenn es eine gibt und sie jetzt frei ist) und ZUM MENÜ. Ohne Glocke: Es
+   * ist kein Feierabend, nur die Sterntöne.
+   *
+   * NOCHMAL laedt seit E-162 nicht mehr selbst neu: Es sendet
+   * `challenge:neustart` und schliesst die Tafel — ob neu geladen oder neu
+   * aufgebaut wird, entscheidet main.ts (wie beim ↻ auf der Karte).
    */
   let challengeId: string | null = null;
   const menue = document.getElementById("abr-menue");
+  const naechste = document.getElementById("abr-naechste");
+  let naechsteId: string | null = null;
   m.bus.on("challenge:geschafft", (e) => {
+    const s = sprache();
     m.audio.playSterne(e.sterne);
     challengeId = e.id;
-    if (!fuelle(`GESCHAFFT · ${e.name}`, e.sterne, challengeZeilen(e))) {
-      m.hud.toast(`Geschafft · ${sterneZeile(e.sterne)}`);
+    // Die Ablage wird vielleicht erst NACH diesem Zuhoerer beschrieben (main.ts) —
+    // das Ergebnis dieses Laufs zaehlt darum schon mit.
+    const stand = leseChallenges();
+    stand[e.id] = { sterne: Math.max(e.sterne, stand[e.id]?.sterne ?? 0) };
+    naechsteId = naechsteFreieAufgabe(
+      e.id,
+      CHALLENGES.map((c) => c.id),
+      stand
+    );
+    if (!fuelle(`${wort("geschafft", s)} · ${waehle(e.name, s)}`, e.sterne, challengeZeilen(e, s), s)) {
+      m.hud.toast(`${wort("geschafft", s)} · ${sterneZeile(e.sterne, s)}`);
       return;
     }
-    if (weiter) weiter.textContent = "NOCHMAL";
-    if (menue) menue.hidden = false;
+    // Die Tafel schreibt hier selbst in der gewählten Sprache
+    feld?.setAttribute("translate", "no");
+    if (weiter) weiter.textContent = wort("nochmal", s);
+    if (naechste) {
+      naechste.textContent = wort("naechste", s);
+      naechste.hidden = naechsteId === null;
+    }
+    if (menue) {
+      menue.textContent = wort("zumMenue", s);
+      menue.hidden = false;
+    }
   });
   menue?.addEventListener("click", zumMenue);
+  naechste?.addEventListener("click", () => {
+    if (naechsteId) nochmal(naechsteId);
+  });
 
   const weiterSpielen = (): void => {
     if (!offen) return;
     if (challengeId) {
-      nochmal(challengeId);
+      offen = false;
+      feld?.classList.remove("open");
+      m.bus.emit("challenge:neustart", {});
       return;
     }
     offen = false;

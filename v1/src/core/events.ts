@@ -1,5 +1,7 @@
 import type { Tagesbilanz } from "../economy/shift";
 import type { ChallengeMessung, ChallengeWertung } from "../challenges/challenge";
+import type { Zweisprachig } from "../challenges/texte";
+import type { ControlFunction } from "./controlConfig";
 
 /**
  * Typisierter Event-Bus (Briefing Kap. 17): Module kommunizieren nur über Events,
@@ -108,7 +110,49 @@ export interface GameEvents {
    * Platzhalter der Bedienung (`{schliessen}` usw.) — welcher Stick das ist,
    * weiss nur die Anzeige, denn die Belegung ist frei waehlbar.
    */
-  "challenge:schritt": { id: string; nr: number; von: number; titel: string; text: string };
+  "challenge:schritt": {
+    id: string;
+    nr: number;
+    von: number;
+    titel: Zweisprachig;
+    text: Zweisprachig;
+    /**
+     * E-162: Welche Bewegung der Geisterdaumen zeigt — die Funktion (nicht der
+     * Stick: welcher Stick das ist, weiss nur die Anzeige aus der Belegung)
+     * und die Richtung im Sinn des Befehls, den der Bagger bekommt ("plus" =
+     * dasselbe Vorzeichen wie Spinne schliessen in `bedientext`). null = kein
+     * Daumen (z. B. ein Schritt, der nur ein Ziel nennt).
+     */
+    zeige: { fn: ControlFunction; richtung: "plus" | "minus" | "beide" } | null;
+  };
+  /**
+   * E-162: Eine Aufgabe beginnt (auch nach ↻). Einmal je Lauf, vor dem ersten
+   * `challenge:schritt`. `nr` ist die Stelle im Katalog (ab 1), `wertung` die
+   * Sternziele — die Karte zeigt sie von Anfang an (Patrick 19.10.2026).
+   */
+  "challenge:start": { id: string; nr: number; name: Zweisprachig; ziel: Zweisprachig; wertung: ChallengeWertung };
+  /**
+   * E-162: Der laufende Stand einer Aufgabe, einmal je Bild ausserhalb der
+   * Pause. Die Karte schreibt nur, was sich geaendert hat.
+   *  - `zaehler`: „4/6 richtig" (`wort` ist das Wort dahinter), null = keiner
+   *  - `balken01`: „platt: 0 … 100 %", null = keiner
+   *  - `pressenBereit`: der Knopf PRESSEN darf auf die Karte (Aufgabe 2)
+   *  - `tipp`: ein Hinweis, der erst nach einem Ereignis erscheint (Aufgabe 6)
+   *  - `marken`: Weltpunkte fuer die Zielmarkierung (Teil, Mulde)
+   */
+  "challenge:stand": {
+    id: string;
+    zeitS: number;
+    zaehler: { ist: number; von: number; wort: Zweisprachig } | null;
+    balken01: number | null;
+    pressenBereit: boolean;
+    tipp: Zweisprachig | null;
+    marken: ReadonlyArray<{ x: number; y: number; z: number; art: "teil" | "ziel" }>;
+  };
+  /** E-162: Knopf PRESSEN auf der Karte — main.ts startet die Presse wie der Kranz. */
+  "challenge:pressen": Record<string, never>;
+  /** E-162: Knopf ↻ auf der Karte oder NOCHMAL — dieselbe Aufgabe von vorn. */
+  "challenge:neustart": Record<string, never>;
   /**
    * Eine Challenge ist geschafft (E-125). Die Sterne sind fertig gerechnet
    * (`challenges/challenge.ts`); das Abschlussbild liest sie nur ab.
@@ -117,7 +161,7 @@ export interface GameEvents {
    */
   "challenge:geschafft": {
     id: string;
-    name: string;
+    name: Zweisprachig;
     sterne: number;
     messung: ChallengeMessung;
     wertung: ChallengeWertung;
@@ -146,6 +190,8 @@ export interface GameEvents {
     x: number;
     y: number;
     z: number;
+    /** E-162: Rapier-Handle des Aufschlagenden (Teil, Wrack, schwerstes gehaltenes Teil), falls bekannt */
+    handle?: number;
   };
   /**
    * Das Wrack knautscht (E-128 baut das Knautschen, E-130 haengt den Ton an).

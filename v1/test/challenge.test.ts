@@ -1,110 +1,129 @@
 /**
- * CHALLENGE 1: EIN AUTO IN DIE PRESSE (E-125, 06.10.2026).
+ * AUFGABE 2: EIN AUTO IN DIE PRESSE (E-125, 06.10.2026; neue Formen E-162).
  *
- * Patrick: „Mit Challenges soll das Spiel anfangen, damit die Steuerung klar
- * wird." Geprueft wird hier:
+ * Geprueft wird hier:
  *
- *  1. die Sterne — eine Stelle, aus gemessenen Werten, mit Gegenproben;
- *  2. die Bildschirmtexte — Bedienelemente aus der Stickbelegung, keine
- *     Tastenbuchstaben;
- *  3. der Ablauf — ein Schritt gilt erst, wenn er gesehen wurde; was schon
+ *  1. die Sterne — eine Stelle, aus gemessenen Werten, mit Gegenproben
+ *     (Konzept 19.10.2026: Zeit, Abstand zur Kammermitte, harte Aufschlaege;
+ *     keine Pendel-Ruhe mehr);
+ *  2. der Ablauf — ein Schritt gilt erst, wenn er gesehen wurde; was schon
  *     richtig ist, wird uebersprungen; gepresst wird erst, wenn das Wrack
- *     losgelassen in der Kammer ist;
- *  4. am ECHTEN Wrack in der ECHTEN Presse, laengs und quer abgelegt: Die
+ *     losgelassen in der Kammer ist; der Knopf PRESSEN erscheint genau dann;
+ *  3. am ECHTEN Wrack in der ECHTEN Presse, laengs und quer abgelegt: Die
  *     Pruefung der Presse sieht es, der Pressenstart schliesst die
- *     Fahrkunst-Messung ab, und der Stempel die Challenge;
- *  5. erster Start und beste Sternzahl im Speicher.
+ *     Fahrkunst-Messung ab, und der Stempel die Aufgabe;
+ *  4. erster Start und beste Sternzahl im Speicher.
+ *
+ * Aufgabe 1 steht in `test/aufgabe1.test.ts`, Aufbau und Neustart in
+ * `test/aufbau.test.ts`. Die Bildschirmtexte (Stickbelegung) und das
+ * Abschlussbild prueft die Anzeige selbst — sie gehoeren zu `ui/`.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { ChallengeLauf, sterne, type ChallengeDaten, type ChallengeQuellen } from "../src/challenges/challenge";
-import { CHALLENGES } from "../src/challenges/katalog";
+import {
+  ChallengeLauf,
+  sterne,
+  type ChallengeDaten,
+  type ChallengeMessung,
+  type ChallengeQuellen,
+} from "../src/challenges/challenge";
+import { CHALLENGES, challengeNach, challengeNr } from "../src/challenges/katalog";
 import { EventBus, type GameEvents } from "../src/core/events";
-import { defaultConfig } from "../src/core/controlConfig";
-import { bedientext } from "../src/ui/challengekarte";
-import { challengeZeilen } from "../src/ui/abrechnung";
 import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
 import { PressManager, PRESS_CENTER } from "../src/world/press";
 import { START_AUTOS } from "../src/world/startplatz";
+import { BAGGER_STAND } from "../src/world/baggerstand";
 import { leseChallenges, merkeChallenge } from "../src/core/save";
 import { Fahrkunst } from "../src/skills/fahrkunst";
 
-const VERLADEN = CHALLENGES[0]!;
+const VERLADEN = CHALLENGES[1]!;
 
 beforeAll(async () => {
   await RAPIER.init();
 });
 
-describe("Die Sterne", () => {
+const M = (m: Partial<ChallengeMessung>): ChallengeMessung => ({
+  zeitS: 60,
+  fehlwuerfe: 0,
+  harteAufschlaege: 0,
+  praezisionCm: 20,
+  ueberlasten: 0,
+  fremdteile: 0,
+  ...m,
+});
+
+describe("Der Katalog", () => {
+  it("Aufgabe 1 vorn, die Presse an zweiter Stelle; Nummern ab 1", () => {
+    expect(CHALLENGES.map((c) => c.id).slice(0, 2)).toEqual(["erster-griff", "verladen"]);
+    expect(challengeNach("verladen")).toBe(VERLADEN);
+    expect(challengeNr("erster-griff")).toBe(1);
+    expect(challengeNr("verladen")).toBe(2);
+    expect(challengeNr("gibt-es-nicht")).toBe(0);
+    expect(new Set(CHALLENGES.map((c) => c.id)).size, "doppelte ID").toBe(CHALLENGES.length);
+  });
+});
+
+describe("Die Sterne der Presse", () => {
   const w = VERLADEN.wertung;
-  it("einer fuer geschafft, zwei fuer sauber, drei fuer sauber und zuegig", () => {
-    expect(sterne(w, { zeitS: 600, ruheGrad: 20, praezisionCm: 200 })).toBe(1);
-    expect(sterne(w, { zeitS: 600, ruheGrad: 8, praezisionCm: 90 })).toBe(2);
-    expect(sterne(w, { zeitS: 100, ruheGrad: 2, praezisionCm: 30 })).toBe(3);
+  it("★ gepresst · ★★ unter 3:00 und 1 m · ★★★ unter 1:30, 40 cm, kein harter Aufschlag", () => {
+    expect(sterne(w, M({ zeitS: 600, praezisionCm: 200 }))).toBe(1);
+    expect(sterne(w, M({ zeitS: 170, praezisionCm: 90 }))).toBe(2);
+    expect(sterne(w, M({ zeitS: 85, praezisionCm: 30 }))).toBe(3);
   });
   it("GEGENPROBE: eine verfehlte Schwelle kostet den Stern", () => {
-    expect(sterne(w, { zeitS: 130, ruheGrad: 2, praezisionCm: 30 }), "zu langsam").toBe(2);
-    expect(sterne(w, { zeitS: 100, ruheGrad: 2, praezisionCm: 101 }), "zu weit daneben").toBe(1);
+    expect(sterne(w, M({ zeitS: 95, praezisionCm: 30 })), "zu langsam fuer drei").toBe(2);
+    expect(sterne(w, M({ zeitS: 85, praezisionCm: 30, harteAufschlaege: 1 })), "ein harter Aufschlag").toBe(2);
+    expect(sterne(w, M({ zeitS: 85, praezisionCm: 101 })), "zu weit daneben").toBe(1);
+    expect(sterne(w, M({ zeitS: 181, praezisionCm: 30 })), "zu langsam fuer zwei").toBe(1);
   });
   it("ungemessen erfuellt keine Schwelle — es wird nichts erfunden", () => {
-    expect(sterne(w, { zeitS: 10, ruheGrad: null, praezisionCm: 10 })).toBe(1);
+    expect(sterne(w, M({ zeitS: 10, praezisionCm: null }))).toBe(1);
+  });
+  it("Pendel-Ruhe ist keine Sternbedingung mehr (Patrick 19.10.2026)", () => {
+    for (const c of CHALLENGES) {
+      expect(Object.keys({ ...c.wertung.zwei, ...c.wertung.drei })).not.toContain("ruheGrad");
+    }
   });
 });
 
-describe("Bildschirmtexte nennen die Bedienelemente, nicht Tasten", () => {
-  it("Werkseinstellung: rechter Stick nach rechts schliesst", () => {
-    const t = VERLADEN.schritte.map((s) => bedientext(s.text, defaultConfig())).join("\n");
-    expect(t).toContain("Rechter Stick nach rechts: Spinne schließen");
-    expect(t).toContain("Rechter Stick nach links: Spinne öffnen");
-    expect(t).toContain("Linker Stick seitlich: Oberwagen drehen");
-    expect(t).toContain("Linker Stick hoch/runter: Hauptarm heben/senken");
-    expect(t).toContain("Rechter Stick hoch/runter: Ausleger heran/weg");
-    expect(t).toContain("SCHERE");
-    expect(t, "ein Platzhalter blieb stehen").not.toMatch(/[{}]/);
-    expect(t, "Tastenbuchstabe im Text").not.toMatch(/\bTaste\b|\b[A-Z]\b(?![a-zäöü])/);
-  });
-  it("umgekehrte oder verlegte Spinne: der Text folgt der Belegung", () => {
-    const c = defaultConfig();
-    c.rightX.invert = true;
-    expect(bedientext("{schliessen}", c)).toBe("Rechter Stick nach links");
-    c.rightX.fn = "none";
-    c.leftY.fn = "grapple";
-    c.leftY.invert = false;
-    expect(bedientext("{schliessen}", c)).toBe("Linker Stick nach unten");
-    c.leftY.fn = "none";
-    expect(bedientext("{oeffnen}", c)).toContain("Steuerung");
-  });
-});
-
-/** Ablauf mit Attrappen: was greift, wo steht das Wrack, schlaeft es. */
+/** Ablauf mit Attrappen: was greift, wo steht das Wrack. */
 function attrappe(): {
   q: ChallengeQuellen;
-  stand: { gegriffen: boolean; ueber: boolean; drin: boolean };
+  stand: { gegriffen: boolean; ueber: boolean; drin: boolean; gueltig: boolean };
+  koerper: { handle: number; translation(): { x: number; y: number; z: number }; isValid(): boolean };
 } {
-  const stand = { gegriffen: false, ueber: false, drin: false };
-  const koerper = { handle: 7, translation: () => ({ x: 0, y: 0, z: 0 }) } as unknown as RAPIER.RigidBody;
+  const stand = { gegriffen: false, ueber: false, drin: false, gueltig: true };
+  const koerper = { handle: 7, translation: () => ({ x: 0, y: 0, z: 0 }), isValid: () => stand.gueltig };
   return {
     stand,
+    koerper,
     q: {
-      wrack: () => koerper,
       gegriffen: () => (stand.gegriffen ? [koerper] : []),
+      spinne: () => ({ x: 0, y: 5, z: 0 }),
+      drehmitte: () => BAGGER_STAND,
+      blickRad: () => 0,
+      behaelter: () => null,
+      ueberBehaelter: () => false,
+      behaelterVon: () => null,
       ueberKammer: () => stand.ueber || stand.drin,
       inKammer: () => stand.drin,
     },
   };
 }
 
-function lauf(q: ChallengeQuellen, daten: ChallengeDaten = VERLADEN) {
+function lauf(a: ReturnType<typeof attrappe>, daten: ChallengeDaten = VERLADEN) {
   const bus = new EventBus();
   const schritte: number[] = [];
+  const bereit: boolean[] = [];
   let ende: GameEvents["challenge:geschafft"] | null = null;
   bus.on("challenge:schritt", (e) => schritte.push(e.nr));
+  bus.on("challenge:stand", (e) => bereit.push(e.pressenBereit));
   bus.on("challenge:geschafft", (e) => (ende = e));
-  const l = new ChallengeLauf(daten, q, bus);
+  const l = new ChallengeLauf(daten, 2, a.q, bus, { teile: [], wracks: [{ body: a.koerper }] });
   l.start();
-  return { l, schritte, ende: () => ende };
+  return { l, bus, schritte, bereit, ende: () => ende as GameEvents["challenge:geschafft"] | null };
 }
 
 const ZYKLUS = {
@@ -119,63 +138,97 @@ const ZYKLUS = {
   z: 0,
 };
 
-describe("Der Ablauf", () => {
-  it("vier Schritte, jeder erst, wenn er gesehen wurde", () => {
-    const { q, stand } = attrappe();
-    const { l, schritte, ende } = lauf(q);
+describe("Der Ablauf an der Presse", () => {
+  it("vier Schritte, jeder erst, wenn er gesehen wurde; PRESSEN erst, wenn es drin liegt", () => {
+    const a = attrappe();
+    const { l, bus, schritte, bereit, ende } = lauf(a);
     l.takt(1);
     expect(schritte).toEqual([1]);
-    stand.gegriffen = true;
+    a.stand.gegriffen = true;
     l.takt(1);
-    stand.ueber = true;
+    a.stand.ueber = true;
     l.takt(1);
     expect(schritte).toEqual([1, 2, 3]);
     // noch in der Spinne ueber der Kammer: nicht abgelegt, Presse gesperrt
-    stand.drin = true;
+    a.stand.drin = true;
     l.takt(1);
     expect(schritte).toEqual([1, 2, 3]);
     expect(l.pressenErlaubt(), "Presse, waehrend das Wrack noch haengt").toBe(false);
-    stand.gegriffen = false;
+    expect(bereit.at(-1), "Knopf PRESSEN, waehrend das Wrack haengt").toBe(false);
+    a.stand.gegriffen = false;
     l.takt(1);
     expect(schritte).toEqual([1, 2, 3, 4]);
-    l.zyklusGemessen(ZYKLUS);
+    expect(bereit.at(-1), "Knopf PRESSEN fehlt").toBe(true);
+    // der Zyklus kommt jetzt ueber den Bus — der Lauf hoert selbst zu
+    bus.emit("fahrkunst:zyklus", ZYKLUS);
     expect(l.pressenErlaubt()).toBe(true);
     l.presseHatGestempelt();
     l.takt(1);
     expect(ende()).not.toBeNull();
-    expect(ende()!.messung).toEqual({ zeitS: 6, ruheGrad: 2, praezisionCm: 25 });
+    expect(ende()!.messung).toEqual({
+      zeitS: 6,
+      fehlwuerfe: 0,
+      harteAufschlaege: 0,
+      praezisionCm: 25,
+      ueberlasten: 0,
+      fremdteile: 0,
+    });
     expect(ende()!.sterne).toBe(3);
+    expect(ende()!.name).toEqual(VERLADEN.name);
   });
 
   it("was schon richtig ist, wird uebersprungen", () => {
-    const { q, stand } = attrappe();
-    const { l, schritte } = lauf(q);
+    const a = attrappe();
+    const { l, schritte } = lauf(a);
     // gleich ueber der Kammer gefasst: Schritt 2 erscheint nie
-    stand.gegriffen = true;
-    stand.ueber = true;
+    a.stand.gegriffen = true;
+    a.stand.ueber = true;
     l.takt(1);
     expect(schritte).toEqual([1, 3]);
   });
 
   it("GEGENPROBE: ein Stempel ohne Freigabe schliesst nichts ab", () => {
-    const { q } = attrappe();
-    const { l, ende } = lauf(q);
+    const a = attrappe();
+    const { l, ende } = lauf(a);
     l.presseHatGestempelt();
     l.takt(1);
     expect(ende()).toBeNull();
   });
 
-  it("ein Zyklus neben der Kammer zaehlt nicht fuer Ruhe und Praezision", () => {
-    const { q, stand } = attrappe();
-    const { l, ende } = lauf(q);
-    l.zyklusGemessen(ZYKLUS); // ueberKammer ist hier noch falsch
-    stand.drin = true;
+  it("ein Zyklus neben der Kammer zaehlt nicht fuer die Praezision", () => {
+    const a = attrappe();
+    const { l, bus, ende } = lauf(a);
+    bus.emit("fahrkunst:zyklus", ZYKLUS); // ueberKammer ist hier noch falsch
+    a.stand.drin = true;
     l.takt(1);
     l.pressenErlaubt();
     l.presseHatGestempelt();
     l.takt(1);
-    expect(ende()!.messung.ruheGrad).toBeNull();
+    expect(ende()!.messung.praezisionCm).toBeNull();
     expect(ende()!.sterne).toBe(1);
+  });
+
+  it("ein harter Aufschlag des Wracks zaehlt, der eines fremden Wracks nicht", () => {
+    const a = attrappe();
+    const { l, bus } = lauf(a);
+    const schlag = (handle: number): void =>
+      bus.emit("schrott:aufprall", { materialId: "mixed", massKg: 900, wucht: 7, blech: true, untergrund: "beton", handle, x: 0, y: 0, z: 0 });
+    schlag(7);
+    schlag(8);
+    expect(l.messung().harteAufschlaege).toBe(1);
+    // Knautschgrad des eigenen Wracks wird mitgeschrieben (Aufgabe 4)
+    bus.emit("wrack:geknautscht", { handle: 7, grad: 0.4, zuwachs: 0.2, x: 0, y: 0, z: 0 });
+    bus.emit("wrack:geknautscht", { handle: 8, grad: 0.9, zuwachs: 0.2, x: 0, y: 0, z: 0 });
+    expect(l.knautschgrad).toBe(0.4);
+  });
+
+  it("ein entsorgtes Wrack (Koerper ungueltig) wird nicht mehr gelesen", () => {
+    const a = attrappe();
+    const { l, schritte } = lauf(a);
+    a.stand.gueltig = false;
+    a.stand.gegriffen = true;
+    expect(() => l.takt(1)).not.toThrow();
+    expect(schritte).toEqual([1]);
   });
 });
 
@@ -199,8 +252,9 @@ describe("Am echten Wrack in der echten Presse", () => {
   }
 
   it("der Startplatz ist der des zweiten Startautos, das Ziel die Kammermitte", () => {
-    expect(VERLADEN.aufbau.wracks).toEqual([START_AUTOS[1]]);
+    expect(VERLADEN.aufbau.wracks).toEqual([{ art: "pkw", ...START_AUTOS[1] }]);
     expect(VERLADEN.ablageziel).toEqual({ x: PRESS_CENTER.x, z: PRESS_CENTER.z });
+    expect(VERLADEN.zielBehaelter, "ein Zielbehaelter verlegte die Praezision weg von der Kammer").toBeUndefined();
   });
 
   it("ueberKammer ist inChamber ohne Hoehe — eine Pruefung, nicht zwei", () => {
@@ -217,7 +271,7 @@ describe("Am echten Wrack in der echten Presse", () => {
    * Laengs (Gier 90 Grad) faellt es auf den Kammerboden und schlaeft ein; quer
    * (0 Grad) bleibt es auf Wandkrone und offener Klappe liegen und schlaeft
    * NIE ein (gemessen 06.10.2026, `tools/challenge-ruhe.ts`). Beide Faelle
-   * muessen die Challenge abschliessen, und beide muessen gemessen werden.
+   * muessen die Aufgabe abschliessen, und beide muessen gemessen werden.
    */
   for (const [lage, gier] of [
     ["laengs", 90],
@@ -241,15 +295,23 @@ describe("Am echten Wrack in der echten Presse", () => {
       fk.ziel = VERLADEN.ablageziel;
       const l = new ChallengeLauf(
         VERLADEN,
+        2,
         {
-          wrack: () => (car.body.isValid() ? car.body : null),
           gegriffen: () => (haengt ? [car.body] : []),
+          spinne: () => ({ x: 0, y: 5, z: 0 }),
+          drehmitte: () => BAGGER_STAND,
+          blickRad: () => 0,
+          behaelter: () => null,
+          ueberBehaelter: () => false,
+          behaelterVon: () => null,
           ueberKammer: (p) => press.ueberKammer(p),
           inKammer: (p) => press.inChamber(p),
         },
-        bus
+        bus,
+        { teile: [], wracks: [car] }
       );
-      fk.onZyklus = (e) => l.zyklusGemessen(e);
+      // wie main.ts: die Fahrkunst meldet ueber den Bus, der Lauf hoert zu
+      fk.onZyklus = (e) => bus.emit("fahrkunst:zyklus", e);
       l.start();
       // Ein Schritt vorweg: Erst danach kennt Rapier die Masse des Wracks
       takt();
@@ -268,6 +330,7 @@ describe("Am echten Wrack in der echten Presse", () => {
         l.takt(1 / 60);
       }
       expect(l.pressenErlaubt(), "die Presse sieht das Wrack nicht in der Kammer").toBe(true);
+      expect(l.pressenBereit, "der Knopf PRESSEN fehlt").toBe(true);
       // Bis E-138 blieb das Wrack quer auf der Wandkrone liegen und der Zyklus
       // offen — der Befund, der `jetztLiegtSie` noetig machte. In der
       // groesseren Kammer (4,45 x 5,05 m) faellt es auch quer hinein; ob der
@@ -282,32 +345,17 @@ describe("Am echten Wrack in der echten Presse", () => {
       }
       expect(ende, "die Presse hat nie gestempelt").not.toBeNull();
       expect(car.crushStage, "das Wrack wurde nicht gepresst").toBeGreaterThan(0);
-      expect(ende!.messung.ruheGrad, "Ruhe nicht gemessen").not.toBeNull();
+      const m = (ende as unknown as GameEvents["challenge:geschafft"]).messung;
+      expect(m.praezisionCm, "Praezision nicht gemessen").not.toBeNull();
       // gemessen wird, wo es lag — 30 cm neben der Mitte abgelegt.
       // Quer (Laenge im Pressweg) ist das Wrack laenger als der Raum vor dem
       // geparkten Stempel (4,45 − 0,56 = 3,89 m < 4,00 m, E-138): Es kippt mit
       // einem Ende auf den Stempel und rutscht — gemessen 0,76 m. Laengs liegt
       // es flach, und dort gilt die alte Schranke.
-      expect(ende!.messung.praezisionCm!).toBeLessThan(lage === "laengs" ? 45 : 90);
+      expect(m.praezisionCm!).toBeLessThan(lage === "laengs" ? 45 : 90);
       expect(world.bodies.len()).toBeGreaterThan(0);
     });
   }
-});
-
-describe("Abschlussbild", () => {
-  it("eine Zeile je Messgroesse, mit Zeichen und dem Weg zu drei Sternen", () => {
-    const z = challengeZeilen({
-      id: "verladen",
-      name: VERLADEN.name,
-      sterne: 2,
-      messung: { zeitS: 154, ruheGrad: 2.4, praezisionCm: 140 },
-      wertung: VERLADEN.wertung,
-    });
-    expect(z.map((x) => x.name)).toEqual(["Zeit", "Ruhe", "Präzision"]);
-    expect(z[0]!.wert).toBe("2:34 min (★★★ bis 2:00 min)");
-    expect(z[1]!.wert).toMatch(/^✓ 2° Pendel/);
-    expect(z[2]!.wert).toMatch(/^✗ 140 cm daneben/);
-  });
 });
 
 describe("Erster Start und Sterne im Speicher", () => {

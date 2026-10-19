@@ -1953,7 +1953,8 @@ class ContainerLabel {
       ctx.fillText(lines[0], 128, 42);
       ctx.font = "24px Consolas, monospace";
       ctx.fillText(lines[1], 128, 76);
-      ctx.fillText(lines[2], 128, 108);
+      // Im Simulator gibt es keine Preiszeile (mitPreis=false): nur zeichnen, was da ist (qa-Befund 19.10.2026, „undefined" auf dem Schild)
+      if (lines[2]) ctx.fillText(lines[2], 128, 108);
     }
     this.sprite.scale.set(2.3, kurz ? 0.47 : 1.15, 1);
     this.sprite.center.set(0.5, kurz ? 0.79 : 0.5);
@@ -2029,7 +2030,9 @@ export class ContainerManager {
       this.nachtschicht(itemManager);
     }
     const changes: Array<{ item: ScrapItem; from: string | null; to: string | null }> = [];
+    let gezaehlt = 0;
     for (const item of itemManager.items) {
+      if (item.containerId) gezaehlt++;
       let to: string | null = null;
       if (!grippedBodies.has(item.body.handle)) {
         const p = item.body.translation();
@@ -2045,7 +2048,25 @@ export class ContainerManager {
         item.containerId = to;
       }
     }
-    if (changes.length === 0) return;
+    /*
+     * E-162: Ein gezaehltes Teil, das es nicht mehr gibt, wechselt keine Zone
+     * und stand deshalb nie in `changes` — beim Neustart einer Aufgabe ohne
+     * Neuladen (`challenges/aufbau.ts`, `raeumeAuf`) blieb die Box voll
+     * angeschrieben. Stimmt die Zahl der gezaehlten Teile nicht mehr mit den
+     * vorhandenen ueberein, wird neu gezaehlt, und das verschwundene meldet
+     * `itemLeft`. (`gezaehlt` ist der Stand vor diesem Durchgang, genau wie
+     * die `itemIds`.)
+     */
+    let vorher = 0;
+    for (const c of this.containers) vorher += c.itemIds.size;
+    const verschwunden: Array<{ itemId: string; containerId: string }> = [];
+    if (vorher !== gezaehlt) {
+      const da = new Set(itemManager.items.map((i) => i.id));
+      for (const c of this.containers) {
+        for (const id of c.itemIds) if (!da.has(id)) verschwunden.push({ itemId: id, containerId: c.cfg.id });
+      }
+    }
+    if (changes.length === 0 && verschwunden.length === 0) return;
 
     for (const c of this.containers) {
       c.itemIds.clear();
@@ -2066,6 +2087,7 @@ export class ContainerManager {
       c.wiegeLadung();
     }
 
+    for (const v of verschwunden) this.bus.emit("itemLeft", v);
     for (const { item, from, to } of changes) {
       if (from) this.bus.emit("itemLeft", { itemId: item.id, containerId: from });
       if (to) {

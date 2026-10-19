@@ -41,7 +41,7 @@ export const BETRIEB = (SPIELART as Spielart) === "betrieb";
  * startet direkt im Sandkasten. Rahmen, Katalog, Karte, Wertung und ihre
  * Wächter bleiben (E-125); auf `false` gestellt ist alles wieder da.
  */
-export const CHALLENGES_PAUSIERT = true;
+export const CHALLENGES_PAUSIERT = false; // E-162: aufgehoben, Aufgabe 1 traegt (Patrick 19.10.2026: Aufgaben + Sandkasten fuer 1.0)
 
 /**
  * Was auf der Seite (`index.html`) nur zu EINER Spielart gehört — `main.ts`

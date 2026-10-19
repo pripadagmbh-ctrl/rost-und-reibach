@@ -1,24 +1,26 @@
 /**
- * Waechter fuer die Pause der Challenges (E-129).
+ * Waechter fuer den Schalter der Aufgaben (E-129 pausiert, E-162 wieder an).
  *
- * Patrick am Geraet, 16.10.2026: "Und die Challenges sind noch nicht
- * ausgereift, pausieren". Pausiert heisst: Das Spiel startet direkt im
- * Sandkasten, ohne Menue und ohne Challenge — und zwar auch dann, wenn die
- * Ablage leer ist (erster Start) oder die Adresse eine Challenge verlangt
- * (NOCHMAL aus E-125). Geloescht ist nichts: Die Wächter in challenge.test.ts
- * pruefen Rahmen, Katalog und Wertung weiter.
+ * Patrick, 19.10.2026: Version 1.0 = Aufgaben + Sandkasten, und „erster Start
+ * direkt in Aufgabe 1 (ohne Menü, danach Menü)". Der Schalter steht darum
+ * wieder auf `false`, und ein Geraet ohne Ablage landet in `CHALLENGES[0]`.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { CHALLENGES_PAUSIERT } from "../src/core/spielart";
 import { waehleSpielart } from "../src/ui/hauptmenue";
+import { CHALLENGES } from "../src/challenges/katalog";
 
-describe("Challenges pausiert", () => {
-  it("der Schalter steht auf Pause", () => {
-    expect(CHALLENGES_PAUSIERT).toBe(true);
+afterEach(() => vi.unstubAllGlobals());
+
+describe("Aufgaben sind an (E-162)", () => {
+  it("der Schalter steht nicht mehr auf Pause", () => {
+    expect(CHALLENGES_PAUSIERT).toBe(false);
   });
 
-  it("das Spiel startet direkt im Sandkasten, ohne Menue und ohne Challenge", async () => {
-    // Kein document, keine Ablage, keine Adresse: Wer pausiert, fragt nichts davon.
-    await expect(waehleSpielart()).resolves.toEqual({ art: "sandkasten" });
+  it("erster Start (leere Ablage, keine Adresse) geht ohne Menue direkt in Aufgabe 1", async () => {
+    vi.stubGlobal("location", { hash: "", pathname: "/", search: "" });
+    vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined, removeItem: () => undefined });
+    await expect(waehleSpielart()).resolves.toEqual({ art: "challenge", id: CHALLENGES[0]!.id });
+    expect(CHALLENGES[0]!.id).toBe("erster-griff");
   });
 });

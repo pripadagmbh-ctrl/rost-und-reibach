@@ -1,30 +1,57 @@
 /**
- * DAS HAUPTMENÜ (E-118) — zwei Spielarten: SANDKASTEN und CHALLENGES.
+ * DAS HAUPTMENÜ (E-118) — zwei Spielarten: SANDKASTEN und AUFGABEN.
  *
  * Es steht VOR dem Aufbau der Welt: `main.ts` wartet auf die Wahl und baut
- * erst dann den Platz. So bekommt eine Challenge ihren eigenen Platz, ohne
+ * erst dann den Platz. So bekommt eine Aufgabe ihren eigenen Platz, ohne
  * dass ein schon gebauter Platz wieder abgeräumt werden muss.
  *
- * Seit E-125 (06.10.2026) stehen die Challenges als Knöpfe in
+ * Seit E-125 (06.10.2026) stehen die Aufgaben als Knöpfe in
  * `#hm-challenges`, mit der besten Sternzahl. Und das Menü kommt beim
  * ALLERERSTEN Start gar nicht erst: Patrick, „Mit Challenges soll das Spiel
- * anfangen, damit die Steuerung klar wird." Wer noch nie eine Challenge
+ * anfangen, damit die Steuerung klar wird." Wer noch nie eine Aufgabe
  * begonnen hat (`leseChallenges()` in `core/save.ts` ist leer), landet direkt
  * in der ersten.
+ *
+ * Seit E-162 (Patrick 19.10.2026, Frage 1 A) werden sie NACHEINANDER
+ * freigeschaltet: Aufgabe n+1 ist offen, sobald Aufgabe n mindestens einen
+ * Stern hat. Der Sandkasten ist immer offen. Gesperrte Knöpfe sind
+ * `disabled`, tragen ein Schloss UND sagen, was fehlt (Kap. 20: nie nur Farbe).
+ * Alle Texte zweisprachig (`ui/aufgabentexte.ts`).
  */
 import { CHALLENGES } from "../challenges/katalog";
-import { leseChallenges } from "../core/save";
+import { sprache, waehle } from "../challenges/texte";
+import { leseChallenges, type ChallengeStand } from "../core/save";
 import { CHALLENGES_PAUSIERT } from "../core/spielart";
-import { sterneZeile } from "./abrechnung";
+import { sterneText, wort } from "./aufgabentexte";
 import { FIRMA } from "../world/werbung";
 
 export type Spielwahl = { art: "sandkasten" } | { art: "challenge"; id: string };
 
+/**
+ * Ist die Aufgabe an Stelle `i` (ab 0) offen? Die erste immer, jede weitere,
+ * sobald die vorige mindestens einen Stern hat. Rein, damit pruefbar.
+ */
+export function aufgabeFrei(i: number, ids: readonly string[], stand: ChallengeStand): boolean {
+  if (i <= 0) return i === 0 && ids.length > 0;
+  if (i >= ids.length) return false;
+  return (stand[ids[i - 1]!]?.sterne ?? 0) >= 1;
+}
+
+/** Die Aufgabe nach `id`, falls es eine gibt und sie bei diesem Stand offen ist — sonst null. */
+export function naechsteFreieAufgabe(id: string, ids: readonly string[], stand: ChallengeStand): string | null {
+  const i = ids.indexOf(id);
+  if (i < 0 || i + 1 >= ids.length) return null;
+  return aufgabeFrei(i + 1, ids, stand) ? ids[i + 1]! : null;
+}
+
 /*
- * NOCHMAL nach einer Challenge: Die Welt wird beim Start gebaut und nie
+ * NOCHMAL nach einer Aufgabe: Die Welt wird beim Start gebaut und nie
  * abgeräumt, also heißt nochmal „neu laden, und zwar direkt in dieselbe
- * Challenge". Das sagt die Adresse (`#challenge=verladen`) — keine Ablage,
+ * Aufgabe". Das sagt die Adresse (`#challenge=verladen`) — keine Ablage,
  * nur ein Wegweiser für den nächsten Start, der beim Lesen gelöscht wird.
+ * Seit E-162 ruft NOCHMAL das nicht mehr selbst (es sendet
+ * `challenge:neustart`, main.ts entscheidet); `nochmal(id)` bleibt der
+ * Rückfall und der Weg zur NÄCHSTEN AUFGABE.
  */
 const ADRESSE = /^#challenge=([\w-]+)$/;
 
@@ -45,33 +72,50 @@ export function zumMenue(): void {
   location.reload();
 }
 
-/** Menü zeigen und auf die Wahl warten — oder gleich in eine Challenge. */
+/** Knopf mit Kopfzeile und Kleingedrucktem — Texte als Textknoten, nie als HTML. */
+function beschrifte(b: HTMLElement, kopf: string, klein: string): void {
+  const small = document.createElement("small");
+  small.textContent = klein;
+  b.replaceChildren(document.createTextNode(kopf), small);
+}
+
+/** Menü zeigen und auf die Wahl warten — oder gleich in eine Aufgabe. */
 export function waehleSpielart(): Promise<Spielwahl> {
-  // Pausiert (E-129): kein Menue, keine Challenge — direkt in den Sandkasten.
+  // Pausiert (E-129): kein Menue, keine Aufgabe — direkt in den Sandkasten.
   if (CHALLENGES_PAUSIERT) return Promise.resolve({ art: "sandkasten" });
   const stand = leseChallenges();
   const direkt = challengeAusAdresse() ?? (Object.keys(stand).length === 0 ? CHALLENGES[0]!.id : null);
   if (direkt) return Promise.resolve({ art: "challenge", id: direkt });
 
+  const s = sprache();
+  const ids = CHALLENGES.map((c) => c.id);
   const el = document.getElementById("hauptmenue")!;
   // Der Name kommt von der einen Stelle, die auch die Tafel am Tor liest (E-131)
   el.querySelector("h1")!.textContent = FIRMA;
   const liste = document.getElementById("hm-challenges")!;
+  const sandkasten = document.getElementById("hm-sandkasten")!;
+  // Diese Knöpfe beschriftet das Menü selbst in der gewählten Sprache —
+  // die Seitenübersetzung (`ui/sprache.ts`) lässt sie darum aus.
+  for (const k of [sandkasten, liste]) k.setAttribute("translate", "no");
+  beschrifte(sandkasten, wort("sandkasten", s), wort("sandkastenText", s));
   el.classList.add("open");
   return new Promise((fertig) => {
-    const waehle = (w: Spielwahl): void => {
+    const waehle_ = (w: Spielwahl): void => {
       el.classList.remove("open");
       fertig(w);
     };
-    document.getElementById("hm-sandkasten")!.addEventListener("click", () => waehle({ art: "sandkasten" }), {
-      once: true,
-    });
+    sandkasten.addEventListener("click", () => waehle_({ art: "sandkasten" }), { once: true });
     CHALLENGES.forEach((c, i) => {
       const b = document.createElement("button");
-      const s = stand[c.id]?.sterne ?? 0;
-      b.innerHTML = `CHALLENGE ${i + 1} · ${c.name}<small></small>`;
-      b.querySelector("small")!.textContent = `${c.beschreibung} ${s > 0 ? sterneZeile(s) : "Noch nicht geschafft."}`;
-      b.addEventListener("click", () => waehle({ art: "challenge", id: c.id }), { once: true });
+      const sterne = stand[c.id]?.sterne ?? 0;
+      const frei = aufgabeFrei(i, ids, stand);
+      const kopf = `${frei ? "" : "🔒 "}${wort("aufgabe", s)} ${i + 1} · ${waehle(c.name, s)}`;
+      const klein = frei
+        ? `${waehle(c.beschreibung, s)} ${sterne > 0 ? sterneText(sterne, s) : wort("nochNicht", s)}`
+        : `🔒 ${wort("gesperrt", s).replace("{n}", String(i))}`;
+      beschrifte(b, kopf, klein);
+      b.disabled = !frei;
+      if (frei) b.addEventListener("click", () => waehle_({ art: "challenge", id: c.id }), { once: true });
       liste.appendChild(b);
     });
   });

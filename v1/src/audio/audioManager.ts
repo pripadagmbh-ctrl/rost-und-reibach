@@ -1018,6 +1018,18 @@ export class AudioManager {
   playCorrect(): void {}
 
   /**
+   * E-162: Ein Aufgabenschritt ist geschafft („Jeder Schritt klickt", Konzept
+   * Aufgabe 1). Dieselbe Klick-Aufnahme wie `playTick` (E-153: nur echte
+   * Aufnahmen), aber ZWEIMAL kurz hintereinander und lauter — so hoert man
+   * blind den Unterschied zwischen „angetippt" (ein leiser Klick) und
+   * „geschafft" (Klack-Klack). Dezent, kein Jingle (Regel 8).
+   */
+  playSchritt(): void {
+    this.spiele(EINZEL_KLICK, 0.32, { tp: 5000, bagger: true }); // SW
+    this.spiele(EINZEL_KLICK, 0.32, { delay: 0.09, tp: 5000, bagger: true }); // SW: 90 ms Abstand
+  }
+
+  /**
    * Rastklick des Funktionsrädchens und jedes Antippens: ein trockenes
    * Kunststoff-Klacken (E-139: Aufnahme statt zwei Pieptönen). Bewusst leise.
    */

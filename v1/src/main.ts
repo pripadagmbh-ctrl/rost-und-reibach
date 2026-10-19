@@ -63,10 +63,15 @@ import { setBaggerOrt, ANSTEH_START_ANZAHL } from "./delivery/routes";
 import { clearSave, merkeChallenge, readSave, speichereGreifer, storeSave, type SaveData } from "./core/save";
 import { Zwischenbild } from "./core/zwischenbild";
 import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SANDKASTEN, NUR_IM_SIMULATOR } from "./core/spielart";
-import { waehleSpielart, type Spielwahl } from "./ui/hauptmenue";
-import { challengeNach } from "./challenges/katalog";
-import { ChallengeLauf } from "./challenges/challenge";
+import { nochmal, waehleSpielart, type Spielwahl } from "./ui/hauptmenue";
+import { challengeNach, challengeNr } from "./challenges/katalog";
+import { ChallengeLauf, type ChallengeDaten } from "./challenges/challenge";
+import { baueAufgabe, grundbestandVon, raeumeAuf, type Grundbestand } from "./challenges/aufbau";
+import { weltQuellen } from "./challenges/quellen";
 import { installChallengeKarte } from "./ui/challengekarte";
+import { installGeisterdaumen } from "./ui/geisterdaumen";
+import { installZielmarke } from "./ui/zielmarke";
+import { onSprache } from "./ui/sprache";
 import { Fahrkunst } from "./skills/fahrkunst";
 import { NACHSCHUB_FOLGE, nachschubMeldung, profilFuer } from "./delivery/nachschub";
 
@@ -223,8 +228,7 @@ async function main(): Promise<void> {
      * Streuschrott, keine Startautos. Nur, was die Challenge aufbaut.
      */
     fence = new FenceManager(scene, physics.world, items, bus);
-    for (const w of challengeDaten.aufbau.wracks) composites.spawnCar(new THREE.Vector3(w.x, 0.5, w.z));
-    items.settle(physics.world);
+    // E-162: Teile und Wracks legt `starteAufgabe` hin (unten, nach dem Bagger) — auch nach ↻
   } else {
     fence = new FenceManager(scene, physics.world, items, bus);
     /*
@@ -394,29 +398,58 @@ async function main(): Promise<void> {
    * selbst), und die Fahrkunst-Zyklen fuer Ruhe und Praezision. Karte und
    * Abschlussbild haengen am Bus.
    */
+  /*
+   * --- E-162: AUFGABEN (Orchestrator-Verdrahtung) ---
+   * `starteAufgabe` raeumt den Platz auf den Grundbestand zurueck (alles, was
+   * vor der ersten Aufgabe da war), legt Teile/Wracks hin und startet einen
+   * neuen Lauf; der alte wird stumm (`beenden`). Das ist ↻ OHNE Neuladen.
+   * Der Bagger wird dabei NICHT zurueckgesetzt (Regel 2: kein Eingriff in
+   * Arm/Pendel) — darum Rueckfall auf Neuladen, wenn er weggefahren ist oder
+   * die Presse gerade arbeitet.
+   */
   let challenge: ChallengeLauf | null = null;
   if (challengeDaten) {
-    const wrack = composites.cars[0] ?? null;
-    const lauf = new ChallengeLauf(
-      challengeDaten,
-      {
-        wrack: () => (wrack?.body.isValid() ? wrack.body : null),
-        gegriffen: () => grip.grippedBodies,
-        ueberKammer: (p) => press.ueberKammer(p),
-        inKammer: (p) => press.inChamber(p),
-      },
-      bus
-    );
-    challenge = lauf;
-    // Die beiden Stellschrauben, die E-119 fuer die Challenge vorgesehen hat
-    fahrkunst.ziel = challengeDaten.ablageziel;
-    fahrkunst.neuBeginnen();
-    bus.on("fahrkunst:zyklus", (e) => lauf.zyklusGemessen(e));
+    let grundbestand: Grundbestand | null = null;
+    const startOrt = excavator.position.clone();
+    const starteAufgabe = (d: ChallengeDaten): void => {
+      challenge?.beenden();
+      grip.releaseAll();
+      if (grundbestand) raeumeAuf(grundbestand, { items, composites });
+      grundbestand ??= grundbestandVon({ items, composites });
+      const objekte = baueAufgabe(d, { items, composites });
+      items.settle(physics.world);
+      if (d.aufbau.greifer) setzeGreifer(excavator, grip, formZu(d.aufbau.greifer));
+      // Die beiden Stellschrauben, die E-119 fuer die Challenge vorgesehen hat
+      fahrkunst.ziel = d.ablageziel;
+      fahrkunst.neuBeginnen();
+      challenge = new ChallengeLauf(
+        d,
+        challengeNr(d.id),
+        weltQuellen({ bagger: excavator, grip, containers, items, press }),
+        bus,
+        objekte
+      );
+      challenge.start();
+    };
+    // SW: 1,0 m — weiter weggefahren, und die Aufgabe staende nicht mehr vor dem Bagger
+    const NEUSTART_FAHRWEG_M = 1.0;
+    bus.on("challenge:neustart", () => {
+      if (press.running || excavator.position.distanceTo(startOrt) > NEUSTART_FAHRWEG_M) nochmal(challengeDaten.id);
+      else starteAufgabe(challengeDaten);
+    });
+    bus.on("challenge:pressen", () => {
+      if (!challenge?.pressenErlaubt()) return;
+      if (!press.start()) hud.toast(press.sperrgrund ?? "Presse läuft bereits …");
+    });
     bus.on("challenge:geschafft", (e) => merkeChallenge(e.id, e.sterne));
     // Begonnen ist begonnen: Der naechste Start zeigt das Menue
     merkeChallenge(challengeDaten.id, 0);
-    installChallengeKarte({ bus, steuerung: () => touch.config, audio });
+    const karte = installChallengeKarte({ bus, steuerung: () => touch.config, audio });
+    onSprache(() => karte.neuBeschriften());
+    installGeisterdaumen({ bus, steuerung: () => touch.config });
+    installZielmarke(scene, bus);
     vehicles.acceptDeliveries = false;
+    starteAufgabe(challengeDaten);
   }
 
   // --- Pausenmenü ---
@@ -712,6 +745,7 @@ async function main(): Promise<void> {
       spaene: item.shape?.spaene !== undefined,
       // ponytail: "auf Schrott" nach Hoehe der Teilmitte (ueber 0,7 m); Strahl nach unten, falls es falsch klingt
       untergrund: stahlGrund(p.x, p.y, p.z) ? "stahl" : p.y > 0.7 ? "schrott" : "beton",
+      handle: item.body.handle, // E-162: Aufgaben zaehlen harte Aufschlaege ihrer Teile
       x: p.x,
       y: p.y,
       z: p.z,
@@ -726,6 +760,7 @@ async function main(): Promise<void> {
       wucht,
       blech: true,
       untergrund: wrackUntergrund(car, stahlGrund),
+      handle: car.body.handle, // E-162
       x: p.x,
       y: p.y,
       z: p.z,
@@ -748,6 +783,7 @@ async function main(): Promise<void> {
       wucht: lastAufschlagWucht(tempo),
       blech: items.isCrushable(it),
       untergrund: aufSchrott ? "schrott" : stahlGrund(p.x, p.y, p.z) ? "stahl" : "beton",
+      handle: it.body.handle, // E-162
       x: p.x,
       y: p.y,
       z: p.z,
@@ -784,6 +820,7 @@ async function main(): Promise<void> {
       wucht: lastAufschlagWucht(e.tempoMs),
       blech: it ? items.isCrushable(it) : true,
       untergrund: untergrund === "wrack" ? "schrott" : untergrund,
+      handle: it?.body.handle ?? grip.grippedBodies[0]?.handle, // E-162: gehaltenes Wrack hat kein Item
       x: e.x,
       y: e.y,
       z: e.z,
@@ -1924,7 +1961,6 @@ async function main(): Promise<void> {
     input.endFrame();
     requestAnimationFrame(frame);
   }
-  challenge?.start();
   if (!BETRIEB && !challenge) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
   requestAnimationFrame(frame);
 }
