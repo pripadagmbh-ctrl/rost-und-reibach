@@ -15,7 +15,8 @@
  */
 export const EN: Record<string, string> = {
   // --- Seite: Titel, Laden, Hauptmenü ---
-  // Seitentitel „Rost & Reibach" (E-173) bleibt auf Englisch derselbe — kein Eintrag
+  // Seitentitel (E-173): der Spielname bleibt auf Englisch derselbe
+  "Rost & Reibach": "Rost & Reibach",
   "Lade Physik …": "Loading physics …",
   "Fehler beim Start — Konsole prüfen.": "Start-up error — check the console.",
   "Bagger-Simulator": "Material handler simulator",

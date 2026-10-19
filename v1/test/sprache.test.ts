@@ -126,7 +126,7 @@ describe("Wächter: kein deutscher Text auf der Seite, wenn Englisch an ist", ()
   });
   it("title, aria-label und der Seitentitel", () => {
     const attr = [...body.matchAll(/\s(?:title|aria-label|placeholder)="([^"]+)"/g)].map((m) => entity(m[1]));
-    const titel = /<title>([^<]+)<\/title>/.exec(seite)![1];
+    const titel = entity(/<title>([^<]+)<\/title>/.exec(seite)![1]); // „Rost &amp; Reibach" (E-173)
     mussUebersetztSein([...attr, titel], "Attribute");
   });
   it("Pausenknöpfe bleiben auch auf Englisch unter 30 Zeichen (iPhone mini, zweispaltig)", () => {
