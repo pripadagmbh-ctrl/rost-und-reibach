@@ -578,6 +578,13 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       „nur Sichtbares" (Zeit, Fehlwürfe, Abstand). Neustart: Empfehlung A
       (Knopf startet neu) als Vorgabe. → Bau E-162 ff.
 
+      Store-Antworten 19.10.: Geschäftsführer „ja"; Preis 4,99 €; Name
+      „Pripada Schrottplatz" (Untertitel Umschlagbagger-Simulator, EN Pripada
+      Scrapyard / Material handler simulator, unter dem Icon „Schrottplatz");
+      Englisch zum Start „ja, wenn bis 09.11. übersetzt"; Stummschalter →
+      Spiel still (ambient); ab iOS 16; Datenschutz/Support auf GitHub Pages;
+      Kontakt im Store: Büro-Festnetz + kontakt@pripada.de.
+
 - [ ] **Gerätebefund 18.10.2026, Klangqualität** — Patrick, wörtlich: „Also
       das anschlagen klingt jetzt, nur sind die Geräusche manchmal wenig
       realistisch. es klingt anders, wenn man gegen beton schlägt vs metal auf
