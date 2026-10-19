@@ -23,8 +23,27 @@ export interface PartDef {
   anchor: [number, number, number];
   /** Box-Maße der losgelösten Part [w,h,d] bzw. Rad [radius, breite] */
   size: number[];
-  kind: "box" | "wheel";
+  /**
+   * `box` ein Kasten (mit `stuecke` mehrere), `wheel` ein Rad — immer mit
+   * Felge (E-185) —, `haube` ein Deckel, der aus der Haut der Fassung
+   * geschnitten wird (`WrackformDef.haube`). Gibt es an einer Fassung keine
+   * Haube (A, B, Bestand), fällt das Teil weg.
+   */
+  kind: "box" | "wheel" | "haube";
   color: number;
+  /**
+   * DIE SPERRE (E-185, Zerstörungskonzept B1): Dieses Teil lässt sich erst
+   * greifen oder abbeißen, wenn ALLE hier genannten Teile ab sind. Ein Teil,
+   * das es an diesem Wrack nicht gibt, zählt als ab. Gefragt wird nur in
+   * `findPartNear` — die eine Stelle, über die Greifen und Biss gehen.
+   */
+  sperre?: string[];
+  /**
+   * Weitere Kästen für das Bild, Mitte RELATIV zum Anker, Maße in m — das
+   * Getriebe am Motor, die Pole der Batterie. Sie gehen mit dem Teil ab; der
+   * lose Kollider ist der Quader um alles.
+   */
+  stuecke?: { size: [number, number, number]; at: [number, number, number]; farbe: number }[];
 }
 
 /**
@@ -132,9 +151,31 @@ export interface CarDef {
   ladeRueckwaerts?: boolean;
 }
 
+/**
+ * Die Felge eines Rades (E-185, Patrick 20.10.2026: „Reifen haben immer
+ * felge"): Stahlfelge, silbern lackiert. // SW: Farbe am Bild abzustimmen
+ */
+export const FELGE_FARBE = 0xa9adb2;
+
+/**
+ * Was ein Rad ist (E-185): Reifen mit Stahlfelge, immer zusammen. Anteile
+ * Reifen 70 % / Felge 30 % (Zerstörungskonzept 20.10.2026, Ansage 12.09.).
+ * Nach der einen Regel (`purity.fraktionVonTeil`, 95 % für sortenrein) ist
+ * ein solches Rad MISCHSCHROTT — wie die losen Räder im Katalog (E-173).
+ */
+export const RAD_ZUSAMMENSETZUNG = [
+  { materialId: "tires", anteil: 0.7 },
+  { materialId: "steel", anteil: 0.3 },
+];
+
 export const CAR_DEF: CarDef = {
   totalMassKg: 950,
-  hullMassKg: 600,
+  /*
+   * 600 → 563 kg (E-185): Motorhaube 15, Batterie 15 und Kühler 7 kg kommen
+   * aus der Karosse und gehen jetzt einzeln ab. Das Wrack wiegt weiter 950 kg
+   * — umverteilt, nicht weggenommen (E-114).
+   */
+  hullMassKg: 563,
   /*
    * Ein Auto ist Mischschrott — auch gepresst (Ansage 12.09.2026: „ein Auto
    * ist immer Mischschrott, da sind so viele Komponenten dran mit Sitzen und
@@ -196,41 +237,113 @@ export const CAR_DEF: CarDef = {
       { name: "Außenspiegel", size: [0.16 / 1.7, 0.1, 0.08], anchor: [0.92 / 0.85, 1.0, 0.62 / 2.0], paarweise: true, farbe: 0x24262a },
     ],
   },
+  /*
+   * DER MOTORRAUM IN ECHTER REIHENFOLGE (E-185, Zerstörungskonzept 20.10.2026,
+   * Patricks Antworten): erst die Haube, dann Batterie und Kühler, dann Motor
+   * und Getriebe als EIN Block. „Um motor/getriebe zu entfernen, muss erst
+   * motorhaube entfernt werden." Die Anker liegen alle im Vorderwagen der
+   * Fassung C (z 0,80 … 2,00 m, Oberkante 0,86 m) und überschneiden sich
+   * nicht; die Räder stehen bei x ±0,70 … 0,94 daneben.
+   */
   parts: [
     {
+      id: "haube",
+      name: "Motorhaube",
+      /*
+       * Lackiertes Dünnblech: nach der einen Regel (`purity.fraktionVonTeil`,
+       * Stahlschrott erst ab 6 mm Wand, E-042) Mischschrott — wie das „Blech"
+       * im Katalog. Das Konzept schrieb „Stahl"; die Regel geht vor.
+       */
+      materialId: "mixed",
+      // SW (Konzept): Stahlhaube eines Kompaktwagens 12–18 kg
+      massKg: 15,
+      // SW (Konzept): zwei Scharniere und ein Schloss, schneller als ein Rad
+      tearSeconds: 1.0,
+      // SW: deckt die Haube (1,46 x 1,09 m) bis kurz vor die Kotflügel
+      grabRadius: 0.75,
+      // Anker und Maße kommen aus der Haut der Fassung (`wrackDaten`); hier nur Platzhalter.
+      anchor: [0, 0.87, 1.33],
+      size: [1.46, 0.08, 1.09],
+      kind: "haube",
+      color: 0x6e5a4e,
+    },
+    {
+      id: "batterie",
+      name: "Batterie",
+      // Starterbatterie: Blei, eigene BATTERIEN-Box (Konzept). // SW 15 kg: 60-Ah-Batterie 14–16 kg
+      materialId: "battery",
+      massKg: 15,
+      tearSeconds: 0.8,
+      grabRadius: 0.4,
+      // Rechts hinten im Motorraum, vor der Spritzwand (0,80 m)
+      anchor: [0.5, 0.66, 0.95],
+      size: [0.24, 0.19, 0.17],
+      kind: "box",
+      color: 0x1f2124,
+      sperre: ["haube"],
+      stuecke: [
+        // Pluspol und Minuspol // SW, Augenmaß
+        { size: [0.035, 0.03, 0.035], at: [0.07, 0.11, 0.04], farbe: 0xa8322a },
+        { size: [0.035, 0.03, 0.035], at: [-0.07, 0.11, 0.04], farbe: 0x8a8f95 },
+      ],
+    },
+    {
+      id: "kuehler",
+      name: "Kühler",
+      // Alu-Netz mit Kunststoffkästen; als Alu gerechnet wie im Konzept. // SW 7 kg
+      materialId: "alu",
+      massKg: 7,
+      tearSeconds: 1.0,
+      grabRadius: 0.45,
+      // Ganz vorn hinter dem Grill (2,00 m), vor dem Motor
+      anchor: [0, 0.56, 1.8],
+      size: [0.64, 0.36, 0.04],
+      kind: "box",
+      color: 0x8a9096,
+      sperre: ["haube"],
+      stuecke: [
+        // Wasserkasten oben und unten // SW
+        { size: [0.66, 0.04, 0.06], at: [0, 0.2, 0], farbe: 0x26282b },
+        { size: [0.66, 0.04, 0.06], at: [0, -0.2, 0], farbe: 0x26282b },
+      ],
+    },
+    {
+      /*
+       * Die Kennung bleibt „engine": Spielstände, Aufgaben und Werkzeuge
+       * reißen den Motor unter diesem Namen heraus.
+       */
       id: "engine",
-      name: "Motorblock",
+      name: "Motor mit Getriebe",
       /*
        * Alu, nicht Stahl (Ansage 12.09.2026: „einzelne Teile wie der Motor
        * sind Alubloecke, die, wenn man die rausreisst, hat man Aluminium").
        * Ein moderner Motorblock ist aus Aluminiumguss; das Stahlinnenleben
-       * bleibt im Rumpf. Genau darum lohnt es, ihn herauszureissen, statt das
-       * Auto am Stueck in die Presse zu geben.
+       * bleibt im Rumpf. „Getriebe ist eigentlich auch Alu" (12.09.2026).
+       *
+       * EIN BLOCK (Patrick, 20.10.2026, Frage 1 B): Motor und Getriebe kommen
+       * zusammen heraus. Masse 150 + 70 = 220 kg wie die beiden Teile vorher.
+       * Das Getriebe sitzt quer neben dem Motor (Frontantrieb), nicht mehr
+       * unter der Frontscheibe — dort kam es beim Biss aufs Dach heraus
+       * (E-124/E-128).
        */
       materialId: "alu",
-      massKg: 150,
-      // Zäher als ein Rad: der Motor hängt an Lagern und Leitungen. Mit
+      massKg: 220,
+      // Zäher als ein Rad: der Block hängt an Lagern und Leitungen. Mit
       // gedrehter Spinne geht es deutlich schneller.
       tearSeconds: 2.6,
       grabRadius: 1.0,
-      anchor: [0, 0.62, 1.45],
-      size: [0.9, 0.42, 0.7],
+      anchor: [0.12, 0.58, 1.36],
+      size: [0.6, 0.4, 0.6],
       kind: "box",
       color: 0x3e4247,
-    },
-    {
-      id: "gearbox",
-      name: "Getriebe",
-      // „Getriebe ist eigentlich auch Alu" (12.09.2026). Sitzt hinter dem
-      // Motor und haengt weniger fest — eine Sekunde weniger Zugzeit.
-      materialId: "alu",
-      massKg: 70,
-      tearSeconds: 1.8,
-      grabRadius: 0.85,
-      anchor: [0, 0.5, 0.55],
-      size: [0.62, 0.4, 0.75],
-      kind: "box",
-      color: 0x9aa0a6,
+      // Batterie sitzt über dem Getriebe, der Kühler davor (Konzept: echte Reihenfolge)
+      sperre: ["haube", "batterie", "kuehler"],
+      stuecke: [
+        // Getriebe links daneben
+        { size: [0.3, 0.36, 0.46], at: [-0.46, -0.02, -0.02], farbe: 0x9aa0a6 },
+        // Ventildeckel oben
+        { size: [0.46, 0.05, 0.34], at: [0, 0.225, 0], farbe: 0x24262a },
+      ],
     },
     ...([
       [-0.82, 1.25],
@@ -242,13 +355,13 @@ export const CAR_DEF: CarDef = {
         id: `wheel_${i}`,
         name: "Rad",
         /*
-         * Reifen mit Stahlfelge gehen ungetrennt in die Reifenmulde (Ansage
-         * 12.09.2026: „Reifen muessen nicht zerlegt werden, es sei denn, es
-         * ist ne Alufelge"). Das Trennen lohnt hier auch rechnerisch nicht:
-         * Gemessen brachte ein Rad ungetrennt 160 €/t und zerlegt weniger,
-         * weil die Reifen Entsorgung kosten.
+         * Reifen mit Stahlfelge, ungetrennt (Ansage 12.09.2026: „Reifen
+         * muessen nicht zerlegt werden, es sei denn, es ist ne Alufelge").
+         * Seit E-185 mit Felge im Bild und in der Stückliste — und damit nach
+         * der 95-%-Regel Mischschrott, wie die losen Räder im Katalog.
          */
-        materialId: "tires",
+        materialId: "mixed",
+        zusammensetzung: RAD_ZUSAMMENSETZUNG,
         massKg: 25,
         tearSeconds: 1.2,
         grabRadius: 0.5,
@@ -382,7 +495,9 @@ export const LKW_DEF: CarDef = {
       ([x, z, breite, kg], i): PartDef => ({
         id: `wheel_${i}`,
         name: "Rad",
-        materialId: "tires",
+        // E-185: Stahlfelge, dieselben Anteile wie am Pkw. // SW: bei Lkw-Rädern trägt die Felge eher 35–40 %
+        materialId: "mixed",
+        zusammensetzung: RAD_ZUSAMMENSETZUNG,
         massKg: kg,
         // SW: zehn Radmuttern statt vier oder fünf
         tearSeconds: 2.0,
@@ -446,7 +561,9 @@ export const WOHNWAGEN_DEF: CarDef = {
       (x, i): PartDef => ({
         id: `wheel_${i}`,
         name: "Rad",
-        materialId: "tires",
+        // E-185: Stahlfelge wie am Pkw
+        materialId: "mixed",
+        zusammensetzung: RAD_ZUSAMMENSETZUNG,
         massKg: 16,
         tearSeconds: 1.2,
         grabRadius: 0.5,

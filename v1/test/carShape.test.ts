@@ -391,8 +391,17 @@ describe("Die Fassungen im laufenden Spiel", () => {
       const { car } = werkbank(id);
       const alle = netze(car.group);
       expect(alle.length, "das Zeichenruf-Budget aus E-111").toBeLessThanOrEqual(13);
-      // Karosserie 1 + 4 Scheiben + 1 Anbaunetz + Motor + Getriebe + 4 Räder
-      expect(alle.length).toBe(12);
+      /*
+       * Karosserie 1 + 4 Scheiben + 1 Anbaunetz (mit Innenraum) + 1
+       * Sammelnetz der Teile, an C dazu die Haube.
+       *
+       * ANGEPASST MIT E-185 (20.10.2026): Vorher 12 — Motor, Getriebe und
+       * vier Räder waren sechs eigene Netze. Mit Batterie, Kühler und Haube
+       * wären es 15 gewesen, über dem Wächter; jetzt liegen alle angebauten
+       * Teile in EINEM Netz (Zerstörungskonzept B7). Gezählt in
+       * `tools/wrackbild.ts`.
+       */
+      expect(alle.length).toBe(id === "c" ? 8 : 7);
     });
 
     it(`Fassung ${id} beult sichtbar`, () => {
@@ -435,9 +444,14 @@ describe("Die Fassungen im laufenden Spiel", () => {
 
     it(`Fassung ${id} lässt sich zerlegen und pressen`, () => {
       const { car } = werkbank(id);
-      for (const p of CAR_DEF.parts) {
-        expect(car.tearPart(p.id), `${p.id} ließ sich nicht abreißen`).not.toBeNull();
+      // ANGEPASST MIT E-185: Die Haube gibt es nur an C (aus der Haut
+      // geschnitten); A und B haben sie nicht — zerlegt wird, was dran ist.
+      const dran = car.teileDran;
+      expect(dran.length).toBe(CAR_DEF.parts.length - (id === "c" ? 0 : 1));
+      for (const pid of dran) {
+        expect(car.tearPart(pid), `${pid} ließ sich nicht abreißen`).not.toBeNull();
       }
+      expect(car.teileDran).toEqual([]);
       car.pressCrush();
       expect(car.crushStage).toBe(2);
     });

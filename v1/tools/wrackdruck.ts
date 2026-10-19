@@ -279,6 +279,8 @@ function lauf(ansatz: Ansatz, korrektur: { x: number; z: number }, heben: boolea
   });
   const teile: string[] = [];
   s.bus.on("partTorn", (e) => teile.push(e.name));
+  // E-185: Eine Haube, die nur aufspringt, ist nicht ab — sie steht trotzdem in der Zeile
+  s.bus.on("wrack:abriss", (e) => e.art === "auf" && teile.push(`${e.name} auf`));
 
   // 3. Absenken, bis die Spinne steht
   s.tasten.down.add("KeyF");

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { CAR_DEF, WRACKDATEN, type CarDef, type PartDef, type WrackArt } from "./carDef";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { CAR_DEF, FELGE_FARBE, WRACKDATEN, type AnbauDef, type CarDef, type PartDef, type WrackArt } from "./carDef";
 import type { ItemManager } from "../world/scrapItems";
 import type { EventBus } from "../core/events";
 import { AUTOLACK, lackton, verwittert } from "../world/objektbau";
@@ -10,6 +11,7 @@ import {
   WRACKFORMEN,
   aufDieFlanke,
   baueWrackform,
+  haubeLage,
   knautschHoehe,
   knautschPunkt,
   knautschWeg,
@@ -49,10 +51,118 @@ export interface TearTarget {
   tear: () => RAPIER.RigidBody;
 }
 
+/**
+ * Ein Teil, das noch am Wrack hängt.
+ *
+ * SAMMELNETZ (E-185, Zerstörungskonzept B7): Motor, Batterie, Kühler und
+ * Räder liegen zusammen in EINEM Netz mit Eckpunktfarben (`von`…`bis` sind
+ * ihre Eckpunkte darin) — wie die Anbauteile seit E-111. Reißt eines ab,
+ * werden seine Eckpunkte im Sammelnetz auf einen Punkt gelegt, und das lose
+ * Stück bekommt sein eigenes Netz aus `geo`. Nur die Haube hat schon am Wrack
+ * ein eigenes Netz (`mesh`): Sie springt auf und knautscht mit der Haut.
+ */
 interface AttachedPart {
   def: PartDef;
-  mesh: THREE.Object3D;
+  /** Eigenes Netz am Wrack — nur die Haube. */
+  mesh: THREE.Mesh | null;
+  /** Das Bild des Teils, Teil-lokal (Ursprung = Anker), mit Farben — für das lose Stück. */
+  geo: THREE.BufferGeometry | null;
+  /** Eckpunkte im Sammelnetz, [von, bis) */
+  von: number;
+  bis: number;
   attached: boolean;
+  /** Haube: aufgesprungen, hängt schief am Scharnier (E-185). */
+  offen: boolean;
+}
+
+/**
+ * Wie weit die Haube aufspringt, rad: 24° um das Scharnier, vorn hoch. // SW
+ * (Konzept: „springt auf und hängt schief am Scharnier")
+ */
+const HAUBE_AUF = -0.42;
+/** … und wie schief sie dabei hängt (ein Scharnier gibt nach), rad: 4°. // SW */
+const HAUBE_SCHIEF = 0.07;
+/**
+ * Dünner wird der Kollider einer losen Haube nicht, m. Rapier-Lehre „Bleche
+ * mit Mindestdicke": Eine Schale (Kapsel 9 cm) springt sonst in einem Bild
+ * durch. // SW
+ */
+const HAUBE_DICKE = 0.08;
+/** So schnell fliegt ein leichtes Teil nach dem Biss höchstens weg, m/s (E-185). // SW */
+const BISS_DV_MAX = 3;
+
+/**
+ * Der Stoß, mit dem ein abgebissenes Teil vom Wrack wegkippt: 40 N·s hoch
+ * und entgegen `richtung` (Wrackmitte − Bissort), wie seit E-114 — für
+ * leichte Teile gedeckelt auf BISS_DV_MAX. EINE Stelle für Spiel und
+ * Messwerkzeug (`tools/abrissflug.ts`).
+ */
+export function bissImpuls(massKg: number, richtung: { x: number; z: number }): { x: number; y: number; z: number } {
+  const j = { x: richtung.x * -40, y: 40, z: richtung.z * -40 };
+  const k = Math.min(1, (BISS_DV_MAX * massKg) / Math.hypot(j.x, j.y, j.z));
+  return { x: j.x * k, y: j.y * k, z: j.z * k };
+}
+/**
+ * Die Felge im Rad (E-185): Radius als Anteil des Rades. // Quelle: 195/65 R15
+ * — Felge 15" = 0,381 m Ø bei 0,63 m Rad-Ø, also 0,6; am Pkw-Rad (0,66 m Ø)
+ * 0,58.
+ */
+const FELGE_ANTEIL = 0.58;
+/** Nabe und Radmuttern, dunkler als die Felge. // SW */
+const NABE_FARBE = 0x6f7378;
+
+/**
+ * DAS BILD EINES TEILS, Teil-lokal (Ursprung = Anker), Farbe an den
+ * Eckpunkten. Ein Rad ist Reifen, Felge und Nabe (E-185: „Reifen haben immer
+ * felge"); die Felge steht 1 cm über die Reifenflanke, damit man sie von
+ * beiden Seiten sieht. Ein Kasten bringt seine `stuecke` mit.
+ */
+function teilGeometrie(p: PartDef): THREE.BufferGeometry {
+  if (p.kind === "wheel") {
+    const [r, b] = [p.size[0]!, p.size[1]!];
+    const reifen = new THREE.CylinderGeometry(r, r, b, 16);
+    const felge = new THREE.CylinderGeometry(r * FELGE_ANTEIL, r * FELGE_ANTEIL, b + 0.02, 12);
+    const nabe = new THREE.CylinderGeometry(r * 0.2, r * 0.2, b + 0.04, 8);
+    for (const g of [reifen, felge, nabe]) g.rotateZ(Math.PI / 2);
+    return verschmelzeBunt(
+      [
+        { geo: reifen, farbe: p.color },
+        { geo: felge, farbe: FELGE_FARBE },
+        { geo: nabe, farbe: NABE_FARBE },
+      ],
+      p.name
+    );
+  }
+  const teile: Bauteil[] = [{ geo: new THREE.BoxGeometry(p.size[0], p.size[1], p.size[2]), farbe: p.color }];
+  for (const s of p.stuecke ?? []) {
+    const g = new THREE.BoxGeometry(...s.size);
+    g.translate(...s.at);
+    teile.push({ geo: g, farbe: s.farbe });
+  }
+  return verschmelzeBunt(teile, p.name);
+}
+
+/**
+ * Ein Achtkant-Prisma, Achse quer (x) — der Kollider eines losen Rades
+ * (Rapier-Lehre „runde Teile als Achtkant", v2 E-011): Es rollt ein Stück
+ * und bleibt dann von selbst liegen. Bis E-185 war es ein Quader, und ein
+ * abgerissenes Rad rollte gar nicht.
+ */
+function radKollider(r: number, b: number): RAPIER.ColliderDesc {
+  const punkte: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    const a = ((i + 0.5) / 8) * Math.PI * 2;
+    punkte.push(b / 2, Math.cos(a) * r, Math.sin(a) * r, -b / 2, Math.cos(a) * r, Math.sin(a) * r);
+  }
+  return RAPIER.ColliderDesc.convexHull(new Float32Array(punkte)) ?? RAPIER.ColliderDesc.cuboid(b / 2, r, r);
+}
+
+/** EIN Material für alle Sammelnetze (Farbe an den Eckpunkten), wie `anbauStoff`. */
+let TEILE_STOFF: THREE.MeshStandardMaterial | null = null;
+function teileStoff(): THREE.MeshStandardMaterial {
+  // SW: zwischen Motor (0,7 / 0,4) und Reifen (0,9 / 0) von vorher
+  if (!TEILE_STOFF) TEILE_STOFF = farbstoff(0.8, 0.25);
+  return TEILE_STOFF;
 }
 
 /**
@@ -289,14 +399,20 @@ export function baueAnbauteile(
    * Bei den Fassungen aus E-116 nein: Die Karosserie hat dort einen echten
    * Ausschnitt, und der Bogen läge mitten im Blech.
    */
-  radlaufBogen = true
+  radlaufBogen = true,
+  /**
+   * Die Innenausstattung der Fassung (E-185): Sitze, Rückbank,
+   * Armaturenbrett — in DASSELBE Netz, nach derselben Rechnung. Sie
+   * knautscht mit und kostet keinen Zeichenruf.
+   */
+  innen: AnbauDef[] = []
 ): THREE.Mesh {
   const k = def.karosserie;
   const halbeBreite = k.chassis[0] / 2;
   const halbeLaenge = k.chassis[2] / 2;
   const teile: Bauteil[] = [];
 
-  for (const a of def.karosserie.anbau) {
+  for (const a of [...def.karosserie.anbau, ...innen]) {
     // Nicht paarweise heisst: einmal, an seinem x-Anteil (der dann 0 ist).
     for (const seite of a.paarweise ? [-1, 1] : [1]) {
       const geo = new THREE.BoxGeometry(a.size[0] * k.chassis[0], a.size[1], a.size[2]);
@@ -314,6 +430,7 @@ export function baueAnbauteile(
   }
 
   const mesh = new THREE.Mesh(verschmelzeBunt(teile, "Anbauteile"), anbauStoff());
+  mesh.name = "Anbauteile";
   mesh.castShadow = true;
   gruppe.add(mesh);
   return mesh;
@@ -400,10 +517,25 @@ export function wrackform(id: WrackformId): WrackformDef | null {
  */
 export function wrackDaten(basis: CarDef, id: WrackformId): CarDef {
   const form = wrackform(id);
-  if (!form) return basis;
+  /*
+   * DIE HAUBE GIBT ES NUR, WO DIE HAUT SIE HAT (E-185). Anker und Maße kommen
+   * aus dem Feld der Fassung (`haubeLage`), nicht aus einer zweiten Zahl im
+   * Datensatz. Ohne Feld (A, B, Bestand) fällt das Teil weg — und eine
+   * Sperre auf „haube" gilt dort als erfüllt.
+   */
+  const lage = form ? haubeLage(form) : null;
+  const mitHaube = (ps: PartDef[]): PartDef[] =>
+    ps.flatMap((p): PartDef[] =>
+      p.kind !== "haube"
+        ? [p]
+        : lage
+          ? [{ ...p, anchor: [lage.mitte.x, lage.mitte.y, lage.mitte.z], size: [lage.groesse.x, lage.groesse.y, lage.groesse.z] }]
+          : []
+    );
+  if (!form) return { ...basis, parts: mitHaube(basis.parts) };
   const parts = !form.rad
-    ? basis.parts
-    : basis.parts.map((p) =>
+    ? mitHaube(basis.parts)
+    : mitHaube(basis.parts).map((p) =>
         p.kind === "wheel"
           ? {
               ...p,
@@ -482,6 +614,10 @@ export class CarComposite {
   private spinne: { ort: THREE.Vector3; achse: THREE.Vector3 } | null = null;
   private druckAlter = Infinity;
   private parts: AttachedPart[] = [];
+  /** Das Sammelnetz aller angebauten Teile außer der Haube (E-185). */
+  private sammel: THREE.Mesh | null = null;
+  /** Der Lack dieses Wracks — die lose Haube trägt ihn in den Spielstand. */
+  private lack = 0;
   private windows: { id: string; mesh: THREE.Object3D; anchor: THREE.Vector3; intact: boolean }[] = [];
   crushStage = 0;
   private prevVel = new THREE.Vector3();
@@ -929,33 +1065,62 @@ export class CarComposite {
       side: THREE.DoubleSide,
     });
 
+    this.lack = lack;
     this.group.add(this.crushGroup);
     if (this.form) this.baueFassung(this.form, lack, glassMat);
     else this.baueBestand(lack, glassMat);
 
-    const anbau = baueAnbauteile(this.crushGroup, this.def, lack, this.form ? !!this.form.radlaufBogen : true);
-    // Spiegel, Leuchten, Stossstangen knautschen mit der Haut (E-128), statt
-    // ueber einem flachen Wrack in der Luft zu stehen.
+    const anbau = baueAnbauteile(
+      this.crushGroup,
+      this.def,
+      lack,
+      this.form ? !!this.form.radlaufBogen : true,
+      this.form?.innen ?? []
+    );
+    // Spiegel, Leuchten, Stossstangen — und seit E-185 die Sitze — knautschen
+    // mit der Haut (E-128), statt ueber einem flachen Wrack in der Luft zu stehen.
     if (this.knautsch) this.beulbar(anbau, false);
+    this.baueSammelnetz();
+  }
 
-    // Parts (nicht quetschbar): Motor + Räder
+  /**
+   * DAS SAMMELNETZ (E-185, Zerstörungskonzept B7). Bis hierher war jedes Teil
+   * ein eigenes Netz mit eigenem Material: am Pkw Motor, Getriebe und vier
+   * Räder, 6 von 12 Netzen. Mit Batterie und Kühler wären es 14 — über dem
+   * Wächter (13, E-025). Jetzt sind es alle zusammen EINS. Sie hängen wie
+   * vorher an der Wrackgruppe, nicht im crushGroup: Sie knautschen nicht mit
+   * (E-128 „nicht entschieden" 8).
+   */
+  private baueSammelnetz(): void {
+    const welt: THREE.BufferGeometry[] = [];
+    let n = 0;
     for (const p of this.def.parts) {
-      let mesh: THREE.Object3D;
-      if (p.kind === "wheel") {
-        const geo = new THREE.CylinderGeometry(p.size[0], p.size[0], p.size[1], 16);
-        geo.rotateZ(Math.PI / 2);
-        mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.9 }));
-      } else {
-        mesh = new THREE.Mesh(
-          new THREE.BoxGeometry(p.size[0], p.size[1], p.size[2]),
-          new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.7, metalness: 0.4 })
-        );
-      }
-      mesh.position.set(...p.anchor);
-      mesh.castShadow = true;
-      this.group.add(mesh);
-      this.parts.push({ def: p, mesh, attached: true });
+      if (p.kind === "haube") continue; // eigenes Netz, gebaut mit der Haut (`baueFassung`)
+      const geo = teilGeometrie(p);
+      const g = geo.clone();
+      g.translate(...p.anchor);
+      const zahl = g.getAttribute("position").count;
+      welt.push(g);
+      this.parts.push({ def: p, mesh: null, geo, von: n, bis: n + zahl, attached: true, offen: false });
+      n += zahl;
     }
+    if (welt.length === 0) return;
+    const merged = mergeGeometries(welt, false);
+    for (const g of welt) g.dispose();
+    if (!merged) throw new Error("Wrackteile liessen sich nicht verschmelzen");
+    this.sammel = new THREE.Mesh(merged, teileStoff());
+    this.sammel.name = "Wrackteile";
+    this.sammel.castShadow = true;
+    this.group.add(this.sammel);
+  }
+
+  /** Ein abgegangenes Teil verschwindet aus dem Sammelnetz: seine Eckpunkte auf einen Punkt. */
+  private ausSammelnetz(t: AttachedPart): void {
+    if (!this.sammel || t.bis <= t.von) return;
+    const a = this.sammel.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const [x, y, z] = t.def.anchor;
+    for (let i = t.von; i < t.bis; i++) a.setXYZ(i, x!, y!, z!);
+    a.needsUpdate = true;
   }
 
   /**
@@ -1015,6 +1180,25 @@ export class CarComposite {
     karosse.castShadow = true;
     this.crushGroup.add(karosse);
     this.beulbar(karosse, true);
+    /*
+     * DIE MOTORHAUBE (E-185): ein eigenes Netz im crushGroup, damit sie mit
+     * der Haut beult und knautscht — und um ihr Scharnier aufspringen kann.
+     * Der Ursprung des Netzes IST das Scharnier; die Eckpunkte liegen
+     * relativ dazu. Die Knautschrechnung (`hautNachfuehren`) addiert die
+     * Lage zurück und rechnet damit am geschlossenen Ort.
+     */
+    const haubeDef = this.def.parts.find((p) => p.kind === "haube");
+    if (bau.haube && haubeDef) {
+      const s = bau.haube.scharnier;
+      bau.haube.geo.translate(-s.x, -s.y, -s.z);
+      const haube = new THREE.Mesh(bau.haube.geo, lackStoff(form, this.formId));
+      haube.name = "Motorhaube";
+      haube.position.copy(s);
+      haube.castShadow = true;
+      this.crushGroup.add(haube);
+      this.beulbar(haube, true);
+      this.parts.push({ def: haubeDef, mesh: haube, geo: null, von: 0, bis: 0, attached: true, offen: false });
+    }
     for (const s of bau.scheiben) {
       const pane = new THREE.Mesh(s.geo, glassMat);
       this.crushGroup.add(pane);
@@ -1312,31 +1496,69 @@ export class CarComposite {
     }
   }
 
-  /** Part lösen → eigenständiges ScrapItem; liefert den neuen Körper. */
+  /**
+   * Part lösen → eigenständiges ScrapItem; liefert den neuen Körper.
+   *
+   * Ohne Sperre (E-185): Wer `tearPart` direkt ruft (Presse, Spielstand,
+   * Aufgaben, Werkzeuge), bekommt das Teil. Die Reihenfolge gilt dort, wo der
+   * SPIELER ansetzt — in `findPartNear`, für Greifen und Biss.
+   */
   tearPart(partId: string): RAPIER.RigidBody | null {
     const part = this.parts.find((p) => p.def.id === partId && p.attached);
     if (!part) return null;
     part.attached = false;
+    const d = part.def;
 
+    /*
+     * DAS LOSE STÜCK BEKOMMT SEIN EIGENES NETZ. Ursprung von Netz und Körper
+     * ist die Mitte des Quaders um das Teil — so liegt der Kollider genau um
+     * das Bild, und ein Spielstand stellt es an derselben Stelle wieder her.
+     *  - Haube: ihr Netz geht mit, so verbeult und geknautscht, wie sie ist
+     *    („fliegt verbeult weg"), mit eigenem Material (Hervorhebung, E-185).
+     *  - Alles andere: aus dem Sammelnetz heraus, das Bild aus `geo`.
+     */
+    const lokal = new THREE.Matrix4();
+    let mesh: THREE.Mesh;
+    if (d.kind === "haube" && part.mesh) {
+      mesh = part.mesh;
+      this.dentables = this.dentables.filter((x) => x.mesh !== mesh);
+      mesh.updateWorldMatrix(true, false);
+      lokal.copy(mesh.matrixWorld);
+      mesh.removeFromParent();
+      mesh.material = (mesh.material as THREE.MeshStandardMaterial).clone();
+    } else {
+      this.ausSammelnetz(part);
+      mesh = new THREE.Mesh(part.geo!, farbstoff(0.8, 0.25)); // SW wie `teileStoff`, eigenes fürs Hervorheben
+      this.group.updateWorldMatrix(true, false);
+      lokal.copy(this.group.matrixWorld).multiply(new THREE.Matrix4().makeTranslation(...d.anchor));
+    }
+    mesh.castShadow = true;
+    const geo = mesh.geometry;
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox!;
+    const mitte = bb.getCenter(new THREE.Vector3());
+    const groesse = bb.getSize(new THREE.Vector3());
+    if (d.kind !== "wheel") geo.translate(-mitte.x, -mitte.y, -mitte.z);
+    const ort = d.kind === "wheel" ? new THREE.Vector3() : mitte.clone();
     const worldPos = new THREE.Vector3();
     const worldQuat = new THREE.Quaternion();
-    part.mesh.getWorldPosition(worldPos);
-    part.mesh.getWorldQuaternion(worldQuat);
-    part.mesh.removeFromParent();
-    this.scene.add(part.mesh);
-    part.mesh.position.copy(worldPos);
-    part.mesh.quaternion.copy(worldQuat);
+    lokal.multiply(new THREE.Matrix4().makeTranslation(ort.x, ort.y, ort.z)).decompose(worldPos, worldQuat, new THREE.Vector3());
+    this.scene.add(mesh);
+    mesh.position.copy(worldPos);
+    mesh.quaternion.copy(worldQuat);
+    mesh.scale.set(1, 1, 1);
 
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true)
         .setTranslation(worldPos.x, worldPos.y, worldPos.z)
         .setRotation({ x: worldQuat.x, y: worldQuat.y, z: worldQuat.z, w: worldQuat.w })
     );
-    const d = part.def;
+    // Die Haube ist ein Blech: nie dünner als HAUBE_DICKE (Rapier-Lehre „Bleche mit Mindestdicke")
+    if (d.kind === "haube") groesse.y = Math.max(groesse.y, HAUBE_DICKE);
     const colliderDesc =
       d.kind === "wheel"
-        ? RAPIER.ColliderDesc.cuboid(d.size[1] / 2, d.size[0], d.size[0])
-        : RAPIER.ColliderDesc.cuboid(d.size[0] / 2, d.size[1] / 2, d.size[2] / 2);
+        ? radKollider(d.size[0]!, d.size[1]!)
+        : RAPIER.ColliderDesc.cuboid(groesse.x / 2, groesse.y / 2, groesse.z / 2);
     this.world.createCollider(colliderDesc.setMass(d.massKg), body);
     /*
      * Auch ein abgerissenes Teil braucht seine Form: Ohne sie weiss das Spiel
@@ -1346,12 +1568,12 @@ export class CarComposite {
     this.items.register({
       materialId: d.materialId,
       massKg: d.massKg,
-      mesh: part.mesh,
+      mesh,
       body,
       shape: {
         kind: d.kind === "wheel" ? "cyl" : "box",
-        dims: d.kind === "wheel" ? [d.size[0], d.size[1]] : [...d.size],
-        color: d.color,
+        dims: d.kind === "wheel" ? [d.size[0]!, d.size[1]!] : [groesse.x, groesse.y, groesse.z],
+        color: d.kind === "haube" ? this.lack : d.color,
         name: d.name,
         zusammensetzung: d.zusammensetzung,
         trennbar: d.trennbar,
@@ -1366,7 +1588,62 @@ export class CarComposite {
     this.currentMassKg = Math.max(this.def.hullMassKg, this.currentMassKg - d.massKg);
     this.masseSetzen();
     this.bus.emit("partTorn", { name: d.name });
+    // E-185: Funken, Staub und Knall hängen an diesem Ereignis (Regel 10)
+    this.bus.emit("wrack:abriss", {
+      art: "ab",
+      handle: this.body.handle,
+      teil: d.id,
+      name: d.name,
+      massKg: d.massKg,
+      x: worldPos.x,
+      y: worldPos.y,
+      z: worldPos.z,
+    });
     return body;
+  }
+
+  /**
+   * DIE HAUBE SPRINGT AUF (E-185, Patrick 20.10.2026, Frage 4 A): Der erste
+   * volle Biss löst das Schloss, die Haube steht schief am Scharnier; der
+   * zweite reißt sie ab. Masse bleibt am Wrack — aufgesprungen ist nicht ab.
+   */
+  private haubeAuf(t: AttachedPart): void {
+    if (!t.mesh || t.offen) return;
+    t.offen = true;
+    t.mesh.rotation.set(HAUBE_AUF, 0, HAUBE_SCHIEF);
+    const p = this.ankerWelt(t, new THREE.Vector3());
+    this.bus.emit("wrack:abriss", {
+      art: "auf",
+      handle: this.body.handle,
+      teil: t.def.id,
+      name: t.def.name,
+      massKg: t.def.massKg,
+      x: p.x,
+      y: p.y,
+      z: p.z,
+    });
+  }
+
+  /** Die Mitte eines angebauten Teils in Weltlage. */
+  private ankerWelt(t: AttachedPart, out: THREE.Vector3): THREE.Vector3 {
+    this.group.updateWorldMatrix(true, false);
+    return out.set(...t.def.anchor).applyMatrix4(this.group.matrixWorld);
+  }
+
+  /** Ist dieses Teil noch hinter einem anderen gesperrt? Teile, die es hier nicht gibt, zählen als ab. */
+  private gesperrtDurch(t: AttachedPart): AttachedPart[] {
+    if (!t.def.sperre) return [];
+    return this.parts.filter((q) => q.attached && t.def.sperre!.includes(q.def.id));
+  }
+
+  /** Welche Teile sind noch dran (für Wächter, Werkzeuge und die Aufgaben)? */
+  get teileDran(): string[] {
+    return this.parts.filter((p) => p.attached).map((p) => p.def.id);
+  }
+
+  /** Ist die Haube aufgesprungen, aber noch dran? (E-185) */
+  get haubeOffen(): boolean {
+    return this.parts.some((p) => p.def.kind === "haube" && p.attached && p.offen);
   }
 
   /** Zustand für den Spielstand (Kap. 18). Beulen werden bewusst nicht gesichert. */
@@ -1395,7 +1672,11 @@ export class CarComposite {
       const part = this.parts.find((p) => p.def.id === id && p.attached);
       if (!part) continue;
       part.attached = false;
-      part.mesh.removeFromParent(); // das gelöste Teil selbst wird als generisches Item wiederhergestellt
+      // Das gelöste Teil selbst wird als generisches Item wiederhergestellt (E-185: Sammelnetz bzw. Haube)
+      if (part.mesh) {
+        this.dentables = this.dentables.filter((x) => x.mesh !== part.mesh);
+        part.mesh.removeFromParent();
+      } else this.ausSammelnetz(part);
       this.currentMassKg = Math.max(this.def.hullMassKg, this.currentMassKg - part.def.massKg);
     }
     this.crushStage = s.crushStage;
@@ -1529,38 +1810,94 @@ export class CarComposite {
     }
     if (dv < this.def.crushImpactDv) return;
     const ort = this.welt(herd);
-    const ziel = this.findPartNear(ort);
-    if (ziel) {
-      const p = this.body.translation();
-      const richtung = new THREE.Vector3(p.x - ort.x, p.y - ort.y, p.z - ort.z);
-      ziel.tear().applyImpulse({ x: richtung.x * -40, y: 40, z: richtung.z * -40 }, true);
+    /*
+     * Dieselbe Suche wie beim Greifen, mit der Sperre (E-185). Eine
+     * geschlossene Haube springt beim ersten vollen Biss nur auf; erst der
+     * zweite reißt sie ab (Patrick, Frage 4 A).
+     */
+    const t = this.naechstesTeil(ort, false);
+    if (!t) return;
+    if (t.def.kind === "haube" && !t.offen) {
+      this.haubeAuf(t);
+      return;
     }
+    const p = this.body.translation();
+    const richtung = new THREE.Vector3(p.x - ort.x, p.y - ort.y, p.z - ort.z);
+    /*
+     * Der Stoß wie seit E-114 (SW 40 N·s), aber höchstens BISS_DV_MAX schnell
+     * (E-185): Ein Kühler (7 kg) flog damit gemessen 3,4 m weit
+     * (`tools/abrissflug.ts`) — der Ruck gehört ans Teil, nicht über den Platz.
+     */
+    this.tearPart(t.def.id)?.applyImpulse(bissImpuls(t.def.massKg, richtung), true);
   }
 
-  findPartNear(pos: THREE.Vector3): TearTarget | null {
+  /**
+   * Das angebaute Teil, das der Spinne an `pos` am nächsten liegt — unter
+   * den freien (`gesperrt` falsch) oder den noch gesperrten.
+   *
+   * Von oben zu greifen ist der übliche Fall: Die Spinne kommt senkrecht
+   * über die Motorhaube und fasst hinein. Deshalb zählt der waagerechte
+   * Abstand voll, der senkrechte nur zur Hälfte — sonst müsste man die
+   * Bauteilmitte auf den Zentimeter treffen (Design 02.09.2026).
+   *
+   * DAS NÄCHSTE, NICHT DAS ERSTE (E-185). Bis hierher gewann das erste Teil
+   * der Liste, dessen Greifradius reichte — bei zwei Teilen (Motor und
+   * Getriebe) gleichgültig, im Motorraum mit Haube, Batterie, Kühler und
+   * Motor übereinander nicht mehr: Wer auf die Batterie zielt, soll die
+   * Batterie bekommen. Gemessen wird der Abstand als Anteil des
+   * Greifradius — so gewinnt das Teil, in dessen Bereich die Spinne am
+   * tiefsten steht.
+   */
+  private naechstesTeil(pos: THREE.Vector3, gesperrt: boolean): AttachedPart | null {
     const tmp = new THREE.Vector3();
+    let best: AttachedPart | null = null;
+    let bestAnteil = Infinity;
     for (const part of this.parts) {
       if (!part.attached) continue;
-      part.mesh.getWorldPosition(tmp);
-      // Von oben zu greifen ist der übliche Fall: Die Spinne kommt senkrecht
-      // über die Motorhaube und fasst hinein. Deshalb zählt der waagerechte
-      // Abstand voll, der senkrechte nur zur Hälfte — sonst müsste man die
-      // Bauteilmitte auf den Zentimeter treffen (Design 02.09.2026).
+      if ((this.gesperrtDurch(part).length > 0) !== gesperrt) continue;
+      this.ankerWelt(part, tmp);
       const dx = pos.x - tmp.x;
       const dy = (pos.y - tmp.y) * 0.5;
       const dz = pos.z - tmp.z;
-      if (Math.hypot(dx, dy, dz) <= part.def.grabRadius) {
-        const anchorWorld = tmp.clone();
-        return {
-          id: `${this.body.handle}_${part.def.id}`,
-          name: part.def.name,
-          tearSeconds: part.def.tearSeconds,
-          anchorWorld,
-          tear: () => this.tearPart(part.def.id)!,
-        };
+      const anteil = Math.hypot(dx, dy, dz) / part.def.grabRadius;
+      if (anteil <= 1 && anteil < bestAnteil) {
+        best = part;
+        bestAnteil = anteil;
       }
     }
-    return null;
+    return best;
+  }
+
+  /**
+   * Nächste greifbare Part nahe der Sensorposition (für die Reiß-Mechanik).
+   *
+   * DIE SPERRE SITZT HIER (E-185, Zerstörungskonzept B1): Was hinter einem
+   * anderen Teil liegt (Motor hinter Haube, Batterie und Kühler), meldet diese
+   * Suche nicht — weder dem Greifen (`gripSystem.partResolver`) noch dem Biss.
+   * Am Greifen selbst ändert sich nichts (Projektregel 2): Steht kein freies
+   * Teil unter der Spinne, fasst sie das Wrack wie bisher.
+   */
+  findPartNear(pos: THREE.Vector3): TearTarget | null {
+    const part = this.naechstesTeil(pos, false);
+    if (!part) return null;
+    return {
+      id: `${this.body.handle}_${part.def.id}`,
+      name: part.def.name,
+      tearSeconds: part.def.tearSeconds,
+      anchorWorld: this.ankerWelt(part, new THREE.Vector3()),
+      tear: () => this.tearPart(part.def.id)!,
+    };
+  }
+
+  /**
+   * Steht die Spinne über einem GESPERRTEN Teil und über keinem freien? Dann
+   * welches, und was noch davor sitzt — für die Griff-Info „Motor mit
+   * Getriebe — erst Motorhaube ab" (E-185, Zerstörungskonzept B1).
+   */
+  sperrHinweis(pos: THREE.Vector3): { name: string; erst: string[] } | null {
+    if (this.naechstesTeil(pos, false)) return null;
+    const t = this.naechstesTeil(pos, true);
+    return t ? { name: t.def.name, erst: this.gesperrtDurch(t).map((q) => q.def.name) } : null;
   }
 }
 
@@ -1657,6 +1994,15 @@ export class CompositeManager {
     for (const car of this.cars) {
       const t = car.findPartNear(pos);
       if (t) return t;
+    }
+    return null;
+  }
+
+  /** Griff-Info für ein gesperrtes Teil unter der Spinne (E-185), sonst null. */
+  sperrHinweis(pos: THREE.Vector3): { name: string; erst: string[] } | null {
+    for (const car of this.cars) {
+      const h = car.sperrHinweis(pos);
+      if (h) return h;
     }
     return null;
   }

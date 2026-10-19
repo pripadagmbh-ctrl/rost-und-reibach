@@ -63,7 +63,10 @@ function beissen(
   bus.emit("greifer:zugedrueckt", { handle, kraftKN, x: at.x, y: at.y, z: at.z });
 }
 
-/** Wo der Motor sitzt — dort setzt die Spinne zum Herausdruecken an. */
+/**
+ * Wo der Motor sitzt — dort setzt die Spinne zum Herausdruecken an. Seit
+ * E-185 ist das erste Teil der Liste die Haube über dem Motorraum.
+ */
 function motorOrt(car: ReturnType<CompositeManager["spawnCar"]>): THREE.Vector3 {
   const ziel = CAR_DEF.parts.find((p) => p.kind !== "wheel")!;
   const p = car.body.translation();
@@ -102,8 +105,20 @@ describe("Schaden durch Zudruecken", () => {
     const vorher = car.massKg;
     const teileVorher = items.items.length;
 
-    // Voller Biss auf den Motor: rohe Gewalt als Sortierung
+    /*
+     * Voller Biss auf den Motorraum: rohe Gewalt als Sortierung.
+     *
+     * ANGEPASST MIT E-185 (20.10.2026): Über dem Motor liegt jetzt die Haube
+     * (Patrick, Frage 4 A: „erster Biss lässt sie aufspringen, zweiter reißt
+     * sie ab"). Der erste Biss nimmt deshalb NICHTS heraus und kostet keine
+     * Masse; erst der zweite bringt ein Stück — die Haube.
+     */
     beissen(bus, car.body.handle, KRAFT_WRACK, motorOrt(car));
+    expect(car.haubeOffen, "der erste Biss lässt die Haube aufspringen").toBe(true);
+    expect(car.massKg, "aufgesprungen ist nicht ab").toBe(vorher);
+    expect(items.items.length).toBe(teileVorher);
+    beissen(bus, car.body.handle, KRAFT_WRACK, motorOrt(car));
+    expect(car.teileDran, "der zweite Biss reißt sie ab").not.toContain("haube");
 
     const nachher = car.massKg;
     const teileNachher = items.items.length;

@@ -88,6 +88,24 @@ async function main(): Promise<void> {
     console.log(`  ZWEI WRACKS:   ${beide.netze} Netze · ${beide.materialien} Materialien · ` +
       `${beide.netze * 2} Zeichenrufe = ${((beide.netze * 2 * 100) / 1322).toFixed(1)} % der gemessenen 1322`);
   }
+  /*
+   * Die grossen Wracks (E-135) haben je eine eigene Fassung. Seit dem
+   * Sammelnetz (E-185) zaehlen sie mit — der LKW stand mit 13 Netzen genau
+   * an der Grenze des Waechters.
+   */
+  for (const art of ["lkw", "wohnwagen"] as const) {
+    const scene = new THREE.Scene();
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    const comps = new CompositeManager(scene, world, new ItemManager(scene, world), new EventBus());
+    const a = zaehle(comps.spawnCar(new THREE.Vector3(0, 1, 0), art).group);
+    console.log(`
+=== ${art.toUpperCase()}`);
+    console.log(`  Netze          ${a.netze}`);
+    console.log(`  Eckpunkte      ${a.ecken}`);
+    console.log(`  Dreiecke       ${Math.round(a.dreiecke)}`);
+    console.log(`  Materialien    ${a.materialien}`);
+    console.log(`  mit Schatten:  ${a.netze * 2} Zeichenrufe`);
+  }
 }
 
 void main();

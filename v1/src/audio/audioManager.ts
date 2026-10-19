@@ -33,6 +33,7 @@ import {
   EINZEL,
   FAMILIEN,
   GRUND,
+  KOERPER,
   kehrKlang,
   knautschKlang,
   oelFluss,
@@ -170,6 +171,7 @@ export class AudioManager {
       bus.on("greifer:zugedrueckt", (e) => this.playBiss(e.kraftKN));
       bus.on("released", () => this.playLoslassen());
       bus.on("wrack:geknautscht", (e) => this.playKnautsch(e.zuwachs));
+      bus.on("wrack:abriss", (e) => this.playAbriss(e.art, e.massKg)); // E-185 (Welt): Knall beim Abreissen
       // E-151: Lasthebemagnet
       bus.on("magnet:an", () => this.playMagnet(true));
       bus.on("magnet:aus", () => this.playMagnet(false));
@@ -898,6 +900,25 @@ export class AudioManager {
   playTear(): void {
     this.spiele([SCHLEIFEN.kehrStahl], 0.35, { dauer: 0.45 });
     this.spiele(FAMILIE_BLECH, 0.5, { delay: 0.05 });
+  }
+
+  /**
+   * E-185 (Welt-Agent, kleine Ergaenzung): Ein Teil geht vom Wrack ab — der
+   * Knall (Zerstoerungskonzept, Spass-Hebel 4, Schicht 2). Eine echte
+   * zugeschlagene Autotuer (`KOERPER.blech`, E-159), lauter je schwerer das
+   * Teil; ab 100 kg (Motorblock) schlaegt Stahl mit. Springt die Haube nur auf,
+   * klackt es leiser. Das Kreischen beim Greifen (`playTear`) bleibt, wie es
+   * ist. // SW: Pegel 0,25 + 0,35 je 150 kg, Stahl ab 100 kg
+   */
+  playAbriss(art: "ab" | "auf", massKg: number): void {
+    if (!this.ctx || !(massKg > 0)) return;
+    const k = Math.min(1, massKg / 150);
+    if (art === "auf") {
+      this.spiele(KOERPER.blech.proben, 0.18, { dauer: KOERPER.blech.dauer, tp: 5000 });
+      return;
+    }
+    this.spiele(KOERPER.blech.proben, 0.25 + 0.35 * k, { dauer: KOERPER.blech.dauer });
+    if (massKg >= 100) this.spiele(FAMILIE_STAHL, 0.3 + 0.2 * k, { delay: 0.03, tp: 3000 });
   }
 
   /** Schwerer Blech-Crash (Quetschstufe). */

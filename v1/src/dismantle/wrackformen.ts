@@ -232,6 +232,20 @@ export interface WrackformDef {
   bleche?: BlechDef[];
   /** Wie die Karosserie zusammenknautscht (E-128). */
   knautsch?: KnautschDef;
+  /**
+   * DIE MOTORHAUBE (E-185) — ein Feld der Haut wie eine Scheibe, nur aus
+   * Blech: Es wird aus der Karosserie geschnitten und ist ein eigenes Netz,
+   * das aufspringt und abgeht. Die hintere Kante (`bisSchnitt`) ist das
+   * Scharnier. Fehlt es, hat die Fassung keine Haube als Teil.
+   */
+  haube?: ScheibeDef;
+  /**
+   * DIE INNENAUSSTATTUNG (E-185) — Sitze, Rückbank, Armaturenbrett. Nur zum
+   * Ansehen (Zerstörungskonzept Frage 2 A): Sie liegt im Anbau-Netz, knautscht
+   * mit und kostet kein Netz. Maße und Sitz wie `AnbauDef`, aber INNEN — sie
+   * berührt die Haut nicht.
+   */
+  innen?: AnbauDef[];
 }
 
 /**
@@ -502,6 +516,45 @@ export interface Wrackbau {
   /** Die ganze Karosserie als EIN Netz, Farbe an den Eckpunkten. */
   koerper: THREE.BufferGeometry;
   scheiben: { id: string; geo: THREE.BufferGeometry }[];
+  /**
+   * Die Motorhaube (E-185), Wrack-lokal wie die Haut, mit Lack an den
+   * Eckpunkten; `scharnier` ist die Mitte ihrer hinteren Kante, `mitte` der
+   * Schwerpunkt ihrer Eckpunkte. Fehlt, wenn die Fassung keine Haube hat.
+   */
+  haube?: { geo: THREE.BufferGeometry; scharnier: THREE.Vector3; mitte: THREE.Vector3 };
+}
+
+/**
+ * Mitte und Scharnier der Motorhaube einer Fassung (E-185), ohne ein Netz zu
+ * bauen — `wrackDaten` braucht den Anker, bevor das Wrack gebaut ist.
+ * Dieselben Eckpunkte wie `baueWrackform`.
+ */
+export function haubeLage(form: WrackformDef): { mitte: THREE.Vector3; scharnier: THREE.Vector3; groesse: THREE.Vector3 } | null {
+  const h = form.haube;
+  if (!h) return null;
+  const n = form.ebenen.length;
+  const mitte = new THREE.Vector3();
+  const scharnier = new THREE.Vector3();
+  const box = new THREE.Box3();
+  const p = new THREE.Vector3();
+  let k = 0;
+  let ks = 0;
+  for (let s = h.vonSchnitt; s <= h.bisSchnitt; s++) {
+    const sch = form.schnitte[s]!;
+    const y = sch.y ?? form.ebenen;
+    for (let r = h.vonRing; r <= h.bisRing; r++) {
+      const { ebene, seite } = ringEbene(r, n);
+      p.set(seite * sch.b[ebene]! * (form.breite / 2), y[ebene]!, sch.z * (form.laenge / 2));
+      mitte.add(p);
+      box.expandByPoint(p);
+      k++;
+      if (s === h.bisSchnitt) {
+        scharnier.add(p);
+        ks++;
+      }
+    }
+  }
+  return { mitte: mitte.divideScalar(k), scharnier: scharnier.divideScalar(ks), groesse: box.getSize(new THREE.Vector3()) };
 }
 
 /**
@@ -575,7 +628,8 @@ export function baueWrackform(form: WrackformDef, lack: number): Wrackbau {
    * Beulen rechnen je Eckpunkt), es fallen nur Dreiecke weg.
    */
   const offen = new Set<number>();
-  for (const sch of form.scheiben) {
+  // E-185: Auch das Feld der Motorhaube bleibt in der Haut offen — die Haube ist ein eigenes Netz.
+  for (const sch of form.haube ? [...form.scheiben, form.haube] : form.scheiben) {
     for (let s = sch.vonSchnitt; s < sch.bisSchnitt; s++) {
       for (let r = sch.vonRing; r < sch.bisRing; r++) offen.add(s * R + r);
     }
@@ -665,7 +719,47 @@ export function baueWrackform(form: WrackformDef, lack: number): Wrackbau {
     return { id: sch.id, geo };
   });
 
-  return { koerper, scheiben };
+  /*
+   * DIE MOTORHAUBE (E-185): dasselbe Feld wie eine Scheibe, aber GENAU auf
+   * der Haut (keine Luft) und mit dem Lack der Eckpunkte — samt der dunklen
+   * Fuge an der Hinterkante, an der sie aus der Haut geschnitten ist. Zwei
+   * Netze teilen hier keine Eckpunkte: Die Spalte zwischen Haube und Kotflügel
+   * schattiert dadurch eigen, wie an einem echten Auto.
+   */
+  let haube: Wrackbau["haube"];
+  const h = form.haube;
+  if (h) {
+    const hp: number[] = [];
+    const hc: number[] = [];
+    const hi: number[] = [];
+    const schnitte = h.bisSchnitt - h.vonSchnitt + 1;
+    const ringe = h.bisRing - h.vonRing + 1;
+    for (let s = h.vonSchnitt; s <= h.bisSchnitt; s++) {
+      for (let r = h.vonRing; r <= h.bisRing; r++) {
+        const i = s * R + r;
+        hp.push(pos[i * 3]!, pos[i * 3 + 1]!, pos[i * 3 + 2]!);
+        hc.push(col[i * 3]!, col[i * 3 + 1]!, col[i * 3 + 2]!);
+      }
+    }
+    for (let s = 0; s + 1 < schnitte; s++) {
+      for (let r = 0; r + 1 < ringe; r++) {
+        const a = s * ringe + r;
+        const b = (s + 1) * ringe + r;
+        const c = (s + 1) * ringe + r + 1;
+        const d = s * ringe + r + 1;
+        hi.push(a, b, c, a, c, d);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(hp, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(hc, 3));
+    geo.setIndex(hi);
+    geo.computeVertexNormals();
+    const lage = haubeLage(form)!;
+    haube = { geo, scharnier: lage.scharnier, mitte: lage.mitte };
+  }
+
+  return { koerper, scheiben, haube };
 }
 
 /* ------------------------------------------------------------------------- */
@@ -851,6 +945,34 @@ export const FORM_C: WrackformDef = {
     { id: "left", vonSchnitt: 9, bisSchnitt: 12, vonRing: 10, bisRing: 12 },
   ],
   /*
+   * DIE MOTORHAUBE (E-185, Zerstörungskonzept B3): vom Stoßfänger-Schnitt
+   * (1,89 m) bis zur Haubenfuge (Schnitt 6, 0,80 m), quer zwischen den
+   * beiden Säulen-Ringen (6 und 11, je 0,65–0,73 m von der Mitte) — außen
+   * bleibt der Rand der Kotflügel stehen. Die Fuge, die die Kante schon seit
+   * E-116 zeichnet, ist die Hinterkante und das Scharnier. 1,46 x 1,09 m.
+   */
+  haube: { id: "haube", vonSchnitt: 1, bisSchnitt: 6, vonRing: 6, bisRing: 11 },
+  /*
+   * DIE INNENAUSSTATTUNG (E-185, Patrick 20.10.2026: „Autos haben
+   * innenausstattung"; Frage 2 A: sichtbar ab 1.0, herausholbar ab 1.1).
+   * x als Anteil der halben Breite (0,85 m), z als Anteil der halben Länge
+   * (2,00 m), Höhen in m über dem Boden (Boden-Kollider bis 0,32 m). Abgelesen
+   * an der Tabelle oben: Windschutzscheibe ab 0,77 m, B-Säule bei −0,06 m,
+   * Heckscheibe bis −1,04 m, Dach innen ab 1,30 m. // SW, Maße eines
+   * Kompaktwagens nach Augenmaß; Farben: dunkler Sitzstoff, schwarzes
+   * Armaturenbrett
+   */
+  innen: [
+    // Vordersitze: Sitzfläche 0,48–0,60 m, Lehne bis 1,10 m
+    { name: "Vordersitz", size: [0.46 / 1.7, 0.12, 0.48], anchor: [0.36 / 0.85, 0.54, 0.11 / 2.0], paarweise: true, farbe: 0x3b3d42 },
+    { name: "Vordersitz", size: [0.44 / 1.7, 0.6, 0.12], anchor: [0.36 / 0.85, 0.8, -0.19 / 2.0], paarweise: true, farbe: 0x3b3d42 },
+    // Rückbank: Sitzfläche über die ganze Breite, Lehne unter der Heckscheibe
+    { name: "Rückbank", size: [1.3 / 1.7, 0.12, 0.45], anchor: [0, 0.54, -0.72 / 2.0], farbe: 0x3b3d42 },
+    { name: "Rückbank", size: [1.3 / 1.7, 0.43, 0.12], anchor: [0, 0.735, -1.0 / 2.0], farbe: 0x3b3d42 },
+    // Armaturenbrett unter der Windschutzscheibe, 0,71–0,87 m
+    { name: "Armaturenbrett", size: [1.4 / 1.7, 0.16, 0.22], anchor: [0, 0.79, 0.61 / 2.0], farbe: 0x232527 },
+  ],
+  /*
    * DER HOHLKÖRPER (E-124). Acht Quader, abgelesen an der Tabelle oben
    * (z = Anteil · 2,00 m): Boden bis zur Schwellerkante 0,32 m, Ebene 1 (die
    * Räder sind nur Netze, der Wagen steht wie bisher auf y = 0); alles Weitere
@@ -993,6 +1115,17 @@ export const FORM_LKW: WrackformDef = {
     { name: "Auspuff", size: [0.16 / 2.5, 1.6, 0.16], anchor: [-1.0 / 1.25, 2.2, 0.68 / 3], farbe: 0x5a5a5a },
   ],
   /*
+   * Innenausstattung (E-185), nur zum Ansehen wie am Pkw: zwei Sitze auf
+   * dem Kabinenboden (1,35 m), das Armaturenbrett unter der Frontscheibe
+   * (Brüstung 2,05 m). Das Fahrerhaus bleibt für die Physik ein Block
+   * (E-135) — man sieht hinein, die Spinne kommt nicht hinein. // SW
+   */
+  innen: [
+    { name: "Vordersitz", size: [0.55 / 2.5, 0.14, 0.5], anchor: [0.62 / 1.25, 1.62, 1.85 / 3], paarweise: true, farbe: 0x3b3d42 },
+    { name: "Vordersitz", size: [0.52 / 2.5, 0.66, 0.14], anchor: [0.62 / 1.25, 1.95, 1.55 / 3], paarweise: true, farbe: 0x3b3d42 },
+    { name: "Armaturenbrett", size: [2.2 / 2.5, 0.3, 0.3], anchor: [0, 2.0, 2.62 / 3], farbe: 0x232527 },
+  ],
+  /*
    * Der Verbund: Rahmen samt Achsen bis 1,05 m über die ganze Grundfläche
    * (er trägt die Masse und steht auf dem Boden, die Räder sind Netze darin —
    * wie am Pkw), darauf das Fahrerhaus als EIN Block von 1,05 bis 2,99 m.
@@ -1081,6 +1214,19 @@ export const FORM_WOHNWAGEN: WrackformDef = {
     { name: "Aufbautür", size: [0.03 / 2.05, 1.7, 0.6], anchor: [0, 1.5, -0.9 / 2.1], amFlanke: true, farbe: 0xd9d4c6 },
     { name: "Rückleuchte", size: [0.18 / 2.05, 0.12, 0.05], anchor: [0.82 / 1.025, 0.55, -2.12 / 2.1], paarweise: true, farbe: 0xb82b1e },
     { name: "Dachluke", size: [0.5 / 2.05, 0.08, 0.5], anchor: [0, 2.43, 0.3 / 2.1], farbe: 0xd8dcde },
+  ],
+  /*
+   * Innenausstattung (E-185), nur zum Ansehen: Sitzgruppe mit Tisch am Bug
+   * (hinter dem Bugfenster), Küchenzeile links (hinter dem linken Fenster),
+   * Bett im Heck. Boden bei 0,60 m, Wände innen bei ±0,90 m, Bug- und
+   * Heckwand innen bei ±1,92 m. Möbel aus Holz, Polster braun — die Farben der
+   * Achtziger. // SW
+   */
+  innen: [
+    { name: "Sitzbank", size: [0.6 / 2.05, 0.44, 0.9], anchor: [0.55 / 1.025, 0.82, 1.45 / 2.1], paarweise: true, farbe: 0x6a5a4a },
+    { name: "Tisch", size: [0.5 / 2.05, 0.05, 0.8], anchor: [0, 1.05, 1.45 / 2.1], farbe: 0x9a7a55 },
+    { name: "Küchenzeile", size: [0.5 / 2.05, 0.9, 1.2], anchor: [-0.62 / 1.025, 1.05, 0.2 / 2.1], farbe: 0x9a7a55 },
+    { name: "Bett", size: [1.75 / 2.05, 0.5, 1.0], anchor: [0, 0.85, -1.4 / 2.1], farbe: 0x8a7f6c },
   ],
   /*
    * Ein geschlossener Kasten: Fahrgestell mit Boden bis 0,60 m (trägt die

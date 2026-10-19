@@ -79,11 +79,24 @@ function karosse(car: CarComposite): THREE.Mesh {
 const strahl = new THREE.Raycaster();
 const pruefstoff = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 function hautBei(car: CarComposite, x: number, z: number): number {
-  const geo = karosse(car).geometry;
-  geo.computeBoundingSphere();
+  /*
+   * ANGEPASST MIT E-185 (20.10.2026): Die Motorhaube ist aus der Haut
+   * geschnitten und ein eigenes Netz (Zerstörungskonzept B3) — geschlossen
+   * gehört sie zur Haut. Gefragt werden deshalb alle Bleche, die beulen
+   * (Karosserie und Haube), in ihrer Lage; die oberste Fläche zählt.
+   */
   strahl.set(new THREE.Vector3(x, 5, z), new THREE.Vector3(0, -1, 0));
-  const t = strahl.intersectObject(new THREE.Mesh(geo, pruefstoff), false);
-  return t.length ? t[0]!.point.y : -Infinity;
+  let oben = -Infinity;
+  for (const d of knautschNetze(car).filter((n) => n.beult)) {
+    d.mesh.geometry.computeBoundingSphere();
+    const m = new THREE.Mesh(d.mesh.geometry, pruefstoff);
+    m.position.copy(d.mesh.position);
+    m.quaternion.copy(d.mesh.quaternion);
+    m.updateMatrixWorld(true);
+    const t = strahl.intersectObject(m, false);
+    if (t.length) oben = Math.max(oben, t[0]!.point.y);
+  }
+  return oben;
 }
 
 /** Oberkante eines Kolliders, Wrack-lokal (nach einem Physikschritt; das Wrack steht ungedreht). */
@@ -132,10 +145,14 @@ describe("Hohlkoerper (E-124)", () => {
     expect(n.x).toBeCloseTo(a.x, 1);
     expect(n.y).toBeCloseTo(a.y, 1);
     expect(n.z).toBeCloseTo(a.z, 1);
-    // und nach dem Herausreissen des Motors um genau dessen Masse leichter
+    // und nach dem Herausreissen des Motors um genau dessen Masse leichter.
+    // ANGEPASST MIT E-185: Motor und Getriebe sind EIN Block (Patrick
+    // 20.10.2026, Frage 1 B) — die Masse kommt aus dem Datensatz, nicht 150.
     car.tearPart("engine");
     world.step();
-    expect(car.body.mass()).toBeCloseTo(CAR_DEF.totalMassKg - 150, 3);
+    const motor = CAR_DEF.parts.find((p) => p.id === "engine")!.massKg;
+    expect(motor).toBe(220);
+    expect(car.body.mass()).toBeCloseTo(CAR_DEF.totalMassKg - motor, 3);
   });
 
   it("die Bodenwanne endet am Schweller (0,32 m), und alles Uebrige steht lueckenlos darauf (E-127)", () => {

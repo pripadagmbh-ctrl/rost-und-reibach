@@ -63,6 +63,7 @@ import { Yard } from "../src/world/yard";
 import { ContainerManager } from "../src/world/containers";
 import { ItemManager, randomCargo } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
+import { WRACKDATEN } from "../src/dismantle/carDef";
 import { PressManager } from "../src/world/press";
 import { OfficeBuilding } from "../src/world/office";
 import { START_HAUFEN, START_AUTOS, START_STREU, START_LKW } from "../src/world/startplatz";
@@ -164,6 +165,28 @@ async function lauf(): Promise<boolean> {
    * Haufen von SELBST wieder einschlaeft, zeigt erst das.
    */
   if (process.env.WECKEN === "1") world.bodies.forEach((b) => b.isDynamic() && b.wakeUp());
+  /*
+   * AUSWEIDEN=1 (E-185): der schlimmste Fall fuer die Zerlegung — an jedem
+   * Wrack auf dem Platz geht ALLES ab, was abgehen kann (Pkw: Haube,
+   * Batterie, Kuehler, Motor, Raeder; LKW und Wohnwagen ihre Teile), mit
+   * demselben kleinen Stoss wie beim Biss (40 N·s quer, 40 hoch). Danach
+   * zaehlt, ob der Platz mit allen losen Teilen wieder einschlaeft.
+   */
+  if (process.env.AUSWEIDEN === "1") {
+    let ab = 0;
+    for (const car of composites.cars) {
+      for (const p of WRACKDATEN[car.art].parts) {
+        const b = car.tearPart(p.id);
+        if (!b) continue;
+        ab++;
+        const t = b.translation();
+        const c = car.body.translation();
+        const r = Math.hypot(t.x - c.x, t.z - c.z) || 1;
+        b.applyImpulse({ x: ((t.x - c.x) / r) * 40, y: 40, z: ((t.z - c.z) / r) * 40 }, true);
+      }
+    }
+    console.log(`Ausgeweidet: ${ab} Teile abgerissen, jetzt ${world.bodies.len()} Koerper`);
+  }
 
   const dt = 1 / 60;
   let ruheAb = -1;

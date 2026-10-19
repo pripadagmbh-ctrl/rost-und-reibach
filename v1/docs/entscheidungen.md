@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-185 | 20.10.2026 | Zerlegen in Reihenfolge: Haube, Batterie, Kühler, Motorblock; Felgen, Sitze | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-184 | 20.10.2026 | Grüne Rost-&-Reibach-Mulden hebbar, Absetzkipper-Mulde übergeben | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-183 | 20.10.2026 | MÜLL-Mulde morgens direkt vor dem Bagger an der BUNT + VA | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-182 | 20.10.2026 | Stahlschrott schmaler, gerade Quermauer, schräge Mauer zur Presse | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -187,6 +188,16 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-185 — Zerlegen in Reihenfolge, Felgen, Sitze** (iPad, dann iPhone mini)
+- Auf die geschlossene Haube beißen: springt sie auf und hängt schief? Zweiter Biss: kommt die Haube, nicht der Motor?
+- Aufs Dach beißen bis flach: kommt kein Motor, kein Getriebe heraus?
+- Haube ab: Batterie, Kühler, Motorblock zu sehen? Motor erst nach Batterie und Kühler — sagt die Griff-Info warum?
+- Rad abreißen: Reifen und Felge erkennbar, rollt kurz, bleibt liegen?
+- Scheiben kaputt, hineinschauen: Sitze, Rückbank, Armaturenbrett — knautschen sie beim Plattdrücken mit?
+- Abreißen: knallt es, fliegt das Teil ein Stück, fühlt sich Greifen an wie vorher?
+- iPhone mini mit beiden Autos: so flüssig wie vorher? Ein Auto ganz ausweiden unter 5 min?
+- Frage: Felge silbern (gebaut) oder rostbraun wie die losen Räder?
 
 **E-184 — Grüne Mulden hebbar** (iPad)
 - Grüne Mulde an der Nordmauer greifen: heben, schwenken, woanders abstellen, ohne Zittern?

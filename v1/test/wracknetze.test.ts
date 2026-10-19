@@ -12,9 +12,9 @@
  * DIESER WÄCHTER PRÜFT DREI DINGE, und das dritte ist das eigentliche:
  *
  *   1. Die Netzzahl je Wrack bleibt bei 13. Wächst sie zurück, meldet er es.
- *   2. Die Zerlegemechanik ist unberührt: Motor, Getriebe und die vier Räder
- *      sind weiter EIGENE Netze und gehen weiter einzeln ab. Genau die dürfen
- *      NICHT verschmolzen werden.
+ *   2. Die Zerlegemechanik ist unberührt: Jedes Teil geht einzeln ab. Seit
+ *      E-185 liegen die angebauten Teile dafür in EINEM Sammelnetz; ein
+ *      abgerissenes Teil verschwindet daraus und bekommt sein eigenes Netz.
  *   3. Das Auto sieht genauso aus wie vorher. Der Umbau hat die Maße nach
  *      `CarDef.karosserie` gehoben; die Prüfung baut die dreizehn Teile noch
  *      einmal nach dem ALTEN, fest verdrahteten Code und vergleicht jeden
@@ -181,20 +181,52 @@ describe("Was NICHT verschmolzen werden darf", () => {
     await initPhysics();
   });
 
-  it("Motor, Getriebe und vier Räder bleiben sechs eigene Netze und gehen einzeln ab", () => {
+  /*
+   * ANGEPASST MIT E-185 (20.10.2026). Bis hierher hieß dieser Fall „Motor,
+   * Getriebe und vier Räder bleiben sechs eigene Netze" — genau die durften
+   * NICHT verschmolzen werden, weil sie einzeln abgehen. Mit Haube, Batterie
+   * und Kühler wären es neun Netze gewesen, das Wrack bei 15 (Wächter 13).
+   * Das Zerstörungskonzept (B7) verschmilzt sie trotzdem — wie die
+   * Anbauteile in E-111 —, aber so, dass jedes weiter einzeln abgeht: Reißt
+   * es ab, verschwinden seine Eckpunkte aus dem Sammelnetz, und das lose Stück
+   * bekommt sein eigenes Netz. Bewacht wird jetzt genau das.
+   */
+  it("alle angebauten Teile liegen in EINEM Sammelnetz und gehen trotzdem einzeln ab (E-185)", () => {
     const scene = new THREE.Scene();
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-    const comps = new CompositeManager(scene, world, new ItemManager(scene, world), new EventBus());
+    const items = new ItemManager(scene, world);
+    const comps = new CompositeManager(scene, world, items, new EventBus());
     const car = comps.spawnCar(new THREE.Vector3(0, 1, 0));
 
-    const zerlegbar = CAR_DEF.parts.map((p) => p.id);
-    expect(zerlegbar.length, "Motor, Getriebe und vier Räder").toBe(6);
     const vorher = netze(car.group).length;
-    for (const id of zerlegbar) {
-      expect(car.tearPart(id), `${id} ließ sich nicht abreißen`).not.toBeNull();
+    expect(vorher, "Karosserie, Anbau, 4 Scheiben, Haube, Sammelnetz").toBe(8);
+    const sammel = netze(car.group).filter((m) => m.name === "Wrackteile");
+    expect(sammel.length, "genau EIN Sammelnetz").toBe(1);
+    const ids = car.teileDran;
+    expect(ids, "Haube, Batterie, Kühler, Motor mit Getriebe, vier Räder").toEqual(CAR_DEF.parts.map((p) => p.id));
+    for (const id of ids) {
+      const body = car.tearPart(id);
+      expect(body, `${id} ließ sich nicht abreißen`).not.toBeNull();
+      const stueck = items.itemByBody(body!)!;
+      expect(stueck.mesh.parent, `${id} hat als loses Stück ein eigenes Netz in der Szene`).toBe(scene);
+      expect(netze(stueck.mesh).length).toBe(1);
     }
-    // Jedes abgerissene Teil verlässt die Wrackgruppe: sechs Netze weniger.
-    expect(netze(car.group).length).toBe(vorher - 6);
+    expect(netze(car.group).length, "nur die Haube nimmt ihr Netz mit").toBe(vorher - 1);
+    // Im Sammelnetz ist nichts mehr zu sehen: jedes Dreieck hat die Fläche null.
+    const g = sammel[0]!.geometry;
+    const pos = g.getAttribute("position") as THREE.BufferAttribute;
+    const idx = g.getIndex()!;
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    let flaeche = 0;
+    for (let i = 0; i < idx.count; i += 3) {
+      a.fromBufferAttribute(pos, idx.getX(i));
+      b.fromBufferAttribute(pos, idx.getX(i + 1));
+      c.fromBufferAttribute(pos, idx.getX(i + 2));
+      flaeche += b.sub(a).cross(c.sub(a)).length() / 2;
+    }
+    expect(flaeche, "ein abgerissenes Teil bleibt im Sammelnetz sichtbar").toBeLessThan(1e-9);
   });
 
   it("Pressen bringt das Wrack weiter auf Stufe 2, mit Radauswurf", () => {
@@ -202,10 +234,12 @@ describe("Was NICHT verschmolzen werden darf", () => {
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     const comps = new CompositeManager(scene, world, new ItemManager(scene, world), new EventBus());
     const car = comps.spawnCar(new THREE.Vector3(0, 1, 0));
-    const raederVorher = netze(car.group).filter((m) => m.parent === car.group).length;
+    // ANGEPASST MIT E-185: Die Räder sind keine eigenen Netze mehr — gezählt wird, was dran ist.
+    const raeder = (): number => car.teileDran.filter((id) => id.startsWith("wheel_")).length;
+    const raederVorher = raeder();
     car.pressCrush();
     expect(car.crushStage).toBe(2);
-    expect(netze(car.group).filter((m) => m.parent === car.group).length, "zwei Raeder fliegen heraus").toBe(raederVorher - 2);
+    expect(raeder(), "zwei Raeder fliegen heraus").toBe(raederVorher - 2);
     /*
      * ALLES, was zur Karosserie gehoert, muss mitgequetscht werden — nicht nur
      * ein bestimmtes Netz. Bis E-117 suchte diese Zeile die Anbauteile an genau

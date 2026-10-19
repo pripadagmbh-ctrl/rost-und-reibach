@@ -25,6 +25,23 @@ export interface GameEvents {
   crushed: { stage: number; x: number; y: number; z: number };
   /** Baugruppe wurde abgerissen */
   partTorn: { name: string };
+  /**
+   * E-185 (Welt): Ein Teil geht vom Wrack ab (`art` "ab") oder die Haube
+   * springt auf ("auf"). Funken, Staub und Knall hängen hier (Regel 10) —
+   * egal ob gegriffen, gebissen oder von der Presse herausgedrückt. `handle`
+   * ist das Wrack, `teil` die Kennung aus `CarDef.parts`, `x/y/z` die Mitte
+   * des Teils, `massKg` seine Masse (laut nach Masse).
+   */
+  "wrack:abriss": {
+    art: "ab" | "auf";
+    handle: number;
+    teil: string;
+    name: string;
+    massKg: number;
+    x: number;
+    y: number;
+    z: number;
+  };
   /** Zaunfeld aus der Verankerung gerissen/gefahren */
   fenceBroken: { x: number; y: number; z: number };
   /**
