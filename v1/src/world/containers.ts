@@ -12,6 +12,7 @@ import {
 } from "./platzinventar";
 import type { ItemManager, ScrapItem } from "./scrapItems";
 import type { EventBus } from "../core/events";
+import { t } from "../ui/sprache"; // E-170: Schilder in der Spielsprache
 
 /**
  * Sortierziele (Design-Pivot 2026-08-27): offene **Haufen-Zonen** für die großen
@@ -1538,7 +1539,7 @@ class GameContainer {
         kante.position.set(0, oberkante - ROLLOFF_RIEGEL / 2, sz * (d / 2));
         group.add(kante);
       }
-      if (cfg.bemalung) group.add(muldenSchrift(cfg.bemalung.schrift, w, d, KUFE + T + h / 2, h));
+      if (cfg.bemalung) group.add(muldenSchrift(t(cfg.bemalung.schrift), w, d, KUFE + T + h / 2, h));
       // Haken-Öse an der Stirnseite: ohne sie ist es eine Kiste, keine Mulde
       const oese = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.045, 6, 12), rahmen);
       oese.rotation.y = Math.PI / 2;
@@ -1802,7 +1803,7 @@ class GameContainer {
    */
   refreshLabel(ampel: AmpelState | null = null, mitPreis = true): void {
     // Was aufgemalt ist, steht auch am Schild: „MÜLL" statt „MUELL" (E-138).
-    const name = this.cfg.bemalung?.schrift ?? this.cfg.label;
+    const name = t(this.cfg.bemalung?.schrift ?? this.cfg.label); // E-170
     if (ampel === null) {
       this.label.draw([name], null);
       return;

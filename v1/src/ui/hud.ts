@@ -2,6 +2,8 @@ import { getMaterial, istAbfall, normalizeMaterialId } from "../materials/catalo
 import { euroIndicator, masseText, preisProTonne } from "../materials/purity";
 import type { ScrapItem } from "../world/scrapItems";
 import type { AmpelState } from "../world/containers";
+import { t } from "./sprache";
+import { installSeiten } from "./seiten";
 
 /**
  * HUD M1 (Briefing Kap. 14): Griff-Info (Material, Gewicht, €-Indikator),
@@ -136,11 +138,13 @@ function stueckName(item: GriffStueck): string {
  */
 function mitFraktion(item: GriffStueck): string {
   const name = stueckName(item);
-  if (!item.shape?.name) return name; // der Name IST schon die Fraktion
+  // Entschieden wird am deutschen Namen (STOFFWORT), gezeigt in der Spielsprache (E-170)
+  if (!item.shape?.name) return t(name); // der Name IST schon die Fraktion
   const id = normalizeMaterialId(item.materialId);
-  if (istAbfall(id) || nameNenntStoff(name, id)) return name;
-  const frak = getMaterial(id).name;
-  return name.endsWith(")") ? `${name} · ${frak}` : `${name} (${frak})`;
+  if (istAbfall(id) || nameNenntStoff(name, id)) return t(name);
+  const frak = t(getMaterial(id).name);
+  const gezeigt = t(name);
+  return gezeigt.endsWith(")") ? `${gezeigt} · ${frak}` : `${gezeigt} (${frak})`;
 }
 
 /**
@@ -204,13 +208,13 @@ export function griffLadung(
   }
   const parts = [
     ...gross,
-    ...[...byMat.entries()].map(([id, n]) => `${n}× ${getMaterial(id).name}`),
+    ...[...byMat.entries()].map(([id, n]) => `${n}× ${t(getMaterial(id).name)}`),
   ];
   const gezeigt = parts.slice(0, GROSS_MAX + 2);
-  if (parts.length > gezeigt.length) gezeigt.push(`+${parts.length - gezeigt.length} weitere`);
+  if (parts.length > gezeigt.length) gezeigt.push(`+${parts.length - gezeigt.length} ${t("weitere")}`);
   // Gewicht in den Kopf, nicht ans Ende der Aufzaehlung: Es ist die Zahl, nach
   // der man den Abwurf entscheidet, und darf nie mit abgeschnitten werden.
-  return { kopf: `Greifer: ${masseText(total)}`, liste: gezeigt.join(", ") };
+  return { kopf: `${t("Greifer")}: ${masseText(total)}`, liste: gezeigt.join(", ") };
 }
 
 /**
@@ -428,12 +432,12 @@ export class Hud {
    * fassen sind.
    */
   showClosedEmpty(): void {
-    this.setzeGriff({ kopf: "Greifer: geschlossen (leer)", liste: "" }, true);
+    this.setzeGriff({ kopf: t("Greifer: geschlossen (leer)"), liste: "" }, true);
   }
 
   /** Hinweis bei offener Spinne über einer abreißbaren Baugruppe. */
   showPartHint(name: string): void {
-    this.setzeGriff({ kopf: `▼ ${name} — greifen + halten zum Abreißen`, liste: "" }, false);
+    this.setzeGriff({ kopf: `▼ ${t(name)} — ${t("greifen + halten zum Abreißen")}`, liste: "" }, false);
   }
 
   /** Reiß-Fortschritt während des Abreißens. */
@@ -441,7 +445,7 @@ export class Hud {
     const blocks = Math.round(progress01 * 10);
     this.setzeGriff(
       {
-        kopf: `${name} abreißen ${"█".repeat(blocks)}${"░".repeat(10 - blocks)} ${(progress01 * 100).toFixed(0)} %`,
+        kopf: `${t(name)} ${t("abreißen")} ${"█".repeat(blocks)}${"░".repeat(10 - blocks)} ${(progress01 * 100).toFixed(0)} %`,
         liste: "",
       },
       false
@@ -519,4 +523,9 @@ export class Hud {
     this.toastTimer = window.setTimeout(() => (el.style.opacity = "0"), 2600);
   }
   private toastTimer = 0;
+
+  /** Sprachwahl und Datenschutz/Lizenzen/Support im Pausenmenü (E-170, E-171). */
+  constructor() {
+    installSeiten();
+  }
 }

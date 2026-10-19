@@ -294,7 +294,8 @@ describe("Unterer HUD-Block: Griff-Info und Ladeanzeige", () => {
     expect(hud).toMatch(/showTarget\([\s\S]{0,120}this\.verbergeGriff\(\)/);
     // ... aber "geschlossen (leer)" bleibt: Das ist die Antwort auf einen
     // Fehlgriff, keine Zustandsmeldung (Empfehlung an Patrick, E-032).
-    expect(hud).toContain('kopf: "Greifer: geschlossen (leer)"');
+    // E-170: steht seit der Übersetzung in t(…)
+    expect(hud).toContain('kopf: t("Greifer: geschlossen (leer)")');
   });
 
   it("laesst die Zeile nicht bei jedem Ueberstreichen auf- und zuklappen", () => {

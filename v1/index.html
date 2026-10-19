@@ -602,6 +602,15 @@
         margin: -4px 0 8px; font-size: 11px; line-height: 1.4; color: #c9a227; min-height: 0;
       }
       #pause .grund:empty { display: none; }
+      /* E-170: Auch auf dem iPad zweispaltig. Einspaltig passten die Knoepfe
+         schon vorher nicht mehr ins Bild (rund 760 px Inhalt bei 718 px Feld, iPad
+         quer), und mit Sprache, Datenschutz, Lizenzen, Support kamen vier dazu. */
+      #pause .panel {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px;
+        align-content: start; min-width: min(560px, 90vw);
+      }
+      #pause h1, #pause .hint, #pause .grund { grid-column: 1 / -1; }
+      #pause .panel button { margin: 0; }
       /* --- Steuerungsmenü: eigenständige Tafel neben dem Pausenfeld --- */
       #controls-menu {
         display: none;
@@ -907,8 +916,9 @@
          ===================================================================== */
       @media (max-height: 430px) {
         #pause .panel {
-          padding: 12px 16px; min-width: 300px; max-height: 94vh;
-          display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+          padding: 12px 16px; min-width: min(640px, 86vw); max-height: 94vh;
+          /* E-170: drei Spalten — 14 Knoepfe in fuenf Reihen wie vorher zehn */
+          display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 10px;
           align-content: start;
         }
         #pause h1, #pause .hint, #pause .grund { grid-column: 1 / -1; }
@@ -1095,6 +1105,9 @@
         <button id="pause-save">Speichern</button>
         <button id="pause-load">Stand laden</button>
         <button id="pause-new">Neues Spiel</button>
+        <!-- Sprache (E-170): beide Woerter, damit man den Knopf in jeder
+             Sprache findet. Beschriftung setzt ui/seiten.ts. -->
+        <button id="pause-sprache" translate="no">Sprache · Language</button>
         <p class="hint">
           Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
           Pedale unten links: Fahren an/aus — dann fährt der linke Stick<br />

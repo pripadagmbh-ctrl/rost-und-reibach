@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-170 | 19.10.2026 | Englisch im Spiel: Sprache vom Gerät, umschaltbar im Pausenmenü | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-161 | 19.10.2026 | iOS-App ohne Mac: Capacitor 8, Cloud-Bau, TestFlight vorbereitet | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-160 | 19.10.2026 | Ein Wrack, das aufschlägt, klingt — auch ohne Knautschen | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-159 | 18.10.2026 | Feste Tonhöhe, Blech statt Dose, Schichtung, AAC, Hörparcours | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -175,6 +176,13 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-170 — Englisch im Spiel** (iPad, dann iPhone mini)
+- Pause → „Sprache: Deutsch“ antippen (oder Gerät auf Englisch): alles englisch, auch Muldenschilder und Griff-Info?
+- Auto greifen, in die Schere, SHEAR: Meldungen natürlich, kein deutsches Wort übrig?
+- iPhone mini quer: Pausenmenü (jetzt drei Spalten) ohne Scrollen, alle Knöpfe lesbar?
+- Zurück auf Deutsch: alles wieder deutsch, ohne Neustart?
+- Frage: Schild „BUNT + VA“ heißt englisch „NON-FERROUS + SS“ (SS = stainless steel) — passt das, oder lieber „NON-FERROUS + STAINLESS“ (zu lang fürs Schild)?
 
 **E-161 — iOS-App** (erst über TestFlight, nach dem Apple-Konto; iPad, dann iPhone mini)
 - Icon auf dem Home-Bildschirm ohne Rand, Name ganz lesbar?

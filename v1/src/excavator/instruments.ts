@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { t } from "../ui/sprache"; // E-170: Anzeige in der Spielsprache
 
 /**
  * Bordinstrument in der Fahrerkabine.
@@ -120,13 +121,13 @@ export class InstrumentPanel {
     x.fillText("PRIPADA", 10, 21);
     x.fillStyle = "#8d979d";
     x.font = "13px Consolas, monospace";
-    x.fillText(r.outriggerDown > 0.85 ? "ABGESTÜTZT" : "FAHRBETRIEB", 108, 21);
+    x.fillText(t(r.outriggerDown > 0.85 ? "ABGESTÜTZT" : "FAHRBETRIEB"), 108, 21);
 
     const deg = (rad: number): number => Math.round(THREE.MathUtils.radToDeg(rad));
     const rows: Array<[string, string]> = [
-      ["Oberwagen", `${Math.abs(deg(r.cabYaw) % 360)}°`],
-      ["Hauptarm", `${deg(r.boomAngle)}°`],
-      ["Ausleger", `${deg(r.stickAngle)}°`],
+      [t("Oberwagen"), `${Math.abs(deg(r.cabYaw) % 360)}°`],
+      [t("Hauptarm"), `${deg(r.boomAngle)}°`],
+      [t("Ausleger"), `${deg(r.stickAngle)}°`],
     ];
     x.font = "14px Consolas, monospace";
     rows.forEach(([label, value], i) => {
@@ -140,7 +141,7 @@ export class InstrumentPanel {
     // Hydraulikdruck steigt mit Last und Achsbewegung
     const bar = Math.round(90 + r.activity * 120 + Math.min(r.carriedMassKg / 40, 90));
     x.fillStyle = "#8d979d";
-    x.fillText("Hydraulik", 10, 132);
+    x.fillText(t("Hydraulik"), 10, 132);
     x.fillStyle = bar > 260 ? "#e0864a" : "#e8e8e4";
     x.fillText(`${bar} bar`, 130, 132);
     x.fillStyle = "#232c31";
@@ -150,16 +151,16 @@ export class InstrumentPanel {
 
     // Greiferstatus
     x.fillStyle = "#8d979d";
-    x.fillText("Spinne", 10, 172);
+    x.fillText(t("Spinne"), 10, 172);
     const zu = r.closure > 0.85;
     x.fillStyle = zu ? "#e0c14a" : "#7ec96a";
     x.fillText(
       r.carriedCount > 0
-        ? `beladen · ${Math.round(r.carriedMassKg)} kg`
+        ? `${t("beladen")} · ${Math.round(r.carriedMassKg)} kg`
         : zu
-          ? "geschlossen"
+          ? t("geschlossen")
           : r.closure < 0.15
-            ? "offen"
+            ? t("offen")
             : `${Math.round(r.closure * 100)} %`,
       130,
       172
@@ -167,7 +168,7 @@ export class InstrumentPanel {
 
     // Öltemperatur — steigt langsam mit der Arbeit
     x.fillStyle = "#8d979d";
-    x.fillText("Öltemperatur", 10, 200);
+    x.fillText(t("Öltemperatur"), 10, 200);
     x.fillStyle = "#e8e8e4";
     x.fillText(`${Math.round(44 + r.activity * 14)} °C`, 130, 200);
 
