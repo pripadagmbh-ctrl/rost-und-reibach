@@ -446,7 +446,17 @@ function fuhreFuer(
   dichte: number;
   spaene: boolean;
 } {
-  const vehicle = nurAbsetzer ? "absetzer" : rollFahrzeug(group);
+  /*
+   * SORTENREIN KOMMT IM KIPPER (E-178). Patrick, 20.10.2026: „Anlieferung
+   * sortenrein direkt zu den metallboxen die dafür gedacht waren". Ins Lager
+   * seiner Sorte kommt nur, wer selbst kippen kann (`routes.faehrtInsSilo`);
+   * eine Pritsche muss der Bagger ausraeumen und haelt deshalb beim Bagger.
+   * Wer eine Sorte sauber getrennt bringt, bringt sie also im Kipper — der
+   * Absetzkipper bleibt, was er ist (er kippt hinter sich, nicht ins Silo).
+   * Kein neuer Wurf: Der Zufallsstrom bleibt Zahl fuer Zahl, wie er war.
+   */
+  const gerollt = nurAbsetzer ? "absetzer" : rollFahrzeug(group);
+  const vehicle: Fahrzeugart = sortedMaterial && gerollt === "pritsche" ? "kipper" : gerollt;
   const aufbau = rollAufbau(group);
   /*
    * Späne (E-147)? Gewürfelt wird nur, wo der Anteil zwischen 0 und 1 liegt —

@@ -67,6 +67,53 @@ const VOLL_PRUEF_S = 0.25;
  * dem „Tara 0 kg" steht — richtig gerechnet und trotzdem falsch gelesen.
  */
 const ABHOLER_CONTAINER_KG = 1800;
+
+/* ---------------------------- ABHOLER NACH BESTELLUNG (E-177) ---------- */
+
+/**
+ * Welcher Wagen zum Abholen kommt (Patrick, 20.10.2026: „manchmal einfach ein
+ * absetzkipper, und manchmal ein grosser container"): der Abroller mit dem
+ * grossen Container (`kind` „abholer") oder ein Absetzkipper, der seine Mulde
+ * auf dem Rahmen behaelt und dort beladen wird.
+ */
+export type AbholAufbau = "abroller" | "absetzer";
+/**
+ * Leergewicht der 7-m³-Absetzmulde (kg) — die Tara des Absetzkippers als
+ * Abholer, wie `ABHOLER_CONTAINER_KG` beim Abroller. SW: Hersteller nennen fuer
+ * eine 7-m³-Absetzmulde aus 4-mm-Blech 550 bis 750 kg.
+ */
+const ABSETZMULDE_LEER_KG = 650;
+/**
+ * Nennvolumen der Absetzmulde (m³), so wird sie bestellt. Aus E-141/E-133:
+ * „7 m³" (`fuellgrad.ABSETZMULDE`, 3,70 × 1,85 × 1,55 m mit schraegen Stirnen).
+ * Was tatsaechlich hineinpasst, rechnet `laderaum()`.
+ */
+export const ABSETZMULDE_NENN_M3 = 7;
+/**
+ * DER ABHOLER FAEHRT DEM BAGGER NACH (E-177) — aber nicht bei jedem Rangieren.
+ *
+ * Umgesetzt wird erst, wenn der Bagger an einem ANDEREN Verladeplatz STEHT:
+ * hoechstens `FOLGE_RADIUS_M` von dessen Baggerstand (SW: gut die Haelfte der
+ * 7,5 m zwischen Stand und Halt — wer so nah steht, steht dort), dabei nicht
+ * mehr als `FOLGE_STILL_M` bewegt (SW: Drehen und ein Schritt vor und zurueck
+ * zaehlen nicht als Weiterfahren), und das `FOLGE_WARTE_S` am Stueck (SW, wie
+ * `VOLL_WARTE_S`: wer durchfaehrt, ist nach drei Sekunden schon weiter).
+ */
+const FOLGE_RADIUS_M = 4;
+const FOLGE_STILL_M = 1;
+const FOLGE_WARTE_S = 3;
+/**
+ * Bei der Ankunft hupt der Fahrer (E-178) — hoechstens alle 30 s (SW): Bei drei
+ * Fuhren hintereinander und einem Abholer, der umsetzt, waere es sonst ein
+ * Hupkonzert. Gezaehlt wird ueber den ganzen Fuhrpark.
+ */
+const HUPE_ABSTAND_S = 30;
+/**
+ * Ein Wrack belegt im Laderaum das Volumen seines Koerpers (`colliderHalf`,
+ * `carDef.ts`), zusammengeknautscht weniger: flach gedrueckt bleiben 30 %
+ * (SW — ein plattes Auto ist etwa ein Drittel so hoch wie ein heiles).
+ */
+const WRACK_FLACH_REST = 0.3;
 /*
  * DER ABSETZKIPPER (E-141) — Tempi und Winkel, alle SW.
  *
@@ -174,7 +221,8 @@ import {
   type Lage,
 } from "./lenkung";
 import { BAGGER_STAND } from "../world/baggerstand";
-import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
+import { lagerMuldeFuer, CONFIGS, type ContainerConfig } from "../world/containers";
+import { zaehltZu } from "../economy/fraktionsgruppen";
 import {
   rollCustomer,
   rollAnlieferung,
@@ -206,6 +254,7 @@ import {
   ABSETZMULDE,
   ABSETZ_HALB_BREITE,
   ABSETZ_WAND,
+  LKW_HALB_BREITE,
   type Aufbau,
 } from "./fuellgrad";
 import { getMaterial } from "../materials/catalog";
@@ -222,6 +271,16 @@ import type { PlatzinventarPort } from "./platzinventarAbholung";
 
 export type DeliveryKind = "kipper" | "pritsche" | "wrack" | "abholer" | "pkw" | "absetzer";
 
+/** Wie die Wagen im Funk heissen (E-177). Der Abholer ist der Abroller mit dem grossen Container. */
+const FAHRZEUG_NAME: Record<DeliveryKind, string> = {
+  kipper: "Kipper",
+  pritsche: "Pritsche",
+  wrack: "Abschlepper",
+  abholer: "Abroller",
+  pkw: "Pkw mit Anhänger",
+  absetzer: "Absetzkipper",
+};
+
 import {
   ROUTE_IN_FWD,
   neueAbladestelle,
@@ -230,6 +289,7 @@ import {
   routeOut,
   PICKUP_IN_FWD,
   neueAbholstelle,
+  aktuellerAbholPlatz as aktuellerAbholPlatzRoute,
   abholPlatzFuer,
   type AbholPlatz,
   pickupApproach,
@@ -267,6 +327,9 @@ import {
   CRANE_SWING,
   ABLADE_SPUR_X,
   ABLADE_HALT_Z,
+  abholPlatzNahe,
+  setzeAbholPlatz,
+  umsetzZug,
 } from "./routes";
 
 type Phase =
@@ -311,6 +374,13 @@ interface RidingBody {
   body: RAPIER.RigidBody;
   localPos: THREE.Vector3;
   localQuat: THREE.Quaternion;
+}
+
+/** Laderaum, den ein Wrack belegt (m³) — siehe `WRACK_FLACH_REST`. */
+export function wrackVolumenVon(car: CarComposite | null): number {
+  if (!car) return 0;
+  const [hx, hy, hz] = WRACKDATEN[car.art].colliderHalf;
+  return 8 * hx * hy * hz * (1 - (1 - WRACK_FLACH_REST) * Math.min(1, Math.max(0, car.knautschgrad)));
 }
 
 class DeliveryVehicle {
@@ -403,6 +473,9 @@ class DeliveryVehicle {
   onMuldeAbgesetzt: ((m: AbgesetzteMulde) => void) | null = null;
   /** Meldet, dass sie wieder am Haken haengt. */
   onMuldeGeholt: (() => void) | null = null;
+
+  /** Ein Absetzkipper, der als Abholer kommt (E-177) — gesetzt im Konstruktor. */
+  readonly abholt: boolean;
 
   /** Ein Absetzkipper, der nur eine Mulde holt: kein Ankauf, keine Verhandlung. */
   get holtNur(): boolean {
@@ -1181,6 +1254,10 @@ class DeliveryVehicle {
      */
     const aufDerFlaeche = this.ladeflaecheKg();
     this.onFahrerlage?.(aufDerFlaeche > 1 ? "abfahrtVoll" : "abfahrtLeer");
+    // Und dem Spieler (E-177): voll von selbst oder auf ABHOLEN
+    this.onMeldung?.(
+      this.vollLos ? `${this.fahrzeugName} ist voll und fährt los.` : `${this.fahrzeugName} fährt los.`
+    );
   }
 
   sendAway(): boolean {
@@ -1334,8 +1411,118 @@ class DeliveryVehicle {
     this.ausfaedelRoute = null;
   }
 
-  private get isPickup(): boolean {
-    return this.kind === "abholer";
+  /** Holt dieser Wagen ab? Der Abroller immer, ein Absetzkipper, wenn er dafuer bestellt ist (E-177). */
+  get isPickup(): boolean {
+    return this.kind === "abholer" || this.abholt;
+  }
+
+  /* ---------------------------- E-177: zum Bagger, hinterher ---------- */
+
+  /** Im Sandkasten: Halt am Verladeplatz beim Bagger, und hinterher, wenn er wechselt. */
+  zumBagger = false;
+  /** Wo der Bagger steht — gesetzt vom Fuhrpark. */
+  baggerPos: (() => { x: number; z: number }) | null = null;
+  /** Ist der Abladeplatz zu (abgesetzte Mulde, E-141)? Gesetzt vom Fuhrpark. */
+  abladeplatzZu: () => boolean = () => false;
+  /** Der Halteplatz, an dem dieser Abholer steht oder hinfaehrt. */
+  private platz: AbholPlatz | null = null;
+  get abholPlatzJetzt(): AbholPlatz | null {
+    return this.platz;
+  }
+  /** Faehrt er gerade zu einem anderen Verladeplatz um? Dann gibt er dort die Ladung frei. */
+  private umsetzen = false;
+  get setztUm(): boolean {
+    return this.umsetzen;
+  }
+  private folgePruefT = 0;
+  private folgeSeitS = 0;
+  private folgeZiel: AbholPlatz | null = null;
+  private folgeStart: { x: number; z: number } | null = null;
+  /** Fuhr er los, weil er voll war? Fuer die Meldung. */
+  private vollLos = false;
+  /** Am Halt angekommen (einmal je Ankunft) — Hupe und Meldung haengt der Fuhrpark daran. */
+  onAngekommen: (() => void) | null = null;
+  /** Eine Zeile fuers HUD (deutsch; `main.ts` uebersetzt mit `t()`). */
+  onMeldung: ((text: string) => void) | null = null;
+  /** Das Ziel steht fest (Waage verlassen oder vom Warteplatz los) — fuer den Buero-Funk. */
+  onZielFest: (() => void) | null = null;
+
+  /** Leergewicht dessen, worin er laedt: Abrollcontainer oder Absetzmulde (E-064, E-177). */
+  private get containerTaraKg(): number {
+    return this.absetz ? ABSETZMULDE_LEER_KG : ABHOLER_CONTAINER_KG;
+  }
+
+  /** Wie der Wagen im Funk heisst. */
+  get fahrzeugName(): string {
+    return FAHRZEUG_NAME[this.kind];
+  }
+
+  /** Das Silo, in das diese Fuhre kippt, oder null (Abladeplatz). Fuer den Buero-Funk. */
+  get zielSilo(): ContainerConfig | null {
+    return this.isPickup ? null : this.zielMulde;
+  }
+
+  /**
+   * Steht der Bagger an einem anderen Verladeplatz? Dann setzt er um.
+   * Liefert true, sobald er losfaehrt. Viermal je Sekunde gefragt (`VOLL_PRUEF_S`).
+   */
+  private pruefeFolgen(dt: number): boolean {
+    const pos = this.baggerPos?.();
+    if (!pos || !this.platz) return false;
+    this.folgePruefT -= dt;
+    if (this.folgePruefT > 0) return false;
+    this.folgePruefT += VOLL_PRUEF_S;
+    const ziel = abholPlatzNahe(pos.x, pos.z, (p) => !(p.ziel === null && this.abladeplatzZu()));
+    const amZiel =
+      ziel.halt[0] !== this.platz.halt[0] || ziel.halt[1] !== this.platz.halt[1]
+        ? Math.hypot(ziel.stand.x - pos.x, ziel.stand.z - pos.z) <= FOLGE_RADIUS_M
+        : false;
+    const still =
+      this.folgeStart !== null &&
+      this.folgeZiel === ziel &&
+      Math.hypot(pos.x - this.folgeStart.x, pos.z - this.folgeStart.z) <= FOLGE_STILL_M;
+    if (!amZiel) {
+      this.folgeSeitS = 0;
+      this.folgeZiel = null;
+      this.folgeStart = null;
+      return false;
+    }
+    if (!still) {
+      this.folgeZiel = ziel;
+      this.folgeStart = { x: pos.x, z: pos.z };
+      this.folgeSeitS = 0;
+      return false;
+    }
+    this.folgeSeitS += VOLL_PRUEF_S;
+    if (this.folgeSeitS < FOLGE_WARTE_S) return false;
+    // Nie mit einem Teil in der Spinne ueber der Flaeche, nie mit rutschender Ladung
+    if (this.greiferUeberFlaeche() || !this.ladeflaecheRuhig()) return false;
+    this.setzeUm(ziel);
+    return true;
+  }
+
+  /**
+   * UMSETZEN: Ladung verriegeln, Rangierzug zum neuen Platz, dort freigeben.
+   * Dieselben Phasen wie bei der Anfahrt (approach → reverseIn → waitLoad),
+   * also dasselbe Fahrgesetz, dieselbe Bauwerks- und Baggerpruefung.
+   */
+  private setzeUm(ziel: AbholPlatz): void {
+    const von = this.platz!;
+    this.verriegeleLadeflaeche();
+    this.umsetzen = true;
+    const zug = umsetzZug(von, ziel, this.bedLen);
+    this.platz = ziel;
+    setzeAbholPlatz(ziel);
+    this.meineAnfahrt = zug.anfahrt;
+    this.meinRueckweg = zug.rueckweg;
+    this.meineAusfahrt = ziel.ausfahrt;
+    this.folgeSeitS = 0;
+    this.folgeZiel = null;
+    this.folgeStart = null;
+    this.phase = "approach";
+    this.phaseT = 0;
+    this.routeS = 0;
+    this.onMeldung?.(`${this.fahrzeugName} fährt dir nach.`);
   }
 
   /**
@@ -1502,10 +1689,24 @@ class DeliveryVehicle {
        * Lagersilo faehrt an den Verladeplatz vor dem Schenkel dieses Silos.
        * Die Rechnung steht in `routes.ts`, damit sie kopflos zu pruefen ist.
        */
-      neueAbholstelle(this.bestellung);
+      /*
+       * IM SANDKASTEN KOMMT ER ZUM BAGGER (E-177): an den Verladeplatz, dessen
+       * Baggerstand der Maschine jetzt am naechsten liegt — und nicht dorthin,
+       * wo die Bestellung ihn hinschickte. Ist der Abladeplatz zu (abgesetzte
+       * Mulde, E-141), kommt er dort nicht hin.
+       */
+      const bagger = this.zumBagger ? this.baggerPos?.() : undefined;
+      if (bagger) {
+        this.platz = abholPlatzNahe(bagger.x, bagger.z, (p) => !(p.ziel === null && this.abladeplatzZu()));
+        setzeAbholPlatz(this.platz);
+      } else {
+        neueAbholstelle(this.bestellung);
+        this.platz = aktuellerAbholPlatzRoute();
+      }
       this.meineAnfahrt = pickupApproach();
       this.meinRueckweg = pickupInRev();
       this.meineAusfahrt = pickupOut();
+      this.onZielFest?.();
       return;
     }
     if (this.absetz) {
@@ -1515,6 +1716,7 @@ class DeliveryVehicle {
       this.meineAnfahrt = zug.anfahrt;
       this.meinRueckweg = zug.rueckweg;
       this.meineAusfahrt = absetzAusfahrt();
+      this.onZielFest?.();
       return;
     }
     const mulde = this.zielMulde;
@@ -1522,12 +1724,14 @@ class DeliveryVehicle {
       this.meineAnfahrt = bayApproach(mulde);
       this.meinRueckweg = bayInRev(mulde);
       this.meineAusfahrt = bayOut(mulde);
+      this.onZielFest?.();
       return;
     }
     neueAbladestelle();
     this.meineAnfahrt = routeApproach();
     this.meinRueckweg = routeInRev();
     this.meineAusfahrt = routeOut();
+    this.onZielFest?.();
   }
 
   /*
@@ -1585,9 +1789,12 @@ class DeliveryVehicle {
     private onWeighOut: ((netKg: number) => void) | null = null,
     customer: CustomerProfile | null = null,
     /** Absetzkipper: Diese abgesetzte Mulde holt er ab (E-141). */
-    holeMulde: AbgesetzteMulde | null = null
+    holeMulde: AbgesetzteMulde | null = null,
+    /** Absetzkipper als Abholer (E-177): kommt leer, wird auf dem Rahmen beladen. */
+    alsAbholer = false
   ) {
-    this.customer = kind === "abholer" ? null : (customer ?? rollCustomer());
+    this.abholt = alsAbholer;
+    this.customer = this.isPickup ? null : (customer ?? rollCustomer());
     // Die Tabelle steht in routes.ts — dieselbe, gegen die die Waechter rechnen
     this.bedLen = bedLenFor(kind);
     /*
@@ -2496,6 +2703,20 @@ class DeliveryVehicle {
     this.flaechePos.set(p.x, p.y, p.z);
     this.bedGroup.worldToLocal(this.flaechePos);
     const l = this.flaechePos;
+    if (this.absetz && this.isPickup) {
+      /*
+       * Der Absetzkipper als Abholer (E-177) laedt in seine Mulde: Ihr Rahmen
+       * ist `bedGroup` (Ursprung Heck unten, laengs +z, `absetzmulde.ts`).
+       * Dieselben Raender wie an der Flaeche, aber ihre Masse.
+       */
+      return (
+        Math.abs(l.x) <= ABSETZMULDE.breite / 2 + DeliveryVehicle.FLAECHE_UEBER_X + extra &&
+        l.z >= -DeliveryVehicle.FLAECHE_UEBER_Z - extra &&
+        l.z <= ABSETZMULDE.laenge + DeliveryVehicle.FLAECHE_UEBER_Z + extra &&
+        l.y >= DeliveryVehicle.FLAECHE_UNTEN &&
+        l.y <= DeliveryVehicle.FLAECHE_OBEN + extra
+      );
+    }
     return (
       Math.abs(l.x) <= BED_HALF_W + DeliveryVehicle.FLAECHE_UEBER_X + extra &&
       l.z >= -DeliveryVehicle.FLAECHE_UEBER_Z - extra &&
@@ -2586,6 +2807,8 @@ class DeliveryVehicle {
     if (!quelle) return;
     this.bedGroup.updateWorldMatrix(true, false);
     const schon = new Set(this.riding.map((r) => r.body.handle));
+    // Was die Spinne haelt, bleibt bei der Spinne — nie zwei Herren fuer einen Koerper (E-120)
+    for (const b of this.gegriffen?.() ?? []) schon.add(b.handle);
     for (const it of quelle.items) {
       if (schon.has(it.body.handle)) continue;
       if (this.aufDerFlaeche(it.body)) this.lockToBed(it.body);
@@ -2632,11 +2855,19 @@ class DeliveryVehicle {
     this.bedGroup.updateWorldMatrix(true, false);
     let belegt = 0;
     for (const it of this.itemQuelle?.items ?? []) {
-      if (it.shape && this.aufDerFlaeche(it.body)) {
-        belegt += deckelVolumen(it.shape.kind, it.shape.dims);
-      }
+      if (!this.aufDerFlaeche(it.body)) continue;
+      belegt += it.shape ? deckelVolumen(it.shape.kind, it.shape.dims) : this.wrackVolumen(it.body);
     }
     return belegt / raum;
+  }
+
+  /**
+   * Was ein Wrack im Laderaum belegt (m³), 0 fuer alles andere ohne Form (E-177).
+   * Bis hierher zaehlte ein Wrack nichts — ein Abroller mit einem LKW-Wrack
+   * darauf waere nie „voll" geworden.
+   */
+  private wrackVolumen(body: RAPIER.RigidBody): number {
+    return wrackVolumenVon(this.composites?.cars.find((c) => c.body.handle === body.handle) ?? null);
   }
 
   /**
@@ -3030,7 +3261,7 @@ class DeliveryVehicle {
              * gefeilscht. Er meldet seine Tara und faehrt weiter; die Wiegung
              * ist ein kurzer Halt, keine Verhandlung.
              */
-            this.taraKg = this.ladeflaecheKg() + ABHOLER_CONTAINER_KG;
+            this.taraKg = this.ladeflaecheKg() + this.containerTaraKg;
             this.onTara?.(this.taraKg);
           } else if (this.holtNur) {
             // Er holt nur seine Mulde (E-141): nichts zu wiegen, nichts zu verhandeln
@@ -3079,6 +3310,8 @@ class DeliveryVehicle {
         if (this.routeS >= this.routeLength(this.routeRev)) {
           this.phase = "pauseBeforeUnload";
           this.phaseT = 0;
+          // Er steht: hupen, und der Abholer sagt Bescheid (E-178)
+          this.onAngekommen?.();
         }
         break;
       case "pauseBeforeUnload":
@@ -3087,8 +3320,14 @@ class DeliveryVehicle {
         if (this.kind === "pritsche" || this.kind === "wrack") this.sideOpenTarget = 1;
         // Der Absetzkipper gibt seine Fuhre erst frei, wenn die Mulde steht
         if (!this.isPickup && !this.absetz) this.releaseCargo();
+        // Umgesetzt (E-177): Was auf dem Weg verriegelt war, liegt wieder frei —
+        // derselbe Weg wie beim Anlieferer, samt neu gemeldeter Kollider (E-071).
+        if (this.umsetzen) {
+          this.releaseCargo();
+          this.umsetzen = false;
+        }
         // Gekippt wird erst, wenn der Ladekran aus dem Weg ist (`kranSteht`)
-        if (this.phaseT > 1.2 && this.absetz) {
+        if (this.phaseT > 1.2 && this.absetz && !this.isPickup) {
           this.phase = this.absetzModus === "holen" ? "muldeHolen" : "muldeHeben";
           this.phaseT = 0;
           break;
@@ -3130,7 +3369,9 @@ class DeliveryVehicle {
         // Die 240 s stehen seit E-082 als `STANDZEIT_S` oben; sie gelten
         // jetzt auch fuer den Anlieferer, und eine Zahl an zwei Stellen war
         // schon einmal der Anfang von zwei verschiedenen Zahlen.
-        if (this.releaseRequested || this.phaseT > DeliveryVehicle.STANDZEIT_S) {
+        // Im Sandkasten wartet er, bis der Spieler fertig sagt oder er voll ist
+        // (E-177) — die Standzeit gilt nur im Betrieb.
+        if (this.releaseRequested || (!this.vollFaehrtLos && this.phaseT > DeliveryVehicle.STANDZEIT_S)) {
           /*
            * Abrechnen, Platzinventar zurueckgeben, verriegeln, funken — das
            * steht seit E-086 in `abholerFaehrtRaus()` und NICHT mehr hier.
@@ -3152,6 +3393,8 @@ class DeliveryVehicle {
            * welche.
            */
           this.starteAusfaedeln(this.routeOut, "out", 0);
+        } else if (this.zumBagger && this.pruefeFolgen(dt)) {
+          // Der Bagger steht an einem anderen Verladeplatz: er faehrt hinterher (E-177)
         } else if (this.vollFaehrtLos) {
           /*
            * VOLL FAEHRT ER VON SELBST (E-120, Patrick 06.10.2026: „LKW faehrt
@@ -3171,7 +3414,10 @@ class DeliveryVehicle {
             const bereit =
               !this.greiferUeberFlaeche() && this.ladeflaecheRuhig() && this.abholerVoll();
             this.vollSeitS = bereit ? this.vollSeitS + VOLL_PRUEF_S : 0;
-            if (this.vollSeitS >= VOLL_WARTE_S) this.sendAway();
+            if (this.vollSeitS >= VOLL_WARTE_S) {
+              this.vollLos = true;
+              this.sendAway();
+            }
           }
         }
         break;
@@ -3460,7 +3706,7 @@ class DeliveryVehicle {
              * Nur eine Meldung: Bezahlt ist das laengst (`onPickupDepart`),
              * und am Kreislauf wird hier nichts angefasst.
              */
-            this.bruttoKg = this.ladeflaecheKg() + ABHOLER_CONTAINER_KG;
+            this.bruttoKg = this.ladeflaecheKg() + this.containerTaraKg;
             this.onAbholungGewogen?.(this.taraKg, this.bruttoKg);
           } else {
             // Ausfahrtswiegung: leer über die Brückenwaage → Netto steht fest
@@ -3565,6 +3811,14 @@ class DeliveryVehicle {
     for (const w of this.sideWalls) this.world.removeRigidBody(w.body);
     this.sideWalls = [];
     /*
+     * Die Heckklappe ist ein eigener Koerper wie die Bordwaende — und blieb bis
+     * E-177 am Ende der Ausfahrt stehen: je Pritsche, Abroller und
+     * Abschlepper ein kinematischer Koerper mehr in der Welt (gemessen mit
+     * `tools/abholer-lauf.ts`: 25 Koerper vor, 26 nach einer Abholung).
+     */
+    if (this.tailGate) this.world.removeRigidBody(this.tailGate.body);
+    this.tailGate = null;
+    /*
      * DER ABHOLER NIMMT SEINE LADUNG MIT — und zwar erst HIER, am Ende der
      * Ausfahrt, ausser Sicht (E-120, Patrick 06.10.2026: „Schrott soll auch
      * nicht direkt verschwinden").
@@ -3580,8 +3834,15 @@ class DeliveryVehicle {
       for (const r of this.riding) {
         if (!r.body.isValid()) continue;
         const it = this.itemQuelle?.itemByBody(r.body);
-        if (it) this.itemQuelle!.remove(it, true);
-        else this.composites?.despawnByBody(r.body);
+        /*
+         * EIN WRACK ZUERST UEBER SEINEN VERWALTER (E-177). Es steht AUCH im
+         * ItemManager (die Karosse meldet sich dort an); ueber den allein
+         * entfernt, blieb es in `composites.cars` stehen, und dessen naechstes
+         * `update()` fragte einen geloeschten Koerper — Absturz der Physik.
+         */
+        if (this.composites?.despawnByBody(r.body)) {
+          if (it) this.itemQuelle!.remove(it, false);
+        } else if (it) this.itemQuelle!.remove(it, true);
       }
       this.riding = [];
     }
@@ -3651,6 +3912,51 @@ class DeliveryVehicle {
   }
 }
 
+/** Wie eine Bestellung im Funk heisst (E-177): Sorte, „Muell" oder gemischt. */
+function abholWas(order: string | null): string {
+  if (order === null) return "gemischte Ladung";
+  if (order === "rubble") return "Müll"; // das ABFALL-Silo nimmt alle vier Abfallsorten
+  return getMaterial(order).name;
+}
+
+/** Laderaum der Absetzmulde (m³) — dieselbe Rechnung wie `laderaum()` beim Absetzkipper. */
+function absetzRaumM3(): number {
+  const halbBreite = ABSETZ_HALB_BREITE;
+  const nutzLaenge = ABSETZMULDE.laenge * ABSETZMULDE.bodenAnteil - 2 * LADE_RAND;
+  return halbBreite * 2 * nutzLaenge * ladeHoeheGrenze(ABSETZ_WAND);
+}
+
+/**
+ * Nennvolumen des Abrollcontainers (m³), auf ganze Kubikmeter: Innenlaenge ×
+ * Innenbreite × Wandhoehe, so wie er gebaut ist (`BED_LEN.abholer`,
+ * `LKW_HALB_BREITE`, `wandHoehe("abholer")`): 5,40 × 2,54 × 2,50 = 34 m³.
+ */
+function abrollerNennM3(): number {
+  return Math.round(bedLenFor("abholer") * 2 * LKW_HALB_BREITE * wandHoehe("abholer", "flach"));
+}
+
+/** Womit ein Anlieferer kommt, fuer den Buero-Funk (E-178). */
+function ladungImFunk(v: DeliveryVehicle): string {
+  if (v.kind === "wrack") {
+    return v.customer?.wrackArt === "wohnwagen" ? "einem Wohnwagen" : "einem Altauto";
+  }
+  const m = v.sortedMaterial;
+  return m ? getMaterial(m).name : "gemischter Ladung";
+}
+
+/**
+ * DER BUERO-FUNK ZU EINER FUHRE (E-178). Patrick, 20.10.2026: „fahrer hupen
+ * und funkspruch aus dem Büro". Eine Zeile, sobald feststeht, wohin der Wagen
+ * faehrt — ins Silo seiner Sorte oder an den Abladeplatz beim Bagger.
+ */
+export function bueroFunk(v: DeliveryVehicle): string {
+  if (v.holtNur) return `Büro an Bagger: ${v.fahrzeugName} holt seine Mulde.`;
+  const silo = v.zielSilo;
+  return silo
+    ? `Büro an Bagger: ${v.fahrzeugName} mit ${ladungImFunk(v)} kommt, kippt ins ${silo.label}.`
+    : `Büro an Bagger: ${v.fahrzeugName} mit ${ladungImFunk(v)} kommt an den Abladeplatz.`;
+}
+
 export class VehicleManager {
   private active: DeliveryVehicle | null = null;
   /**
@@ -3702,6 +4008,26 @@ export class VehicleManager {
 
   /** Baggerposition für die Blockade-Prüfung; von main gesetzt. */
   getExcavatorPos: (() => THREE.Vector3) | null = null;
+  /**
+   * DER ABHOLER IM SANDKASTEN (E-177): Er kommt zum Bagger und faehrt ihm nach,
+   * und er kommt als Absetzkipper oder Abroller — je nachdem, wie viel von der
+   * bestellten Sorte bereitliegt. Gesetzt in `main.ts` im Block „Simulator:
+   * abhaengen"; im Betrieb bleibt es bei E-056 (Halt nach Bestellung, immer
+   * der Abroller).
+   */
+  sandkastenAbholer = false;
+  /**
+   * Eine Zeile fuers HUD (E-177): Buero-Funk zu jeder Fuhre, Abholer bestellt,
+   * steht bereit, faehrt nach, faehrt los. Deutsch — `main.ts` uebersetzt mit
+   * `t()` und gibt es ueber den Bus weiter. Anders als `onPickupFunk` bleibt
+   * dieser Kanal im Sandkasten an.
+   */
+  onMeldung: ((text: string) => void) | null = null;
+  /** Ein Fahrer ist an seinem Halt angekommen und hupt (E-178, hoechstens alle `HUPE_ABSTAND_S`). */
+  onAnkunftHupe: (() => void) | null = null;
+  /** Eigene Uhr fuer den Hupabstand — `t` wird bei jeder Fuhre zurueckgesetzt. */
+  private uhr = 0;
+  private letzteHupe = -Infinity;
   /** Hupe, wenn etwas zu lange im Weg steht. */
   onHonk: (() => void) | null = null;
   onWeighIn: ((kg: number) => void) | null = null;
@@ -3779,6 +4105,11 @@ export class VehicleManager {
 
   spawnNow(kind?: DeliveryKind, kunde?: CustomerProfile): void {
     if (this.active) return;
+    // Der Abholer hat seinen eigenen Weg (E-177): kein Kunde, Fahrzeug nach Bestellung
+    if (kind === "abholer") {
+      this.spawnAbholer();
+      return;
+    }
     // Erst die Kundschaft, dann das Fahrzeug dazu: ein Privatmann kommt nicht
     // mit dem Sattelzug, und ein Abbruchbetrieb nicht mit dem PKW-Anhänger.
     // Zweimal zu würfeln hätte Fahrzeug und Kunde entkoppelt.
@@ -3794,50 +4125,20 @@ export class VehicleManager {
      */
     if (
       this.mulde &&
-      k !== "abholer" &&
       !faehrtInsSilo(k, lagerMuldeFuer(gezogen.sortedMaterial ?? null))
     ) {
       this.nachMulde = { k, kunde: gezogen };
       return;
     }
-    const c = k === "abholer" ? null : gezogen;
+    const c = gezogen;
     this.active = this.baueWagen(k, c);
     if (k === "absetzer") {
       // Kippen oder absetzen (E-141) — abgesetzt nur, wenn keine andere steht
       this.active.absetzModus = !this.mulde && Math.random() < ABSETZEN_ANTEIL ? "absetzen" : "kippen";
     }
-    // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
-    this.active.bestellung = k === "abholer" ? this.pickupOrder : null;
-    /*
-     * Und daran haengt auch, was er funkt, wenn er steht (E-056). Der Ort
-     * kommt aus dem Schild des Behaelters, an dem er haelt — dieselbe Quelle,
-     * aus der auch der Halteplatz gerechnet wird. Zwei Listen, eine fuer die
-     * Fahrt und eine fuer den Text, wuerden beim naechsten Umzug der Reihe
-     * auseinanderlaufen. DIESE KOPPLUNG BLEIBT, auch jetzt, wo ein Fahrer mit
-     * Namen spricht: Der Name kommt aus der Figur, der Ort aus dem Schild.
-     */
-    if (k === "abholer") {
-      const wagen = this.active;
-      wagen.onFahrerlage = (lage) => {
-        const ziel = abholPlatzFuer(wagen.bestellung).ziel;
-        this.onPickupFunk?.(ABHOLFAHRER.funkname, fahrerfunk(lage, ziel?.label ?? null));
-      };
-      // Die beiden Wiegungen (E-064) — leer herein, voll hinaus.
-      wagen.onTara = (tara) => this.onAbholerTara?.(tara);
-      wagen.onAbholungGewogen = (tara, brutto) => this.onAbholerBrutto?.(tara, brutto);
-      // Voll faehrt er von selbst (E-120) — nie mit einem Teil in der Spinne.
-      wagen.vollFaehrtLos = this.vollFaehrtLos;
-      wagen.gegriffen = () => this.gegriffen?.() ?? [];
-    } else {
-      /*
-       * Und der Anlieferer spricht ebenfalls (E-082) — derselbe Kanal zum
-       * HUD, aber mit seinem eigenen Namen und seinen eigenen Saetzen. Der
-       * Name kommt aus dem Kundenprofil, das ohnehin schon am Wagen haengt;
-       * eine zweite Liste von Sprechern gibt es nicht.
-       */
-      // (verdrahtet in `baueWagen`)
-    }
-    if (c) this.onCustomerArrived?.(c);
+    this.active.bestellung = null;
+    // Der Anlieferer spricht (E-082) — verdrahtet in `baueWagen`.
+    this.onCustomerArrived?.(c);
     // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
     // Nur freie Plätze vergeben, sonst stünde einer im anderen.
     if (c && c.group !== "gewerbe" && Math.random() < (c.group === "haendler" ? 0.75 : 0.35)) {
@@ -3851,14 +4152,114 @@ export class VehicleManager {
       }
     }
     this.active.loadCargo(this.items, this.composites);
-    if (k !== "abholer") this.deliveries++;
+    this.deliveries++;
+  }
+
+  /**
+   * DER ABHOLER FAEHRT VOR (E-177) — als Abroller oder als Absetzkipper, so
+   * wie bestellt (`pickupAufbau`). Kein Kunde, keine Ladung.
+   */
+  private spawnAbholer(): void {
+    const aufbau = this.pickupAufbau;
+    const wagen = this.baueWagen(aufbau === "absetzer" ? "absetzer" : "abholer", null, null, true);
+    this.active = wagen;
+    // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
+    wagen.bestellung = this.pickupOrder;
+    /*
+     * Und daran haengt auch, was er funkt, wenn er steht (E-056). Der Ort
+     * kommt aus dem Schild des Behaelters, an dem er haelt — dieselbe Quelle,
+     * aus der auch der Halteplatz gerechnet wird. Seit E-177 der Platz, an
+     * dem er WIRKLICH steht (er kann dem Bagger nachgefahren sein).
+     */
+    wagen.onFahrerlage = (lage) => {
+      const ziel = (wagen.abholPlatzJetzt ?? abholPlatzFuer(wagen.bestellung)).ziel;
+      this.onPickupFunk?.(ABHOLFAHRER.funkname, fahrerfunk(lage, ziel?.label ?? null));
+    };
+    // Die beiden Wiegungen (E-064) — leer herein, voll hinaus.
+    wagen.onTara = (tara) => this.onAbholerTara?.(tara);
+    wagen.onAbholungGewogen = (tara, brutto) => this.onAbholerBrutto?.(tara, brutto);
+    // Voll faehrt er von selbst (E-120) — nie mit einem Teil in der Spinne.
+    wagen.vollFaehrtLos = this.vollFaehrtLos;
+    wagen.gegriffen = () => this.gegriffen?.() ?? [];
+    // E-177: zum Bagger, und hinterher
+    wagen.zumBagger = this.sandkastenAbholer;
+    wagen.baggerPos = this.getExcavatorPos;
+    wagen.abladeplatzZu = () => this.mulde !== null;
+    wagen.onMeldung = (text) => this.onMeldung?.(text);
+    this.onMeldung?.(
+      `Büro an Bagger: ${this.abholAngebot(this.pickupOrder, aufbau).fahrzeug} für ${abholWas(this.pickupOrder)} ist unterwegs.`
+    );
+    wagen.loadCargo(this.items, this.composites);
+  }
+
+  /** Wie der Abholer kommt, der als naechster faehrt (E-177). */
+  pickupAufbau: AbholAufbau = "abroller";
+
+  /**
+   * WAS FUER DIESE BESTELLUNG KAEME (E-177): Fahrzeug, Nennvolumen und was von
+   * der Sorte auf dem Platz liegt.
+   *
+   * Die Wahl (SW): Liegt von der Sorte nicht mehr da, als in die Absetzmulde
+   * passt (ihr Laderaum, `laderaum()`), kommt der Absetzkipper — sonst der
+   * Abroller. Ein Disponent schickt fuer zwei Kubikmeter Kupfer keinen
+   * 34-m³-Container, und fuer einen Berg Mischschrott keine Mulde. Gezaehlt
+   * wird, was lose auf dem Platz liegt (nicht auf einem Wagen, nicht in der
+   * Spinne), mit derselben Volumenrechnung wie beim Beladen (`deckelVolumen`,
+   * Wracks mit `wrackVolumenVon`). Welche Teile zur Sorte gehoeren, sagt
+   * `zaehltZu` (Kupfer nimmt Messing mit, Muell alle vier Abfallsorten).
+   */
+  abholAngebot(
+    order: string | null,
+    aufbau: AbholAufbau | null = null
+  ): { aufbau: AbholAufbau; m3: number; bereitM3: number; fahrzeug: string } {
+    let bereit = 0;
+    for (const it of this.items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      if (order && !zaehltZu(order, it.materialId)) continue;
+      if (it.shape) bereit += deckelVolumen(it.shape.kind, it.shape.dims);
+      else bereit += wrackVolumenVon(this.composites.cars.find((c) => c.body.handle === it.body.handle) ?? null);
+    }
+    const wahl = aufbau ?? (this.sandkastenAbholer && bereit <= absetzRaumM3() ? "absetzer" : "abroller");
+    const m3 = wahl === "absetzer" ? ABSETZMULDE_NENN_M3 : abrollerNennM3();
+    return {
+      aufbau: wahl,
+      m3,
+      bereitM3: bereit,
+      fahrzeug: `${wahl === "absetzer" ? "Absetzkipper" : "Abroller"} ${m3} m³`,
+    };
+  }
+
+  /**
+   * DIE BESTELLLISTE (E-177): jede Sorte, die ein Abnehmer nimmt — Stahl,
+   * Misch, je Lagersilo seine Leitfraktion (Muell steht fuer alle vier
+   * Abfallsorten) — und „gemischt". Sortiert nach dem, was bereitliegt.
+   * Datengetrieben: Wer ein Silo dazustellt, bekommt eine Zeile dazu.
+   */
+  abholListe(): Array<{ order: string | null; aufbau: AbholAufbau; titel: string; zeile: string }> {
+    const sorten = ["steel", "mixed", ...CONFIGS.filter((c) => c.lager === true).map((c) => c.fractionId)].filter(
+      (id, i, a) => a.indexOf(id) === i
+    );
+    const zeilen = [...sorten, null].map((order) => {
+      const a = this.abholAngebot(order);
+      return {
+        order,
+        aufbau: a.aufbau,
+        titel: order === null ? "Gemischt" : abholWas(order),
+        zeile: `${a.fahrzeug} · ${a.bereitM3.toFixed(1).replace(".", ",")} m³ da`,
+        bereit: a.bereitM3,
+      };
+    });
+    const gemischt = zeilen.pop()!;
+    zeilen.sort((a, b) => b.bereit - a.bereit);
+    return [...zeilen, gemischt].map(({ order, aufbau, titel, zeile }) => ({ order, aufbau, titel, zeile }));
   }
 
   /** Ein Fahrzeug bauen und an den Fuhrpark anschliessen — fuer Tor und Warteplatz. */
   private baueWagen(
     k: DeliveryKind,
     c: CustomerProfile | null,
-    holeMulde: AbgesetzteMulde | null = null
+    holeMulde: AbgesetzteMulde | null = null,
+    alsAbholer = false
   ): DeliveryVehicle {
     const v = new DeliveryVehicle(
       k,
@@ -3869,14 +4270,25 @@ export class VehicleManager {
       (kg) => this.onWeighIn?.(kg),
       (kg) => this.onWeighOut?.(kg),
       c,
-      holeMulde
+      holeMulde,
+      alsAbholer
     );
     v.itemQuelle = this.items;
     v.platzinventar = this.platzinventar;
     // Der Anlieferer spricht (E-082) — hier, damit auch ein Ansteher spricht.
-    if (k !== "abholer") {
+    if (!v.isPickup) {
       v.onAnliefererlage = (lage) => this.onPickupFunk?.(v.customer?.name ?? "Fahrer", anliefererfunk(lage));
+      // Buero-Funk, sobald feststeht, wohin er faehrt (E-178)
+      v.onZielFest = () => this.onMeldung?.(bueroFunk(v));
     }
+    // Angekommen: hupen (E-178), und der Abholer sagt, dass er bereit steht
+    v.onAngekommen = () => {
+      if (this.uhr - this.letzteHupe >= HUPE_ABSTAND_S) {
+        this.letzteHupe = this.uhr;
+        this.onAnkunftHupe?.();
+      }
+      if (v.isPickup) this.onMeldung?.(`${v.fahrzeugName} steht bereit — laden, dann ABHOLEN drücken (V).`);
+    };
     // Die abgesetzte Mulde geht an den Fuhrpark (E-141)
     v.onMuldeAbgesetzt = (m) => (this.mulde = m);
     v.onMuldeGeholt = () => (this.mulde = null);
@@ -3905,8 +4317,8 @@ export class VehicleManager {
   /** Der Platz, an dem der Abholer gerade wirklich steht bzw. hinfaehrt. */
   get aktuellerAbholPlatz(): AbholPlatz | null {
     const a = this.active;
-    if (!a || a.kind !== "abholer") return null;
-    return abholPlatzFuer(a.bestellung);
+    if (!a || !a.isPickup) return null;
+    return a.abholPlatzJetzt ?? abholPlatzFuer(a.bestellung);
   }
 
   /**
@@ -3916,7 +4328,7 @@ export class VehicleManager {
    * (die ihrerseits `null` sein darf, wenn gemischt geladen wird) — darum das
    * Objekt drumherum statt eines blanken Strings.
    */
-  private vorgemerkt: { order: string | null } | null = null;
+  private vorgemerkt: { order: string | null; aufbau: AbholAufbau } | null = null;
 
   /** Ist eine Abholung vorgemerkt? Fuer HUD und Tests. */
   get abholungVorgemerkt(): boolean {
@@ -3937,23 +4349,37 @@ export class VehicleManager {
    * Ladung auf dem Platz; ihn abzuwuergen waere kein Vorrang, sondern ein
    * Verlust.
    */
-  requestPickup(order?: string | null): "gerufen" | "abgefahren" | "vorgemerkt" {
+  requestPickup(
+    order?: string | null,
+    /** Welcher Wagen kommen soll — so, wie ihn die Bestellliste angezeigt hat (E-177). */
+    aufbauGewuenscht?: AbholAufbau
+  ): "gerufen" | "abgefahren" | "vorgemerkt" {
+    // Wartet er schon (oder setzt er gerade um), heisst ABHOLEN: fertig, losfahren
+    if (this.active?.isPickup && (this.active.waitingForLoad || this.active.setztUm)) {
+      this.active.requestRelease();
+      return "abgefahren";
+    }
+    // Das Fahrzeug steht mit der Bestellung fest (E-177) — nach dem, was jetzt bereitliegt
+    const aufbau = aufbauGewuenscht ?? this.abholAngebot(order ?? null).aufbau;
     // An den Abladeplatz kann er nicht, solange dort eine Mulde steht (E-141)
-    if (!this.active && this.mulde && !abholPlatzFuer(order ?? null).ziel) {
-      this.vorgemerkt = { order: order ?? null };
+    if (!this.active && this.mulde && !this.abholZielFuer(order ?? null).ziel) {
+      this.vorgemerkt = { order: order ?? null, aufbau };
       return "vorgemerkt";
     }
     if (this.active) {
-      if (this.active.kind === "abholer" && this.active.waitingForLoad) {
-        this.active.requestRelease();
-        return "abgefahren";
-      }
-      this.vorgemerkt = { order: order ?? null };
+      this.vorgemerkt = { order: order ?? null, aufbau };
       return "vorgemerkt";
     }
     this.pickupOrder = order ?? null;
-    this.spawnNow("abholer");
+    this.pickupAufbau = aufbau;
+    this.spawnAbholer();
     return "gerufen";
+  }
+
+  /** Wohin ein Abholer jetzt fuehre: zum Bagger (E-177) oder nach Bestellung (E-056). */
+  private abholZielFuer(order: string | null): AbholPlatz {
+    const b = this.sandkastenAbholer ? this.getExcavatorPos?.() : undefined;
+    return b ? abholPlatzNahe(b.x, b.z) : abholPlatzFuer(order);
   }
 
   /**
@@ -4036,7 +4462,7 @@ export class VehicleManager {
 
   /** Der wartende Abhol-LKW (für Beladung/Verkauf), sonst null. */
   get pickupTruck(): DeliveryVehicle | null {
-    return this.active && this.active.kind === "abholer" ? this.active : null;
+    return this.active && this.active.isPickup ? this.active : null;
   }
 
   /**
@@ -4044,7 +4470,7 @@ export class VehicleManager {
    * oder man gerade keinen Platz hat. Er dreht ab und fährt zur Ausfahrt.
    */
   sendAway(): "weggeschickt" | "zuSpaet" | "niemandDa" {
-    if (!this.active || this.active.kind === "abholer") return "niemandDa";
+    if (!this.active || this.active.isPickup) return "niemandDa";
     return this.active.sendAway() ? "weggeschickt" : "zuSpaet";
   }
 
@@ -4196,6 +4622,7 @@ export class VehicleManager {
 
   update(dt: number): void {
     this.t += dt;
+    this.uhr += dt;
     this.pruefeMulde(dt);
     // Wartende Fahrzeuge weiterlaufen lassen: Pause, dann Ausfahrt
     for (let i = this.parked.length - 1; i >= 0; i--) {
@@ -4219,10 +4646,11 @@ export class VehicleManager {
           return;
         }
         const v = this.vorgemerkt;
-        if (v && abholPlatzFuer(v.order).ziel) {
+        if (v && this.abholZielFuer(v.order).ziel) {
           this.pickupOrder = v.order;
+          this.pickupAufbau = v.aufbau;
           this.vorgemerkt = null;
-          this.spawnNow("abholer");
+          this.spawnAbholer();
         }
         return;
       }
@@ -4230,8 +4658,9 @@ export class VehicleManager {
       // auch dann, wenn die Einfahrt fuer Anlieferer gerade zu ist.
       if (this.vorgemerkt) {
         this.pickupOrder = this.vorgemerkt.order;
+        this.pickupAufbau = this.vorgemerkt.aufbau;
         this.vorgemerkt = null;
-        this.spawnNow("abholer");
+        this.spawnAbholer();
         return;
       }
       // Was waehrend der Mulde warten musste, kommt jetzt (E-141)

@@ -14,6 +14,8 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | E-183 | 20.10.2026 | MÜLL-Mulde morgens direkt vor dem Bagger an der BUNT + VA | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-182 | 20.10.2026 | Stahlschrott schmaler, gerade Quermauer, schräge Mauer zur Presse | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-181 | 20.10.2026 | Mulden sind Stahl, Mischschrott häufiger, Reifen nur als Rad | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
+| E-178 | 20.10.2026 | Sortenrein kommt im Kipper ins Lager, Fahrer hupt, Büro funkt | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
+| E-177 | 20.10.2026 | Abholer nach Sorte und m³, kommt zum Bagger, nimmt Wracks mit | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-174 | 20.10.2026 | Vier Werbetafeln statt neun: Tor, Waage, Bucht, Halle 1 | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-173 | 20.10.2026 | Spiel heißt wieder Rost & Reibach, überall auf dem Platz | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-172 | 19.10.2026 | Stummschalter auf lautlos: Spiel still, fremde Musik läuft weiter | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
@@ -209,6 +211,18 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Frage: Kipper-Mulde (Lkw-Brücke) auch Stahl? Empfehlung: nein, sie ist kein Muldencontainer.
 - Frage: Werkzeugcontainer (Baustelle) auch Stahl? Empfehlung: nein, Holzboden, Trapezblech.
 - Frage: Reifen-Fraktion ohne eigene Teile lassen (nur aus Rad und Wrack)? Empfehlung: ja.
+
+**E-178 — Sortenrein im Kipper, Hupe, Büro-Funk** (iPad)
+- Sortenreine Fuhre: steht „Büro an Bagger: Kipper mit … kommt, kippt ins …-LAGER", und kippt er dort?
+- Hupt der Fahrer bei der Ankunft — und nicht zu oft?
+- Fehlen dir Pritschen mit sortenreiner Ladung zum Abladen?
+
+**E-177 — Abholer nach Sorte und m³, zum Bagger, mit Wracks** (iPad, dann iPhone mini)
+- ABHOLEN: Liste mit jeder Sorte, Müll, Gemischt, je mit Fahrzeug und m³? Wenig Kupfer → Absetzkipper 7 m³, Mischschrott → Abroller 34 m³?
+- Schrott und ein Auto in den Abroller, ABHOLEN: fährt alles mit, nichts fällt herunter oder fliegt weg?
+- LKW-Wrack auf den Container: fährt er von selbst los, Wrack liegt ruhig oben?
+- Mit dem Bagger an ein Lagersilo, kurz stehen: fährt er nach, ohne durch Mauern oder den Bagger — und beim bloßen Rangieren nicht?
+- Absetzkipper: kommst du mit der Spinne in die ganze Mulde?
 
 **E-174 — Vier Tafeln statt neun** (iPad)
 - Rundblick aus der Kabine: fehlen Tafeln an Nord- oder Ostmauer, oder ist es so ruhiger?

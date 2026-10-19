@@ -732,6 +732,22 @@ export const EN: Record<string, string> = {
   Wandmitte: "Wall, middle",
   "Windschutz Mitte": "Windscreen, middle",
   Wohnwagen: "Caravan",
+
+  // --- ABHOLER UND FUHREN (Lieferung, E-177/E-178): Bestellliste, Büro-Funk ---
+  "Wofür kommt der Abholer? Er hält beim Bagger und fährt ihm nach.":
+    "What is the pickup for? It stops by the loader and follows it.",
+  Abroller: "Hook-lift truck",
+  Absetzkipper: "Skip loader",
+  Kipper: "Tipper truck",
+  Pritsche: "Flatbed truck",
+  Abschlepper: "Tow truck",
+  "Pkw mit Anhänger": "Car with trailer",
+  Müll: "Waste",
+  Gemischt: "Mixed",
+  "gemischte Ladung": "a mixed load",
+  "gemischter Ladung": "a mixed load",
+  "einem Altauto": "a scrap car",
+  "einem Wohnwagen": "a caravan",
 };
 
 /**
@@ -762,4 +778,14 @@ export const MUSTER: Array<[RegExp, string]> = [
   // Senderansage „Schlagerwelle 104,1 — Dur, …": Sendernamen sind Eigennamen und bleiben
   [/^(.+) (\d+,\d) — (.+)$/, "$1 $2 — $3"],
   [/^Hörprobe (\d+)\/(\d+) · (.+) · (\d+)\/(\d+)$/, "Sound test $1/$2 · $3 · $4/$5"],
+  // --- Abholer und Fuhren (Lieferung, E-177/E-178) — die allgemeinen zuletzt ---
+  [/^Büro an Bagger: (.+) (\d+) m³ für (.+) ist unterwegs\.$/, "Office to loader: $1 $2 m³ for $3 is on its way."],
+  [/^Büro an Bagger: (.+) mit (.+) kommt, kippt ins (.+)\.$/, "Office to loader: $1 with $2 coming, tipping into the $3."],
+  [/^Büro an Bagger: (.+) mit (.+) kommt an den Abladeplatz\.$/, "Office to loader: $1 with $2 coming to the unloading bay."],
+  [/^Büro an Bagger: (.+) holt seine Mulde\.$/, "Office to loader: $1 is collecting its skip."],
+  [/^(.+) steht bereit — laden, dann ABHOLEN drücken \(V\)\.$/, "$1 is ready — load it, then press PICKUP (V)."],
+  [/^(.+) (\d+) m³ · ([\d,]+) m³ da$/, "$1 $2 m³ · $3 m³ ready"],
+  [/^(.+) fährt dir nach\.$/, "$1 is following you."],
+  [/^(.+) ist voll und fährt los\.$/, "$1 is full and leaving."],
+  [/^(.+) fährt los\.$/, "$1 is leaving."],
 ];

@@ -739,6 +739,76 @@ export function pickupOut(): Array<[number, number]> {
   return aktuellerAbholPlatz().ausfahrt;
 }
 
+/* ------------------------- DER ABHOLER KOMMT ZUM BAGGER (E-177) -------- */
+
+/*
+ * Patrick, 20.10.2026: „Abholer kommt immer zum bagger und fährt hinterher,
+ * wenn ich den verladeplatz wechsle". Im Sandkasten haengt der Halt deshalb
+ * nicht mehr an der Bestellung (E-056), sondern am Bagger: Es gilt der
+ * Halteplatz, dessen Baggerstand (`stand`) der Maschine am naechsten liegt.
+ * Die Plaetze selbst bleiben dieselben — Abladeplatz und je Lagersilo ein
+ * Verladeplatz —, mit ihren gepruefen Strecken. Kein neuer Ort.
+ */
+let platzListe: AbholPlatz[] | null = null;
+
+/** Jeder Halteplatz genau einmal (ohne Bestellung, Stahl und Misch teilen den Abladeplatz). */
+export function abholPlaetzeEinmal(): AbholPlatz[] {
+  if (!platzListe) {
+    const alle = alleAbholPlaetze();
+    platzListe = alle.filter(
+      (p, i) => alle.findIndex((q) => q.halt[0] === p.halt[0] && q.halt[1] === p.halt[1]) === i
+    );
+  }
+  return platzListe;
+}
+
+/** Der Halteplatz, dessen Baggerstand (x | z) am naechsten liegt. */
+export function abholPlatzNahe(
+  x: number,
+  z: number,
+  erlaubt: (p: AbholPlatz) => boolean = () => true
+): AbholPlatz {
+  let best: AbholPlatz | null = null;
+  let bestD = Infinity;
+  for (const p of abholPlaetzeEinmal()) {
+    if (!erlaubt(p)) continue;
+    const d = Math.hypot(p.stand.x - x, p.stand.z - z);
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best ?? abholPlatzFuer(null);
+}
+
+/** Diesen Platz als den aktuellen setzen (Spurueberwachung, `pickupApproach` …). */
+export function setzeAbholPlatz(p: AbholPlatz): void {
+  abholPlatz = p;
+}
+
+/** Wohin die Kabine im Halt schaut: zum vorletzten Punkt des Rueckwegs. */
+export function haltGier(p: AbholPlatz): number {
+  const n = p.rueckweg.length;
+  const [rx, rz] = p.rueckweg[n - 2]!;
+  return Math.atan2(rx - p.halt[0], rz - p.halt[1]);
+}
+
+/**
+ * VOM EINEN VERLADEPLATZ ZUM ANDEREN — ein Rangierzug wie jeder (E-140).
+ *
+ * Gerechnet vom Halt des alten Platzes (nicht vom zentimetergenauen Stand
+ * des Wagens, der weicht hoechstens 0,4 m ab): So ist der Zug je Paar EINMAL
+ * zu rechnen und dann gemerkt. Gemessen 6 bis 320 ms beim ersten Mal (Dev-PC,
+ * 42 Paare, alle frei — `test/abholer-verladen.test.ts`).
+ * ponytail: lazy beim ersten Umsetzen; vorausrechnen, falls das auf dem
+ * iPhone ruckelt.
+ */
+export function umsetzZug(von: AbholPlatz, nach: AbholPlatz, bedLen = BED_LEN.abholer!): Rangierzug {
+  const g = haltGier(von);
+  const [hx, hz] = von.halt;
+  return rangierzug([[hx - Math.sin(g), hz - Math.cos(g)], [hx, hz]], nach.halt, haltGier(nach), null, bedLen);
+}
+
 /* ------------------------------------------- KIPPER: gemischte Ladung ---- */
 
 /*
