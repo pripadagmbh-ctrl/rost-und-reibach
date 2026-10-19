@@ -554,6 +554,19 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 20.10.2026, Anlieferung und Abholer** — Patrick, wörtlich:
+      „Anlieferung sortenrein direkt zu den metallboxen die dafür gedacht
+      waren, faher hupen und fnkspruch aus dem Büro. Abholer kommt immer zum
+      bagger und fährt hinterher, wenn ich den verladeplatz wechsle"
+
+      | # | Punkt |
+      |---|---|
+      | 30a | Sortenreine Anlieferung fährt direkt zur passenden Metallbox |
+      | 30b | Fahrer hupt (bei Ankunft) |
+      | 30c | Funkspruch aus dem Büro |
+      | 31a | Abholer kommt immer zum Bagger |
+      | 31b | Abholer fährt hinterher, wenn der Bagger den Verladeplatz wechselt |
+
 - [ ] **Aufgabenliste 20.10.2026** — Patrick, wörtlich: „Aufgaben:
       Nenn das SPiel wieder Rost&Reibach. Auch die Werbetafeln entsprechend
       umbennen. Auch weniger Werbetafeln. Den Platz und die Ausbuchtung am
