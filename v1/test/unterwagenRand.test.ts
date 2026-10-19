@@ -213,13 +213,19 @@ describe("Der Startplatz des MUELL-Containers haengt an derselben Zahl", () => {
     expect(SCHWENK_AUSSEN - d, `${d.toFixed(2)} m vom Sitz`).toBeGreaterThanOrEqual(TASCHENLUFT);
   });
 
-  it("3 — die Fahrlinie nach vorn bleibt frei, gerechnet mit der halben Breite", () => {
+  /*
+   * SEIT E-183 STEHT ER MIT ABSICHT 0,80 m IN DER FAHRLINIE (Patrick: „direkt
+   * vor dem Bagger an der Wand zum Buntmetall"). Die Rechnung haengt weiter an
+   * `UNTERWAGEN_HALB_B`: Wird die Maschine breiter, waechst der Ueberstand,
+   * und der Waechter meldet es.
+   */
+  it("3 — höchstens 0,80 m in der Fahrlinie nach vorn, gerechnet mit der halben Breite (E-183)", () => {
     const noetig = HW + UNTERWAGEN_HALB_B;
     const seitlich = Math.abs(muell.x - BAGGER_STAND.x);
     expect(
       seitlich - noetig,
-      `nur ${seitlich.toFixed(2)} m neben der Fahrlinie, noetig sind ${noetig.toFixed(2)} m`
-    ).toBeGreaterThanOrEqual(MINDESTLUFT);
+      `${(noetig - seitlich).toFixed(2)} m in der Fahrlinie, erlaubt sind 0,80 m`
+    ).toBeGreaterThanOrEqual(-0.8 - 1e-9);
 
     // Gegenprobe: mit der alten 1,30 waere die Schranke schwaecher.
     expect(UNTERWAGEN_HALB_B, "die halbe Breite ist wieder auf 1,30 gerutscht").toBeGreaterThan(1.3);
@@ -244,21 +250,14 @@ describe("Der Startplatz des MUELL-Containers haengt an derselben Zahl", () => {
       }
     }
     expect(engste, `der MUELL kommt ${engste.toFixed(2)} m an „${wo}" heran`).toBeGreaterThanOrEqual(
-      TASCHENLUFT
+      MINDESTLUFT - 1e-9
     );
     /*
-     * Und die Gegenprobe zur Tasche selbst: Sie ist wirklich so knapp, wie
-     * `TASCHENLUFT` behauptet. Waere wieder Platz, gehoerte die Schranke
-     * zurueck auf 0,15 m.
+     * E-183: Die Tasche aus E-110 ist verlassen. Er steht jetzt AN der
+     * Schwelle der BUNT + VA — „an der Wand zum Buntmetall": der naechste
+     * Bau ist die Mulde, und er ist hoechstens 0,20 m davon weg.
      */
-    const bunt = CONFIGS.find((c) => c.id === "r_bunt")!;
-    const wandNord = Math.max(
-      ...STATIC_OBSTACLES.filter((o) => o.label.startsWith(`${bunt.label} `)).map((o) => o.z + o.hd)
-    );
-    const bandGrenze =
-      BAGGER_STAND.z + Math.sqrt(SCHWENK_AUSSEN ** 2 - (muell.x - BAGGER_STAND.x) ** 2);
-    const tasche = bandGrenze - (wandNord + HD);
-    expect(tasche, `die Tasche ist ${tasche.toFixed(2)} m hoch`).toBeLessThan(2 * MINDESTLUFT);
-    expect(tasche, "die Tasche ist zu — dann steht der Container im Bauwerk").toBeGreaterThan(0);
+    expect(wo.startsWith("BUNT + VA"), `naechster Bau ist ${wo}`).toBe(true);
+    expect(engste, "er steht nicht an der Mulde").toBeLessThanOrEqual(0.2);
   });
 });

@@ -400,7 +400,15 @@ describe("Der Müllcontainer steht morgens richtig", () => {
     }
   });
 
-  it("und er steht nicht in der Fahrlinie des Baggers nach vorn", () => {
+  /*
+   * SEIT E-183 (20.10.2026) STEHT ER MIT ABSICHT DARIN. Patrick: „Mulde für
+   * Müll steht direkt vor dem Bagger an der Wand zum Buntmetall." Der Wächter
+   * hält jetzt fest, WIE WEIT: höchstens 0,80 m in der Fahrlinie, sodass die
+   * Maschine mit etwas Linkseinschlag vorbeikommt (rechts von ihr bleiben
+   * zwischen Container und Rückfahrspur mehr als 5 m). Wer ihn weiter
+   * hineinschiebt, muss den Wächter und Patrick fragen.
+   */
+  it("und er steht höchstens 0,80 m in der Fahrlinie des Baggers nach vorn (E-183)", () => {
     /*
      * DER ANLASS VON E-041. Der Bagger schaut nach +z; fährt er geradeaus los,
      * prüft `ExcavatorCollision.chassisHits()` seinen Standpunkt gegen die
@@ -422,8 +430,8 @@ describe("Der Müllcontainer steht morgens richtig", () => {
     expect(Number.isFinite(seitlich), "Seitenabstand ist keine Zahl").toBe(true);
     expect(
       seitlich - noetig,
-      `nur ${seitlich.toFixed(2)} m neben der Fahrlinie, nötig sind ${noetig.toFixed(2)} m`
-    ).toBeGreaterThan(0);
+      `${(noetig - seitlich).toFixed(2)} m in der Fahrlinie, erlaubt sind 0,80 m`
+    ).toBeGreaterThanOrEqual(-0.8 - 1e-9);
   });
 
   it("und er wird nicht gepresst — seit E-138 eine Abfrage der Presse, nicht mehr die Geometrie", async () => {

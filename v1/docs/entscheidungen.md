@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-183 | 20.10.2026 | MÜLL-Mulde morgens direkt vor dem Bagger an der BUNT + VA | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-182 | 20.10.2026 | Stahlschrott schmaler, gerade Quermauer, schräge Mauer zur Presse | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-174 | 20.10.2026 | Vier Werbetafeln statt neun: Tor, Waage, Bucht, Halle 1 | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-173 | 20.10.2026 | Spiel heißt wieder Rost & Reibach, überall auf dem Platz | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
@@ -182,6 +183,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-183 — MÜLL-Mulde vor dem Bagger** (iPad)
+- Sandkasten: steht die blaue MÜLL-Mulde direkt vor dir an der BUNT + VA, wie gemeint?
+- Müll hineinwerfen: ganze Mulde bequem erreichbar?
+- Geradeaus losfahren: stört das Vorbeilenken (sie steht 0,8 m in der Fahrlinie)?
 
 **E-182 — Stahlschrott schmaler, Quermauer, schräge Mauer** (iPad)
 - Hinter dich schauen: Stahlschrott schmal genug, beide Autos noch gut greifbar?

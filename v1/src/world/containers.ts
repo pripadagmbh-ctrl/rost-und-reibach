@@ -244,6 +244,13 @@ export function bayDrehung(cfg: ContainerConfig): number {
  * LINKS (Westen) der riesige Stahlschrott-Haufen, RECHTS (Osten) die Boxen in
  * einer Reihe — alles im Schwenkbereich, damit kaum gefahren werden muss.
  */
+/**
+ * Wo die MÜLL-Mulde morgens steht (E-183): direkt vor dem Bagger an der
+ * Schwelle der BUNT + VA. Herleitung beim Eintrag `r_rubble` unten. Für
+ * Aufgaben-Aufbauten und Wächter benannt, damit niemand die Zahl abschreibt.
+ */
+export const MUELL_START = { x: -3.0, z: -16.0 } as const;
+
 export const CONFIGS: ContainerConfig[] = [
   /*
    * PLATZORDNUNG NACH E-010 (14.09.2026) — die Ausbuchtung.
@@ -596,8 +603,29 @@ export const CONFIGS: ContainerConfig[] = [
    * das ist eine Gestaltungsfrage fuer Patrick und keine Rechnung mehr: Wer
    * mehr Luft will, muss den Container aus der Tasche nehmen.
    */
+  /*
+   * NEUER STARTPLATZ SEIT E-183 (20.10.2026): (−3,0 | −16,0) — `MUELL_START`.
+   *
+   * Patrick: „Mulde für Müll steht direkt vor dem Bagger an der Wand zum
+   * Buntmetall." Die Tasche oben war das Einzige, was Fahrlinie, Schwenkband
+   * und Mulde zusammen zuließen — nur 50 % der Grundfläche lagen im Band, die
+   * Nordkante 11 m weg. Jetzt steht er an der Schwelle der BUNT + VA
+   * (Westkante x −4,80, 0,15 m vor der Schwelle bei −4,95), vor dem Bagger:
+   *
+   *   Mitte (−3,0 | −16,0)     6,96 m vom Sitz, 80 % der Fläche im Band
+   *                            (gerechnet im 60 × 60-Raster, vorher 50 %)
+   *   Grundfläche              x −4,80 … −1,20,  z −18,15 … −13,85
+   *   an der Schwelle          1,9 m Länge (z −18,15 … −16,25), der Rest
+   *                            nördlich der Mulde
+   *   zu den vorderen Pratzen  1,5 m (Pratzen bis z −19,7)
+   *
+   * DER PREIS, bewusst bezahlt: Er steht 0,80 m in der Fahrlinie (Schranke 3
+   * oben: x ≤ −3,80 verlangt). Wer geradeaus losfährt, stößt an seine
+   * Ostkante; nach vorn geht es mit etwas Linkseinschlag vorbei. Die
+   * Rückfahrspur (Schranke 4) bleibt frei (x + 1,80 = 0,6 ≤ 3,35).
+   */
   { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
-    label: "MUELL", kind: "rolloff", x: -3.96, z: -14.04, size: [3.6, 4.3, 0.8],
+    label: "MUELL", kind: "rolloff", x: MUELL_START.x, z: MUELL_START.z, size: [3.6, 4.3, 0.8],
     platzinventar: true,
     /*
      * E-138: Enzianblau (RAL 5010) mit weisser Schrift. Blau, weil der Platz
