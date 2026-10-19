@@ -554,6 +554,33 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Aufgabenliste 20.10.2026** — Patrick, wörtlich: „Aufgaben:
+      Nenn das SPiel wieder Rost&Reibach. Auch die Werbetafeln entsprechend
+      umbennen. Auch weniger Werbetafeln. Den Platz und die Ausbuchtung am
+      stahlschrott reruzieren, beim misschrott eine quermauer setzenm damit
+      eine mauer grade, und eine mauer zur presse diagonal zur presse hingeht,
+      und mit der aussenkante der presse abschliesst. Absetzcontainer sollten
+      hebbar sein. LKWs sollten verladen werden können, eim abholer. Neues
+      Zerstörungskonzept für autos und holkörper bauen, mehr spass am zerstören
+      ist ziel. Reifen haben immer felge. Um motor/getribe zu entfernen, muss
+      erst motorhaube entfernt werdne. Autos haben innenausstattung, Mulde für
+      Müll steht direkt vor dem bagger an der wand zum buntmetall"
+
+      | # | Punkt |
+      |---|---|
+      | 23a | Spiel heißt wieder „Rost&Reibach" |
+      | 23b | Werbetafeln entsprechend umbenennen |
+      | 23c | Weniger Werbetafeln |
+      | 24a | Platz und Ausbuchtung am Stahlschrott verkleinern |
+      | 24b | Mischschrott: Quermauer — eine Mauer gerade, eine diagonal zur Presse, schließt mit der Außenkante der Presse ab |
+      | 25 | Absetzcontainer hebbar |
+      | 26 | LKWs verladen können beim Abholer |
+      | 27 | Neues Zerstörungskonzept für Autos und Hohlkörper — mehr Spaß am Zerstören |
+      | 28a | Reifen haben immer eine Felge |
+      | 28b | Motor/Getriebe erst nach Abnahme der Motorhaube entfernbar |
+      | 28c | Autos haben Innenausstattung |
+      | 29 | Müll-Mulde direkt vor dem Bagger an der Wand zum Buntmetall |
+
 - [ ] **Ziel 19.10.2026: App Store in vier Wochen** — Patrick, wörtlich:
       „Stelle dir vor du bist Profi Spiele publisher, Ziel ist es eine Version
       zu bekommen, die ap live in den app store zu bekommen. Wie würdest du das
