@@ -572,6 +572,12 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 22f | Einmalpreis: Paid Apps Agreement, Bank, Steuer (Patrick) |
       | 22g | TestFlight-Tests, fünf Erstspieler beobachten |
 
+      Aufgaben-Konzept (v1/docs/aufgaben-konzept.md), Antworten 19.10.:
+      Freischalten „nacheinander ab 1 Stern" (Sandkasten immer offen); erster
+      Start „direkt Aufgabe 1"; Presse „Knopf PRESSEN auf der Karte"; Sterne
+      „nur Sichtbares" (Zeit, Fehlwürfe, Abstand). Neustart: Empfehlung A
+      (Knopf startet neu) als Vorgabe. → Bau E-162 ff.
+
 - [ ] **Gerätebefund 18.10.2026, Klangqualität** — Patrick, wörtlich: „Also
       das anschlagen klingt jetzt, nur sind die Geräusche manchmal wenig
       realistisch. es klingt anders, wenn man gegen beton schlägt vs metal auf
