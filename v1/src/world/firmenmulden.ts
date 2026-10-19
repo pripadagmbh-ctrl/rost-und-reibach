@@ -5,15 +5,23 @@ import { PRIPADA_GRUEN, werbeAtlas, atlasFeld } from "./werbung";
 import type { Obstacle } from "./obstacles";
 
 /**
- * PRIPADA-ABSETZMULDEN AM PLATZRAND (E-133).
+ * FIRMEN-ABSETZMULDEN AM PLATZRAND (E-133, seit E-173 „Rost & Reibach",
+ * seit E-184 hebbar).
  *
  * Patrick, 17.10.2026: „Baue auch container auf dem schrottplatz mit ein, aber
  * mit pripada drauf", dazu „ne, die mulden bleiben" und „nur paar container am
  * rand verteilen". Vier einzelne grüne Mulden, keine Reihe, kein Stapel; die
  * Sortiermulden, Lager, Halden und der MÜLL bleiben, wie sie sind.
  *
- * Kulisse mit Kollider: Geworfenes fällt hinein (offener Trog), Laster,
- * Lambert und die Streife fahren über die Hindernisliste drum herum.
+ * Geworfenes fällt hinein (offener Trog), Laster, Lambert und die Streife
+ * fahren über die Hindernisliste drum herum.
+ *
+ * HEBBAR SEIT E-184. Patrick, 20.10.2026: „Absetzcontainer sollten hebbar
+ * sein" — auf Nachfrage „alle Elemente, die nicht fest verankert sind wie
+ * Gebäude und Mauern". Jede Mulde ist ein eigener beweglicher Körper wie der
+ * MÜLL (`containers.ts`, rolloff): gedämpft, nur um die Hochachse drehbar, mit
+ * der Leermasse einer echten Mulde. Die Spinne greift und hebt sie, solange
+ * die Traglast reicht; was darin liegt, bleibt eigene Physik.
  */
 export interface Firmenmulde {
   name: string;
@@ -24,6 +32,8 @@ export interface Firmenmulde {
   laenge: number;
   breite: number;
   hoehe: number;
+  /** Leermasse (kg) */
+  leerKg: number;
   /** Welche Weltachse die Länge trägt */
   achse: "x" | "z";
 }
@@ -32,9 +42,13 @@ export interface Firmenmulde {
  * Maße: 5 m³ wie `objektkatalog` „Absetzmulde 5 m³" (E-123: 3,30 lang,
  * 1,75 breit, 1,35 hoch). 7 und 10 m³ als SW nach typischen Absetzmulden.
  */
-const M5 = { laenge: 3.3, breite: 1.75, hoehe: 1.35 };
-const M7 = { laenge: 3.7, breite: 1.85, hoehe: 1.55 }; // SW
-const M10 = { laenge: 4.0, breite: 1.95, hoehe: 1.75 }; // SW
+/*
+ * Leermasse (E-184, SW nach üblichen Herstellerangaben für Absetzmulden aus
+ * 4-mm-Blech: 5 m³ rund 500–600 kg, 7 m³ 650–750, 10 m³ 850–950 kg).
+ */
+const M5 = { laenge: 3.3, breite: 1.75, hoehe: 1.35, leerKg: 550 };
+const M7 = { laenge: 3.7, breite: 1.85, hoehe: 1.55, leerKg: 700 }; // SW
+const M10 = { laenge: 4.0, breite: 1.95, hoehe: 1.75, leerKg: 900 }; // SW
 
 /*
  * Orte: Vorgabe Bauleiter 17.10.2026, am Rand und außerhalb jedes
@@ -50,19 +64,27 @@ export const FIRMENMULDEN: readonly Firmenmulde[] = [
   { name: "Südwest-Ecke", x: -37.0, z: -27.4, ...M7, achse: "x" },
 ];
 
-/** Volle Grundfläche je Mulde — so plant jeder Weg drum herum. */
+/**
+ * Volle Grundfläche je Mulde — so plant jeder Weg drum herum.
+ *
+ * Seit E-184 LEBENDE Einträge: `obstacles.ts` legt genau diese Objekte in
+ * seine Liste, und `baueFirmenmulden` schreibt Lage und Umriss hinein, sobald
+ * eine Mulde gezeichnet wird. Bis dahin (und in Vitest ohne Zeichnen) stehen
+ * dort die Startplätze.
+ */
+const HINDERNISSE: Obstacle[] = FIRMENMULDEN.map((m) => {
+  const inX = m.achse === "x";
+  return {
+    x: m.x,
+    z: m.z,
+    hw: (inX ? m.laenge : m.breite) / 2,
+    hd: (inX ? m.breite : m.laenge) / 2,
+    top: m.hoehe,
+    label: `Firmenmulde ${m.name}`,
+  };
+});
 export function firmenmuldenHindernisse(): Obstacle[] {
-  return FIRMENMULDEN.map((m) => {
-    const inX = m.achse === "x";
-    return {
-      x: m.x,
-      z: m.z,
-      hw: (inX ? m.laenge : m.breite) / 2,
-      hd: (inX ? m.breite : m.laenge) / 2,
-      top: m.hoehe,
-      label: `Firmenmulde ${m.name}`,
-    };
-  });
+  return HINDERNISSE;
 }
 
 /* ------------------------------------------------------------ Bauart ----- */
@@ -198,65 +220,101 @@ function mulde(w: number, h: number, d: number, feld: ReturnType<typeof atlasFel
   return { teile, aufkleber, kollider };
 }
 
+
 /**
- * Alle Firmenmulden bauen: EIN Netz für die Körper (Vertexfarben), EIN Netz
- * für alle Aufkleber (Atlas aus `werbung.ts`), ein fester Körper mit fünf
- * Kollidern je Mulde. Ohne Atlas (Vitest ohne Leinwand) keine Aufkleber.
+ * Alle Firmenmulden bauen (E-184): je Mulde ein Netz für den Körper
+ * (Vertexfarben, wirft Schatten) mit dem Aufkleber als Kind (Atlas, ohne
+ * Schatten) und ein beweglicher Körper mit fünf Kollidern. Ohne Atlas
+ * (Vitest ohne Leinwand) keine Aufkleber. Liefert die Körper (für Wächter und
+ * Messungen).
+ *
+ * NACHFÜHREN OHNE EIGENE BILDSCHLEIFE: Die Szene ruft vor jedem Bild
+ * `onBeforeRender` — noch vor dem Aussortieren außerhalb des Bildes. Dort
+ * holen sich die Netze ihre Lage vom Körper und schreiben den Umriss in die
+ * Hindernisliste. So braucht `main.ts` keinen neuen Aufruf, und eine Mulde,
+ * die ins Bild getragen wird, steht dort auch.
  */
-export function baueFirmenmulden(scene: THREE.Scene, world: RAPIER.World): void {
+export function baueFirmenmulden(scene: THREE.Scene, world: RAPIER.World): RAPIER.RigidBody[] {
   const atlas = werbeAtlas();
   const feld = atlas ? atlasFeld("pripadaGruen", 2) : null;
-  const koerper: THREE.BufferGeometry[] = [];
-  const aufkleber: THREE.BufferGeometry[] = [];
-  const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
   const farbe = new THREE.Color();
   const yAchse = new THREE.Vector3(0, 1, 0);
+  // Grün, Rost und Stahl wie der Abroller (`vehicleModel.ts`: 0,75 / 0,35)
+  const koerperMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.35 });
+  const logoMat = atlas ? new THREE.MeshStandardMaterial({ map: atlas, roughness: 0.75, metalness: 0.35 }) : null;
+  const bodies: RAPIER.RigidBody[] = [];
+  const folgen: Array<() => void> = [];
 
-  for (const m of FIRMENMULDEN) {
+  FIRMENMULDEN.forEach((m, nr) => {
     const plan = mulde(m.breite, m.hoehe, m.laenge, feld);
     // Bauplan hat die Länge in z; Längsachse x heißt eine Vierteldrehung
     const rot = m.achse === "x" ? Math.PI / 2 : 0;
     const dreh = new THREE.Quaternion().setFromAxisAngle(yAchse, rot);
-    const lage = new THREE.Matrix4().compose(new THREE.Vector3(m.x, 0, m.z), dreh, new THREE.Vector3(1, 1, 1));
+
+    // Körper an der Startlage erzeugen (Rapier-Lehre v2 E-058), wie der MÜLL:
+    // gedämpft, kippt nicht, rutscht nach einem Stoß nicht über den Platz
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(m.x, 0, m.z)
+        .setRotation({ x: dreh.x, y: dreh.y, z: dreh.z, w: dreh.w })
+        .setLinearDamping(6.0)
+        .setAngularDamping(8.0)
+        .enabledRotations(false, true, false)
+    );
+    // Masse: Boden 40 %, jede der vier Wände 15 % (SW — der Boden ist das stärkste Blech)
+    plan.kollider.forEach((desc, i) => {
+      world.createCollider(desc.setMass(m.leerKg * (i === 0 ? 0.4 : 0.15)).setFriction(1.4), body);
+    });
+    bodies.push(body);
+
     for (const { geo, farbe: hex } of plan.teile) {
       farbe.set(hex);
       const n = geo.getAttribute("position").count;
       const c = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) farbe.toArray(c, i * 3);
       geo.setAttribute("color", new THREE.BufferAttribute(c, 3));
-      koerper.push(geo.applyMatrix4(lage));
     }
-    for (const geo of plan.aufkleber) aufkleber.push(geo.applyMatrix4(lage));
-    for (const desc of plan.kollider) {
-      const p = new THREE.Vector3(desc.translation.x, desc.translation.y, desc.translation.z)
-        .applyQuaternion(dreh)
-        .add(new THREE.Vector3(m.x, 0, m.z));
-      const r = dreh.clone().multiply(
-        new THREE.Quaternion(desc.rotation.x, desc.rotation.y, desc.rotation.z, desc.rotation.w)
-      );
-      world.createCollider(
-        desc.setTranslation(p.x, p.y, p.z).setRotation({ x: r.x, y: r.y, z: r.z, w: r.w }),
-        body
-      );
+    const koerperGeo = mergeGeometries(plan.teile.map((t) => t.geo), false);
+    koerperGeo.computeVertexNormals();
+    for (const t of plan.teile) t.geo.dispose();
+    const netz = new THREE.Mesh(koerperGeo, koerperMat);
+    netz.name = `Firmenmulde ${m.name}`;
+    netz.castShadow = true;
+    if (logoMat && plan.aufkleber.length > 0) {
+      // Ein flacher Aufkleber wirft keinen eigenen Schatten — spart den Schattenruf
+      const logo = new THREE.Mesh(mergeGeometries(plan.aufkleber, false), logoMat);
+      logo.name = `Firmenmulde ${m.name} Aufkleber`;
+      netz.add(logo);
     }
-  }
 
-  // Grün, Rost und Stahl wie der Abroller (`vehicleModel.ts`: 0,75 / 0,35)
-  const netz = new THREE.Mesh(
-    mergeGeometries(koerper, false),
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.35 })
-  );
-  netz.geometry.computeVertexNormals();
-  netz.name = "Firmenmulden";
-  netz.castShadow = true;
-  scene.add(netz);
-  for (const g of koerper) g.dispose();
-
-  if (!atlas) return;
-  const logos = new THREE.Mesh(
-    mergeGeometries(aufkleber, false),
-    new THREE.MeshStandardMaterial({ map: atlas, roughness: 0.75, metalness: 0.35 })
-  );
-  logos.name = "Firmenmulden Aufkleber";
-  scene.add(logos);
+    const h = HINDERNISSE[nr]!;
+    const inX = m.achse === "x";
+    const folge = (): void => {
+      if (!body.isValid()) return;
+      const t = body.translation();
+      const r = body.rotation();
+      netz.position.set(t.x, t.y, t.z);
+      netz.quaternion.set(r.x, r.y, r.z, r.w);
+      netz.updateMatrixWorld(true);
+      // Umriss: gedreht wächst er auf den Hüllkreis, wie beim MÜLL — eine
+      // achsenparallele Liste kann keinen schiefen Kasten führen
+      const gier = Math.atan2(2 * r.w * r.y, 1 - 2 * r.y * r.y) - rot;
+      const s = Math.abs(Math.sin(gier));
+      const laengsX = s < 0.15 ? inX : Math.abs(Math.cos(gier)) < 0.15 ? !inX : null;
+      h.x = t.x;
+      h.z = t.z;
+      h.hw = laengsX === null ? m.laenge / 2 : (laengsX ? m.laenge : m.breite) / 2;
+      h.hd = laengsX === null ? m.laenge / 2 : (laengsX ? m.breite : m.laenge) / 2;
+      h.top = t.y + m.hoehe;
+    };
+    folgen.push(folge);
+    folge();
+    scene.add(netz);
+  });
+  const vorher = scene.onBeforeRender;
+  scene.onBeforeRender = function (...a) {
+    vorher.apply(this, a);
+    for (const f of folgen) f();
+  };
+  return bodies;
 }
