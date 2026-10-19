@@ -554,6 +554,24 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ziel 19.10.2026: App Store in vier Wochen** — Patrick, wörtlich:
+      „Stelle dir vor du bist Profi Spiele publisher, Ziel ist es eine Version
+      zu bekommen, die ap live in den app store zu bekommen. Wie würdest du das
+      prüfen, wie evaluieren? Was fehlt um das Ziel in den nächsten vier Wochen
+      zu erreichen?" Antworten: Apple-Konto GmbH „nein" (noch keins);
+      Umfang „Aufgaben + Sandkasten"; Preis „Einmalpreis, Deutsch + Englisch";
+      Start „Ja, alles parallel".
+
+      | # | Punkt |
+      |---|---|
+      | 22a | Apple-Entwicklerkonto GmbH + D-U-N-S beantragen (Patrick) |
+      | 22b | iOS-Build in der Cloud bis TestFlight |
+      | 22c | Aufgaben (6–8 Challenges mit Sternen) zurück, erste als Einführung |
+      | 22d | Leistung iPhone mini, offline, Speichern |
+      | 22e | Store-Auftritt DE/EN, Datenschutz, Impressum, Altersfreigabe |
+      | 22f | Einmalpreis: Paid Apps Agreement, Bank, Steuer (Patrick) |
+      | 22g | TestFlight-Tests, fünf Erstspieler beobachten |
+
 - [ ] **Gerätebefund 18.10.2026, Klangqualität** — Patrick, wörtlich: „Also
       das anschlagen klingt jetzt, nur sind die Geräusche manchmal wenig
       realistisch. es klingt anders, wenn man gegen beton schlägt vs metal auf
