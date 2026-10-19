@@ -100,9 +100,18 @@ describe("Die Schilder stehen niemandem im Weg (E-131)", () => {
     ];
   };
 
-  it("mehr als die eine Firmentafel, und der Name ist mehrfach dabei", () => {
-    expect(schilder.length).toBeGreaterThanOrEqual(6);
-    expect(schilder.filter((s) => s.bild.name === FIRMA).length).toBeGreaterThanOrEqual(3);
+  /*
+   * E-174 — Patrick, 20.10.2026: „Auch weniger Werbetafeln." Vier bleiben:
+   * Tor, Bürodach an der Waage, hinter der Bucht, Halle 1.
+   */
+  it("vier Tafeln: Tor, Waage, Bucht, Halle 1 (E-174)", () => {
+    expect(schilder.map((s) => s.name)).toEqual([
+      "Firmentafel am Tor",
+      "Tafel, Dach Büro an der Waage",
+      "Tafel, hinter der Bucht",
+      "Halle 1",
+    ]);
+    expect(schilder.filter((s) => s.bild.name === FIRMA).length).toBe(4);
   });
 
   /** Die Dachtafel auf dem Büro (E-133) steht über dem Platz, nicht auf ihm. */

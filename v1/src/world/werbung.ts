@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { SCHILD_POS, SCHILD_B, SCHILD_H, YARD_D, YARD_MAX_X, BUCHT_Z, TRENNSTEIN_X } from "./yard";
+import { SCHILD_POS, SCHILD_B, SCHILD_H, BUCHT_Z, TRENNSTEIN_X } from "./yard";
 import { HALLEN_X, HALLEN_Z, HALLE_TIEFE, OFFICE_X, OFFICE_Z } from "./office";
 
 /**
@@ -175,8 +175,6 @@ export interface Werbeschild {
 
 /** Schaut nach −z (von der Nordmauer auf den Platz) */
 const NACH_SUEDEN = Math.PI;
-/** Schaut nach −x (von der Ostmauer auf den Platz) */
-const NACH_WESTEN = -Math.PI / 2;
 /** Schaut nach +x (Hallenfront, `office.TOR_RICHTUNG`) */
 const NACH_OSTEN = Math.PI / 2;
 /** Schaut nach +z (von hinter der Bucht auf den Platz) */
@@ -189,7 +187,7 @@ const NACH_NORDEN = 0;
  * Baumreihe hinter der Nordmauer bei z +34 anfängt und eine Krone bis 2,5 m
  * nach vorn reicht (`Yard.buildLandscape`, Maßstab bis 1,65 × `KRONE_R`) —
  * weiter hinten stünden Äste vor der Schrift. An der Ostmauer gilt dasselbe
- * (Bäume ab x +15,5).
+ * (Bäume ab x +15,5). Seit E-174 steht nur noch die Bucht-Tafel so.
  */
 const HINTER_MAUER = 1.5;
 
@@ -201,11 +199,10 @@ const HINTER_MAUER = 1.5;
  * kämen auf 9. Die Unterkante: Ein beladener Laster ist bis 4,00 m hoch
  * (E-126, StVZO § 32); aus dem Sitz sieht man über einen Laster auf dem
  * Warteplatz hinweg noch die Unterkante. Mitte damit auf 6,8 m — so hoch wie
- * die Firmentafel (`SCHILD_POS.y`).
+ * die Firmentafel (`SCHILD_POS.y`). Seit E-174 nur noch hinter der Bucht.
  */
 const FREI_B = 9.0;
 const FREI_H = 4.5;
-const FREI_Y = 4.55 + FREI_H / 2;
 
 /**
  * Die Blende über dem Hallentor: von der Unterkante des Sturzes (4,475 m,
@@ -258,13 +255,19 @@ const BUCHT_UNTERKANTE = 5.0;
  * Alle Tafeln des Platzes. Gerechnet beim Aufruf, nicht beim Laden: `yard.ts`
  * baut sie, und diese Datei liest Zahlen aus `yard.ts` — so entsteht kein
  * Ringschluss beim Laden der Module.
+ *
+ * WENIGER TAFELN (E-174). Patrick, 20.10.2026: „Auch weniger Werbetafeln."
+ * Von neun bleiben vier, je eine dort, wo man hinschaut:
+ *  - am Tor (wer hereinkommt; Bestand seit E-010),
+ *  - auf dem Bürodach an der Waage (E-133: „direkt an der Waage"),
+ *  - hinter der Bucht (E-133: „da wo gearbeitet wird" — dorthin schaut, wer an
+ *    den Halden greift),
+ *  - über dem Tor von Halle 1 („Sortierhalle"; Patrick nannte die Halle unter
+ *    dem, was Rost & Reibach trägt).
+ * Weg sind die vier freistehenden an Nord- und Ostmauer und die Blenden von
+ * Halle 2 und 3 — derselbe Name sechsmal mehr sagte nichts Neues.
  */
 export function werbeschilder(): Werbeschild[] {
-  const nord = YARD_D / 2 + HINTER_MAUER;
-  const ost = YARD_MAX_X + HINTER_MAUER;
-  const frei = (name: string, bild: Bild, x: number, z: number, rot: number): Werbeschild => ({
-    name, bild, x, y: FREI_Y, z, b: FREI_B, h: FREI_H, rot, pfosten: true,
-  });
   const blende = (name: string, bild: Bild, halle: number): Werbeschild => ({
     name, bild, x: BLENDE_X, y: BLENDE_Y, z: HALLEN_Z[halle]!, b: BLENDE_B, h: BLENDE_H, rot: NACH_OSTEN, pfosten: false,
   });
@@ -275,21 +278,6 @@ export function werbeschilder(): Werbeschild[] {
       x: SCHILD_POS.x, y: SCHILD_POS.y, z: SCHILD_POS.z, b: SCHILD_B, h: SCHILD_H,
       rot: NACH_SUEDEN, pfosten: true, kollider: true,
     },
-    /*
-     * Nordmauer östlich des Tors: −17,5 … −8,5 steht über den beiden
-     * Warteplätzen am Tor und Janines Wagen, 3 m neben der Zufahrt
-     * (x −22 ± 1,55). 1,0 … 10,0 lässt den Flutlichtmast auf x 0
-     * (`daylight.einmauern`) in der Lücke stehen.
-     */
-    frei("Tafel, Nordmauer am Tor", TAFEL, -13.0, nord, NACH_SUEDEN),
-    frei("Tafel, Nordmauer Ost", TAFEL, 5.5, nord, NACH_SUEDEN),
-    /*
-     * Ostmauer: z −20 … −11 steht hinter dem Abladeplatz, rechts vom Sitz —
-     * dorthin schaut, wer einen Laster leer macht; seit E-133 der eigene Name („da wo
-     * gearbeitet wird"). z 11,5 … 20,5 lässt die Masten auf z 8 und z 26 frei.
-     */
-    frei("Tafel, Ostmauer am Abladeplatz", TAFEL, ost, -15.5, NACH_WESTEN),
-    frei("Tafel, Ostmauer Nord", TAFEL, ost, 16.0, NACH_WESTEN),
     {
       name: "Tafel, Dach Büro an der Waage", bild: TAFEL,
       x: OFFICE_X + 2.5, y: DACH_UNTERKANTE + DACH_H / 2, z: OFFICE_Z, b: DACH_B, h: DACH_H,
@@ -300,10 +288,8 @@ export function werbeschilder(): Werbeschild[] {
       x: TRENNSTEIN_X, y: BUCHT_UNTERKANTE + FREI_H / 2, z: BUCHT_Z - HINTER_MAUER, b: FREI_B, h: FREI_H,
       rot: NACH_NORDEN, pfosten: true,
     },
-    // Die drei Hallen: Blende über dem Tor, auf den Platz hin.
+    // Halle 1: Blende über dem Tor, auf den Platz hin.
     blende("Halle 1", HALLE_BILD, 0),
-    blende("Halle 2", HALLE_BILD, 1),
-    blende("Halle 3", HALLE_BILD, 2),
   ];
 }
 

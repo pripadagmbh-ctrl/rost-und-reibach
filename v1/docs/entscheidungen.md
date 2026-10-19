@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-174 | 20.10.2026 | Vier Werbetafeln statt neun: Tor, Waage, Bucht, Halle 1 | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-173 | 20.10.2026 | Spiel heißt wieder Rost & Reibach, überall auf dem Platz | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-172 | 19.10.2026 | Stummschalter auf lautlos: Spiel still, fremde Musik läuft weiter | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-171 | 19.10.2026 | Datenschutz, Lizenzen, Support als Seiten im App-Paket | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
@@ -179,6 +180,10 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-174 — Vier Tafeln statt neun** (iPad)
+- Rundblick aus der Kabine: fehlen Tafeln an Nord- oder Ostmauer, oder ist es so ruhiger?
+- Halle 2 und 3 ohne Blende: wirkt der Giebel leer?
 
 **E-173 — Rost & Reibach** (iPad, dann iPhone mini)
 - Tafel am Tor, Bürodach, hinter der Bucht: „Rost & Reibach" mit rostbraunem Ring lesbar? Gefällt das rostbraune „&"?
