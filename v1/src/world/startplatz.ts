@@ -92,8 +92,16 @@ const STREU_TEILE = LEERER_START ? 0 : 10;
  * steht hier abgeschrieben, weil ein Import von CONFIGS einen Ringschluss gaebe
  * (containers → scrapItems → startplatz); `test/startplatz.test.ts` haelt sie
  * gegen die Halde.
+ *
+ * E-182 (20.10.2026): (−2,55 | −32,2), Streuung 2,4 statt 2,9 m. Die schräge
+ * Mauer am Mischschrott steht bei z −32,2 innen auf x −5,35 (`yard.mischSchraegeX`
+ * + halbe Steindicke), die Quermauer innen auf x 0,2. Mit 2,9 m um x −3,0
+ * lagen Teile in bzw. hinter der schrägen Mauer (Bild A-draufsicht-hinten,
+ * erster Lauf); jetzt bleiben 0,30 m zur schrägen Mauer (senkrecht zur
+ * Wand gemessen) und 0,35 m zur
+ * Quermauer. `test/startplatz.test.ts` rechnet beides nach.
  */
-export const START_HAUFEN = { x: -3.0, z: -32.0, streuung: 2.9, teile: HAUFEN_TEILE };
+export const START_HAUFEN = { x: -2.55, z: -32.2, streuung: 2.4, teile: HAUFEN_TEILE };
 
 /**
  * Die beiden Altfahrzeuge, je eines an der vorderen Kante einer Halde.
@@ -123,9 +131,17 @@ export const START_HAUFEN = { x: -3.0, z: -32.0, streuung: 2.9, teile: HAUFEN_TE
  *    z −27,6, das Auto beginnt bei −29,2).
  * Das erste Auto bleibt, wo es war.
  */
+/*
+ * E-182 (20.10.2026): Die Stahlhalde ist schmaler (Ostschenkel x 5,9, innen
+ * 0,8 … 5,6). Beide Autos (1,7 m breit, `CAR_DEF.karosserie.chassis`) stehen
+ * weiter nebeneinander darin: 0,3 m zur Quermauer, 0,85 m zwischen sich, 0,25 m
+ * zum Ostschenkel. Vorderkanten 5,8 und 8,4 m vom Sitz, beide im Band
+ * (5,8 … 9,2).
+ * `challenges/katalog.ts` liest das zweite für die Presse-Aufgabe.
+ */
 export const START_AUTOS: Array<{ x: number; z: number }> = [
-  { x: 2.4, z: -29.8 },
-  { x: 5.0, z: -31.2 },
+  { x: 1.95, z: -29.8 },
+  { x: 4.5, z: -31.2 },
 ];
 
 /**
@@ -152,7 +168,7 @@ export const START_AUTOS: Array<{ x: number; z: number }> = [
 export const START_LKW = { x: 7.4, z: 9.0, gier: Math.PI };
 
 /** Streuschrott ringsum: zehn Teile auf einem Kreis um den Haufen. */
-export const START_STREU = { x: START_HAUFEN.x, z: START_HAUFEN.z, radius: 2.9, teile: STREU_TEILE };
+export const START_STREU = { x: START_HAUFEN.x, z: START_HAUFEN.z, radius: START_HAUFEN.streuung, teile: STREU_TEILE };
 
 /**
  * Wo der eine Kehrbesen liegt (E-031, neu gerechnet in E-037 und E-049).

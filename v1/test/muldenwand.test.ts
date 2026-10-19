@@ -26,6 +26,8 @@ import { initPhysics } from "../src/physics/physicsWorld";
 import { leinwandAttrappe } from "../tools/leinwand-attrappe";
 import {
   mauerLaeufe,
+  schraegeLaeufe,
+  MISCH_SCHRAEG_VORN_X,
   MAUER_STEIN,
   TOR_HALB,
   GATE_X,
@@ -91,12 +93,13 @@ describe("Die Umrandung kommt in den Ecken an", () => {
   const t = MAUER_STEIN.dicke / 2;
   const lauf = (name: string) => laeufe.find((l) => l.name === name)!;
 
-  it("führt neun Läufe: vier Platzseiten mit ihren Lücken und die Ausbuchtung", () => {
+  it("führt acht gerade Läufe und einen schrägen: vier Platzseiten mit ihren Lücken und die Ausbuchtung", () => {
+    // Seit E-182 ist der Westschenkel der Bucht schräg (`schraegeLaeufe`)
+    expect(schraegeLaeufe().map((l) => l.name)).toEqual(["misch-schraeg"]);
     expect(laeufe.map((l) => l.name).sort()).toEqual(
       [
         "bucht-ost",
         "bucht-sued",
-        "bucht-west",
         "nord-ost",
         "nord-west",
         "ost",
@@ -135,15 +138,20 @@ describe("Die Umrandung kommt in den Ecken an", () => {
   });
 
   it("die Ausbuchtung ist rundum geschlossen, ohne Überstand", () => {
-    // Schenkel tragen die Ecken, die Rückwand stößt zwischen ihnen an.
-    for (const n of ["bucht-west", "bucht-ost"]) {
-      expect(lauf(n).von).toBeCloseTo(BUCHT_Z - t, 9);
-      expect(lauf(n).bis).toBeCloseTo(-hz - t, 9);
-    }
+    // Der Ostschenkel trägt seine Ecke, die Rückwand stößt an.
+    expect(lauf("bucht-ost").von).toBeCloseTo(BUCHT_Z - t, 9);
+    expect(lauf("bucht-ost").bis).toBeCloseTo(-hz - t, 9);
     expect(lauf("bucht-sued").von).toBeCloseTo(BUCHT_X_VON + t, 9);
     expect(lauf("bucht-sued").bis).toBeCloseTo(BUCHT_X_BIS - t, 9);
-    // und die Südmauer hört an den Schenkeln auf, ohne in die Öffnung zu ragen
-    expect(lauf("sued-west").bis).toBeCloseTo(BUCHT_X_VON - t, 9);
+    // Die schräge Mauer (E-182) reicht hinten über die Ecke hinaus und endet
+    // vorn auf der Achse der Südmauer, an der diese aufhört.
+    const sl = schraegeLaeufe()[0]!;
+    expect(Math.hypot(sl.x0 - BUCHT_X_VON, sl.z0 - BUCHT_Z)).toBeCloseTo(t, 9);
+    expect(sl.z0).toBeLessThan(BUCHT_Z);
+    expect(sl.x1).toBeCloseTo(MISCH_SCHRAEG_VORN_X, 9);
+    expect(sl.z1).toBeCloseTo(-hz, 9);
+    // und die Südmauer hört an der schrägen Mauer bzw. am Ostschenkel auf
+    expect(lauf("sued-west").bis).toBeCloseTo(MISCH_SCHRAEG_VORN_X - t, 9);
     expect(lauf("sued-ost").von).toBeCloseTo(BUCHT_X_BIS + t, 9);
   });
 
@@ -152,7 +160,7 @@ describe("Die Umrandung kommt in den Ecken an", () => {
       laeufe.some(
         (l) => l.achse === "x" && Math.abs(l.fest + hz) < 0.01 && x > l.von && x < l.bis
       );
-    for (let x = BUCHT_X_VON + 0.2; x < BUCHT_X_BIS - 0.2; x += 0.5) {
+    for (let x = MISCH_SCHRAEG_VORN_X + t + 0.2; x < BUCHT_X_BIS - 0.2; x += 0.5) {
       expect(belegt(x), `Südmauer steht bei x=${x.toFixed(1)} vor der Bucht`).toBe(false);
     }
   });

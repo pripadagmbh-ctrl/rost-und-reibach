@@ -15,6 +15,7 @@ import { describe, it, expect } from "vitest";
 import { START_HAUFEN, START_AUTOS, START_STREU } from "../src/world/startplatz";
 import { PRESS_CENTER, PRESS_INNER } from "../src/world/press";
 import { CONFIGS } from "../src/world/containers";
+import { BUCHT_X_BIS, MAUER_STEIN, TRENNSTEIN_X, mischSchraegeX, schraegeLaeufe } from "../src/world/yard";
 
 /** Die Presskammer von aussen, so wie press.ts sie baut (Boden + 0,7 m). */
 const KAMMER = {
@@ -89,5 +90,36 @@ describe("Anfangszustand des Platzes", () => {
     for (const [i, a] of START_AUTOS.entries()) {
       expect(inHalde(a.x, a.z), `Altfahrzeug ${i} steht in keiner Halde`).toBe(true);
     }
+  });
+  /*
+   * E-182: Haufen, Streugut und Autos bleiben zwischen den Mauern der Bucht —
+   * mit mindestens 0,2 m Luft zur schrägen Mauer, zur Quermauer und zum
+   * Ostschenkel (gerechnet gegen die Wandflächen, nicht gegen die Mitte).
+   */
+  it("nichts Anfängliches steckt in einer Mauer der Bucht (E-182)", () => {
+    const T = MAUER_STEIN.dicke / 2;
+    // schräge Mauer: senkrechter Abstand zur Mittellinie minus halbe Dicke
+    const sl = schraegeLaeufe()[0]!;
+    const lx = sl.x1 - sl.x0;
+    const lz = sl.z1 - sl.z0;
+    const l = Math.hypot(lx, lz);
+    const zurSchraegen = (x: number, z: number): number =>
+      Math.abs((x - sl.x0) * lz - (z - sl.z0) * lx) / l - T;
+    // Haufen und Streugut: der ganze Kreis im Mischschrott
+    for (const [was, x, z, r] of [
+      ["Starthaufen", START_HAUFEN.x, START_HAUFEN.z, START_HAUFEN.streuung],
+      ["Streugut", START_STREU.x, START_STREU.z, START_STREU.radius],
+    ] as Array<[string, number, number, number]>) {
+      expect(zurSchraegen(x, z) - r, `${was} reicht in die schräge Mauer`).toBeGreaterThanOrEqual(0.2);
+      expect(x < mischSchraegeX(z), `${was} liegt hinter der schrägen Mauer`).toBe(false);
+      expect(TRENNSTEIN_X - T - (x + r), `${was} reicht in die Quermauer`).toBeGreaterThanOrEqual(0.2);
+    }
+    // Autos (1,7 m breit): in der Stahlhalde zwischen Quermauer und Ostschenkel
+    for (const [i, a] of START_AUTOS.entries()) {
+      expect(a.x - 0.85 - (TRENNSTEIN_X + T), `Auto ${i} an der Quermauer`).toBeGreaterThanOrEqual(0.2);
+      expect(BUCHT_X_BIS - T - (a.x + 0.85), `Auto ${i} am Ostschenkel`).toBeGreaterThanOrEqual(0.2);
+    }
+    const [a0, a1] = START_AUTOS;
+    expect(Math.abs(a1!.x - a0!.x) - 1.7, "die Autos stehen ineinander").toBeGreaterThanOrEqual(0.5);
   });
 });

@@ -46,7 +46,7 @@ function presseFuss(): { x: number; z: number; hw: number; hd: number } {
   return { x: (x0 + x1) / 2, z: (z0 + z1) / 2, hw: (x1 - x0) / 2, hd: (z1 - z0) / 2 };
 }
 import { BAGGER_STAND } from "../src/world/baggerstand";
-import { WEIGH_X, WEIGH_Z, TRENNSTEIN_X } from "../src/world/yard";
+import { WEIGH_X, WEIGH_Z, TRENNSTEIN_X, mischSchraegeX } from "../src/world/yard";
 import {
   CLAW_OPEN_SPLAY,
   CLAW_SEGMENTS,
@@ -310,12 +310,17 @@ describe("Feste Bauten", () => {
      * ist das beim Mischschrott −x. Aus der Lage gerechnet statt abgeschrieben.
      */
     const weg = Math.sign(h.x - TRENNSTEIN_X);
-    const aussen = hitsObstacle(h.x + weg * (w / 2 + 0.2), h.z, 0);
-    expect(aussen, "Aussenwand sperrt").not.toBeNull();
-    expect(aussen!.label, "es ist nicht die Buchtwand").toContain("Bucht");
     /*
-     * Zwischen den beiden Halden steht nur die Pyramide aus Trennsteinen. Sie
-     * darf den Arm nicht aufhalten: „sodass der Zugriff von Mischschrott zu
+     * Seit E-182 ist die Aussenwand des Mischschrotts die schraege Mauer zur
+     * Presse: Geprobt wird auf ihrer Mittellinie in Haldentiefe.
+     */
+    const aussen = hitsObstacle(mischSchraegeX(h.z), h.z, 0);
+    expect(aussen, "Aussenwand sperrt").not.toBeNull();
+    expect(aussen!.label, "es ist nicht die schraege Mauer").toContain("Schräge Mauer");
+    expect(Math.sign(mischSchraegeX(h.z) - TRENNSTEIN_X), "sie steht auf der Aussenseite").toBe(weg);
+    /*
+     * Zwischen den beiden Halden steht die Quermauer (bis E-182 eine Pyramide
+     * aus Trennsteinen), hoechstens 2,4 m. Sie darf den Arm nicht aufhalten: „sodass der Zugriff von Mischschrott zu
      * Stahlschrott fluessig laeuft." Geprueft wird das ueber die Hoehe — auf
      * 2,5 m ist dort nichts mehr.
      */

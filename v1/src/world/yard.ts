@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { reihenstuecke } from "./legoreihe";
 import { baueWerbeschilder } from "./werbung";
 import { baueFirmenmulden } from "./firmenmulden";
+import { PRESS_CENTER, PRESS_FUSS } from "./press";
 
 /** Position der Brückenwaage in der Nordspur (SW) */
 /**
@@ -93,7 +94,18 @@ export const GATE_X = -22;
  * Zahlen aus `tools/platzkonzept.mjs` (`bxA`, `bxB`, `BUCHT_Z`).
  */
 export const BUCHT_X_VON = -6.5;
-export const BUCHT_X_BIS = 7.5;
+/*
+ * E-182 (20.10.2026): 7,5 → 5,9. Patrick: „Den Platz und die Ausbuchtung am
+ * Stahlschrott reduzieren." Der Ostschenkel rückt 1,6 m nach Westen; die
+ * Stahlschrott-Halde ist innen 4,8 statt 6,4 m breit. Weiter ging es nicht
+ * ohne ein Auto zu verlieren: Beide Altfahrzeuge (`START_AUTOS`, je 1,7 m
+ * breit) stehen nebeneinander darin, mit 0,25–0,3 m zu den Wänden und 0,85 m
+ * zwischen sich (`grosswracks.test.ts` verlangt mehr als 0,8). Was wegfällt, lag ohnehin außer Reichweite: Die alte
+ * Ostecke (7,2 | −29,3) ist 10,4 m vom Sitz (Band bis 9,2 m). Nebenwirkung:
+ * Hinter dem Abladeplatz (x 6,3) steht jetzt die hohe Südmauer statt der
+ * offenen Bucht — gekipptes läuft an der Mauer aus statt in die Halde.
+ */
+export const BUCHT_X_BIS = 5.9;
 /*
  * Flacher seit dem 14.09.2026 abends: −35,5 statt −38,5.
  *
@@ -105,6 +117,76 @@ export const BUCHT_X_BIS = 7.5;
  * Stauraum — 40,8 statt 61,2 m² je Halde, zusammen 81,6 statt 122,4 m².
  */
 export const BUCHT_Z = -35.5;
+/** Dicke eines Betonlegosteins (Bestand seit 29.08.2026), siehe `MAUER_STEIN`. */
+const MAUER_STEIN_DICKE = 0.6;
+/*
+ * DIE SCHRÄGE MAUER AM MISCHSCHROTT (E-182).
+ *
+ * Patrick, 20.10.2026: „beim Mischschrott eine Quermauer setzen, damit eine
+ * Mauer gerade, und eine Mauer zur Presse diagonal zur Presse hingeht, und mit
+ * der Außenkante der Presse abschließt."
+ *
+ * Gebaut ist die Lesart „Halde mit zwei Seitenwänden": Die gerade Mauer ist
+ * die Quermauer zum Stahlschrott (`TRENNSTEINE`, jetzt durchgehend), die
+ * schräge ersetzt den Westschenkel der Bucht. Sie läuft von der hinteren
+ * Ecke (`MISCH_SCHRAEG_HINTEN_X` | `BUCHT_Z`) nach vorn zur Presse und endet
+ * dort, wo die Presse nach Osten aufhört: Ihre Außenseite liegt am Ende auf
+ * der Außenkante des Pressenrahmens (x −5,125). Vorher lag hinter der
+ * Pressenecke ein 1,4 m breiter Winkel der Halde, in den die Spinne nur über
+ * den Rahmen hinweg kam — der ist jetzt zu.
+ *
+ * Die Zahl für hinten ist die Wahl zwischen den beiden gerenderten Varianten
+ * (A: −6,5, die Ecke bleibt, die Mauer steht 14° schräg; B: −9,0, die Bucht
+ * wird hinten breiter, 33° schräg). Gebaut ist A — Rückfrage an Patrick.
+ */
+export const MISCH_SCHRAEG_HINTEN_X = BUCHT_X_VON;
+/** Außenkante des Pressenrahmens nach Osten (−5,125, `press.ts`). */
+const PRESSE_AUSSEN_OST = PRESS_CENTER.x + PRESS_FUSS.hw;
+/** Mittellinie der schrägen Mauer am vorderen Ende, auf der Südmauerachse. */
+export const MISCH_SCHRAEG_VORN_X = PRESSE_AUSSEN_OST + MAUER_STEIN_DICKE / 2;
+
+/** Eine schräge Mauer: Mittellinie von (x0 | z0) nach (x1 | z1), Höhe in m. */
+export interface SchraegLauf {
+  name: string;
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  hoehe: number;
+}
+
+/**
+ * Die schrägen Mauerläufe — zurzeit nur der am Mischschrott. Hinten um eine
+ * halbe Steindicke verlängert, damit die Ecke zur Rückwand geschlossen ist.
+ */
+export function schraegeLaeufe(): SchraegLauf[] {
+  const x1 = MISCH_SCHRAEG_VORN_X;
+  const z1 = -YARD_D / 2;
+  const dx = x1 - MISCH_SCHRAEG_HINTEN_X;
+  const dz = z1 - BUCHT_Z;
+  const l = Math.hypot(dx, dz);
+  const t = MAUER_STEIN_DICKE / 2;
+  return [
+    {
+      name: "misch-schraeg",
+      x0: MISCH_SCHRAEG_HINTEN_X - (dx / l) * t,
+      z0: BUCHT_Z - (dz / l) * t,
+      x1,
+      z1,
+      hoehe: SUED_HOCH,
+    },
+  ];
+}
+
+/**
+ * Wo die schräge Mauer bei der Tiefe z steht (Mittellinie) — für Halde,
+ * Hindernisliste und Wächter.
+ */
+export function mischSchraegeX(z: number): number {
+  const t = (z - BUCHT_Z) / (-YARD_D / 2 - BUCHT_Z);
+  return MISCH_SCHRAEG_HINTEN_X + t * (MISCH_SCHRAEG_VORN_X - MISCH_SCHRAEG_HINTEN_X);
+}
+
 /*
  * Die frühere Hilfsfunktion `inBucht(x)` ist weg: Seit die Umrandung aus
  * `mauerLaeufe()` kommt, steht die Aussparung als eigener Lauf da und muss
@@ -137,13 +219,19 @@ export const TRENNSTEIN_X = 0.5;
  * Lagen laufen 1–4–4–1: in der Mitte 2,4 m, an beiden Enden 0,6 m. Die
  * Pyramide bleibt damit dieselbe Figur, nur kuerzer.
  */
-export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [1, 4, 4, 1].map(
+/*
+ * E-182: aus der Pyramide 1–4–4–1 wird eine gerade Quermauer, durchgehend vier
+ * Lagen (2,4 m) — Patrick: „eine Mauer grade". Vier Lagen statt der 4,8 m der
+ * Bucht (SW): So greift die Spinne weiter über die Kante von einer Halde in
+ * die andere (Ansage 14.09.2026: „Zugriff … flüssig").
+ */
+export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [4, 4, 4, 4].map(
   (lagen, i) => ({ z: -29.9 - i * TRENNSTEIN_L, hoehe: lagen * TRENNSTEIN_H })
 );
 
 /* -------------------------------------------------- Die Mauerläufe ------- */
 /** Steinmaß der Umrandung (Bestand seit 29.08.2026). */
-export const MAUER_STEIN = { laenge: 1.6, hoehe: 0.6, dicke: 0.6 };
+export const MAUER_STEIN = { laenge: 1.6, hoehe: 0.6, dicke: MAUER_STEIN_DICKE };
 /** Halbe Breite der Einfahrtslücke in der Nordwand. */
 export const TOR_HALB = 4.5;
 
@@ -183,14 +271,15 @@ export function mauerLaeufe(): Mauerlauf[] {
     // Nordwand, links und rechts der Einfahrt — bündig an den Torpfosten
     { name: "nord-west", achse: "x", fest: hz, von: YARD_MIN_X - t, bis: gateL },
     { name: "nord-ost", achse: "x", fest: hz, von: gateR, bis: YARD_MAX_X + t },
-    // Südwand, links und rechts der Ausbuchtung
-    { name: "sued-west", achse: "x", fest: -hz, von: YARD_MIN_X - t, bis: BUCHT_X_VON - t },
+    // Südwand, links und rechts der Ausbuchtung. Links läuft sie seit E-182
+    // hinter der Presse bis an die schräge Mauer am Mischschrott.
+    { name: "sued-west", achse: "x", fest: -hz, von: YARD_MIN_X - t, bis: MISCH_SCHRAEG_VORN_X - t },
     { name: "sued-ost", achse: "x", fest: -hz, von: BUCHT_X_BIS + t, bis: YARD_MAX_X + t },
     // Ost- und Westwand stoßen innen an
     { name: "west", achse: "z", fest: YARD_MIN_X, von: -hz + t, bis: hz - t },
     { name: "ost", achse: "z", fest: YARD_MAX_X, von: -hz + t, bis: hz - t },
-    // Die Ausbuchtung: zwei Schenkel (mit den Ecken) und die Rückwand quer
-    { name: "bucht-west", achse: "z", fest: BUCHT_X_VON, von: BUCHT_Z - t, bis: -hz - t },
+    // Die Ausbuchtung: der Ostschenkel (mit der Ecke) und die Rückwand quer;
+    // der Westschenkel ist seit E-182 die schräge Mauer (`schraegeLaeufe`).
     { name: "bucht-ost", achse: "z", fest: BUCHT_X_BIS, von: BUCHT_Z - t, bis: -hz - t },
     { name: "bucht-sued", achse: "x", fest: BUCHT_Z, von: BUCHT_X_VON + t, bis: BUCHT_X_BIS - t },
   ];
@@ -692,12 +781,24 @@ export class Yard {
     const buchtTex = tex.clone();
     buchtTex.needsUpdate = true;
     buchtTex.repeat.set(9, 6);
+    /*
+     * Seit E-182 ein Trapez: Die Westseite folgt der schrägen Mauer. Die
+     * Fläche liegt in (x | −z), deshalb nach dem Kippen um −90° richtig herum;
+     * die Texturkoordinaten sind Meter, also ein Kachelmaß von 14/9 × 6,5/6 m
+     * wie bisher.
+     */
+    buchtTex.repeat.set(9 / 14, 6 / 6.5);
+    const form = new THREE.Shape([
+      new THREE.Vector2(MISCH_SCHRAEG_HINTEN_X, -BUCHT_Z),
+      new THREE.Vector2(BUCHT_X_BIS, -BUCHT_Z),
+      new THREE.Vector2(BUCHT_X_BIS, YARD_D / 2),
+      new THREE.Vector2(MISCH_SCHRAEG_VORN_X, YARD_D / 2),
+    ]);
     const bucht = new THREE.Mesh(
-      new THREE.PlaneGeometry(BUCHT_X_BIS - BUCHT_X_VON, -YARD_D / 2 - BUCHT_Z),
+      new THREE.ShapeGeometry(form),
       new THREE.MeshStandardMaterial({ map: buchtTex, roughness: 1 })
     );
     bucht.rotation.x = -Math.PI / 2;
-    bucht.position.set((BUCHT_X_VON + BUCHT_X_BIS) / 2, 0, (-YARD_D / 2 + BUCHT_Z) / 2);
     bucht.receiveShadow = true;
     scene.add(bucht);
 
@@ -1066,14 +1167,17 @@ export class Yard {
       z: number,
       alongX: boolean,
       reihen = ROWS,
-      laenge = BL
+      laenge = BL,
+      winkel?: number
     ): void => {
       const anteil = laenge / BL;
       const noppen = anteil < 0.7 ? [0] : [-0.45 * anteil, 0.45 * anteil];
+      // Schräge Läufe (E-182): Winkel um y, Noppen längs wie bei einem x-Lauf
+      const schraeg = winkel !== undefined;
       for (let r = 0; r < reihen; r++) {
         const f = farben[n++ % 3]!;
         block.position.set(x, BH / 2 + r * BH, z);
-        block.rotation.set(0, alongX ? 0 : Math.PI / 2, 0);
+        block.rotation.set(0, schraeg ? winkel : alongX ? 0 : Math.PI / 2, 0);
         block.scale.set(1, 1, 1);
         block.updateMatrix();
         const ohneStreckung = block.matrix.clone();
@@ -1081,7 +1185,7 @@ export class Yard {
         block.updateMatrix();
         bloecke.push({ m: block.matrix.clone(), f });
         for (const s of noppen) {
-          niete.position.set(alongX ? s : 0, BH / 2 + 0.045, alongX ? 0 : s);
+          niete.position.set(alongX || schraeg ? s : 0, BH / 2 + 0.045, alongX || schraeg ? 0 : s);
           niete.updateMatrix();
           // Block-Matrix mal lokale Matrix — genau die Rechnung, die vorher die
           // Eltern-Kind-Beziehung gemacht hat. So sitzt jede Niete auf den
@@ -1122,6 +1226,16 @@ export class Yard {
       }
     }
     this.buildTrennsteine(place);
+    // Die schräge Mauer am Mischschrott (E-182): dieselben Steine, gedreht
+    for (const sl of schraegeLaeufe()) {
+      const dx = sl.x1 - sl.x0;
+      const dz = sl.z1 - sl.z0;
+      const l = Math.hypot(dx, dz);
+      const winkel = Math.atan2(-dz, dx);
+      for (const st of reihenstuecke(0, l, BL)) {
+        place(sl.x0 + (dx / l) * st.mitte, sl.z0 + (dz / l) * st.mitte, true, Math.round(sl.hoehe / BH), st.laenge, winkel);
+      }
+    }
 
     const wallMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 });
     const bauen = (geo: THREE.BufferGeometry, liste: Array<{ m: THREE.Matrix4; f: THREE.Color }>): void => {
@@ -1156,12 +1270,25 @@ export class Yard {
      * ein durchgehender Quader liefe sie quer durch deren Oeffnung, und der
      * Bagger koennte nicht in die Bucht greifen.
      */
-    addWall((YARD_MIN_X + BUCHT_X_VON) / 2, -hz, BUCHT_X_VON - YARD_MIN_X, BT);
+    const suedWestBis = MISCH_SCHRAEG_VORN_X - BT / 2;
+    addWall((YARD_MIN_X + suedWestBis) / 2, -hz, suedWestBis - YARD_MIN_X, BT);
     addWall((BUCHT_X_BIS + YARD_MAX_X) / 2, -hz, YARD_MAX_X - BUCHT_X_BIS, BT);
-    // Die drei Waende der Ausbuchtung, alle auf voller Hoehe
-    for (const bx of [BUCHT_X_VON, BUCHT_X_BIS])
-      addWall(bx, (-hz + BUCHT_Z) / 2, BT, -hz - BUCHT_Z, SUED_HOCH);
+    // Die Waende der Ausbuchtung, alle auf voller Hoehe: Ostschenkel, Rueckwand
+    addWall(BUCHT_X_BIS, (-hz + BUCHT_Z) / 2, BT, -hz - BUCHT_Z, SUED_HOCH);
     addWall((BUCHT_X_VON + BUCHT_X_BIS) / 2, BUCHT_Z, BUCHT_X_BIS - BUCHT_X_VON, BT, SUED_HOCH);
+    // ... und die schraege Mauer am Mischschrott als gedrehter Quader (E-182)
+    for (const sl of schraegeLaeufe()) {
+      const dx = sl.x1 - sl.x0;
+      const dz = sl.z1 - sl.z0;
+      const l = Math.hypot(dx, dz);
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(-dz, dx));
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(l / 2, sl.hoehe / 2, BT / 2)
+          .setTranslation((sl.x0 + sl.x1) / 2, sl.hoehe / 2, (sl.z0 + sl.z1) / 2)
+          .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }),
+        wallBody
+      );
+    }
     // Die Trennsteine zwischen den Halden: je Saeule ein Quader
     for (const s of TRENNSTEINE)
       addWall(TRENNSTEIN_X, s.z, TRENNSTEIN_T, TRENNSTEIN_L, s.hoehe);
@@ -1172,7 +1299,7 @@ export class Yard {
      * fuehre er durch die sichtbare Mauer hindurch.
      */
     const hochVon = SUED_HOCH_VON - SUED_HOCH_RAMPE;
-    addWall((hochVon + BUCHT_X_VON) / 2, -hz, BUCHT_X_VON - hochVon, BT, SUED_HOCH);
+    addWall((hochVon + suedWestBis) / 2, -hz, suedWestBis - hochVon, BT, SUED_HOCH);
     addWall(
       (BUCHT_X_BIS + YARD_MAX_X) / 2,
       -hz,

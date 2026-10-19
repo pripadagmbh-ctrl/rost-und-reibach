@@ -47,6 +47,11 @@ import {
   BUCHT_X_BIS,
   BUCHT_Z,
   TRENNSTEINE,
+  TRENNSTEIN_L,
+  TRENNSTEIN_X,
+  MISCH_SCHRAEG_HINTEN_X,
+  MISCH_SCHRAEG_VORN_X,
+  mischSchraegeX,
   YARD_D,
   YARD_MAX_X,
   YARD_MIN_X,
@@ -313,7 +318,8 @@ describe("Die Sortiermulden haben keine Rückwand (E-006)", () => {
 describe("Die Ausbuchtung", () => {
   it("ist rundum mit hoher Wand eingefasst", () => {
     for (const [name, x, z] of [
-      ["Westschenkel", BUCHT_X_VON, -34],
+      // Seit E-182 schräg: von (BUCHT_X_VON | BUCHT_Z) zur Außenkante der Presse
+      ["schräge Mauer", mischSchraegeX(-34), -34],
       ["Ostschenkel", BUCHT_X_BIS, -34],
       ["Rückwand", 0.5, BUCHT_Z],
     ] as Array<[string, number, number]>) {
@@ -324,7 +330,8 @@ describe("Die Ausbuchtung", () => {
   });
 
   it("ist nach Norden offen — sonst käme der Bagger nicht hinein", () => {
-    for (let x = BUCHT_X_VON + 1; x < BUCHT_X_BIS - 1; x += 1) {
+    // Seit E-182 beginnt die Öffnung an der schrägen Mauer, nicht am alten Westschenkel
+    for (let x = MISCH_SCHRAEG_VORN_X + 1; x < BUCHT_X_BIS - 1; x += 1) {
       expect(hitsObstacle(x, -YARD_D / 2, 0), `Südmauer sperrt die Bucht bei x=${x}`).toBeNull();
     }
   });
@@ -344,21 +351,42 @@ describe("Die Ausbuchtung", () => {
     }
   });
 
-  it("die Trennsteine sind in der Mitte am höchsten und laufen nach außen ab", () => {
-    const hoehen = TRENNSTEINE.map((s) => s.hoehe);
-    expect(Math.max(...hoehen), "die Mitte erreicht 2,4 m nicht").toBeCloseTo(2.4, 6);
-    expect(hoehen[0], "das vordere Ende läuft nicht auf 0,6 m ab").toBeCloseTo(0.6, 6);
-    expect(hoehen[hoehen.length - 1], "das hintere Ende läuft nicht ab").toBeCloseTo(0.6, 6);
-    // Pyramide: von vorn bis zur Mitte steigend, danach fallend.
-    const mitte = hoehen.indexOf(Math.max(...hoehen));
-    for (let i = 1; i <= mitte; i++) expect(hoehen[i]).toBeGreaterThanOrEqual(hoehen[i - 1]!);
-    for (let i = mitte + 1; i < hoehen.length; i++)
-      expect(hoehen[i]).toBeLessThanOrEqual(hoehen[i - 1]!);
+  /*
+   * E-182 — Patrick, 20.10.2026: „beim Mischschrott eine Quermauer setzen,
+   * damit eine Mauer grade …". Aus der Pyramide 1–4–4–1 wird eine gerade
+   * Mauer: überall 2,4 m, lückenlos von der Rückwand bis zur Öffnung.
+   */
+  it("die Quermauer ist gerade: überall 2,4 m, lückenlos von hinten bis zur Öffnung", () => {
+    for (const s of TRENNSTEINE) expect(s.hoehe).toBeCloseTo(2.4, 6);
+    const vorn = Math.max(...TRENNSTEINE.map((s) => s.z + TRENNSTEIN_L / 2));
+    const hinten = Math.min(...TRENNSTEINE.map((s) => s.z - TRENNSTEIN_L / 2));
+    expect(vorn).toBeGreaterThanOrEqual(-YARD_D / 2 - 0.2);
+    expect(hinten).toBeLessThanOrEqual(BUCHT_Z + 0.3);
+    for (let z = hinten + 0.1; z < vorn; z += 0.2) {
+      expect(hitsObstacle(TRENNSTEIN_X, z, 0, 2.0), `Lücke in der Quermauer bei z=${z.toFixed(1)}`).not.toBeNull();
+    }
   });
 
-  it("der Arm kommt über die Trennsteine hinweg", () => {
-    // Das ist der ganze Sinn der Pyramide: „sodass der Zugriff von
-    // Mischschrott zu Stahlschrott flüssig läuft."
+  it("die schräge Mauer endet an der Außenkante der Presse (E-182)", () => {
+    // Außenseite am vorderen Ende = Ostkante des Pressenrahmens
+    const presseOst = PRESS_CENTER.x + PRESS_FUSS.hw;
+    expect(MISCH_SCHRAEG_VORN_X - 0.3).toBeCloseTo(presseOst, 6);
+    // und sie ist wirklich schräg, nicht gerade
+    expect(MISCH_SCHRAEG_VORN_X).toBeGreaterThan(MISCH_SCHRAEG_HINTEN_X + 1);
+    // Zwischen Presse und schräger Mauer bleibt kein Loch nach draußen:
+    // hinter der Presse steht die Südmauer bis an die schräge Mauer.
+    for (let x = PRESS_CENTER.x; x < presseOst; x += 0.25) {
+      expect(hitsObstacle(x, -YARD_D / 2, 0, 1.0), `Loch hinter der Presse bei x=${x}`).not.toBeNull();
+    }
+    // Entlang der schrägen Mauer ist die Hindernisliste geschlossen
+    for (let z = BUCHT_Z + 0.3; z < -YARD_D / 2; z += 0.2) {
+      expect(hitsObstacle(mischSchraegeX(z), z, 0, 4.0), `Lücke in der schrägen Mauer bei z=${z.toFixed(1)}`).not.toBeNull();
+    }
+  });
+
+  it("der Arm kommt über die Quermauer hinweg", () => {
+    // „sodass der Zugriff von Mischschrott zu Stahlschrott flüssig läuft" —
+    // seit E-182 gerade statt Pyramide, aber nicht höher als 2,4 m.
     for (const s of TRENNSTEINE) {
       expect(s.hoehe, "ein Trennstein steht so hoch wie eine Boxwand").toBeLessThanOrEqual(2.4);
       expect(hitsObstacle(0.5, s.z, 0, 2.5), `Trennstein bei z=${s.z} sperrt nach oben`).toBeNull();

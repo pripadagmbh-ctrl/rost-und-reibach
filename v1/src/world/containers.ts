@@ -311,8 +311,14 @@ export const CONFIGS: ContainerConfig[] = [
    * Stahl bekommt kein Silo mehr (E-010): Er ist der groesste Mengenstrom
    * und wird direkt an der Halde verladen; ein Silo dafuer waere ein Umweg.
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: 4.0,
-    z: -32.0, size: [6.8, 6.0, 5.0],
+  /*
+   * E-182 (20.10.2026): schmaler. Patrick: „Den Platz und die Ausbuchtung am
+   * Stahlschrott reduzieren." Der Ostschenkel steht auf x 5,9
+   * (`yard.BUCHT_X_BIS`, vorher 7,5); die Zone reicht wie bisher 0,2 m in
+   * beide Wände: x 0,6 … 5,8 statt 0,6 … 7,4.
+   */
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: 3.2,
+    z: -32.0, size: [5.2, 6.0, 5.0],
     haldeWaende: { rueck: false, aussen: false, nord: false, trenn: false } },
 
   /*

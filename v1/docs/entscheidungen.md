@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-182 | 20.10.2026 | Stahlschrott schmaler, gerade Quermauer, schräge Mauer zur Presse | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-174 | 20.10.2026 | Vier Werbetafeln statt neun: Tor, Waage, Bucht, Halle 1 | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-173 | 20.10.2026 | Spiel heißt wieder Rost & Reibach, überall auf dem Platz | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-172 | 19.10.2026 | Stummschalter auf lautlos: Spiel still, fremde Musik läuft weiter | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
@@ -181,6 +182,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-182 — Stahlschrott schmaler, Quermauer, schräge Mauer** (iPad)
+- Hinter dich schauen: Stahlschrott schmal genug, beide Autos noch gut greifbar?
+- Quermauer Misch/Stahl gerade, 2,4 m: kommst du mit der Spinne bequem drüber?
+- Schräge Mauer: endet sie an der Presse so, wie gemeint? Frage: Variante A (gebaut, 14°) oder B (33°, Mischschrott hinten breiter) — Bilder im Bericht.
+- Kipper abladen lassen: bleibt der Haufen vor der Mauer, rutscht nichts in den Stahlschrott?
 
 **E-174 — Vier Tafeln statt neun** (iPad)
 - Rundblick aus der Kabine: fehlen Tafeln an Nord- oder Ostmauer, oder ist es so ruhiger?

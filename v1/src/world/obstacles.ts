@@ -18,6 +18,8 @@ import {
   TRENNSTEIN_X,
   TRENNSTEIN_L,
   TRENNSTEIN_T,
+  MISCH_SCHRAEG_VORN_X,
+  schraegeLaeufe,
 } from "./yard";
 import { officeFootprints, hallenWaende } from "./office";
 import { CONFIGS, muldenWaendeWelt, type ContainerConfig } from "./containers";
@@ -189,6 +191,45 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
   });
 }
 
+/** Wo die Südmauer links der Bucht endet: an der schrägen Mauer (E-182). */
+const SUED_WEST_BIS = MISCH_SCHRAEG_VORN_X - WALL_T / 2;
+
+/**
+ * Eine schräge Mauer als Treppe aus achsparallelen Stücken (E-182).
+ *
+ * `hitsObstacle` und die Fahrzeugwächter rechnen mit Rechtecken. Die Strecke
+ * wird in Stücke von höchstens `TREPPE_M` Länge geteilt; jedes Stück ist das
+ * Rechteck um seinen Abschnitt der Mauer (Mittellinie ± halbe Dicke). An der
+ * Ecke eines Stücks ragt das Rechteck damit höchstens
+ * `TREPPE_M/2 · sin(Winkel)` über die Mauerfläche hinaus — bei 0,5 m und
+ * 14° sind das 6 cm, bei 33° 14 cm. Der Kollider in `yard.ts` ist ein
+ * gedrehter Quader und genau.
+ */
+const TREPPE_M = 0.5; // SW
+function schraegeHindernisse(): Obstacle[] {
+  const out: Obstacle[] = [];
+  for (const sl of schraegeLaeufe()) {
+    const dx = sl.x1 - sl.x0;
+    const dz = sl.z1 - sl.z0;
+    const l = Math.hypot(dx, dz);
+    const n = Math.ceil(l / TREPPE_M);
+    // Halbe Dicke, auf die Achsen umgelegt: senkrecht zur Strecke
+    const qx = (Math.abs(dz) / l) * (WALL_T / 2);
+    const qz = (Math.abs(dx) / l) * (WALL_T / 2);
+    for (let i = 0; i < n; i++) {
+      out.push({
+        x: sl.x0 + (dx * (i + 0.5)) / n,
+        z: sl.z0 + (dz * (i + 0.5)) / n,
+        hw: Math.abs(dx) / n / 2 + qx,
+        hd: Math.abs(dz) / n / 2 + qz,
+        top: sl.hoehe,
+        label: `Schräge Mauer ${i + 1}`,
+      });
+    }
+  }
+  return out;
+}
+
 export const STATIC_OBSTACLES: Obstacle[] = [
   /*
    * --- Umrandung aus Betonlego, Einfahrt im Nordwesten ausgespart ---
@@ -198,10 +239,11 @@ export const STATIC_OBSTACLES: Obstacle[] = [
    * ueber die ganze Breite laege quer vor ihrer Oeffnung eine unsichtbare
    * Wand, und der Bagger kaeme nicht in die Bucht.
    */
+  // Seit E-182 bis an die schräge Mauer am Mischschrott, hinter der Presse
   {
-    x: (YARD_MIN_X + BUCHT_X_VON) / 2,
+    x: (YARD_MIN_X + SUED_WEST_BIS) / 2,
     z: -HZ,
-    hw: (BUCHT_X_VON - YARD_MIN_X) / 2,
+    hw: (SUED_WEST_BIS - YARD_MIN_X) / 2,
     hd: WALL_T / 2,
     top: WALL_H,
     label: "Südwand West",
@@ -220,9 +262,9 @@ export const STATIC_OBSTACLES: Obstacle[] = [
    * die Mauer dort nur mit 1,8 m verzeichnet waere.
    */
   {
-    x: (SUED_HOCH_VON - SUED_HOCH_RAMPE + BUCHT_X_VON) / 2,
+    x: (SUED_HOCH_VON - SUED_HOCH_RAMPE + SUED_WEST_BIS) / 2,
     z: -HZ,
-    hw: (BUCHT_X_VON - (SUED_HOCH_VON - SUED_HOCH_RAMPE)) / 2,
+    hw: (SUED_WEST_BIS - (SUED_HOCH_VON - SUED_HOCH_RAMPE)) / 2,
     hd: WALL_T / 2,
     top: SUED_HOCH,
     label: "Südwand hoch",
@@ -237,16 +279,11 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   },
   /*
    * Die Ausbuchtung: zwei Schenkel nach Sueden und die Rueckwand quer dazu,
-   * alle auf `SUED_HOCH` — „rundum mit hoher Wand" (E-010).
+   * alle auf `SUED_HOCH` — „rundum mit hoher Wand" (E-010). Der Westschenkel
+   * ist seit E-182 schraeg (`schraegeLaeufe`); die Liste kennt nur Rechtecke,
+   * also steht er als Treppe aus kurzen Stuecken da (`schraegeHindernisse`).
    */
-  {
-    x: BUCHT_X_VON,
-    z: (-HZ + BUCHT_Z) / 2,
-    hw: WALL_T / 2,
-    hd: (-HZ - BUCHT_Z) / 2,
-    top: SUED_HOCH,
-    label: "Buchtwand West",
-  },
+  ...schraegeHindernisse(),
   {
     x: BUCHT_X_BIS,
     z: (-HZ + BUCHT_Z) / 2,
