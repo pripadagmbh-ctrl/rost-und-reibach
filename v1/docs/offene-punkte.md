@@ -554,6 +554,22 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 20.10.2026, Sorten und Abholer-Bestellung** — Patrick, wörtlich:
+      „muldencontainer sind eher stahlschrott. Auch fehlt es an der balance
+      zwischen misch und stahlschrott. Mischschrott ist häufiger.
+      Reifenstapel gibt es nicht mehr, nur einzel reifen. es können abholer für
+      jede sorte und auch für müll bestellt werden. Inklusive m hoch drei
+      angabe, also manchmal einfach ein absetzkipper, und manchmal ein grosser
+      container"
+
+      | # | Punkt |
+      |---|---|
+      | 32a | Muldencontainer (Absetzmulden als Schrott) sind Stahlschrott |
+      | 32b | Mischschrott häufiger als Stahlschrott (Balance) |
+      | 32c | Keine Reifenstapel mehr, nur Einzelreifen |
+      | 33a | Abholer bestellbar für jede Sorte und für Müll |
+      | 33b | Mit m³-Angabe: mal Absetzkipper, mal großer Container |
+
 - [ ] **Ansage 20.10.2026, Anlieferung und Abholer** — Patrick, wörtlich:
       „Anlieferung sortenrein direkt zu den metallboxen die dafür gedacht
       waren, faher hupen und fnkspruch aus dem Büro. Abholer kommt immer zum
