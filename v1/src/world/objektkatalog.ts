@@ -232,8 +232,18 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "alu", massKg: 55, kind: "box", dims: [1.2, 0.45, 2.2], bau: "boot", name: "Ruderboot (Alu)" },
 
   // --- Fahrzeugschrott ---
-  { materialId: "tires", massKg: 45, kind: "cyl", dims: [0.32, 1.0], bau: "stapel", name: "Reifenstapel (Pkw)" },
-  { materialId: "tires", massKg: 120, kind: "cyl", dims: [0.55, 1.2], bau: "stapel", name: "Reifenstapel (LKW)" },
+  /* E-181, Patrick 20.10.2026: „Reifenstapel gibt es nicht mehr, nur einzel reifen"
+   * und „Reifen haben immer felge". Hier standen Reifenstapel (Pkw) und (LKW).
+   * Jedes Rad ist ein Torus [Ringhalbmesser, Rohrhalbmesser]: Aussenhalbmesser =
+   * Summe, Breite = 2 x Rohr. Gezeichnet mit Felge (`scrapItems.radGeometrie`),
+   * Kollider Achtkant (v2 E-011). Gummi + Felge ist Verbund -> Mischschrott nach
+   * der einen Regel; trennen wie beim Rad mit Alufelge nur mit Werkzeug. */
+  // Pkw-Rad 205/55 R16: Aussen-Ø 0,632 m, Breite 0,205 m. Reifen 8,5 kg + Stahlfelge
+  // 6,5Jx16 9 kg = 17,5 kg (Groessenordnung Handelsangaben, SW) -> 18 kg.
+  { materialId: "mixed", massKg: 18, kind: "torus", dims: [0.215, 0.1], name: "Pkw-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "steel", anteil: 0.52 }, { materialId: "tires", anteil: 0.48 }] },
+  // Transporter-Rad 235/65 R16C: Aussen-Ø 0,711 m, Breite 0,235 m. Reifen 13 kg +
+  // Stahlfelge 11 kg = 24 kg (SW).
+  { materialId: "mixed", massKg: 24, kind: "torus", dims: [0.24, 0.115], name: "Transporter-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.54 }, { materialId: "steel", anteil: 0.46 }] },
   // Alufelge statt Stahlfelge: Das lohnt zu trennen — aber nicht mit der
   // Spinne, sondern mit Flex oder Abdrueckmaschine (Ansage 12.09.2026).
   { materialId: "mixed", massKg: 24, kind: "cyl", dims: [0.34, 0.24], name: "Rad mit Alufelge", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.58 }, { materialId: "alu", anteil: 0.42 }] },
@@ -310,7 +320,10 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "mixed", massKg: 175, kind: "box", dims: [1.2, 0.9, 1.2], bau: "haufen", name: "Mischschrott-Haufen" },
   { materialId: "steel", massKg: 190, kind: "wire", dims: [0.75], bau: "haufen", name: "Stahlteile-Haufen" },
   { materialId: "steel", massKg: 210, kind: "box", dims: [0.7, 0.7, 0.7], bau: "stapel", name: "Metallpaket (gepresst)" },
-  { materialId: "tires", massKg: 95, kind: "wire", dims: [0.85], bau: "haufen", name: "Reifenhaufen" },
+  // E-181: war „Reifenhaufen" (95 kg) — Haufen gibt es nicht mehr, nur Einzelraeder.
+  // Anhaenger-Rad 155/80 R13: Aussen-Ø 0,578 m, Breite 0,155 m. Reifen 6 kg +
+  // Stahlfelge 4,5Jx13 5 kg = 11 kg (SW).
+  { materialId: "mixed", massKg: 11, kind: "torus", dims: [0.21, 0.078], name: "Anhänger-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.55 }, { materialId: "steel", anteil: 0.45 }] },
   { materialId: "steel", massKg: 205, kind: "box", dims: [0.55, 0.55, 1.3], bau: "stapel", name: "Schrottschere-Abschnitte" },
   /* --- Massives Kleinzeug (E-042, 15.09.2026) ---------------------------
    *
@@ -489,19 +502,24 @@ export const KATALOG_SPECS: PileSpec[] = [
   // Badezimmer-Ausbau: WC 25 kg, Waschbecken 20, Spuelkasten 10 = 55 kg.
   { materialId: "rubble", massKg: 55, kind: "box", dims: [0.7, 0.5, 0.6], bau: "stapel", name: "Sanitärkeramik (WC und Becken)" },
 
-  /* --- Reifen: 4 -> 8 Kleinteile ---------------------------------------- */
-  // LKW-Reifen 315/80 R22.5: Aussendurchmesser 1,08 m, Breite 0,315 m, 62 kg
-  // (Herstellerangabe fuer diese gaengige Groesse). Als Torus
-  // R = 0,52 / r = 0,14.
-  { materialId: "tires", massKg: 62, kind: "torus", dims: [0.52, 0.14], name: "LKW-Reifen" },
-  // Radladerreifen 17.5 R25: 1,45 m Aussendurchmesser, 160 kg. Der schwerste
-  // Einzelreifen, den die Spinne noch bequem traegt.
-  { materialId: "tires", massKg: 160, kind: "torus", dims: [0.65, 0.22], name: "Erdbaureifen (Radlader)" },
-  // Zehn Motorradreifen à 4 kg, zusammengebunden = 40 kg auf 0,18 m³.
-  { materialId: "tires", massKg: 40, kind: "box", dims: [0.6, 0.5, 0.6], bau: "buendel", name: "Motorradreifen (Bund)" },
-  // Vollgummireifen vom Stapler (18x7-8), 30 kg das Stueck, vier gestapelt
-  // = 120 kg; Stapelhoehe 4 x 0,18 m = 0,72 m.
-  { materialId: "tires", massKg: 120, kind: "cyl", dims: [0.28, 0.72], bau: "stapel", name: "Vollgummireifen (Stapler)" },
+  /* --- Raeder (E-181, Patrick 20.10.2026: nur Einzelreifen, immer mit Felge) ---
+   * Hier standen LKW-Reifen, Erdbaureifen, Motorradreifen (Bund) und
+   * Vollgummireifen (Stapel aus vier) — alle ohne Felge. Der Erdbaureifen wiegt
+   * mit Felge 255 kg und steht jetzt als Radlader-Rad bei KATALOG_BIG.
+   * Die alten Tori waren zu gross gerechnet (R 0,52 + r 0,14 = Ø 1,32 m statt
+   * der genannten 1,08 m); die Masse unten kommen aus den Reifengroessen. */
+  // LKW-Rad 315/80 R22.5: Aussen-Ø 1,08 m, Breite 0,315 m. Reifen 62 kg (bisheriger
+  // Eintrag, Herstellerangabe) + Stahlfelge 9.00x22.5 46 kg (wie „LKW-Felge") = 108 kg.
+  { materialId: "mixed", massKg: 108, kind: "torus", dims: [0.38, 0.16], name: "LKW-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.57 }, { materialId: "steel", anteil: 0.43 }] },
+  // Motorrad-Hinterrad 180/55 ZR17: Aussen-Ø 0,63 m, Breite 0,18 m. Reifen 6 kg +
+  // Alu-Gussfelge 5 kg = 11 kg (SW).
+  { materialId: "mixed", massKg: 11, kind: "torus", dims: [0.225, 0.09], name: "Motorrad-Hinterrad (Alufelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.55 }, { materialId: "alu", anteil: 0.45 }] },
+  // Stapler-Rad 18x7-8, Vollgummi: Aussen-Ø 0,457 m, Breite 0,178 m. Der Torus
+  // [0,135 | 0,095] (Ø 0,46 m, 0,19 m breit) fasst als Vollkoerper rund 0,024 m³;
+  // bei der Feststoffdichte aus `test/gewicht.test.ts` traegt er 31 kg. Vollgummi
+  // 24 kg + geteilte Stahlfelge 8 Zoll 6 kg = 30 kg (SW; der alte Eintrag nannte
+  // 30 kg fuer den Reifen allein, das sprengt das Volumen).
+  { materialId: "mixed", massKg: 30, kind: "torus", dims: [0.135, 0.095], name: "Stapler-Rad (Vollgummi)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.8 }, { materialId: "steel", anteil: 0.2 }] },
 
   /* --- Holz: 6 -> 8 Kleinteile ------------------------------------------ */
   // Europalette 1,2 x 0,8 m wiegt 25 kg; vier gestapelt = 100 kg bei 0,6 m.
@@ -517,6 +535,10 @@ export const KATALOG_SPECS: PileSpec[] = [
 /* ------------------------------------------------------------------------ */
 
 export const KATALOG_BIG: PileSpec[] = [
+  // E-181: der Erdbaureifen (bis dahin Kleinteil, ohne Felge), jetzt mit Felge.
+  // Radlader-Rad 17.5 R25: Aussen-Ø 1,45 m, Breite 0,445 m. Reifen 160 kg (bisheriger
+  // Eintrag) + Felge 14.00-25 rund 95 kg (SW) = 255 kg — ueber der Kleinteil-Grenze.
+  { materialId: "mixed", massKg: 255, kind: "torus", dims: [0.5, 0.22], name: "Radlader-Rad", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.63 }, { materialId: "steel", anteil: 0.37 }] },
   // --- Landwirtschaft ---
   { materialId: "steel", massKg: 320, kind: "box", dims: [1.6, 1.7, 1.5], bau: "kabine", name: "Traktorkabine", zusammensetzung: [{ materialId: "steel", anteil: 0.8 }, { materialId: "rubble", anteil: 0.06 }, { materialId: "plastic", anteil: 0.1 }, { materialId: "alu", anteil: 0.04 }] },
   { materialId: "steel", massKg: 480, kind: "box", dims: [2.4, 0.7, 0.7], bau: "achse", name: "Traktor-Hinterachse" },
@@ -580,7 +602,7 @@ export const KATALOG_BIG: PileSpec[] = [
   { materialId: "alu", massKg: 280, kind: "box", dims: [2.6, 2.2, 0.2], bau: "fensterflaeche", name: "Fensterfront (Pfosten-Riegel)" },
   // E-123: war `container` — mit Eckbeschlaegen und Tuerfluegeln wie ein
   // Seecontainer. Eine Absetzmulde ist ein offener Trog mit schraegen Stirnwaenden.
-  { materialId: "steel", massKg: 520, kind: "box", dims: [2.2, 1.3, 3.2], bau: "mulde", name: "Schuttcontainer (Absetzmulde)" },
+  { materialId: "steel", massKg: 520, kind: "box", dims: [2.2, 1.3, 3.2], bau: "mulde", name: "Schuttcontainer (Absetzmulde)", massiv: true }, // E-181, Patrick 20.10.2026: "muldencontainer sind eher stahlschrott" (wie der Seecontainer, E-042)
   { materialId: "wood", massKg: 340, kind: "box", dims: [2.1, 2.1, 3.2], bau: "kabine", name: "Bauwagen (alt, Holz)" },
 
   // --- Gebäudetechnik ---
@@ -653,8 +675,9 @@ export const KATALOG_BIG: PileSpec[] = [
   { materialId: "steel", massKg: 380, kind: "box", dims: [1.3, 1.3, 2.0], bau: "container", name: "Werkzeugcontainer (Baustelle)", zusammensetzung: [{ materialId: "steel", anteil: 0.85 }, { materialId: "wood", anteil: 0.12 }, { materialId: "plastic", anteil: 0.03 }] },
   // Kippbehaelter fuer den Stapler, 4 mm Blech: offener Trog 1,2 × 1,6 m,
   // 0,95 m hoch (unter der flachen Bordwand + Ueberstand von 0,99 m) — rund
-  // 7,5 m² × 0,004 × 7850 = 236 kg, mit Gabeltaschen 260 kg. -> 3,6 mm, Mischschrott.
-  { materialId: "steel", massKg: 260, kind: "box", dims: [1.2, 0.95, 1.6], bau: "mulde", name: "Kippbehälter (Stapler)" },
+  // 7,5 m² × 0,004 × 7850 = 236 kg, mit Gabeltaschen 260 kg. -> 3,6 mm, nach der
+  // Wandstaerke Mischschrott; seit E-181 per `massiv` Stahlschrott.
+  { materialId: "steel", massKg: 260, kind: "box", dims: [1.2, 0.95, 1.6], bau: "mulde", name: "Kippbehälter (Stapler)", massiv: true }, // E-181, Patrick 20.10.2026: "muldencontainer sind eher stahlschrott" (wie der Seecontainer, E-042)
 
   // --- Gerueste ---
   // Stahl-Stellrahmen 0,73 × 2,00 m wiegt 18–19 kg (Rahmengeruest, Groessenordnung
@@ -773,8 +796,9 @@ export const KATALOG_HUGE: PileSpec[] = [
   // Absetzmulde 5 m³ mit Klappdeckel. Trog aus 5-mm-Blech (Boden 2,25 × 1,75,
   // Seiten trapezfoermig 2,25 → 3,30 m, schraege Stirnwaende): 16,6 m² ×
   // 0,005 × 7850 = 652 kg; Deckel 3 mm, 5,8 m² = 136 kg; Zapfen und Profile
-  // 30 kg -> 820 kg. 1,35 m hoch: passt auf Rungen und Koffer. -> Mischschrott.
-  { materialId: "steel", massKg: 820, kind: "box", dims: [1.75, 1.35, 3.3], bau: "deckelmulde", name: "Absetzmulde 5 m³ (Klappdeckel)" },
+  // 30 kg -> 820 kg. 1,35 m hoch: passt auf Rungen und Koffer. -> 4,1 mm, nach der
+  // Wandstaerke Mischschrott; seit E-181 per `massiv` Stahlschrott.
+  { materialId: "steel", massKg: 820, kind: "box", dims: [1.75, 1.35, 3.3], bau: "deckelmulde", name: "Absetzmulde 5 m³ (Klappdeckel)", massiv: true }, // E-181, Patrick 20.10.2026: "muldencontainer sind eher stahlschrott" (wie der Seecontainer, E-042)
   // Minibagger der 1,5-t-Klasse, Ausleger und Schutzdach abgebaut: Laenge
   // 2,1 m (Unterwagen 1,55 m + Schild), Breite 1,0 m, Hoehe 1,3 m bis zur
   // Lehne. 1,5 t minus Arm (240 kg, eigener Eintrag) = rund 1300 kg.

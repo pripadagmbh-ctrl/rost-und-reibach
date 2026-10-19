@@ -144,15 +144,21 @@ describe("Was der Katalog daraus macht", () => {
     // Geruestrahmen und Geruestrohre tragen jetzt die Stueckliste „Stahl 100 %"
     // (fuer den Magneten, E-146), und zwei echte Zinkteile ersetzen die
     // verlorenen (Kaminverwahrung, Zinkdruckguss) — ohne Stueckliste.
+    //
+    // E-181 (20.10.2026): gleich viele Eintraege, acht mehr mit Stueckliste.
+    // Patrick: „nur einzel reifen" und „Reifen haben immer felge" — acht
+    // Reifen ohne Stueckliste (zwei Stapel, Haufen, Bund, Vollgummi-Stapel,
+    // LKW-, Erd- und Traktorreifen) sind acht Raeder mit Reifen + Felge.
     expect(ALLE.length).toBe(339);
-    expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(64);
+    expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(72);
   });
 
-  it("von den 64 werden 58 zu Mischschrott, genau 6 bleiben sortenrein", () => {
+  it("von den 72 werden 66 zu Mischschrott, genau 6 bleiben sortenrein", () => {
     const mitZus = ALLE.filter((s) => s.zusammensetzung);
     // E-150: Gitterroste, Leitungsrinnen, Geruestrahmen sind duennwandig -> Misch;
     // die Geruestrohre (7,7 mm rechnerisch) sind Stahlschrott.
-    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(58);
+    // E-181: die acht Raeder sind Verbund -> Mischschrott (58 -> 66).
+    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(66);
     // E-123: Der Minibagger-Ausleger kommt dazu — 4 % Schlaeuche, massives Blech.
     // E-138: Beide Minibagger (14 % Fremdstoff, massiv) mit `VERBUND_BIS` 0,15
     // — Patrick, 17.10.2026: „Minibagger sind eher Stahl als Mischschrott."
@@ -524,7 +530,7 @@ describe("Die Farbe trägt die Fraktion nicht", () => {
     expect(d, "über 10 wäre eine klar andere Farbe").toBeLessThan(10);
   });
 
-  it("23 von 327 Teilen tragen die Fraktionsfarbe unmittelbar", () => {
+  it("28 Teile ohne Bau (23 bis E-181; die Raeder zeigen Reifen und Felge)", () => {
     /*
      * Alles mit `bau` wird nach Zweck gefärbt (objektbau.ts:22-30).
      * 16 waren es bis E-042; Bremsscheibe und Großzahnrad sind absichtlich
@@ -541,8 +547,12 @@ describe("Die Farbe trägt die Fraktion nicht", () => {
      * Traktorreifen nackte Ringe. Und `metallton` trägt seither auch die vier
      * Abfallsorten — ein Lattenrost-Stapel ist braun, ein Reifenstapel
      * schwarz (`test/abfall.test.ts`).
+     *
+     * 28 seit E-181 (20.10.2026): Die drei nackten Reifen sind Raeder, dazu
+     * fuenf Raeder statt Stapel, Haufen und Bund — alle ohne `bau`, das Rad
+     * zeichnet `scrapItems.radGeometrie` (Reifen und Felge in einem Netz).
      */
-    expect(ALLE.filter((s) => !s.bau).length).toBe(23);
+    expect(ALLE.filter((s) => !s.bau).length).toBe(28);
   });
 
   it("Aluminium ist nicht mehr mit Edelstahl zu verwechseln (E-042)", () => {

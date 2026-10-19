@@ -63,8 +63,9 @@ const finde = (name: string): PileSpec => {
 /** Name -> Fraktion, wie `fraktionVonTeil` sie ausrechnet. Hier steht sie als Entscheidung. */
 const NEU: Array<[string, string]> = [
   ["Werkzeugcontainer (Baustelle)", "mixed"],
-  ["Kippbehälter (Stapler)", "mixed"],
-  ["Absetzmulde 5 m³ (Klappdeckel)", "mixed"],
+  // E-181, Patrick 20.10.2026: "muldencontainer sind eher stahlschrott" (`massiv`)
+  ["Kippbehälter (Stapler)", "steel"],
+  ["Absetzmulde 5 m³ (Klappdeckel)", "steel"],
   // E-150: verzinkt ist Stahl — die Regel macht duennwandige Rahmen zu Misch
   ["Gerüstrahmen (Paket, verzinkt)", "mixed"],
   ["Alu-Rollgerüst (zerlegt, Paket)", "alu"],

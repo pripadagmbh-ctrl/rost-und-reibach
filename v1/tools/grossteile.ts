@@ -564,4 +564,5 @@ function main(): void {
     console.log(`    ${id.padEnd(8)}${(kg / tage).toFixed(0).padStart(8)} kg`);
 }
 
-main();
+// Nur als Aufruf laufen, nicht als Baustein (tools/sortenanteile.ts nutzt packeFuhre).
+if (!(globalThis as { grossteileAlsBaustein?: boolean }).grossteileAlsBaustein) main();

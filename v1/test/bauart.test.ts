@@ -469,14 +469,21 @@ describe("Was eine Fuhre ansagt, liegt auch drauf", () => {
     vi.spyOn(Math, "random").mockImplementation(festerZufall(1));
     const ladung = randomCargo(4000, 0, 0);
     const anteil = (id: string) => ladung.filter((c) => c.materialId === id).length / ladung.length;
-    // Ein Sechsunddreissigstel des letzten Fuenftels x 3 Lose = 1,67 %.
-    expect(anteil("rubble")).toBeGreaterThan(0.008);
-    expect(anteil("rubble")).toBeLessThan(0.026);
-    // Und dasselbe fuer die Fraktion, die es bis heute gar nicht gab.
-    expect(anteil("tires"), "Reifen werden weiter nicht angeliefert").toBeGreaterThan(0.008);
-    // Der Stahlanteil dagegen sitzt wie eh: Stahl gibt es in jeder Klasse.
-    expect(anteil("steel")).toBeGreaterThan(0.38);
-    expect(anteil("steel")).toBeLessThan(0.47);
+    // Ein Sechsunddreissigstel des letzten Fuenftels x 4 Lose = 2,22 % (seit
+    // E-181 vier statt drei Lose: die Reifen-Lose sind verteilt).
+    expect(anteil("rubble")).toBeGreaterThan(0.012);
+    expect(anteil("rubble")).toBeLessThan(0.032);
+    // E-181 (Patrick 20.10.2026: „Reifen haben immer felge"): Ein Reifen
+    // ohne Felge kommt nicht mehr — er kommt als Rad, und das ist Mischschrott.
+    expect(anteil("tires"), "ein Reifen ohne Felge kam an").toBe(0);
+    // E-181 (Patrick 20.10.2026: „Mischschrott ist häufiger"): 50 % Misch,
+    // 22 % Stahl (`FRAKTIONSMIX`). Bei 4000 Zuegen streut 0,22 um 0,007 und
+    // 0,50 um 0,008 je Standardabweichung — die Schranken liegen bei 4 bis 5.
+    expect(anteil("steel")).toBeGreaterThan(0.19);
+    expect(anteil("steel")).toBeLessThan(0.25);
+    expect(anteil("mixed")).toBeGreaterThan(0.46);
+    expect(anteil("mixed")).toBeLessThan(0.54);
+    expect(anteil("mixed"), "Mischschrott ist häufiger als Stahlschrott").toBeGreaterThan(2 * anteil("steel"));
   });
 });
 
@@ -522,7 +529,8 @@ describe("Was die Griff-Info sagt und was nicht (E-061)", () => {
      * Zwei Gruende, nie ein dritter: Abfall braucht keine Klasse, und ein
      * Name, der den Stoff schon nennt, braucht ihn nicht zweimal.
      */
-    for (const n of ["Couch (Dreisitzer)", "Matratzenstapel", "Reifenhaufen", "Betonblock"]) {
+    // E-181: der Reifenhaufen ist ein Rad geworden; Dämmwolle steht fuer ihn
+    for (const n of ["Couch (Dreisitzer)", "Matratzenstapel", "Dämmwolle-Bigbag", "Betonblock"]) {
       const kopf = kopfVon(ALLE.find((e) => e.name === n)!);
       expect(kopf, `${n} sollte ohne Klammer stehen`).toContain(`▼ ${n} ·`);
     }

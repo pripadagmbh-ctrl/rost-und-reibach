@@ -169,14 +169,24 @@ describe("Jede der vier hat acht Sorten in der Kleinteil-Klasse", () => {
   const klein = SPECS;
   const sorten = (frak: string) => klein.filter((s) => fraktionVonTeil(s) === frak);
 
-  for (const id of ABFALLFRAKTIONEN) {
+  /*
+   * E-181 (20.10.2026): Reifen ausgenommen. Patrick: „Reifenstapel gibt es
+   * nicht mehr, nur einzel reifen" und „Reifen haben immer felge" — ein Rad ist
+   * Verbund und damit Mischschrott. Die acht Raeder zaehlt `test/gewicht.test.ts`.
+   */
+  const MIT_TEILEN = ABFALLFRAKTIONEN.filter((id) => id !== "tires");
+  for (const id of MIT_TEILEN) {
     it(`${getMaterial(id).name}: mindestens acht`, () => {
       expect(sorten(id).length).toBeGreaterThanOrEqual(8);
     });
   }
 
+  it("E-181: Reifen ohne Felge gibt es nicht mehr", () => {
+    expect(sorten("tires").map((s) => s.name)).toEqual([]);
+  });
+
   it("und es sind acht VERSCHIEDENE Dinge, nicht achtmal dasselbe", () => {
-    for (const id of ABFALLFRAKTIONEN) {
+    for (const id of MIT_TEILEN) {
       const namen = sorten(id).map((s) => s.name ?? "(ohne Namen)");
       expect(new Set(namen).size, `${getMaterial(id).name} wiederholt sich`).toBe(namen.length);
     }
@@ -218,14 +228,26 @@ describe("Der Fraktionsmix kennt alle vier — und hat sich nicht verschoben", (
     return zaehl;
   };
 
-  it("Reifen kommen an — bis zum 16.09.2026 konnten sie das nicht", () => {
+  it("Holz, Baumischabfall, Kunststoff kommen an; Reifen nur noch als Rad", () => {
     /*
-     * Der eigentliche Befund. `tires` fehlte im Lostopf; ein Reifen kam nur
-     * als Bestandteil eines Fahrzeugs oder aus dem Wrack auf den Platz.
+     * Bis zum 16.09.2026 fehlte `tires` im Lostopf; ein Reifen kam nur als
+     * Bestandteil eines Fahrzeugs oder aus dem Wrack auf den Platz.
+     *
+     * Seit E-181 (20.10.2026) ist das wieder so, diesmal mit Absicht:
+     * Patrick, „Reifen haben immer felge". Ein Rad ist Mischschrott; sein
+     * Reifen wird erst durchs Trennen (Werkzeug) oder am Wrack zur Fraktion
+     * Reifen. Ein Reifen-Los faende keinen Gegenstand und fiele auf ein
+     * beliebiges Teil zurueck — darum steht `tires` nicht mehr im Lostopf.
      */
     const z = messe(20260916, 4000);
-    for (const id of ABFALLFRAKTIONEN)
+    for (const id of ABFALLFRAKTIONEN.filter((f) => f !== "tires"))
       expect(z[id] ?? 0, `${getMaterial(id).name} wird nie angeliefert`).toBeGreaterThan(0);
+    expect(z.tires ?? 0, "ein Reifen ohne Felge kam an").toBe(0);
+    const raeder = randomCargo(4000).filter((c) =>
+      (c.shape.zusammensetzung ?? []).some((a) => a.materialId === "tires" && a.anteil >= 0.4)
+    );
+    expect(raeder.length, "Raeder kommen nie an").toBeGreaterThan(0);
+    expect(new Set(raeder.map((c) => c.materialId))).toEqual(new Set(["mixed"]));
   });
 
   it("der Abfallanteil einer Anlieferung liegt bei 6,7 % — wie vorher", () => {
@@ -234,6 +256,9 @@ describe("Der Fraktionsmix kennt alle vier — und hat sich nicht verschoben", (
      * Abfallsorten drei von neun Losen des letzten Fuenftels: 20 % x 3/9 =
      * 6,67 %. Jetzt teilen sich VIER Sorten dieselben drei Lose — der Anteil
      * bleibt, nur die Verteilung darin aendert sich.
+     *
+     * E-181 (20.10.2026): wieder drei Sorten (ohne Reifen) mit je vier Losen
+     * — 12 von 36, dieselben 6,67 %. Der Rest des Fraktionsmixes bleibt 20 %.
      *
      * Waere `tires` einfach als zehnter Name dazugekommen, stuenden hier 8,0 %,
      * und jede Anlieferung braechte ein Fuenftel mehr Zuzahl-Ware. Preise und

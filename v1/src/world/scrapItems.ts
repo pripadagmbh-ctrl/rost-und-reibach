@@ -225,6 +225,57 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
   return new THREE.TubeGeometry(curve, STEPS, tube * 0.78, 7, false);
 }
 
+/**
+ * Ist das Teil ein Rad — Reifen auf Felge? Dann die Farbe der Felge, sonst null.
+ *
+ * E-181, Patrick 20.10.2026: „Reifen haben immer felge." Erkannt wird das Rad
+ * an seiner Stueckliste (Reifen plus Stahl oder Alu), nicht am Namen: Ein Rad
+ * aus einem alten Spielstand bekommt die Stueckliste vom Katalog nachgetragen
+ * (`katalogFuer`) und sieht dann genauso aus.
+ */
+export function radFelge(shape: ScrapShape): number | null {
+  if (shape.kind !== "torus" && shape.kind !== "cyl") return null;
+  const zus = shape.zusammensetzung ?? [];
+  if (!zus.some((a) => a.materialId === "tires")) return null;
+  const felge = zus.find((a) => a.materialId === "steel" || a.materialId === "alu");
+  return felge ? getMaterial(felge.materialId).color : null;
+}
+
+/**
+ * Ein Rad als EIN Netz: Reifen (Torus) und Felge (Scheibe), Farbe in den
+ * Eckpunkten — ein Zeichenruf wie vorher der nackte Reifen.
+ *
+ * Die Felge reicht bis in die Rohrmitte des Reifens und ist schmaler als er;
+ * man sieht sie im Loch und als Rand innen. Liegend gebaut (Achse senkrecht),
+ * wie der Achtkant-Kollider (`achtkant(ring + rohr, rohr)`, v2 E-011).
+ * Farben aus `MATERIALS`: Reifen in seiner Fraktionsfarbe, Felge in der von
+ * Stahl bzw. Alu.
+ */
+export function radGeometrie(ring: number, rohr: number, felgenFarbe: number): THREE.BufferGeometry {
+  const faerben = (g: THREE.BufferGeometry, hex: number): THREE.BufferGeometry => {
+    const c = new THREE.Color(hex);
+    const n = g.getAttribute("position").count;
+    const f = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) f.set([c.r, c.g, c.b], i * 3);
+    g.setAttribute("color", new THREE.BufferAttribute(f, 3));
+    return g;
+  };
+  const reifen = new THREE.TorusGeometry(ring, rohr, 8, 16);
+  reifen.rotateX(Math.PI / 2);
+  // Felgenbett: bis zur Rohrmitte, 70 % der Reifenbreite (SW, Augenmass)
+  const felge = new THREE.CylinderGeometry(ring, ring, rohr * 1.4, 16);
+  // Nabe: ein Drittel des Ringhalbmessers, steht etwas vor
+  const nabe = new THREE.CylinderGeometry(ring * 0.33, ring * 0.33, rohr * 1.6, 8);
+  const teile = [
+    faerben(reifen, getMaterial("tires").color),
+    faerben(felge, felgenFarbe),
+    faerben(nabe, felgenFarbe),
+  ];
+  const rad = mergeGeometries(teile, false) ?? teile[0]!;
+  for (const t of teile) if (t !== rad) t.dispose();
+  return rad;
+}
+
 /** Kollider für ein plattgedrücktes Teil (flacher Quader über der Grundfläche). */
 /**
  * Dämpfung nach Masse. Physikalisch bremst Luftwiderstand leichte Körper
@@ -972,7 +1023,10 @@ export const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32], name: "LKW-Felge", massiv: true }, // E-042, Patrick 15.09.2026: "LKW-Felge, sind gehaerteter Stahl und daher auf massiv setzen."
   { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15], bau: "motor", name: "Motorradmotor" },
   { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor", name: "Elektromotor", trennbar: true, zusammensetzung: [{ materialId: "steel", anteil: 0.58 }, { materialId: "copper", anteil: 0.38 }, { materialId: "alu", anteil: 0.04 }] },
-  { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11], name: "Traktorreifen" },
+  // E-181 (Patrick 20.10.2026: „Reifen haben immer felge"): war „Traktorreifen", 11 kg
+  // ohne Felge. Traktor-Vorderrad 7.50-16: Aussen-Ø 0,80 m, Breite 0,20 m; Reifen
+  // rund 25 kg + Felge 5.50x16 12 kg = 37 kg (SW).
+  { materialId: "mixed", massKg: 37, kind: "torus", dims: [0.3, 0.1], name: "Traktor-Vorderrad", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.68 }, { materialId: "steel", anteil: 0.32 }] },
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
   ...KATALOG_SPECS,
@@ -1105,10 +1159,43 @@ function colorFor(spec: PileSpec, seed: number): number {
  * eine Wirtschaftsaenderung, die niemand bestellt hat (E-067 hat genau deshalb
  * die Finger davon gelassen). `test/abfall.test.ts` misst den Anteil.
  */
+/*
+ * E-181 (20.10.2026): REIFEN SIND RAEDER, und Raeder sind Mischschrott.
+ * Patrick: „Reifenstapel gibt es nicht mehr, nur einzel reifen" und „Reifen
+ * haben immer felge". Damit hat `tires` keinen einzigen Katalogeintrag mehr —
+ * ein Reifen-Los faende nichts und fiele auf ein beliebiges Teil zurueck
+ * (`pool[Math.random() …]`). Seine drei Lose gehen an die drei anderen
+ * Abfallsorten: jede VIER statt drei. Der Abfall behaelt damit genau seine
+ * 12 von 36 Losen (ein Drittel des Topfes), nur ohne Reifen. Reifen gibt es
+ * weiter — aus dem Rad getrennt (Werkzeug) oder vom Wrack.
+ */
 const REST_LOSE: string[] = [
   ...["va", "copper", "brass", "zinc", "battery", "cable"].flatMap((f) => [f, f, f, f]),
-  ...ABFALLFRAKTIONEN.flatMap((f) => [f, f, f]),
+  ...ABFALLFRAKTIONEN.filter((f) => f !== "tires").flatMap((f) => [f, f, f, f]),
 ];
+
+/**
+ * Wie sich eine gemischte Ladung auf die Sorten verteilt — Starthaufen,
+ * Streuschrott, Privatleute und gemischte Haendlerfuhren ziehen hieraus.
+ *
+ * E-181, Patrick 20.10.2026: „Auch fehlt es an der balance zwischen misch und
+ * stahlschrott. Mischschrott ist häufiger." Bis dahin 42 % Stahl gegen 22 %
+ * Misch — gemessen kam Stahlschrott im Starthaufen 2,5-mal so oft wie
+ * Mischschrott (`tools/sortenanteile.ts`).
+ *
+ * SW, nach dem Bild des echten Altschrotthandels: Was gesammelt ankommt, ist
+ * zum groessten Teil Misch- und Sammelschrott (Blech, Geraete, Verbund);
+ * sauberer schwerer Stahlschrott ist das Seltenere und das Teurere (E-042:
+ * „das ist halt so das Premium"). Branchenbild, keine nachgeschlagene Zahl.
+ *
+ *   Misch 50 % · Stahl 22 % · Alu 8 % · Rest 20 % (`REST_LOSE`)
+ *
+ * Der Rest bleibt bei 20 %: Buntmetall, Kabel, Akkus und Abfall kommen so oft
+ * wie vorher (`test/abfall.test.ts`). Alu gibt die Haelfte ab (16 -> 8 %),
+ * weil Alu im Sammelschrott ebenfalls ein Nebenbestandteil ist und der Abstand
+ * Misch : Stahl sonst nur aus dem Stahl kaeme.
+ */
+export const FRAKTIONSMIX = { mixed: 0.5, steel: 0.22, alu: 0.08 } as const;
 
 /**
  * Zufalls-Ladung für Anlieferungen.
@@ -1142,17 +1229,18 @@ export function randomCargo(
      * in dieser Liste wurde keiner davon je gezogen, und sie waren mit einem
      * Schlag aus dem Spiel.
      *
-     * 42 % Stahl, 22 % Mischschrott, 16 % Alu, der Rest verteilt sich
-     * (`REST_LOSE`, siehe dort — die Anteile stehen dort gerechnet).
+     * Die Anteile stehen in `FRAKTIONSMIX` (E-181: Misch vor Stahl), der
+     * Rest verteilt sich ueber `REST_LOSE` (siehe dort, gerechnet).
      */
     const r = Math.random();
+    const m = FRAKTIONSMIX;
     const wanted =
       onlyMaterial ??
-      (r < 0.42
-        ? "steel"
-        : r < 0.64
-          ? "mixed"
-          : r < 0.8
+      (r < m.mixed
+        ? "mixed"
+        : r < m.mixed + m.steel
+          ? "steel"
+          : r < m.mixed + m.steel + m.alu
             ? "alu"
             : REST_LOSE[Math.floor(Math.random() * REST_LOSE.length)]);
     let matching = pool.filter((s) => s.materialId === wanted);
@@ -1527,7 +1615,13 @@ export class ItemManager {
       collider = RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2);
     } else if (shape.kind === "cyl") {
       const [r, len] = shape.dims;
-      geo = new THREE.CylinderGeometry(r, r, len, 14);
+      // E-181: ein kurzes Rad (Rad mit Alufelge) sieht aus wie die Raeder als Torus
+      const felge = len <= r * 2.5 ? radFelge(shape) : null;
+      geo = felge !== null ? radGeometrie(r - len / 2, len / 2, felge) : new THREE.CylinderGeometry(r, r, len, 14);
+      if (felge !== null) {
+        material.color.setHex(0xffffff);
+        material.vertexColors = true;
+      }
       if (len > r * 2.5) {
         geo.rotateX(Math.PI / 2); // langes Rohr, liegend
         collider = RAPIER.ColliderDesc.cuboid(r, r, len / 2);
@@ -1536,16 +1630,24 @@ export class ItemManager {
       }
     } else if (shape.kind === "torus") {
       const [r, tube] = shape.dims;
+      // E-181: Reifen gibt es nur noch mit Felge
+      const felge = materialId === "cable" ? null : radFelge(shape);
       // Kabel wird als mehrfach gewickelter Strang gebaut — ein glatter Ring
       // sah aus wie ein Donut, nicht wie aufgerolltes Kabel.
       geo =
         materialId === "cable"
           ? cableCoilGeometry(r, tube)
-          : (() => {
-              const g = new THREE.TorusGeometry(r, tube, 8, 16);
-              g.rotateX(Math.PI / 2);
-              return g;
-            })();
+          : felge !== null
+            ? radGeometrie(r, tube, felge)
+            : (() => {
+                const g = new THREE.TorusGeometry(r, tube, 8, 16);
+                g.rotateX(Math.PI / 2);
+                return g;
+              })();
+      if (felge !== null) {
+        material.color.setHex(0xffffff);
+        material.vertexColors = true;
+      }
       collider = achtkant(r + tube, tube);
     } else {
       // Drahtknäuel: verrauschte Kugel im Wireframe liest sich als Maschendraht

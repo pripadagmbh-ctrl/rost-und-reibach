@@ -331,8 +331,39 @@ describe("Eine sortenreine Fuhre wiederholt sich nicht sofort (E-063)", () => {
      * in `test/abfall.test.ts` — der Abfallanteil einer Anlieferung liegt
      * unveraendert bei 6,7 %.
      */
-    for (const frak of ["tires", "wood", "rubble", "plastic"])
+    /*
+     * E-181 (20.10.2026): Reifen sind seither Raeder. Patrick: „Reifenstapel
+     * gibt es nicht mehr, nur einzel reifen" und „Reifen haben immer felge".
+     * Ein Rad ist Gummi + Felge, also Verbund und nach der einen Regel
+     * Mischschrott — `tires` hat darum keinen Katalogeintrag mehr, und die acht
+     * stehen jetzt bei den Raedern (naechster Test). Reifen als Fraktion gibt
+     * es weiter: aus dem Rad getrennt oder vom Wrack.
+     */
+    for (const frak of ["wood", "rubble", "plastic"])
       expect(sorten(frak, "klein"), `${frak} ist weiter duenn`).toBeGreaterThanOrEqual(8);
+    expect(sorten("tires", "klein"), "ein Reifen ohne Felge ist zurueck").toBe(0);
+  });
+
+  it("E-181: acht Raeder in der Kleinteil-Klasse, jedes mit Felge", () => {
+    /*
+     * Die acht Sorten, die Reifen bis zum 20.10.2026 hatten, als Raeder:
+     * Pkw, Transporter, Anhaenger, LKW, Motorrad, Stapler, Traktor, dazu das
+     * Rad mit Alufelge. Jedes traegt Reifen UND Felge (Stahl oder Alu) in der
+     * Stueckliste — daran erkennt `scrapItems.radFelge` das Rad und zeichnet
+     * die Felge.
+     */
+    const raeder = ALLE.filter(
+      (e) =>
+        klasse(e.liste) === "klein" &&
+        (e.spec.zusammensetzung ?? []).some((a) => a.materialId === "tires" && a.anteil >= 0.4)
+    );
+    expect(raeder.length).toBeGreaterThanOrEqual(8);
+    for (const e of raeder) {
+      const zus = e.spec.zusammensetzung ?? [];
+      expect(zus.some((a) => a.materialId === "steel" || a.materialId === "alu"), `${e.spec.name} ohne Felge`).toBe(true);
+      expect(fraktionVonTeil(e.spec), `${e.spec.name}`).toBe("mixed");
+      expect(["torus", "cyl"], `${e.spec.name} rollt nicht als Achtkant`).toContain(e.spec.kind);
+    }
   });
 });
 
