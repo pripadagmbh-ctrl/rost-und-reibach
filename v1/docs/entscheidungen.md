@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-173 | 20.10.2026 | Spiel heißt wieder Rost & Reibach, überall auf dem Platz | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-172 | 19.10.2026 | Stummschalter auf lautlos: Spiel still, fremde Musik läuft weiter | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-171 | 19.10.2026 | Datenschutz, Lizenzen, Support als Seiten im App-Paket | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-170 | 19.10.2026 | Englisch im Spiel: Sprache vom Gerät, umschaltbar im Pausenmenü | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
@@ -179,6 +180,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-173 — Rost & Reibach** (iPad, dann iPhone mini)
+- Tafel am Tor, Bürodach, hinter der Bucht: „Rost & Reibach" mit rostbraunem Ring lesbar? Gefällt das rostbraune „&"?
+- Grüne Mulden und Abholer (V): Name auf beiden Seiten, nicht spiegelverkehrt?
+- „Zum Home-Bildschirm": steht „Rost&Reibach" ganz unter dem Symbol?
+- Frage: Mulden und Abholer bleiben grün (Empfehlung) — oder Oxidrot (passt zu „Rost", hebt sich vom Beton ab, aber anders als der grüne Bagger)?
+
 **E-172 — Stummschalter „ambient“** (iPhone mini)
 - Safari, Live-Adresse: lautlos → Spinne zupacken still? Schalter zurück → Ton wieder da?
 - App über TestFlight: Musik-App läuft, Spiel öffnen → Musik läuft weiter, Spiel darüber hörbar?
@@ -204,7 +211,7 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Flugmodus, App neu starten: läuft alles samt Ton?
 - Stummschalter umlegen: was passiert mit dem Ton? (Frage: „ambient“ empfohlen)
 - App schließen und neu öffnen: Spielstand noch da?
-- Frage: Name unter dem Icon „Schrottplatz“ (Vorschlag) oder „Pripada Schrottplatz“ (wird abgeschnitten)?
+- ~~Frage: Name unter dem Icon~~ — entschieden in E-173: „Rost&Reibach“.
 
 **E-160 — Wrack-Aufschlag klingt** (iPad-Lautsprecher, nach Einbau in main.ts)
 - Auto 1–2 m heben und loslassen: ein schwerer Blechschlag wie eine Autotür, keine Coladose, kein Rattern?

@@ -24,6 +24,8 @@ Die Zeichenzahlen sind nachgezählt. Grenzen laut Apple ([App information](https
 
 ## 1. Name und Untertitel — drei Varianten zur Wahl
 
+**Entschieden 20.10.2026 (Patrick, E-173):** Der Name im Store ist **„Rost & Reibach"** (14 Zeichen), deutsch wie englisch; Anbieter bleibt die Pripada GmbH. Unter dem App-Symbol steht „Rost&Reibach" (`Info.plist`, CFBundleDisplayName), weil „Rost & Reibach" dort zu „Rost & Rei…" gekürzt würde. Die Untertitel unten gelten weiter; die Namensspalte ist der Stand vor der Entscheidung.
+
 Der Name ist das Stärkste, was Apple bei der Suche liest; der Untertitel das Zweitstärkste. Wörter aus Name und Untertitel müssen nicht noch einmal in die Schlüsselwörter.
 
 ### Deutsch

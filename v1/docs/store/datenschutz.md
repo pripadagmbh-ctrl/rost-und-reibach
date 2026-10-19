@@ -37,7 +37,7 @@ Im Spiel: ein Knopf **„Datenschutz“** im Pausenmenü, der diese Adresse im B
 > Platzhalter in [eckigen Klammern] bitte ersetzen.
 
 ```
-Datenschutzerklärung für die App „Pripada Schrottplatz“
+Datenschutzerklärung für die App „Rost & Reibach“
 
 Stand: [Datum]
 
@@ -78,7 +78,7 @@ Sie haben nach der DSGVO das Recht auf Auskunft, Berichtigung, Löschung, Einsch
 ## Privacy Policy — English
 
 ```
-Privacy Policy for the app "Pripada Scrapyard"
+Privacy Policy for the app "Rost & Reibach"
 
 Last updated: [date]
 
@@ -143,7 +143,7 @@ Ich kann den Stand der Technik ehrlich beschreiben, aber nicht sagen, ob er rech
 1. **Die Datenschutzerklärung oben** — insbesondere Abschnitt 5 (Absturzberichte über Apple) und 6 (E-Mail-Kontakt), und ob ein Datenschutzbeauftragter genannt werden muss.
 2. **Impressum / Anbieterkennzeichnung:** Muss die App selbst oder die Support-Seite ein Impressum zeigen (Digitale-Dienste-Gesetz)? Vorschlag: Support-Seite verlinkt auf `pripada.de/impressum.html`, im Spiel ein Knopf „Impressum“ neben „Datenschutz“.
 3. **DSA-Händlerangaben** — welche Telefonnummer/E-Mail öffentlich stehen (siehe `apple-konto.md`, 4d).
-4. **Markenrecht:** Ist „Pripada Schrottplatz“ als App-Name unbedenklich, und will die GmbH „Pripada“ für Spiele (Klasse 9/41) schützen lassen? Recherche beim DPMA/EUIPO.
+4. **Markenrecht:** Ist „Rost & Reibach“ als App-Name unbedenklich, und will die GmbH „Rost & Reibach“ für Spiele (Klasse 9/41) schützen lassen? Recherche beim DPMA/EUIPO.
 5. **Klänge:** Alle CC0 außer einer Pixabay-Aufnahme (Pixabay Content License: Einbau ins Spiel erlaubt, die Datei für sich allein weitergeben nicht). Quellen: `v1/public/ton/QUELLEN.md`. Bestätigen lassen, dass ein **kostenpflichtiges** Spiel davon gedeckt ist ([Pixabay-Lizenz](https://pixabay.com/service/license-summary/)).
 6. **Fremde Software im Spiel:** Three.js (MIT-Lizenz), Rapier (Apache-2.0), Capacitor (MIT). Diese Lizenzen verlangen, dass ihr Lizenztext mitgeliefert wird. Vorschlag: Seite „Lizenzen“ im Pausenmenü — Arbeit im Spiel.
 7. **Steuer:** Wie die Auszahlungen von Apple und Apples Provision bei der GmbH zu verbuchen sind (Umsatzsteuer, W-8BEN-E). Apple verweist dafür selbst auf den Steuerberater ([Understanding taxes](https://developer.apple.com/help/app-store-connect/making-payments-to-apple/understanding-taxes)).

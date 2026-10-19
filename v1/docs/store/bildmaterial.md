@@ -77,7 +77,7 @@ Inhaltlich:
 | 12–16 s | Wrack in die Schere, Deckel drückt, Paket fällt heraus | *Pressen.* / *Crush.* | Knautschen |
 | 16–20 s | Schnelle Folge: Kupfer in die Kupfermulde, Magnet hebt Eisen, Alu in die Alumulde | *Sortieren.* / *Sort.* | Kupfer-, Stahl-, Alu-Aufschläge |
 | 20–23 s | Kipper fährt rückwärts heran und kippt ab | *Nachschub kommt.* / *More is coming.* | LKW-Hupe, Abkippen |
-| 23–25 s | Weiter Blick über den Platz, Name eingeblendet | *Pripada Schrottplatz — offline, ohne Werbung.* / *Pripada Scrapyard — offline, no ads.* | ausklingen |
+| 23–25 s | Weiter Blick über den Platz, Name eingeblendet | *Rost & Reibach — offline, ohne Werbung.* / *Rost & Reibach — offline, no ads.* | ausklingen |
 
 Aufnahme wie die Bildschirmfotos: am PC im Fenster mit 1920 × 886 bzw. 1600 × 1200, mit 30 Bildern/s aufgenommen. Alternativ auf dem iPad mit der eingebauten Bildschirmaufnahme und dann auf 1600 × 1200 zugeschnitten — das geht aber nur verlustfrei, wenn das Seitenverhältnis passt (4:3).
 
@@ -97,7 +97,7 @@ Was Apple und die Praxis verlangen:
 
 **Gestalterisch:** Das heutige Icon ist ein grau-grüner Greifer auf fast schwarzem Grund mit gelbem Streifen. Auf dem Homescreen ist es klein und dunkel; der Greifer hebt sich wenig ab. Vorschläge zur Wahl:
 - (a) so lassen, nur Alphakanal entfernen — schnell, sicher;
-- (b) Greifer heller und größer, bis fast an den Rand, Hintergrund ein dunkles Pripada-Grün (`#2f7a4f` wie die Firmenmulden);
+- (b) Greifer heller und größer, bis fast an den Rand, Hintergrund ein dunkles Firmengrün (`#2f7a4f` wie die Rost-&-Reibach-Mulden);
 - (c) Greifer mit einem Autowrack in den Schalen — erzählt mehr, wird aber klein unleserlich.
 
 *Empfehlung: (b).* Entscheidung bei dir.

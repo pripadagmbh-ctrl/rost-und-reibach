@@ -1,6 +1,6 @@
 {
   "appId": "de.pripada.schrottplatz",
-  "appName": "PRIPADA Schrottplatz",
+  "appName": "Rost & Reibach",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false,

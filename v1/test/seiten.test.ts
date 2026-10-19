@@ -35,8 +35,10 @@ describe("die drei Seiten in public/ (landen in dist/ und im App-Paket)", () => 
 
   it("Datenschutz: Name, Kontakt, Telefon bleibt Platzhalter", () => {
     const html = lies("public/datenschutz.html");
-    expect(html).toContain("Pripada Schrottplatz");
-    expect(html).toContain("Pripada Scrapyard");
+    // E-173: Das Spiel heißt „Rost & Reibach", Anbieter bleibt die Pripada GmbH
+    expect(html).toContain("„Rost &amp; Reibach“");
+    expect(html).toContain("“Rost &amp; Reibach”");
+    expect(html).toContain("Pripada GmbH");
     expect(html).toContain("kontakt@pripada.de");
     expect(html).toContain("[Telefonnummer]");
   });

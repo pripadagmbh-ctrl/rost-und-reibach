@@ -72,7 +72,7 @@ Texte: `store-texte.md` · Bilder: `bildmaterial.md`.
 | ☐ | Punkt | Was zu tun | Status | Wer |
 |---|---|---|---|---|
 | ☐ | Mehr als eine Website | Vollständiges Spiel, offline, im Paket — Hinweis an die Prüfer steht in `altersfreigabe-und-pruefung.md` ([4.2](https://developer.apple.com/app-store/review/guidelines/#minimum-functionality)) | offen | iOS + Store |
-| ☐ | Keine fremden Marken im Spiel | Seit E-143 nur Pripada auf Schildern; Fahrzeuge und Maschine ohne fremde Logos und Typenschilder — einmal gezielt durchsehen ([4.1](https://developer.apple.com/app-store/review/guidelines/#copycats), [5.2](https://developer.apple.com/app-store/review/guidelines/#intellectual-property)) | offen | Spiel |
+| ☐ | Keine fremden Marken im Spiel | Seit E-143 nur der eigene Name auf Schildern, seit E-173 „Rost & Reibach"; Fahrzeuge und Maschine ohne fremde Logos und Typenschilder — einmal gezielt durchsehen ([4.1](https://developer.apple.com/app-store/review/guidelines/#copycats), [5.2](https://developer.apple.com/app-store/review/guidelines/#intellectual-property)) | offen | Spiel |
 
 ## F. Datenschutz — Richtlinie 5.1
 

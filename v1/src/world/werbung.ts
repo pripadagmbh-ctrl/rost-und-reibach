@@ -5,20 +5,32 @@ import { SCHILD_POS, SCHILD_B, SCHILD_H, YARD_D, YARD_MAX_X, BUCHT_Z, TRENNSTEIN
 import { HALLEN_X, HALLEN_Z, HALLE_TIEFE, OFFICE_X, OFFICE_Z } from "./office";
 
 /**
- * DER FIRMENNAME — die eine Stelle (E-131).
+ * DER SPIELNAME — die eine Stelle (E-131, seit E-173 wieder Rost & Reibach).
  *
- * Patrick, 16.10.2026: „mache anstelle von ROST&Reibach wieder Pripada.de
- * rein". PRIPADA ist seine eigene Firma; bis zum 12.09.2026 stand sie schon
- * auf dem Schild (damals „PRIPADA GMBH"). Wer den Namen zeigt — Tafel am Tor,
- * Hauptmenü —, liest ihn hier. Paketname, Ordner und alte Log-Einträge
- * bleiben, wie sie sind; das sind Bezeichner, keine Anzeige.
+ * Patrick, 20.10.2026: „Nenn das Spiel wieder Rost&Reibach. Auch die
+ * Werbetafeln entsprechend umbenennen." Auf Nachfrage: Im Store heißt es
+ * „Rost & Reibach" (Anbieter bleibt die Pripada GmbH), und auf dem Platz wird
+ * ALLES Rost & Reibach — Tafeln, grüne Mulden, Abholer, Waage, Halle.
+ * Vom 16. bis 20.10.2026 stand hier „Pripada.de" (E-131/E-143), davor vom
+ * 12.09. bis 16.10. „Rust’n’Reibach". Wer den Namen zeigt — Tafeln,
+ * Mulden-Aufkleber, Abholer, Hauptmenü —, liest ihn hier. Paketname, Ordner,
+ * Bezeichner (`PRIPADA_GRUEN`, `"pripadaGruen"`) und alte Log-Einträge
+ * bleiben, wie sie sind; das sind Namen im Code, keine Anzeige.
  */
-export const FIRMA = "Pripada.de";
+export const FIRMA = "Rost & Reibach";
+/**
+ * Unter dem App-Symbol auf dem Home-Bildschirm (`Info.plist`
+ * CFBundleDisplayName, `manifest.webmanifest` short_name): ohne Leerzeichen.
+ * Gemessen (Arial 12 px als Ersatz für SF Pro): „Rost & Reibach" 83 px,
+ * „Rost&Reibach" 77 px — so breit wie „Kleinanzeigen" (75 px), das ein iPhone
+ * ungekürzt zeigt; mit Leerzeichen würde es zu „Rost & Rei…".
+ */
+export const FIRMA_KURZ = "Rost&Reibach";
 
 /* ------------------------------------------------------------ Bildinhalt -- */
 
 /**
- * Das Grün der Pripada-Behälter: der Abrollcontainer des Abholers
+ * Das Grün der Firmenbehälter (Bezeichner aus E-133): der Abrollcontainer des Abholers
  * (`vehicleModel.ts`, seit jeher 0x2f7a4f) und die Firmenmulden
  * (`firmenmulden.ts`, E-133). Eine Zahl, damit Lack und Aufkleber nicht
  * auseinanderlaufen.
@@ -37,19 +49,19 @@ interface Bild {
   name: string;
   /** Kleinere Zeilen darunter (höchstens zwei) */
   zeilen: string[];
-  /** Das P-Signet über dem Namen — nur bei Pripada */
+  /** Das Ring-Signet über dem Namen — nur auf der großen Tafel */
   signet?: boolean;
   /** Rost und Flecken */
   verwittert: boolean;
 }
 
 /*
- * NUR PRIPADA.DE (E-143). Patrick, 17.10.2026, nachdem er die Firmenschilder
- * aus E-133 am Gerät gesehen hatte: „alles gut lesbar, aber nimm rent4ring und
- * ledprofi raus. Mach nur pripada.de rein" — und auf Nachfrage glasklar-mg.de
- * ebenso. Jede Tafel des Platzes zeigt Pripada.de; die Logodateien sind weg.
+ * NUR DER EIGENE NAME (E-143, seit E-173 Rost & Reibach). Patrick,
+ * 17.10.2026: „nimm rent4ring und ledprofi raus. Mach nur pripada.de rein";
+ * 20.10.2026: „Nenn das Spiel wieder Rost&Reibach. Auch die Werbetafeln
+ * entsprechend umbenennen." Fremde Firmen und Logodateien sind weg.
  */
-const PRIPADA: Bild = {
+const TAFEL: Bild = {
   grund: "#e8e4db",
   schrift: "#20262c",
   neben: "#7d7565",
@@ -58,7 +70,7 @@ const PRIPADA: Bild = {
   signet: true,
   verwittert: true,
 };
-const PRIPADA_HALLE: Bild = {
+const HALLE_BILD: Bild = {
   grund: "#e8e4db",
   schrift: "#20262c",
   neben: "#7d7565",
@@ -83,8 +95,8 @@ const PRIPADA_HALLE: Bild = {
  * große und vier flache Zellen.
  *
  * SEIT E-143 NUR NOCH 1024 × 1024. Mit den fremden Logos sind fünf Zellen
- * weggefallen; übrig sind die große Pripada-Tafel (oben), die Hallenblende
- * und das grüne Pripada-Feld für Abholer und Firmenmulden (`atlasFeld`).
+ * weggefallen; übrig sind die große Tafel (oben), die Hallenblende
+ * und das grüne Feld für Abholer und Firmenmulden (`atlasFeld`).
  * Ein Viertel der Fläche heißt rund 5,6 statt 16 MB Grafikspeicher mit
  * Mipmaps — die Sorge um das iPhone mini aus E-131.
  */
@@ -103,8 +115,8 @@ const flach = (i: number): Zelle => ({ x: 0, y: 512 + i * 256, b: 1024, h: 256 }
 
 /** Jedes Bild einmal im Atlas — zwei Tafeln mit demselben Bild teilen sich die Zelle. */
 const ZELLEN: Array<[Bild, Zelle]> = [
-  [PRIPADA, gross()],
-  [PRIPADA_HALLE, flach(0)],
+  [TAFEL, gross()],
+  [HALLE_BILD, flach(0)],
 ];
 /** Das grüne Feld: ganze Zelle Grün, Signet und Name nur im mittleren 512 × 256. */
 const GRUEN = flach(1);
@@ -119,7 +131,7 @@ export interface AtlasFeld {
 }
 
 /**
- * Wo im Atlas das grüne Pripada-Feld liegt.
+ * Wo im Atlas das grüne Firmenfeld liegt.
  *
  * „pripadaGruen": zentrierter Ausschnitt der grünen Zelle mit dem gewünschten
  * Seitenverhältnis (Breite/Höhe), Höhe = volle Zellhöhe; das Signet steht in
@@ -208,7 +220,7 @@ const BLENDE_Y = 4.475 + BLENDE_H / 2;
 const BLENDE_X = HALLEN_X + HALLE_TIEFE / 2 + 0.18 + 0.03;
 
 /**
- * PRIPADA AUF DEM BÜRODACH, DIREKT AN DER WAAGE (E-133).
+ * DIE TAFEL AUF DEM BÜRODACH, DIREKT AN DER WAAGE (E-133).
  *
  * Patrick, 17.10.2026: „Pripada prominent direkt an der waage". Ein
  * Dachaufsteller auf dem Büro, Schaufläche nach Osten zur Waage und auf den
@@ -231,7 +243,7 @@ const DACH_UNTERKANTE = 7.9 + 0.2;
 const DACH_FUSS = 6.6;
 
 /**
- * PRIPADA HINTER DER BUCHT (E-133): „da wo gearbeitet wird". Wer an den Halden
+ * DIE TAFEL HINTER DER BUCHT (E-133): „da wo gearbeitet wird". Wer an den Halden
  * greift, schaut nach Süden auf die Buchtrückwand (`SUED_HOCH` = 4,8 m). Die
  * Tafel steht `HINTER_MAUER` dahinter, Unterkante 5,0 m — knapp über der Wand
  * (SW). Mitte x 0,5 = über der Fuge zwischen den Halden (`TRENNSTEIN_X`).
@@ -259,7 +271,7 @@ export function werbeschilder(): Werbeschild[] {
   return [
     // Die Firmentafel am Tor bleibt, wo sie seit E-010 steht (kulisse.test.ts).
     {
-      name: "Firmentafel am Tor", bild: PRIPADA,
+      name: "Firmentafel am Tor", bild: TAFEL,
       x: SCHILD_POS.x, y: SCHILD_POS.y, z: SCHILD_POS.z, b: SCHILD_B, h: SCHILD_H,
       rot: NACH_SUEDEN, pfosten: true, kollider: true,
     },
@@ -269,29 +281,29 @@ export function werbeschilder(): Werbeschild[] {
      * (x −22 ± 1,55). 1,0 … 10,0 lässt den Flutlichtmast auf x 0
      * (`daylight.einmauern`) in der Lücke stehen.
      */
-    frei("Pripada, Nordmauer am Tor", PRIPADA, -13.0, nord, NACH_SUEDEN),
-    frei("Pripada, Nordmauer Ost", PRIPADA, 5.5, nord, NACH_SUEDEN),
+    frei("Tafel, Nordmauer am Tor", TAFEL, -13.0, nord, NACH_SUEDEN),
+    frei("Tafel, Nordmauer Ost", TAFEL, 5.5, nord, NACH_SUEDEN),
     /*
      * Ostmauer: z −20 … −11 steht hinter dem Abladeplatz, rechts vom Sitz —
-     * dorthin schaut, wer einen Laster leer macht; seit E-133 Pripada („da wo
+     * dorthin schaut, wer einen Laster leer macht; seit E-133 der eigene Name („da wo
      * gearbeitet wird"). z 11,5 … 20,5 lässt die Masten auf z 8 und z 26 frei.
      */
-    frei("Pripada, Ostmauer am Abladeplatz", PRIPADA, ost, -15.5, NACH_WESTEN),
-    frei("Pripada, Ostmauer Nord", PRIPADA, ost, 16.0, NACH_WESTEN),
+    frei("Tafel, Ostmauer am Abladeplatz", TAFEL, ost, -15.5, NACH_WESTEN),
+    frei("Tafel, Ostmauer Nord", TAFEL, ost, 16.0, NACH_WESTEN),
     {
-      name: "Pripada, Dach Büro an der Waage", bild: PRIPADA,
+      name: "Tafel, Dach Büro an der Waage", bild: TAFEL,
       x: OFFICE_X + 2.5, y: DACH_UNTERKANTE + DACH_H / 2, z: OFFICE_Z, b: DACH_B, h: DACH_H,
       rot: NACH_OSTEN, pfosten: true, fuss: DACH_FUSS,
     },
     {
-      name: "Pripada, hinter der Bucht", bild: PRIPADA,
+      name: "Tafel, hinter der Bucht", bild: TAFEL,
       x: TRENNSTEIN_X, y: BUCHT_UNTERKANTE + FREI_H / 2, z: BUCHT_Z - HINTER_MAUER, b: FREI_B, h: FREI_H,
       rot: NACH_NORDEN, pfosten: true,
     },
     // Die drei Hallen: Blende über dem Tor, auf den Platz hin.
-    blende("Halle 1", PRIPADA_HALLE, 0),
-    blende("Halle 2", PRIPADA_HALLE, 1),
-    blende("Halle 3", PRIPADA_HALLE, 2),
+    blende("Halle 1", HALLE_BILD, 0),
+    blende("Halle 2", HALLE_BILD, 1),
+    blende("Halle 3", HALLE_BILD, 2),
   ];
 }
 
@@ -356,8 +368,7 @@ function maleTafel(ctx: CanvasRenderingContext2D, bild: Bild, z: Zelle, saat: nu
     // Ohne Zeilen steht der Name in der Mitte: Grundlinie 0,7 × 150 / 2 unter der Zellmitte
     const grund = bild.signet ? 330 : bild.zeilen.length > 0 ? 250 : 256 + 52;
     ctx.fillText(bild.name, mx + 3, grund + 3);
-    ctx.fillStyle = bild.schrift;
-    ctx.fillText(bild.name, mx, grund);
+    schreibeName(ctx, bild.name, mx, grund, bild.schrift);
     ctx.fillStyle = bild.neben;
     ctx.letterSpacing = bild.signet ? "16px" : "10px";
     if (bild.zeilen[0]) {
@@ -375,8 +386,7 @@ function maleTafel(ctx: CanvasRenderingContext2D, bild: Bild, z: Zelle, saat: nu
     setzeSchrift(ctx, 700, 112, bild.name, breitMax);
     ctx.fillStyle = schatten;
     ctx.fillText(bild.name, mx + 3, 128 + 3);
-    ctx.fillStyle = bild.schrift;
-    ctx.fillText(bild.name, mx, 128);
+    schreibeName(ctx, bild.name, mx, 128, bild.schrift);
     ctx.fillStyle = bild.neben;
     ctx.letterSpacing = "8px";
     if (bild.zeilen[0]) {
@@ -395,7 +405,7 @@ const GRUEN_SCHRIFT = "#f2efe6";
 
 /**
  * Die grüne Zelle: überall `PRIPADA_GRUEN`, im mittleren 512 × 256-Feld das
- * Signet über „Pripada.de". Links und rechts davon je 256 px reines Grün —
+ * Signet über dem Namen (`FIRMA`). Links und rechts davon je 256 px reines Grün —
  * dort tastet `atlasFeld("pripadaGruenRand")` die Flächenfarbe ab. Keine
  * Verwitterung: Das ist Lack auf einem Behälter, kein Blechschild.
  */
@@ -414,29 +424,65 @@ function maleGruen(ctx: CanvasRenderingContext2D, z: Zelle): void {
   ctx.textAlign = "center";
   ctx.letterSpacing = "2px";
   setzeSchrift(ctx, 700, 90, FIRMA, GRUEN_MITTE_B - 52);
-  ctx.fillText(FIRMA, mx, z.y + 222);
+  schreibeName(ctx, FIRMA, mx, z.y + 222, GRUEN_SCHRIFT, UND_AUF_GRUEN);
   ctx.letterSpacing = "0px";
   ctx.restore();
 }
 
 /**
- * Das P im Kreis — das Signet der PRIPADA-Tafel bis zum 12.09.2026 (Commit
- * a6cc90f), auf 71 % verkleinert (Radius 110 → 78), damit es über der
- * Wortmarke Platz hat wie der Ring der Rust’n’Reibach-Tafel.
+ * Rostbraun für das „&" und das Signet (SW): die Farbe der Rostfahnen unter den
+ * Schraubenlöchern (`verwittere`, 140/76/38), etwas dunkler, damit es auf der
+ * hellen Platte steht. Auf Grün ein heller Rostton — das dunkle verschwände.
  */
-function maleSignet(ctx: CanvasRenderingContext2D, cx: number, cy: number, farbe = "#9a8f7c"): void {
-  ctx.strokeStyle = farbe;
+const ROST = "#8a4524";
+const UND_AUF_GRUEN = "#e0a070";
+
+/**
+ * Den Namen zentriert schreiben, das „&" in Rost (E-173): „Rost" und
+ * „Reibach" in der Schriftfarbe, das Zeichen dazwischen rostbraun — so wie
+ * auf der Rust’n’Reibach-Tafel bis 16.10.2026 die beiden Apostrophe um das n
+ * abgesetzt waren. Schrift (`ctx.font`) ist vorher gesetzt; ohne „&" ist es
+ * ein gewöhnliches `fillText`.
+ */
+function schreibeName(
+  ctx: CanvasRenderingContext2D, text: string, mx: number, y: number, farbe: string, und = ROST
+): void {
+  const i = text.indexOf("&");
   ctx.fillStyle = farbe;
+  if (i < 0) {
+    ctx.fillText(text, mx, y);
+    return;
+  }
+  const teile: Array<[string, string]> = [[text.slice(0, i), farbe], ["&", und], [text.slice(i + 1), farbe]];
+  const breite = ctx.measureText(text).width;
+  const ausrichtung = ctx.textAlign;
+  ctx.textAlign = "left";
+  let x = mx - breite / 2;
+  for (const [t, f] of teile) {
+    ctx.fillStyle = f;
+    ctx.fillText(t, x, y);
+    x += ctx.measureText(t).width;
+  }
+  ctx.textAlign = ausrichtung;
+}
+
+/**
+ * Das Signet: ein offener Ring mit einem kleineren darin — das Zeichen der
+ * Rust’n’Reibach-Tafel vom 12.09. bis 16.10.2026 (Stand vor Commit 1a1b51a,
+ * `yard.buildBillboard`), Maße unverändert. Seit E-173 wieder in Gebrauch,
+ * jetzt rostbraun statt grau (Patrick: „Rost & Reibach", kein fremdes Logo).
+ */
+function maleSignet(ctx: CanvasRenderingContext2D, cx: number, cy: number, farbe = ROST): void {
+  ctx.strokeStyle = farbe;
   ctx.lineCap = "butt";
-  ctx.lineWidth = 24;
+  ctx.lineWidth = 26;
   ctx.beginPath();
-  ctx.arc(cx, cy, 78, -Math.PI / 2, Math.PI * 0.75);
+  ctx.arc(cx, cy, 78, -Math.PI * 0.62, Math.PI * 1.28);
   ctx.stroke();
-  ctx.lineWidth = 21;
+  ctx.lineWidth = 22;
   ctx.beginPath();
-  ctx.arc(cx - 13, cy - 4, 41, Math.PI * 0.5, Math.PI * 1.75);
+  ctx.arc(cx, cy, 40, Math.PI * 0.38, Math.PI * 2.28);
   ctx.stroke();
-  ctx.fillRect(cx - 23, cy - 4, 21, 92);
 }
 
 /** Schraubenlöcher mit Rostfahnen, angefressene Ränder, Rostnester. */

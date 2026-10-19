@@ -22,7 +22,7 @@ Der Fragebogen fragt erst nach Funktionen, dann je Inhalt nach der Häufigkeit (
 | | User-Generated Content | **nein** | Spieler teilen nichts |
 | | Social Media | **nein** | |
 | | Messaging and Chat | **nein** | |
-| | Advertising | **nein** | keine Werbung. Die Pripada-Schilder auf dem Platz sind Kulisse des eigenen Hauses, keine Werbeeinblendung |
+| | Advertising | **nein** | keine Werbung. Die Rost-&-Reibach-Schilder auf dem Platz tragen den Spielnamen und sind Kulisse, keine Werbeeinblendung |
 | Mature Themes | Profanity or Crude Humor | **keine** | |
 | | Horror/Fear Themes | **keine** | |
 | | Alcohol, Tobacco, or Drug Use or References | **keine** | |
@@ -73,7 +73,7 @@ Weitere Felder im Abschnitt **App Review Information**:
 - **Contact:** dein Name, Telefon, E-Mail (nur für Apple sichtbar) **[du]**.
 
 ```
-Pripada Scrapyard is a complete, self-contained 3D simulation game. All assets are bundled in the app; it works fully offline, requires no account, contains no ads and no in-app purchases, and collects no data.
+Rost & Reibach is a complete, self-contained 3D simulation game. All assets are bundled in the app; it works fully offline, requires no account, contains no ads and no in-app purchases, and collects no data.
 
 The game is played in LANDSCAPE on iPhone and iPad. Best tested on iPad.
 
@@ -114,7 +114,7 @@ Wenn pripada.de nicht erweiterbar ist: Support- und Datenschutzseite können auc
 ### Entwurf Support-Seite (`pripada.de/app.html`)
 
 ```
-Pripada Schrottplatz – Hilfe und Kontakt
+Rost & Reibach – Hilfe und Kontakt
 
 Fragen, Fehler, Ideen? Schreiben Sie uns: [kontakt@pripada.de]
 Wir antworten in der Regel innerhalb von [zwei Werktagen].

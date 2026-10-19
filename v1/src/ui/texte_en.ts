@@ -15,7 +15,7 @@
  */
 export const EN: Record<string, string> = {
   // --- Seite: Titel, Laden, Hauptmenü ---
-  "PRIPADA Schrottplatz": "PRIPADA Scrapyard",
+  // Seitentitel „Rost & Reibach" (E-173) bleibt auf Englisch derselbe — kein Eintrag
   "Lade Physik …": "Loading physics …",
   "Fehler beim Start — Konsole prüfen.": "Start-up error — check the console.",
   "Bagger-Simulator": "Material handler simulator",

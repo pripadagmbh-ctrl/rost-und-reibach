@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { initPhysics } from "../src/physics/physicsWorld";
-import { FIRMA, werbeschilder, baueWerbeschilder, werbeAtlas, atlasFeld, PRIPADA_GRUEN } from "../src/world/werbung";
+import { FIRMA, FIRMA_KURZ, werbeschilder, baueWerbeschilder, werbeAtlas, atlasFeld, PRIPADA_GRUEN } from "../src/world/werbung";
 import { YARD_D, YARD_MIN_X, YARD_MAX_X, GATE_X, BUCHT_Z, WEIGH_X, WEIGH_Z } from "../src/world/yard";
 import { alleHindernisse } from "../src/world/obstacles";
 import { BAGGER_STAND, VERLADE_STAND, SCHWENK_AUSSEN } from "../src/world/baggerstand";
@@ -33,25 +33,50 @@ function dateien(ordner: string): string[] {
   });
 }
 
-describe("Der Firmenname (E-131)", () => {
-  it("heisst Pripada.de", () => {
-    expect(FIRMA).toBe("Pripada.de");
+/*
+ * E-173 — Patrick, 20.10.2026: „Nenn das Spiel wieder Rost&Reibach. Auch die
+ * Werbetafeln entsprechend umbenennen." Auf Nachfrage: Auf dem Platz wird
+ * ALLES Rost & Reibach, Pripada verschwindet aus dem Spiel (Anbieter im Store
+ * bleibt die Pripada GmbH — das steht auf den Rechtsseiten, nicht im Spiel).
+ */
+describe("Der Spielname (E-131, E-173)", () => {
+  it("heisst Rost & Reibach", () => {
+    expect(FIRMA).toBe("Rost & Reibach");
   });
 
-  it("kein Text im Spiel nennt noch Rust’n’Reibach", () => {
+  /*
+   * Noch offen: Ausleger und Bordinstrument schreiben „PRIPADA" — das ist der
+   * Bagger-Bereich (`src/excavator/`), bestellt über den Orchestrator. Steht
+   * dort kein Pripada mehr, meldet der Test, dass die Ausnahme weg kann.
+   */
+  const NOCH_OFFEN = ["src/excavator/excavator.ts", "src/excavator/instruments.ts"].map((p) => join(wurzel, p));
+
+  it("kein Text im Spiel nennt noch Pripada oder Rust’n’Reibach", () => {
     // Zeichenketten in Anfuehrungszeichen — Kommentare duerfen die Geschichte erzaehlen
-    const zeichenkette = /["'`][^"'`\n]*(Reibach|RUSTN)[^"'`\n]*["'`]/;
+    const zeichenkette = /["'`][^"'`\n]*(Pripada|PRIPADA|RUSTN|Rust’n)[^"'`\n]*["'`]/;
     const treffer: string[] = [];
     for (const p of [...dateien(join(wurzel, "src")), join(wurzel, "index.html")]) {
       const text = readFileSync(p, "utf8");
       const ohneKommentare = p.endsWith(".html")
         ? text.replace(/<!--[\s\S]*?-->/g, "")
         : text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-      if (p.endsWith(".html") ? /Reibach|RUSTN/.test(ohneKommentare) : zeichenkette.test(ohneKommentare)) {
+      if (p.endsWith(".html") ? /Pripada|PRIPADA|RUSTN/.test(ohneKommentare) : zeichenkette.test(ohneKommentare)) {
         treffer.push(p);
       }
     }
-    expect(treffer).toEqual([]);
+    expect(treffer.filter((p) => !NOCH_OFFEN.includes(p))).toEqual([]);
+    for (const p of NOCH_OFFEN) expect(treffer, `${p} ist sauber — Ausnahme streichen`).toContain(p);
+  });
+
+  it("Titel, Manifest und App-Name heissen Rost & Reibach, unter dem Symbol ohne Leerzeichen", () => {
+    expect(readFileSync(join(wurzel, "index.html"), "utf8")).toContain("<title>Rost &amp; Reibach</title>");
+    const manifest = JSON.parse(readFileSync(join(wurzel, "public/manifest.webmanifest"), "utf8"));
+    expect(manifest.name).toBe(FIRMA);
+    expect(manifest.short_name).toBe(FIRMA_KURZ);
+    expect(JSON.parse(readFileSync(join(wurzel, "capacitor.config.json"), "utf8")).appName).toBe(FIRMA);
+    const plist = readFileSync(join(wurzel, "ios/App/App/Info.plist"), "utf8");
+    expect(plist).toMatch(/<key>CFBundleDisplayName<\/key>\s*<string>Rost&amp;Reibach<\/string>/);
+    expect(FIRMA_KURZ.length).toBeLessThanOrEqual(12);
   });
 
   it("das Hauptmenue holt den Namen von derselben Stelle", () => {
@@ -75,7 +100,7 @@ describe("Die Schilder stehen niemandem im Weg (E-131)", () => {
     ];
   };
 
-  it("mehr als die eine Firmentafel, und Pripada.de ist mehrfach dabei", () => {
+  it("mehr als die eine Firmentafel, und der Name ist mehrfach dabei", () => {
     expect(schilder.length).toBeGreaterThanOrEqual(6);
     expect(schilder.filter((s) => s.bild.name === FIRMA).length).toBeGreaterThanOrEqual(3);
   });
@@ -174,7 +199,7 @@ describe("Echte Firmen statt erfundener (E-133)", () => {
    * E-143 — Patrick, 17.10.2026: „nimm rent4ring und ledprofi raus. Mach nur
    * pripada.de rein", auf Nachfrage glasklar-mg.de ebenso.
    */
-  it("jede Tafel zeigt Pripada.de, keine fremde Firma (E-143)", () => {
+  it("jede Tafel zeigt den eigenen Namen, keine fremde Firma (E-143)", () => {
     expect(schilder.length).toBeGreaterThan(0);
     for (const s of schilder) expect(s.bild.name, s.name).toBe(FIRMA);
     const texte = schilder.flatMap((s) => [s.bild.name, ...s.bild.zeilen]).join(" | ");
@@ -185,12 +210,12 @@ describe("Echte Firmen statt erfundener (E-133)", () => {
     expect(existsSync(join(wurzel, "public/logos"))).toBe(false);
   });
 
-  it("Pripada steht höchstens 10 m von der Waage", () => {
+  it("der Name steht höchstens 10 m von der Waage", () => {
     const naechste = Math.min(...pripada.map((s) => Math.hypot(s.x - WEIGH_X, s.z - WEIGH_Z)));
     expect(naechste).toBeLessThanOrEqual(10);
   });
 
-  it("Pripada steht höchstens 20 m vom Abladeplatz-Halt", () => {
+  it("der Name steht höchstens 20 m vom Abladeplatz-Halt", () => {
     const [hx, hz] = alleAbholPlaetze()[0]!.halt;
     const naechste = Math.min(...pripada.map((s) => Math.hypot(s.x - hx, s.z - hz)));
     expect(naechste).toBeLessThanOrEqual(20);
@@ -198,7 +223,7 @@ describe("Echte Firmen statt erfundener (E-133)", () => {
 
   it("die Dachtafel steht auf dem Büro, ihre Unterkante über dem First", () => {
     const dach = schilder.filter((s) => (s.fuss ?? 0) > 0);
-    expect(dach.map((s) => s.name)).toEqual(["Pripada, Dach Büro an der Waage"]);
+    expect(dach.map((s) => s.name)).toEqual(["Tafel, Dach Büro an der Waage"]);
     const s = dach[0]!;
     const [ox, oz, ohw, ohd] = officeFootprints()[0]!;
     expect(Math.abs(s.x - ox)).toBeLessThan(ohw);
@@ -214,9 +239,9 @@ describe("Echte Firmen statt erfundener (E-133)", () => {
     expect(s.fuss!).toBeLessThan(6.2 + 1.7);
   });
 
-  it("Pripada auch hinter der Bucht, über deren Rückwand", () => {
+  it("der Name auch hinter der Bucht, über deren Rückwand", () => {
     const bucht = pripada.find((s) => s.z < BUCHT_Z);
-    expect(bucht, "keine Pripada-Tafel hinter der Bucht").toBeDefined();
+    expect(bucht, "keine Tafel hinter der Bucht").toBeDefined();
     expect(bucht!.y - bucht!.h / 2).toBeGreaterThan(4.8); // SUED_HOCH
   });
 });
