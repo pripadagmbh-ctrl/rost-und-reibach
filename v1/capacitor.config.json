@@ -6,6 +6,10 @@
     "allowMixedContent": false,
     "backgroundColor": "#1a1c1e"
   },
+  "ios": {
+    "backgroundColor": "#1a1c1e",
+    "scrollEnabled": false
+  },
   "server": {
     "androidScheme": "https"
   }

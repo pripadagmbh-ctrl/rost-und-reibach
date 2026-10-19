@@ -1,0 +1,159 @@
+name: iOS-App bauen
+
+# E-161 — iOS ohne eigenen Mac. Anleitung: docs/11_iOS_Veroeffentlichung.md
+#
+# Job 1 "simulator": baut v1 als iOS-App fuer den Simulator, OHNE Signatur.
+#   Beweis, dass alles kompiliert. Braucht kein Apple-Konto.
+# Job 2 "testflight": baut, signiert und laedt nach TestFlight hoch. Laeuft
+#   nur, wenn alle vier Secrets eingetragen sind; sonst wird er uebersprungen
+#   (grau, kein Fehler).
+#
+# Ausloeser: von Hand (Actions → "iOS-App bauen" → Run workflow) oder ein Push
+# auf einen Branch "ios/...". Bewusst NICHT bei Push auf main: der
+# Pages-Deploy (deploy.yml) bleibt davon unberuehrt.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["ios/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Die Fassung, die im App Store steht. Fuer jedes Update im Store erhoehen
+  # (1.0 → 1.1). Die Buildnummer zaehlt von selbst: Laufnummer.Versuch.
+  APP_VERSION: "1.0"
+  BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+
+jobs:
+  simulator:
+    # Capacitor 8 verlangt Xcode 26; seit April 2026 nimmt Apple nur noch
+    # Uploads mit dem iOS-26-SDK an. Beides liefert das macOS-26-Abbild.
+    runs-on: macos-26
+    outputs:
+      asc: ${{ steps.secrets.outputs.asc }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Xcode-Fassung
+        run: xcodebuild -version
+      - name: v1 — Abhaengigkeiten
+        working-directory: v1
+        run: npm ci
+      - name: v1 — Bauen
+        working-directory: v1
+        run: npm run build
+      - name: Spiel in das iOS-Projekt kopieren (cap sync)
+        working-directory: v1
+        run: npx cap sync ios
+      - name: Fuer den Simulator bauen (ohne Signatur)
+        working-directory: v1/ios/App
+        run: |
+          xcodebuild build \
+            -project App.xcodeproj -scheme App -configuration Release \
+            -sdk iphonesimulator -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            MARKETING_VERSION="$APP_VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Sind die Apple-Secrets eingetragen?
+        id: secrets
+        env:
+          A: ${{ secrets.ASC_KEY_ID }}
+          B: ${{ secrets.ASC_ISSUER_ID }}
+          C: ${{ secrets.ASC_KEY_P8 }}
+          D: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$A" ] && [ -n "$B" ] && [ -n "$C" ] && [ -n "$D" ]; then
+            echo "asc=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "asc=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::TestFlight uebersprungen: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 und APPLE_TEAM_ID fehlen (siehe docs/11_iOS_Veroeffentlichung.md)."
+          fi
+
+  testflight:
+    needs: simulator
+    if: needs.simulator.outputs.asc == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: v1 — Abhaengigkeiten, Bauen, cap sync
+        working-directory: v1
+        run: |
+          npm ci
+          npm run build
+          npx cap sync ios
+      - name: API-Schluessel ablegen
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/AuthKey.p8"
+      # Automatische Signatur mit dem App-Store-Connect-API-Schluessel: Xcode
+      # holt Zertifikat und Profil selbst bei Apple ("Cloud Signing"). Kein
+      # Mac, kein Schluesselbund, keine Zertifikatsdatei noetig.
+      # ponytail: jeder frische Runner kann ein neues "Apple Development"-
+      # Zertifikat anlegen. Meldet Apple ein Limit: alte unter
+      # developer.apple.com → Certificates widerrufen, oder auf fastlane match
+      # umsteigen.
+      - name: Archiv bauen und signieren
+        working-directory: v1/ios/App
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcodebuild archive \
+            -project App.xcodeproj -scheme App -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="$APP_VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+      # destination=upload: xcodebuild signiert fuer den Store und laedt
+      # direkt zu App Store Connect hoch — kein altool, kein fastlane.
+      - name: Exportieren und zu TestFlight hochladen
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "::notice::Build $APP_VERSION ($BUILD_NUMBER) hochgeladen. In App Store Connect → TestFlight erscheint er nach 5–30 Minuten Verarbeitung."
+      - name: Schluessel loeschen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"

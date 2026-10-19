@@ -14,13 +14,18 @@
     "icons": "node ../tools/make-icons.mjs",
     "android:add": "npm run build && npx cap add android",
     "android:sync": "npm run build && npx cap sync android",
-    "android:open": "npx cap open android"
+    "android:open": "npx cap open android",
+    "ios:sync": "npm run build && npx cap sync ios",
+    "ios:bilder": "node tools/ios-bilder.mjs"
   },
   "dependencies": {
+    "@capacitor/core": "8.5.2",
+    "@capacitor/ios": "8.5.2",
     "@dimforge/rapier3d-compat": "^0.14.0",
     "three": "^0.169.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.5.2",
     "@types/node": "^22.20.2",
     "@types/three": "^0.169.0",
     "typescript": "~5.6.2",

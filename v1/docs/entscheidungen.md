@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-161 | 19.10.2026 | iOS-App ohne Mac: Capacitor 8, Cloud-Bau, TestFlight vorbereitet | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-160 | 19.10.2026 | Ein Wrack, das aufschlägt, klingt — auch ohne Knautschen | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-159 | 18.10.2026 | Feste Tonhöhe, Blech statt Dose, Schichtung, AAC, Hörparcours | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
 | E-158 | 18.10.2026 | Nichts versinkt mehr im Boden: gehaltene und gedrückte Wracks bleiben oben | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -174,6 +175,15 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-161 — iOS-App** (erst über TestFlight, nach dem Apple-Konto; iPad, dann iPhone mini)
+- Icon auf dem Home-Bildschirm ohne Rand, Name ganz lesbar?
+- Start: dunkles Startbild mit Icon, kein weißer Blitz?
+- Drehen: bleibt im Querformat, beide Richtungen, keine Statusleiste?
+- Flugmodus, App neu starten: läuft alles samt Ton?
+- Stummschalter umlegen: was passiert mit dem Ton? (Frage: „ambient“ empfohlen)
+- App schließen und neu öffnen: Spielstand noch da?
+- Frage: Name unter dem Icon „Schrottplatz“ (Vorschlag) oder „Pripada Schrottplatz“ (wird abgeschnitten)?
 
 **E-160 — Wrack-Aufschlag klingt** (iPad-Lautsprecher, nach Einbau in main.ts)
 - Auto 1–2 m heben und loslassen: ein schwerer Blechschlag wie eine Autotür, keine Coladose, kein Rattern?
