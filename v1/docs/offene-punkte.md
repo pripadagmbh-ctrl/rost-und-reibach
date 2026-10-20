@@ -570,6 +570,11 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 33a | Abholer bestellbar für jede Sorte und für Müll |
       | 33b | Mit m³-Angabe: mal Absetzkipper, mal großer Container |
 
+      Antworten 20.10. (nach Bildern): schräge Mauer Variante A (14°) bleibt;
+      Quermauer 2,4 m bleibt; **Rad mit Felge zählt als Reifen** (Ausnahme zur
+      95-%-Regel, gilt für lose Räder und Räder vom Wrack); Motorhaube bleibt
+      Mischschrott; Abholer kommt nur auf ABHOLEN, nicht von selbst.
+
 - [ ] **Ansage 20.10.2026, Anlieferung und Abholer** — Patrick, wörtlich:
       „Anlieferung sortenrein direkt zu den metallboxen die dafür gedacht
       waren, faher hupen und fnkspruch aus dem Büro. Abholer kommt immer zum
