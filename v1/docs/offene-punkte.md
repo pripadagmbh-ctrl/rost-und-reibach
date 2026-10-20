@@ -554,6 +554,16 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Korrektur 20.10.2026, Mauern** — Patrick, wörtlich: „die wände waren
+      anders gemeint, die ausbuchtungen sollen weiterhin da sein allerdings
+      sollen jeweils die aussenwände der ausbuchtung etwas angeschrägt sein,
+      sodass man beim schwenken nicht immer anschlägt" (betrifft E-182)
+
+      | # | Punkt |
+      |---|---|
+      | 24c | Ausbuchtungen bleiben wie vorher (E-182 zurücknehmen, soweit es sie verändert) |
+      | 24d | Außenwände jeder Ausbuchtung leicht angeschrägt, damit man beim Schwenken nicht anschlägt |
+
 - [ ] **Ansage 20.10.2026, Sorten und Abholer-Bestellung** — Patrick, wörtlich:
       „muldencontainer sind eher stahlschrott. Auch fehlt es an der balance
       zwischen misch und stahlschrott. Mischschrott ist häufiger.
