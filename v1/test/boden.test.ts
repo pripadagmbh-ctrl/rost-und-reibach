@@ -36,7 +36,7 @@ beforeAll(async () => {
 
 type Schritte = Array<[string[], number]>;
 
-function lauf(form: Greiferform, art: WrackArt, schritte: Schritte, ohne?: "boden" | "druck", haengt = false) {
+function lauf(form: Greiferform, art: WrackArt, schritte: Schritte, ohne?: "boden" | "druck" | "zu", haengt = false) {
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = DT;
   // dieselben Kontaktwerte wie im Spiel (`physicsWorld.ts`)
@@ -58,6 +58,7 @@ function lauf(form: Greiferform, art: WrackArt, schritte: Schritte, ohne?: "bode
   grip.ferroAnteil = (x) => ferroAnteilVon(x, items, comps.cars);
   if (ohne === "boden") b.greifsystem = null; // Gegenprobe: ohne Sperre fuer gehaltene Teile
   if (ohne === "druck") (b as unknown as { collision: { drueckeInBoden(): null } }).collision.drueckeInBoden = () => null;
+  if (ohne === "zu") (b as unknown as { collision: { bodenTiefeBeruehrt(): number } }).collision.bodenTiefeBeruehrt = () => 0;
   const down = new Set<string>();
   const inp = {
     wheelDelta: 0,
@@ -126,6 +127,20 @@ const GREIFEN_ABSENKEN: Schritte = [
 ];
 /** Ein Wrack, das tiefer haengt als die Krallen, absenken — es setzt zuerst auf */
 const HAENGT_ABSENKEN: Schritte = [[["Space", "KeyF", "KeyG"], 240]];
+
+describe("E-188 — Zudruecken quetscht das LKW-Wrack nicht in den Boden", () => {
+  const ZU: Schritte = [[["KeyF", "KeyG"], 200], [["Space"], 120]];
+  it("LKW-Wrack (7 t) absenken und zudruecken: unter 15 cm im Beton (vorher 0,40 m)", () => {
+    // 0,10 m davon kommen vom Absenken (weicher Bodenkontakt unter 7 t), das Zudruecken legt kaum etwas drauf
+    const r = lauf(FUENFSCHALEN, "lkw", ZU);
+    expect(r.tiefste, "im Beton (m)").toBeLessThan(0.15);
+  }, 60_000);
+
+  it("Gegenprobe: ohne die Regel quetscht das Zudruecken es tief hinein", () => {
+    const r = lauf(FUENFSCHALEN, "lkw", ZU, "zu");
+    expect(r.tiefste).toBeGreaterThan(0.3);
+  }, 60_000);
+});
 
 describe("E-158 — nichts versinkt im Boden", () => {
   it("Auto vom Boden greifen und wieder absenken: < 5 cm im Beton", () => {

@@ -305,6 +305,16 @@ describe("Aufgabe 6: am echten Platz mit dem echten Bagger (Messung)", () => {
     let gR = zielR + 0.25;
     for (let i = 0; i < 3; i++) {
       stelleArm(k, gR, Math.max(k.b.grappleGroup.position.y, 4.8), jbs, ["Space"]);
+      /*
+       * G5: Erst auspendeln lassen, dann messen — sonst jagt die Korrektur
+       * dem Pendel nach (gemessen: 7,34 m bei Ziel 7,35, dann 6,80 und 8,12;
+       * das freie Pendel braucht rund 4 s, E-132). Liegt das Wrack ueber dem
+       * Kreis, nicht weiter nachziehen.
+       */
+      k.tasten.down.clear();
+      k.tasten.down.add("Space");
+      bis(k, () => false, 240, jbs);
+      if (Math.abs(zielR - d.wrackR()) < 0.25) break;
       gR += zielR - d.wrackR();
     }
     const gelenkUeberZiel = k.b.ausladungM;

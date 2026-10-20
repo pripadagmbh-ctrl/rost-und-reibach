@@ -557,7 +557,8 @@ export class ExcavatorCollision {
               for (let n = 0; n < m.numContacts(); n++) {
                 const d = m.contactDist(n);
                 if (d < PLOW_KONTAKT) liegt = true;
-                if (d < -EINSINK_M && vonOben > 0) ja = true; // nur wenn die Spinne von OBEN drueckt — seitlich ist Sache von `grappleSchiebtBrocken`
+                // nur wenn die Spinne von OBEN drueckt — seitlich ist Sache von `grappleSchiebtBrocken`
+                if (d < -EINSINK_M && vonOben > 0) ja = true;
               }
             });
           });
@@ -574,6 +575,39 @@ export class ExcavatorCollision {
       });
     }
     return wer;
+  }
+
+  /**
+   * E-188: Wie tief steckt das tiefste lose Teil, das die Spinne gerade
+   * beruehrt, in Festem (m)? Fuer das Zudruecken: Waechst die Tiefe, waehrend
+   * die Schalen schliessen, druecken sie es in den Boden. Rapier-Kontakte des
+   * letzten Schritts, nur gelesen (v2 E-044).
+   */
+  bodenTiefeBeruehrt(abKg = 0): number {
+    const g = this.ctx.grappleBody();
+    const world = this.ctx.world;
+    let tiefe = 0;
+    const geprueft = new Set<number>();
+    for (let i = 0; i < g.numColliders(); i++) {
+      const c = g.collider(i);
+      if (!c.isEnabled()) continue;
+      world.contactPairsWith(c, (o) => {
+        const b = o.parent();
+        if (!b || !b.isDynamic() || geprueft.has(b.handle) || this.ctx.grippedHandles.has(b.handle)) return;
+        geprueft.add(b.handle);
+        if (b.mass() < abKg) return;
+        for (let k = 0; k < b.numColliders(); k++) {
+          const bc = b.collider(k);
+          world.contactPairsWith(bc, (f) => {
+            if (!f.parent()?.isFixed()) return;
+            world.contactPair(bc, f, (m) => {
+              for (let n = 0; n < m.numContacts(); n++) tiefe = Math.max(tiefe, -m.contactDist(n));
+            });
+          });
+        }
+      });
+    }
+    return tiefe;
   }
 
   /** Spinne gegen Mauern, Mulden und Schere. */

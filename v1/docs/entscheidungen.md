@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-188 | 20.10.2026 | Überlast einmal je Versuch, LKW-Wrack sinkt beim Zudrücken nicht, Schleppen unter Überlast | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-189 | 20.10.2026 | Bucht wie vorher, Ecken angeschrägt: kein Anschlag beim Schwenken | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-187 | 20.10.2026 | Hämmern mit der Spinne knautscht das Wrack, halb so stark wie ein Biss | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-186 | 20.10.2026 | Ein Rad zählt als Reifen, lose wie vom Wrack | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -193,6 +194,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-188 — Überlast einmal, Zudrücken, Schleppen**
+- Zu schweres Teil greifen, Heben gedrückt halten: Kommt „Zu schwer“ nur einmal?
+- Auf das LKW-Wrack drücken und zudrücken: Bleibt es auf dem Boden?
+- Unter Überlast schwenken: Schleppt die Maschine langsam — oder soll sie ganz stehen?
 
 **E-189 — Bucht-Ecken angeschrägt** (iPad)
 - Mit voller Ausladung hinter dir von links nach rechts schwenken, auch tief: schlägst du noch an einer Ecke der Bucht an?

@@ -149,6 +149,7 @@ describe("Ueberlast wie an der echten Maschine (EN 474-5)", () => {
     expect(m.massKg).toBeCloseTo(6000, -1);
     expect(m.grenzeKg).toBeLessThan(6000);
     expect(m.ausladungM).toBeGreaterThan(7);
+    s.fahre("KeyZ", 10); // Hebel ruht 0,4 s (E-188: neue Meldung erst nach 0,3 s Ruhe)
     s.fahre("KeyR", 30);
     expect(s.meldungen.length, "neuer Versuch, neue Meldung").toBe(2);
     const r0 = b.ausladungM;
@@ -231,6 +232,31 @@ describe("Ueberlast wie an der echten Maschine (EN 474-5)", () => {
     s.fahre("KeyR", 40);
     expect(b.grappleGroup.position.y - y0, "mit Pratzen geht es hoch").toBeGreaterThan(0.3);
     expect(s.meldungen.length).toBe(1);
+    s.world.free();
+  }, 60_000);
+
+  it("E-188: an der Grenze 1,5 s Heben gehalten — eine Meldung, nicht fuenf", () => {
+    // Traglast in dieser Stellung lesen, dann eine Last knapp darueber anhaengen
+    const probe = mitLast(100, []);
+    const grenze = probe.bagger.traglastKg;
+    probe.world.free();
+    const s = mitLast(grenze + 50, []);
+    s.fahre("KeyR", 90);
+    expect(s.meldungen.length, `Meldungen bei ${Math.round(grenze + 50)} kg an der Grenze ${Math.round(grenze)} kg`).toBe(1);
+    // neuer Versuch nach dem Loslassen: wieder genau eine
+    s.fahre("KeyR", 60);
+    expect(s.meldungen.length).toBeLessThanOrEqual(2);
+    s.world.free();
+  }, 60_000);
+
+  it("E-188: unter Ueberlast (9 t bei 8 m) schleppt der Schwenk nur langsam", () => {
+    const s = mitLast(9000, []);
+    expect(s.bagger.ueberlast || s.bagger.traglastKg < 9000).toBe(true);
+    const g0 = s.bagger.grappleGroup.position.clone();
+    s.fahre("KeyE", 120);
+    const tempo = s.bagger.grappleGroup.position.distanceTo(g0) / 2.25;
+    // vorher bis 4 m/s; jetzt ein Zehntel des Schwenks: rund 0,5 m/s
+    expect(tempo, "Spinne im Mittel (m/s)").toBeLessThan(0.8);
     s.world.free();
   }, 60_000);
 

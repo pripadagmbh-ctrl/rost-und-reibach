@@ -472,8 +472,22 @@ const EINDRING_HALT_S = 0.35;
  * durch den Boden (gemessen: 210-kg-Teil 0,20 m unter dem Beton).
  */
 const MAGNET_AUFLAGE_M = 0.03;
+/** E-188: Ab dieser Tiefe eines beruehrten Teils im Boden (m) prueft das Zudruecken, ob es weiter sinkt. SW, wie `EINSINK_M` (E-158) */
+const ZU_EINSINK_M = 0.03;
+/** E-188: So viel tiefer je Bild (m) heisst „sinkt beim Zudruecken weiter". SW: ueber dem Zittern eines aufliegenden Teils */
+const ZU_SINKT_M = 0.002;
+/** E-188: Ab dieser Masse (kg) zaehlt ein beruehrtes Teil — dieselbe Grenze wie die Brocken-Sperre (`EINDRING_SCHWER_KG`) */
+const SCHWER_AUFLIEGEND_KG = 350;
 /** E-152: Ab dieser Winkelaenderung (rad je Bild) gilt Heben/Ausfahren als versucht — Rechenrauschen darunter */
 const UEBERLAST_TOT_RAD = 1e-6;
+/** E-188: So lange (s) muss der Hebel fuer Heben/Ausfahren ruhen, bis eine neue Ueberlast-Meldung kommt. SW: laenger als ein Zucken, kuerzer als ein bewusster neuer Versuch */
+const UEBERLAST_RUHE_S = 0.3;
+/**
+ * E-188: Schwenk- und Fahrtempo unter Ueberlast (Anteil). SW 0,1: Die Last
+ * wird geschleppt, nicht geschleudert — 33 °/s werden 3,3 °/s, an der Spitze
+ * rund 0,5 m/s. Frage an Patrick, ob es ganz stehen soll.
+ */
+const UEBERLAST_SCHLEPP = 0.1;
 /** Wie weit die Schalen beim Anschlag zurueckfedern (rad) */
 const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
 /** Wie lange der Rueckprall nachschwingt (s) */
@@ -926,6 +940,8 @@ export class Excavator {
   ueberlast = false;
   onUeberlast: ((e: GameEvents["greifer:ueberlast"]) => void) | null = null;
   private ueberlastGemeldet = false;
+  /** E-188: Wie lange Heben/Ausfahren nicht befohlen wurde (s) */
+  private ueberlastRuheS = 0;
   /**
    * E-157: JEDES ANSCHLAGEN KLINGT. Patrick, 18.10.2026: „anschlagen soll immer
    * geräusche erzeugen, also auto vor schere oder wand" und „greifer vor lkw
@@ -965,6 +981,10 @@ export class Excavator {
     this.onAnschlag?.({ tempoMs: tempo, traegt, koerper: a.koerper, label: a.label, x: a.punkt.x, y: a.punkt.y, z: a.punkt.z });
   }
 
+  /** E-188: Bodentiefe des beruehrten Teils im letzten Bild — fuer das Zudruecken */
+  private zuBodenTiefeAlt = 0;
+  /** E-188: Schalen-Kollider aus, weil Zudruecken ein Teil in den Boden drueckte — bis der Hebel ruht */
+  private zuKrallenAus = false;
   /** E-146: Ist der Lasthebemagnet eingeschaltet? */
   magnetAn = false;
   /** E-146: Magnet ein- bzw. ausgeschaltet — main legt es auf den Bus (`magnet:an`, `magnet:aus`). */
@@ -1933,7 +1953,7 @@ export class Excavator {
    * abgeschaltet: die Last hängt am Gelenk und würde sonst herausgequetscht.
    */
   private updateClawColliders(): void {
-    const carrying = this.carriedCount > 0 || this.clawGraceS > 0;
+    const carrying = this.carriedCount > 0 || this.clawGraceS > 0 || this.zuKrallenAus;
     for (let c = 0; c < this.form.schalen; c++) {
       const a = (c / this.form.schalen) * Math.PI * 2;
       // Jede Kralle mit ihrem eigenen Winkel — sonst stuenden die Kollider
@@ -2057,7 +2077,15 @@ export class Excavator {
     this.blockedByOutriggers =
       this.outriggerDown > 0.15 && (wantsDrive !== 0 || rawSteer !== 0);
     const locked = this.outriggerDown > 0.15;
-    const driveTarget = (locked ? 0 : wantsDrive) * DRIVE_MAX;
+    /*
+     * E-188: Unter Ueberlast schleppt die Maschine die Last nur langsam mit.
+     * Gemessen schleifte ein 7-t-Wrack, das sie nicht heben kann, beim
+     * Schwenken mit 1,5–4 m/s ueber den Boden — eine echte 20–25-t-Maschine
+     * bringt am 8-m-Hebel nicht die Kraft auf, 7 t mit Reibung ueber Beton zu
+     * ziehen. `UEBERLAST_SCHLEPP` (SW) gilt fuer Schwenken und Fahren.
+     */
+    const schlepp = this.ueberlast ? UEBERLAST_SCHLEPP : 1;
+    const driveTarget = (locked ? 0 : wantsDrive) * DRIVE_MAX * schlepp;
     this.driveVel = ramp(this.driveVel, driveTarget, (DRIVE_MAX / DRIVE_RAMP_TIME) * dt);
     const steer = locked ? 0 : rawSteer;
     if (Math.abs(this.driveVel) > 0.05 || steer !== 0) {
@@ -2107,7 +2135,7 @@ export class Excavator {
     this.inCab = clamp1(axis2(input, "KeyE", "KeyQ", "ArrowRight", "ArrowLeft") + (t?.cab ?? 0));
     this.inBoom = clamp1(axis2(input, "KeyF", "KeyR", "PageDown", "PageUp") + (t?.boom ?? 0));
     this.inStick = clamp1(axis2(input, "KeyG", "KeyT", "ArrowDown", "ArrowUp") + (t?.stick ?? 0));
-    const cabTarget = this.inCab * CAB_MAX * loadFactor;
+    const cabTarget = this.inCab * CAB_MAX * loadFactor * schlepp;
     this.cabVel = ramp(this.cabVel, cabTarget, (CAB_MAX / rampe) * dt);
     this.cabYaw += this.cabVel * dt;
 
@@ -2168,6 +2196,26 @@ export class Excavator {
     }
     const closureVorher = this.closure;
     this.closure = THREE.MathUtils.clamp(this.closure + closeRate, 0, 1);
+    /*
+     * E-188: Zudruecken darf ein Teil nicht in den Boden druecken. Gemessen:
+     * Das LKW-Wrack (7 t, hohler Rumpf) sank beim Zudruecken 0,31 m in 20
+     * Bildern in den Beton — die Schalen-Kollider fassten durch die
+     * Rumpfwaende, und der Loeser schob den Rumpf vor ihnen her nach unten.
+     *
+     * Sinkt ein beruehrtes Teil ab `SCHWER_AUFLIEGEND_KG` beim Zudruecken weiter
+     * in den Boden (ueber `ZU_EINSINK_M`), schalten die Schalen-Kollider ab,
+     * solange zugedrueckt wird — wie beim Loslassen (`clawGraceS`). Die Schalen
+     * schliessen weiter, das Greifsystem greift wie immer (es fragt die Form,
+     * nicht die Kollider), und der Boden schiebt das Teil zurueck.
+     *
+     * Verworfen, gemessen: die Schalen ANHALTEN. Das kostete Griffe (Pkw 1,4 m
+     * daneben, Wohnwagen 0 statt 3 von 3) bzw., auf schwere Teile begrenzt, den
+     * ausgeschlachteten LKW-Rumpf in Aufgabe 6.
+     */
+    const bodenTiefe = this.grippedHandles.size === 0 ? this.collision.bodenTiefeBeruehrt(SCHWER_AUFLIEGEND_KG) : 0;
+    if (closeRate > 0 && bodenTiefe > ZU_EINSINK_M && bodenTiefe > this.zuBodenTiefeAlt + ZU_SINKT_M) this.zuKrallenAus = true;
+    if (closeRate <= 0 || this.grippedHandles.size > 0) this.zuKrallenAus = false;
+    this.zuBodenTiefeAlt = bodenTiefe;
     /*
      * Zuschnappen: Wenn die Zaehne aufeinandertreffen, klingt das metallisch —
      * am deutlichsten, wenn nichts dazwischen ist (Wunsch 11.09.2026). Der
@@ -3431,6 +3479,16 @@ export class Excavator {
    */
   private ueberlastSperre(prevBoom: number, prevStick: number, prevPos: THREE.Vector3, traegt: boolean): void {
     const last = this.carriedMassKg;
+    /*
+     * E-188: „Einmal je Versuch" haengt am HEBEL, nicht an der Sperre. An der
+     * Grenze kippt die Sperre von Bild zu Bild (Heben zieht die Last etwas
+     * heran, dann passt sie wieder) — gemessen kamen beim Halten 5 Meldungen
+     * in 1,5 s. Neu gemeldet wird erst, wenn Heben und Ausfahren
+     * `UEBERLAST_RUHE_S` lang nicht befohlen wurden, oder die Last weg ist.
+     */
+    const versuch = this.inBoom > 0 || this.inStick > 0;
+    this.ueberlastRuheS = versuch ? 0 : this.ueberlastRuheS + 1 / 60;
+    if (this.ueberlastRuheS >= UEBERLAST_RUHE_S) this.ueberlastGemeldet = false;
     if (!traegt || last <= 0) {
       this.ueberlast = false;
       this.ueberlastGemeldet = false;
@@ -3446,10 +3504,7 @@ export class Excavator {
      */
     const hebt = this.boomAngle > prevBoom + UEBERLAST_TOT_RAD;
     const aus = this.stickAngle > prevStick + UEBERLAST_TOT_RAD;
-    if (!this.ueberlast || (!hebt && !aus)) {
-      this.ueberlastGemeldet = false;
-      return;
-    }
+    if (!this.ueberlast || (!hebt && !aus)) return;
     const h = this.halt;
     const rAlt = Math.hypot(h.gPos.x - prevPos.x, h.gPos.z - prevPos.z);
     if (hebt) {
