@@ -564,6 +564,11 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 24c | Ausbuchtungen bleiben wie vorher (E-182 zurücknehmen, soweit es sie verändert) |
       | 24d | Außenwände jeder Ausbuchtung leicht angeschrägt, damit man beim Schwenken nicht anschlägt |
 
+      Antworten 20.10.: „Alles wie vorher + angeschrägt" (Ausbuchtungen in
+      alter Größe, E-182 zurück, Außenwände angeschrägt; MÜLL-Platz E-183 bleibt).
+      Aufgaben: Karte klappt auf kleinen Bildschirmen zusammen; Späne in der
+      Magnet-Aufgabe gehören in die Mischhalde; Hämmern soll auch knautschen.
+
 - [ ] **Ansage 20.10.2026, Sorten und Abholer-Bestellung** — Patrick, wörtlich:
       „muldencontainer sind eher stahlschrott. Auch fehlt es an der balance
       zwischen misch und stahlschrott. Mischschrott ist häufiger.
