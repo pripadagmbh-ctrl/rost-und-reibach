@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-187 | 20.10.2026 | Hämmern mit der Spinne knautscht das Wrack, halb so stark wie ein Biss | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-186 | 20.10.2026 | Ein Rad zählt als Reifen, lose wie vom Wrack | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-185 | 20.10.2026 | Zerlegen in Reihenfolge: Haube, Batterie, Kühler, Motorblock; Felgen, Sitze | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-184 | 20.10.2026 | Grüne Rost-&-Reibach-Mulden hebbar, Absetzkipper-Mulde übergeben | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -216,6 +217,10 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Quermauer Misch/Stahl gerade, 2,4 m: kommst du mit der Spinne bequem drüber?
 - Schräge Mauer: endet sie an der Presse so, wie gemeint? Frage: Variante A (gebaut, 14°) oder B (33°, Mischschrott hinten breiter) — Bilder im Bericht.
 - Kipper abladen lassen: bleibt der Haufen vor der Mauer, rutscht nichts in den Stahlschrott?
+
+**E-187 — Hämmern knautscht** (iPad)
+- Mit offener Spinne aufs Dach hauen: gibt es nach und knirscht es, etwa halb so viel wie Zudrücken?
+- Auf die Haube hauen: vorn mehr als hinten? Auf Beton hauen: nichts am Auto?
 
 **E-186 — Rad zählt als Reifen** (iPad)
 - Loses Rad greifen: steht „Reifen“ an, gehört es in die MÜLL-Mulde?

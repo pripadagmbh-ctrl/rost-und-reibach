@@ -233,6 +233,13 @@ const KNAUTSCH_RADIUS = 1.5;
 const KNAUTSCH_GRUND = 0.6;
 
 /**
+ * Ein voller Spinnen-Schlag (`wucht` 1, E-187) als Aufprall-Δv: knautscht
+ * halb so weit wie ein voller Biss — min(0,2; 0,035 · dv) = 0,10 m statt
+ * 0,20 m. // SW (Auftrag: „ein voller Schlag ≈ halber Biss")
+ */
+const SCHLAG_DV_VOLL = 0.1 / 0.035;
+
+/**
  * Wie lange ein Schalenkontakt als Druckstelle gilt, in Physikschritten.
  *
  * Der Biss kommt 0,7 s nach Beginn des Zudrueckens (`DRUCK_S` am Bagger). Hat
@@ -1802,6 +1809,20 @@ export class CarComposite {
    *    liegt (`findPartNear`, wie bisher) — rohe Gewalt als Sortierung
    *    (E-114).
    */
+  /**
+   * HÄMMERN KNAUTSCHT (E-187, Patrick 20.10.2026: „Hämmern knautscht auch";
+   * schon E-137: „Hämmern und drücken soll und muss mit der Spinne möglich
+   * sein"). Ein Schlag der Spinne auf das Wrack knautscht es dort, wo sie
+   * trifft — dieselbe Rechnung wie der Biss (`knautschen`), nur schwächer:
+   * ein voller Schlag (`wucht` 1) ist ein halber voller Biss (Weg 0,10 statt
+   * 0,20 m). Kein Abreißen, keine Scheiben, kein Stoß — nur Blech.
+   * Gehaltene oder verladene Wracks (kinematisch) bleiben, wie sie sind.
+   */
+  schlag(wucht: number, punkt: { x: number; y: number; z: number }): void {
+    if (!this.knautsch || !(wucht > 0) || this.body.isKinematic()) return;
+    this.knautschen(this.lokal(punkt), Math.min(1, wucht) * SCHLAG_DV_VOLL);
+  }
+
   private beissenHohl(dv: number, at: THREE.Vector3): void {
     const herd = this.druckort(at);
     if (dv > 3) this.knautschen(herd, dv);
@@ -1996,6 +2017,11 @@ export class CompositeManager {
       if (t) return t;
     }
     return null;
+  }
+
+  /** Ein Spinnen-Schlag auf den Körper `handle` (E-187) — trifft er ein Wrack, knautscht es. */
+  schlag(handle: number, wucht: number, punkt: { x: number; y: number; z: number }): void {
+    this.cars.find((c) => c.body.handle === handle)?.schlag(wucht, punkt);
   }
 
   /** Griff-Info für ein gesperrtes Teil unter der Spinne (E-185), sonst null. */
