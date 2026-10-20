@@ -814,8 +814,10 @@ async function main(): Promise<void> {
     h === null
       ? stahlGrund(p.x, p.y, p.z) ? "stahl" : "beton"
       : composites.cars.some((c) => c.body.handle === h) ? "wrack" : "schrott";
-  excavator.onSpinneAufschlag = (wucht, h, p) =>
+  excavator.onSpinneAufschlag = (wucht, h, p) => {
     bus.emit("spinne:aufschlag", { wucht, untergrund: spinnenGrund(h, p), x: p.x, y: p.y, z: p.z });
+    if (h !== null) composites.schlag(h, wucht, p); // E-187: Haemmern knautscht
+  };
   excavator.onSpinneDruecken = (staerke, h, p) =>
     bus.emit("spinne:druecken", { staerke, untergrund: spinnenGrund(h, p), x: p.x, y: p.y, z: p.z });
   // E-157: Jedes Anschlagen klingt — gehaltene Last als Schrott-Aufprall, die leere Spinne als Spinnen-Schlag
@@ -825,6 +827,8 @@ async function main(): Promise<void> {
       istSchrott: (h) => items.items.some((i) => i.body.handle === h),
       stahlPunkt: stahlGrund,
     });
+    // E-187: Anschlagen an ein Wrack knautscht es (leer wie mit Last)
+    if (e.koerper) composites.schlag(e.koerper.handle, Math.min(e.tempoMs / SPINNE_WUCHT_VOLL_MS, 1), e);
     if (!e.traegt) {
       bus.emit("spinne:aufschlag", { wucht: Math.min(e.tempoMs / SPINNE_WUCHT_VOLL_MS, 1), untergrund, x: e.x, y: e.y, z: e.z });
       return;
