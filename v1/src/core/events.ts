@@ -8,6 +8,14 @@ import type { ControlFunction } from "./controlConfig";
  * kein Modul greift in ein anderes hinein.
  */
 export interface GameEvents {
+  /**
+   * Der Fuhrpark sagt etwas (E-177/E-178): Buero-Funk zu jeder Fuhre, Abholer
+   * bestellt, steht bereit, faehrt nach, faehrt los. `text` ist deutsch; das HUD
+   * zeigt `t(text)`.
+   */
+  "fuhrpark:meldung": { text: string };
+  /** Ein Fahrer ist an seinem Halt angekommen und hupt (hoechstens alle 30 s, E-178). */
+  "fuhrpark:hupe": Record<string, never>;
   /** Ein Item ist in einen Container gefallen (per Zonen-Zählung erkannt) */
   itemEntered: { itemId: string; materialId: string; containerId: string; correct: boolean };
   /** Ein Item wurde aus einem Container entfernt (Nachsortieren) */

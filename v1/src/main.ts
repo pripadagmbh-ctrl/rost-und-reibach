@@ -71,7 +71,7 @@ import { weltQuellen } from "./challenges/quellen";
 import { installChallengeKarte } from "./ui/challengekarte";
 import { installGeisterdaumen } from "./ui/geisterdaumen";
 import { installZielmarke } from "./ui/zielmarke";
-import { onSprache } from "./ui/sprache";
+import { onSprache, sprache, t } from "./ui/sprache";
 import { Fahrkunst } from "./skills/fahrkunst";
 import { NACHSCHUB_FOLGE, nachschubMeldung, profilFuer } from "./delivery/nachschub";
 
@@ -627,6 +627,24 @@ async function main(): Promise<void> {
   const showPickup = (v: boolean): void => {
     pickupEl.classList.toggle("open", v);
     if (!v) return;
+    // E-177: Im Sandkasten jede Sorte und Muell, mit Fahrzeug und m³
+    if (!BETRIEB) {
+      pickupEl.querySelector(".sub")!.textContent = t("Wofür kommt der Abholer? Er hält beim Bagger und fährt ihm nach.");
+      pickupListEl.innerHTML = "";
+      for (const e of vehicles.abholListe()) {
+        const b = document.createElement("button");
+        b.innerHTML = `${e.titel}<span class="kg">${e.zeile}</span>`;
+        b.addEventListener("click", () => {
+          showPickup(false);
+          tutAbholer = true;
+          if (vehicles.requestPickup(e.order, e.aufbau) === "vorgemerkt") {
+            hud.toast("Abholer vorgemerkt — er kommt, sobald die Fuhre weg ist.");
+          }
+        });
+        pickupListEl.appendChild(b);
+      }
+      return;
+    }
     // Nur anbieten, was auch dasteht — mit der Menge, die bereitliegt
     const kg = new Map<string, number>();
     for (const it of items.items) {
@@ -700,7 +718,7 @@ async function main(): Promise<void> {
   excavator.onUeberlast = (e) => bus.emit("greifer:ueberlast", e);
   const tonnen = (kg: number): string => (kg / 1000).toFixed(1).replace(".", ",");
   bus.on("greifer:ueberlast", (e) =>
-    hud.toast(`Zu schwer: ${tonnen(e.massKg)} t – hier hebt die Maschine ${tonnen(e.grenzeKg)} t. ${e.abgestuetzt ? "Näher heranziehen." : "Näher heranziehen oder abstützen (O)."}`)
+    hud.toast(`Zu schwer: ${tonnen(e.massKg)} t – hier hebt die Maschine ${tonnen(e.grenzeKg)} t. ${e.abgestuetzt ? "Näher am Bagger greifen." : "Abstützen (O) und näher greifen."}`) // E-162 Nachtrag: eine Last am Boden laesst sich nicht heranziehen (Messung tools/schwere-last.ts)
   );
   /*
    * Aufschlaege: Der wichtigste Klang auf dem Platz. Ob es metallisch
@@ -925,6 +943,12 @@ async function main(): Promise<void> {
     audio.playGlass();
     particles.spawn(evPos.set(e.x, e.y, e.z), 14, 0xcfe8f2, 2.4, 1.6, 0.5);
   });
+  // E-185: Abriss am Wrack — Funken und Staub, beim Aufspringen der Haube weniger
+  bus.on("wrack:abriss", (e) => {
+    const n = e.art === "ab" ? 1 : 0.4;
+    particles.spawn(evPos.set(e.x, e.y, e.z), Math.round(10 * n), 0xffc060, 3.5, 1.8, 0.4);
+    particles.spawn(evPos.set(e.x, e.y, e.z), Math.round(12 * n), 0x9a8b74, 1.8, 1.3, 0.6);
+  });
   bus.on("crushed", (e) => {
     audio.playCrash(1);
     particles.spawn(evPos.set(e.x, e.y + 0.4, e.z), 12, 0x9a8b74, 2.2, 1.6, 0.7);
@@ -956,6 +980,11 @@ async function main(): Promise<void> {
     audio.playHupe();
     hud.toast("Der Fahrer hupt — Fahrspur ist blockiert!");
   };
+  // E-177/E-178: Buero-Funk, Abholer-Zeilen und Ankunftshupe ueber den Bus
+  vehicles.onMeldung = (text) => bus.emit("fuhrpark:meldung", { text });
+  vehicles.onAnkunftHupe = () => bus.emit("fuhrpark:hupe", {});
+  bus.on("fuhrpark:meldung", (e) => hud.toast(t(e.text)));
+  bus.on("fuhrpark:hupe", () => audio.playHupe());
   // Brückenwaage: voll rein, leer raus → Kunde bekommt sein Geld
   // --- Platz ausbauen: verdientes Geld bekommt eine Verwendung ---
   const ausbau = new UpgradeState();
@@ -1294,6 +1323,8 @@ async function main(): Promise<void> {
     // E-120: Der Abholer faehrt voll von selbst, und nichts verschwindet auf
     // einen Schlag — der Muellcontainer leert sich nachts nicht mehr.
     vehicles.vollFaehrtLos = true;
+    // E-177: Abholer kommt zum Bagger, faehrt nach, Absetzkipper oder Abroller nach Menge
+    vehicles.sandkastenAbholer = true;
     containers.nachtschichtAktiv = false;
     // E-131: Zum Start stehen schon Fuhren an, die erste rollt gleich los
     if (!challenge) vehicles.stelleAnstehendeAuf(ANSTEH_START_ANZAHL);
@@ -1525,21 +1556,16 @@ async function main(): Promise<void> {
     // Lambert und Ausbau gibt es nur im Betrieb (E-118); die Abholung seit
     // E-120 auch im Sandkasten — dort ohne Fraktionswahl, es gibt kein Geld.
     if (!challenge && (input.wasPressed("KeyV") || touch.consumePress("KeyV"))) {
-      if (vehicles.pickupTruck?.waitingForLoad) {
-        vehicles.requestPickup();
-        hud.toast("Container geht raus …");
+      const wagen = vehicles.pickupTruck;
+      if (wagen?.waitingForLoad || wagen?.setztUm) {
+        vehicles.requestPickup(); // „… fährt los." kommt über den Bus (E-177)
       } else if (vehicles.abholungVorgemerkt) {
         hud.toast("Die Abholung ist schon vorgemerkt und fährt als nächstes vor.");
-      } else if (BETRIEB) {
+      } else {
         // Auch bei belegtem Platz bestellbar: Die Abholung hat Vorrang und
         // wird vorgemerkt, statt an einem laufenden Anlieferer zu scheitern.
+        // Seit E-177 auch im Sandkasten, mit Sorte, Fahrzeug und m³.
         showPickup(true);
-      } else {
-        hud.toast(
-          vehicles.requestPickup(null) === "vorgemerkt"
-            ? "Abholer vorgemerkt — er kommt, sobald die Fuhre weg ist."
-            : "Abholer kommt leer — voll fährt er von selbst los."
-        );
       }
     }
     /*
@@ -1695,9 +1721,19 @@ async function main(): Promise<void> {
         hud.showTearing(tearing.name, tearing.progress01);
       } else if (excavator.closure < 0.3) {
         const part = composites.findPartNear(sensorPos);
+        // E-185: Was gesperrt ist, sagt, was zuerst ab muss
+        const gesperrt = part ? null : composites.sperrHinweis(sensorPos);
         if (part) {
           items.setHighlight(null);
           hud.showPartHint(part.name);
+        } else if (gesperrt) {
+          items.setHighlight(null);
+          const erst = gesperrt.erst.map((n) => t(n));
+          hud.showPartHint(
+            sprache() === "en"
+              ? `${t(gesperrt.name)} — remove ${erst.join(" and ")} first`
+              : `${gesperrt.name} — erst ${erst.join(" und ")} ab`
+          );
         } else {
           const target = items.findNearest(sensorPos, 1.2);
           items.setHighlight(target);

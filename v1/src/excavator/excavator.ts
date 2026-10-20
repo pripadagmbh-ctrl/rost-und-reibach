@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { FIRMA_KURZ } from "../world/werbung";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { findeBox, type Box } from "../world/boxen";
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -1753,7 +1754,7 @@ export class Excavator {
     this.cabLiftGroup.add(plate);
   }
 
-  /** „PRIPADA" in weißer Blockschrift auf beiden Auslegerflanken. */
+  /** Der Firmenname in weißer Blockschrift auf beiden Auslegerflanken (E-173). */
   private buildBoomLogo(): void {
     const canvas = document.createElement("canvas");
     canvas.width = 1024;
@@ -1765,7 +1766,10 @@ export class Excavator {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.letterSpacing = "12px";
-    ctx.fillText("PRIPADA", 40, canvas.height / 2 + 6);
+    // E-173: Firmenname aus einer Quelle, auf die Breite vor dem Signet gestaucht
+    const breit = ctx.measureText(FIRMA_KURZ.toUpperCase()).width;
+    if (breit > 820) ctx.font = `bold ${Math.floor((160 * 820) / breit)}px 'Arial Black', Impact, sans-serif`;
+    ctx.fillText(FIRMA_KURZ.toUpperCase(), 40, canvas.height / 2 + 6);
     // Signet rechts neben der Wortmarke
     const sx0 = 880;
     const sy0 = canvas.height / 2;

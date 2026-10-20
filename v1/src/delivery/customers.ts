@@ -171,7 +171,7 @@ export const FAMILIES: Family[] = [
     family: "Boxmann",
     firstName: "Ewald",
     hardness: 4,
-    typical: "steel",
+    typical: "mixed", // E-181: Patrick 20.10.2026 „Mischschrott ist häufiger"
     greetings: ["Schwer beladen, pass auf.", "Der Kipper ist randvoll.", "Lange Fahrt gehabt."],
     // Klein und rund, kommt von weit her und sieht auch so aus.
     aussehen: { groesse: 1.62, fuelle: 0.85, pflege: 0.2, haut: 3, haar: 4, jacke: 4, weste: false, merkmal: "keins" },
@@ -189,7 +189,7 @@ export const FAMILIES: Family[] = [
     family: "Adorf",
     firstName: "Manni",
     hardness: 3,
-    typical: null,
+    typical: "mixed", // E-181: „Zusammengesammelt die Woche." — das ist Mischschrott
     greetings: ["Zusammengesammelt die Woche.", "Bisschen von allem.", "Passt das so?"],
     // Lang, dünn, sauber — sammelt die Woche über zusammen.
     aussehen: { groesse: 1.7, fuelle: 0.2, pflege: 0.85, haut: 2, haar: 1, jacke: 1, weste: false, merkmal: "uhr" },
@@ -245,7 +245,7 @@ export const TRADES: Trade[] = [
   },
   {
     name: "Maschinenbau Voigt",
-    material: "steel",
+    material: "mixed", // E-181: „Zwei Motoren sind dabei" — Motoren sind Misch
     beifang: 0.12,
     greetings: ["Große Teile heute, Vorsicht.", "Zwei Motoren sind dabei."],
     /*
@@ -280,7 +280,7 @@ export const TRADES: Trade[] = [
   },
   {
     name: "Abbruch Kranz",
-    material: "steel",
+    material: "mixed", // E-181: Heizkörper, Rohre, Bleche mit Dreck — Sammelschrott
     beifang: 0.32, // viel Störstoff aus dem Abriss
     greetings: ["Heizkörper und Rohre.", "Da ist auch Dreck dabei, ich weiß."],
     aussehen: { groesse: 1.68, fuelle: 0.85, pflege: 0.15, haut: 0, haar: 3, jacke: 4, weste: true, merkmal: "goldkette" },

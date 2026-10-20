@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { t } from "../ui/sprache"; // E-170: Anzeige in der Spielsprache
+import { FIRMA_KURZ } from "../world/werbung"; // E-173
 
 /**
  * Bordinstrument in der Fahrerkabine.
@@ -118,7 +119,7 @@ export class InstrumentPanel {
     x.fillRect(0, 0, W, 30);
     x.fillStyle = "#7ec96a";
     x.font = "bold 17px Consolas, monospace";
-    x.fillText("PRIPADA", 10, 21);
+    x.fillText(FIRMA_KURZ.toUpperCase(), 10, 21);
     x.fillStyle = "#8d979d";
     x.font = "13px Consolas, monospace";
     x.fillText(t(r.outriggerDown > 0.85 ? "ABGESTÜTZT" : "FAHRBETRIEB"), 108, 21);

@@ -49,7 +49,7 @@ describe("Der Spielname (E-131, E-173)", () => {
    * Bagger-Bereich (`src/excavator/`), bestellt über den Orchestrator. Steht
    * dort kein Pripada mehr, meldet der Test, dass die Ausnahme weg kann.
    */
-  const NOCH_OFFEN = ["src/excavator/excavator.ts", "src/excavator/instruments.ts"].map((p) => join(wurzel, p));
+  const NOCH_OFFEN: string[] = [];
 
   it("kein Text im Spiel nennt noch Pripada oder Rust’n’Reibach", () => {
     // Zeichenketten in Anfuehrungszeichen — Kommentare duerfen die Geschichte erzaehlen
