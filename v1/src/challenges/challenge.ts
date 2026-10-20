@@ -59,7 +59,23 @@ import type { Zweisprachig } from "./texte";
  *                      zaehlen nicht mit.
  *   wrack_geknautscht  das Aufgaben-Wrack ist sichtbar angeknautscht
  *                      (`wrack:geknautscht.grad` ≥ `ANGEKNAUTSCHT_AB`)
- *   wrack_platt        … und mindestens `plattAb` (Aufgabe 4)
+ *   wrack_platt        … und mindestens `plattAb` (Aufgabe 4) — seit G5 auch
+ *                      erst, wenn `wrack_beides` gesehen ist
+ *
+ * Seit G5 (20.10.2026, Aufgabe 4 lehrt Haemmern UND Zudruecken, E-187):
+ *   wrack_gehauen      ein Schlag der Spinne hat das Wrack geknautscht
+ *   wrack_beides       … und ein Biss auch (Reihenfolge egal)
+ *   Zugeordnet wird je Bild: Kam seit dem letzten `takt` Knautschzuwachs
+ *   am eigenen Wrack (`wrack:geknautscht.zuwachs` > 0) UND ein
+ *   `spinne:aufschlag` auf `"wrack"`, war es ein Schlag; UND ein
+ *   `greifer:zugedrueckt` mit dem Wrack-Handle, ein Biss. Der Zuwachs allein
+ *   unterscheidet nicht (ein schwacher Biss knautscht so viel wie ein voller
+ *   Schlag), und die Reihenfolge der Meldungen ist je Weg verschieden
+ *   (`main.ts`: Haemmern meldet vor dem Knautschen, Anschlagen und Beissen
+ *   danach) — darum das Bild als Klammer. Ist das Wrack schon `plattAb`
+ *   platt, zaehlt der Schlag bzw. Biss auch ohne Zuwachs: Ein ganz flaches
+ *   Wrack knautscht nicht mehr (gemessen G5: gehauen bis 1,0, dann hingen
+ *   alle Bisse ohne Zuwachs).
  *   wrack_gehoben      gefasst und mit der Unterkante `WRACK_HUB_M` ueber dem
  *                      Boden (Aufgabe 6)
  *   wrack_abgelegt     losgelassen, liegt mit der Mitte im Ablagekreis
@@ -95,6 +111,8 @@ export type Beobachtung =
   | "wrack_gepresst"
   | "wrack_geknautscht"
   | "wrack_platt"
+  | "wrack_gehauen"
+  | "wrack_beides"
   | "wrack_gehoben"
   | "wrack_abgelegt";
 
@@ -324,6 +342,15 @@ export const HUB_OHNE_ZIEL_M = 1.0;
  * (`test/aufgabe4.test.ts`), ein Zucken beim Aufsetzen nichts.
  */
 export const ANGEKNAUTSCHT_AB = 0.05;
+/**
+ * Ab dieser Wucht (`spinne:aufschlag.wucht`, 1 = Ausleger und Stiel voll,
+ * 3,15 m/s) ist ein Aufschlag aufs Wrack ein SCHLAG, kein Aufsetzen (G5).
+ * // SW: 0,6 ≈ 1,9 m/s, mehr als das halbe volle Senktempo. Gemessen: Wer
+ * die offene Spinne zum Beissen aufs Dach setzt, meldet ebenfalls einen
+ * Aufschlag (ab 0,8 m/s = Wucht 0,25), und seit E-187 knautscht der etwas —
+ * ohne Schwelle galt sanftes Beissen als „Hau drauf“.
+ */
+export const HAU_AB = 0.6;
 
 /**
  * „Gehoben" (Aufgabe 6): Unterkante des gefassten Wracks so hoch ueber dem
@@ -424,6 +451,13 @@ export class ChallengeLauf {
   private ueberlasten = 0;
   /** Hoechster gemeldeter Knautschgrad eines Aufgaben-Wracks (Aufgabe 4 liest ihn) */
   knautschgrad = 0;
+  /** Seit dem letzten `takt`: Knautschzuwachs am eigenen Wrack, ein Schlag aufs Wrack, ein Biss ins Wrack (G5) */
+  private zuwachsJetzt = 0;
+  private schlagJetzt = false;
+  private bissJetzt = false;
+  /** Ein Schlag bzw. ein Biss hat das Wrack geknautscht (G5) */
+  private gehauen = false;
+  private gebissen = false;
   /** Teile, deren falscher Einwurf schon gezaehlt ist — frei erst nach erneutem Greifen */
   private falschGezaehlt = new Set<string>();
   /** Falsche Teile, die gerade in einem Ziel liegen: Teil → Ziel */
@@ -511,7 +545,15 @@ export class ChallengeLauf {
       if (neu) this.ueberlasten++;
     });
     bus.on("wrack:geknautscht", (e) => {
-      if (zaehlt() && this.eigeneHandles.has(e.handle)) this.knautschgrad = Math.max(this.knautschgrad, e.grad);
+      if (!zaehlt() || !this.eigeneHandles.has(e.handle)) return;
+      this.knautschgrad = Math.max(this.knautschgrad, e.grad);
+      this.zuwachsJetzt += e.zuwachs;
+    });
+    bus.on("spinne:aufschlag", (e) => {
+      if (zaehlt() && e.untergrund === "wrack" && e.wucht >= HAU_AB) this.schlagJetzt = true;
+    });
+    bus.on("greifer:zugedrueckt", (e) => {
+      if (zaehlt() && this.eigeneHandles.has(e.handle)) this.bissJetzt = true;
     });
     bus.on("fahrkunst:zyklus", (e) => {
       if (zaehlt()) this.zyklusGemessen(e);
@@ -543,6 +585,13 @@ export class ChallengeLauf {
   takt(dt: number): void {
     if (!this.laeuft || this.aus || this.geschafft) return;
     this.zeitS += dt;
+    // Platt gibt nichts mehr her (Knautschgrad 1,0 = kein Zuwachs) — dann zaehlt der Schlag bzw. Biss auch so, sonst haenge die Aufgabe
+    if (this.zuwachsJetzt > 0 || this.knautschgrad >= (this.daten.plattAb ?? 1)) {
+      if (this.schlagJetzt) this.gehauen = true;
+      if (this.bissJetzt) this.gebissen = true;
+    }
+    this.zuwachsJetzt = 0;
+    this.schlagJetzt = this.bissJetzt = false;
     const { jetzt, marken, imZiel } = this.beobachte(dt);
     // Was der Spieler schon richtig macht, wird uebersprungen: Ein spaeterer
     // Schritt, der schon zu sehen ist, nimmt die frueheren mit.
@@ -688,7 +737,7 @@ export class ChallengeLauf {
         }
       }
       this.wrackWarGefasst = wGefasst;
-      const fertig = this.inKammer || this.gepresst || abgelegt || (d.plattAb !== undefined && this.knautschgrad >= d.plattAb);
+      const fertig = this.inKammer || this.gepresst || abgelegt || this.platt;
       if (!wGefasst && !fertig) marken.push({ x: wp.x, y: spanne.oben, z: wp.z, art: "teil" });
       if (d.zielMarke && (wGefasst || d.zielMarkeAbStart)) marken.push({ ...d.zielMarke, art: "ziel" });
     }
@@ -706,13 +755,21 @@ export class ChallengeLauf {
         wrack_in_kammer: this.inKammer,
         wrack_gepresst: this.gepresst,
         wrack_geknautscht: this.knautschgrad >= ANGEKNAUTSCHT_AB,
-        wrack_platt: d.plattAb !== undefined && this.knautschgrad >= d.plattAb,
+        wrack_platt: this.platt,
+        wrack_gehauen: this.gehauen,
+        wrack_beides: this.gehauen && this.gebissen,
         wrack_gehoben: wGehoben,
         wrack_abgelegt: abgelegt,
       },
       marken,
       imZiel: nImZiel,
     };
+  }
+
+  /** Platt genug UND beide Wege gesehen (Patrick 20.10.2026: die Aufgabe lehrt Haemmern und Zudruecken) */
+  private get platt(): boolean {
+    const d = this.daten.plattAb;
+    return d !== undefined && this.knautschgrad >= d && this.gehauen && this.gebissen;
   }
 
   /** Die Messung, wie sie jetzt steht. */

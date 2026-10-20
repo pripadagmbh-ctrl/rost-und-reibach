@@ -280,9 +280,15 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
      * hoechstens 1 m neben der Kammermitte · ★★★ unter 1:30 min, hoechstens
      * 40 cm daneben und kein harter Aufschlag. Alle Zahlen SW.
      *
-     * Praezision (cm von der Kammermitte, E-119/E-125): Quer bleiben je Seite
-     * rund 1,2 m bis zur Wand — unter 100 cm liegt das Wrack ganz drin, unter
-     * 40 cm (ein Drittel davon) mittig. Harter Aufschlag: `HART_AB_MS` und
+     * Praezision (cm von der Kammermitte, E-119/E-125). Gemessen G6
+     * (21.10.2026, `PRESS_INNER` 4,45 x 5,05 m seit E-138, Wrack quer
+     * gehaengt rund 2,4 x 4,26 m): entlang des Presswegs 0,9–1,1 m Luft je
+     * Seite, in Richtung der Wrackachse nur 0,35–0,45 m. Unter 40 cm liegt
+     * es also in jeder Richtung drin — das ist rund der echte Wandabstand
+     * (★★★); bis 100 cm (★★) liegt es in Achsrichtung schon auf der Wand und
+     * rutscht beim Pressen hinein. Erreichbar: ausgependelt und senkrecht
+     * abgesetzt 8–25 cm, 10 von 10 Laeufen ★★★ (`test/aufgabe2.test.ts`).
+     * Harter Aufschlag: `HART_AB_MS` und
      * `FALLHOEHE_HART_M` in `challenge.ts` — gemessen G3: langsam abgesetzt
      * 0, aus der Wandkrone fallen gelassen 1.
      */
@@ -382,8 +388,8 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
     id: "platt-machen",
     name: { de: "PLATT MACHEN", en: "FLATTEN IT" },
     beschreibung: {
-      de: "Einen Wohnwagen mit der Spinne platt machen: zubeißen, auf, weiter, wieder zu.",
-      en: "Flatten a caravan with the grapple: bite, open, move on, bite again.",
+      de: "Einen Wohnwagen mit der Spinne platt machen: draufhauen und zubeißen, Stück für Stück.",
+      en: "Flatten a caravan with the grapple: hammer it and bite it, bit by bit.",
     },
     ziel: {
       de: "Mach den Wohnwagen platt — nur mit der Spinne.",
@@ -391,41 +397,67 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
     },
     /*
      * DER WOHNWAGEN (E-135, knautscht dreimal so schnell wie ein Pkw) steht
-     * vorn auf 8°, 7,4 m, Deichsel zum Bagger, 10° schraeg — der einzige
-     * Platz vorn, an dem Aufbau UND Deichsel (1,3 m vor dem Bug,
-     * `FORM_WOHNWAGEN`) frei von MUELL-Mulde und Besenplatz bleiben
-     * (0,3 m Rand, Abtastung 1°/0,2 m/5°, `test/aufgabe4.test.ts`).
+     * vorn LINKS auf 22°, 7,4 m, Deichsel gerade zum Bagger (G5).
+     *
+     * Vorher (G3) stand er auf 8° — genau unter der Spinne der Startpose
+     * (Ausladung 8,09 m, geradeaus): Die offenen Schalen (Kollider-Mitten
+     * bis 1,97 m herab, ±1,29 m breit) steckten vom ersten Bild an im
+     * 2,46 m hohen Aufbau. Wer zuerst hob, hob den Wohnwagen 1,2 m mit an,
+     * und Hauen ging nicht: Die Spinne sass dauerhaft im Wrack fest
+     * (`armBlocked`, gemessen G5). Rechts davon liegt die MUELL-Mulde.
+     * Auf 22° bleiben vom Startort der Spinne bis zum Aufbau rund 2 m
+     * waagrecht frei (gerechnet, `test/aufgabe4.test.ts`: ≥ 1,7 m; am echten
+     * Bagger: Heben bewegt ihn nicht). Der Besenplatz (31,6°) ist in einer
+     * Aufgabe leer (Kopf dieser Datei) — er zaehlt hier nicht als belegt.
+     * Aufbau UND Deichsel (1,3 m vor dem Bug, `FORM_WOHNWAGEN`) frei mit
+     * 0,3 m Rand; von der Kamera 9° neben der Bildmitte.
      *
      * WAS PLATT MACHT — gemessen am echten Bagger (G3, `test/aufgabe4.test.ts`):
      *   Zudruecken auf dem Wohnwagen (ein Biss)   +0,26 je Biss: 3 Bisse 0,77,
      *                                             4 Bisse 1,00
-     *   Haemmern mit der leeren Spinne (30 Schlaege) 0,00 — es schiebt ihn
-     *                                             nur 2,8 m weg
      *   Zu und mit dem Hauptarm nachdruecken        nur der erste Biss (0,26)
-     * Darum lehrt die Aufgabe Zudruecken, nicht Haemmern (Rueckfrage an
-     * Patrick, Bericht G3): Haemmern ist heute nur zu hoeren (E-137/E-139).
+     *
+     * SEIT E-187 KNAUTSCHT AUCH HAEMMERN (ein voller Schlag = halber Biss),
+     * und Patrick (20.10.2026): Die Aufgabe lehrt BEIDES, in Text und Sternen.
+     * Drei Schritte, je eine Bewegung: „Hau drauf" (`wrack_gehauen`), „Beiß
+     * zu" (`wrack_beides`: Schlag UND Biss gesehen), „Mach ihn platt"
+     * (`wrack_platt`: ≥ `plattAb` UND beides). Wer zuerst beisst,
+     * ueberspringt nur „Beiß zu" — „Hau drauf" bleibt stehen, bis ein Schlag
+     * geknautscht hat; wer nur beisst, hat den Balken voll und ist erst nach
+     * einem Schlag fertig. Die Sterne verlangen damit beide Bewegungen ohne
+     * eigene Messgroesse: Ohne beides gibt es kein Ende und keine Sterne.
+     * Messung G5 (a/b/c) in `test/aufgabe4.test.ts`, Zahlen bei `wertung`.
      */
     aufbau: {
       wracks: [
         {
           art: "wohnwagen",
-          x: BAGGER_STAND.x + 7.4 * Math.sin((8 * Math.PI) / 180),
-          z: BAGGER_STAND.z + 7.4 * Math.cos((8 * Math.PI) / 180),
-          gier: ((8 + 180 - 10) * Math.PI) / 180,
+          x: BAGGER_STAND.x + 7.4 * Math.sin((22 * Math.PI) / 180),
+          z: BAGGER_STAND.z + 7.4 * Math.cos((22 * Math.PI) / 180),
+          gier: ((22 + 180) * Math.PI) / 180,
         },
       ],
       greifer: "fuenfschalen",
     },
     ablageziel: null,
     /*
-     * Fertig bei 80 % (Konzept). // SW: Mit 0,26 je Biss sind das vier
-     * Bisse (drei geben 0,77) — geuebt rund 20 s, unter der Minute fuer
-     * ★★★. 0,75 waeren drei Bisse; das Konzept bleibt, bis Patrick spielt.
+     * Fertig bei 80 % (Konzept) — und erst, wenn Schlag und Biss je einmal
+     * geknautscht haben (G5). // SW: Mit 0,26 je Biss und 0,13 je vollem
+     * Schlag sind das z. B. zwei Bisse und drei Schlaege.
      */
     plattAb: 0.8,
     schritte: [
       {
-        beobachtet: "wrack_geknautscht",
+        beobachtet: "wrack_gehauen",
+        titel: { de: "Hau drauf", en: "Hammer it" },
+        text: {
+          de: "{cab+} zum Wohnwagen, Spinne hoch, dann {boom-} — mit Schwung.",
+          en: "{cab+} to the caravan, grapple up, then {boom-} — with a swing.",
+        },
+        zeige: { fn: "boom", richtung: "minus" },
+      },
+      {
+        beobachtet: "wrack_beides",
         titel: { de: "Beiß zu", en: "Bite" },
         text: {
           de: "Offene Spinne aufs Dach, {boom-}, dann {grapple+}.",
@@ -437,16 +469,22 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
         beobachtet: "wrack_platt",
         titel: { de: "Mach ihn platt", en: "Flatten it" },
         text: {
-          de: "{grapple-}, ein Stück weiter, wieder {grapple+} — bis er platt ist.",
-          en: "{grapple-}, move along a bit, {grapple+} again — until it is flat.",
+          de: "Hauen und beißen, Stück für Stück — bis er platt ist.",
+          en: "Hammer and bite, bit by bit — until it is flat.",
         },
         zeige: { fn: "grapple", richtung: "beide" },
       },
     ],
     /* Sterne (Konzept, Aufgabe 4): ★ zu 80 % platt · ★★ unter 2:00 · ★★★ unter 1:00. SW. */
     wertung: {
-      zwei: { zeitS: 120 }, // SW, Konzept 19.10.2026
-      drei: { zeitS: 60 }, // SW, Konzept 19.10.2026
+      /*
+       * SW, Konzept 19.10.2026 — nachgemessen G5 mit Haemmern (Test-Fahrer am
+       * echten Bagger, `test/aufgabe4.test.ts`): nur beissen 65 s, nur hauen
+       * 24 s, gemischt 18 s bis fertig. ★★★ unter 1:00 heisst also: beides
+       * zuegig mischen; wer nur beisst, kommt auf ★★.
+       */
+      zwei: { zeitS: 120 },
+      drei: { zeitS: 60 },
     },
   },
   {

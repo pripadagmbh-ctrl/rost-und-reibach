@@ -6,7 +6,8 @@
  * E-182), echte Behaelter samt beweglicher MUELL-Mulde (`ContainerManager`),
  * echte Presse, echter Bagger mit Greifsystem, Fahrkunst und die echten
  * Quellen (`weltQuellen`). Verdrahtung und Schrittfolge wie `main.ts`
- * (`schrittInhalt`, Haken an Greifer und Bagger, Aufschlaege auf den Bus).
+ * (`schrittInhalt`, Haken an Greifer und Bagger, Aufschlaege auf den Bus,
+ * seit G5 auch Haemmern/Anschlagen → `composites.schlag`, E-187).
  * Kein Startauto, kein Haufen, kein Besen — wie im Aufgaben-Zweig von main.ts.
  *
  * Nur fuer Tests und Messungen; nichts hier ist Spielcode.
@@ -25,6 +26,7 @@ import { PressManager } from "../src/world/press";
 import { Yard } from "../src/world/yard";
 import { EventBus, type GameEvents } from "../src/core/events";
 import { lastAufschlagWucht } from "../src/audio/klangregeln";
+import { anschlagUntergrund, SPINNE_WUCHT_VOLL_MS } from "../src/excavator/aufschlag";
 import { Fahrkunst } from "../src/skills/fahrkunst";
 import { ChallengeLauf, type ChallengeDaten } from "../src/challenges/challenge";
 import { baueAufgabe, type AufgabenObjekte } from "../src/challenges/aufbau";
@@ -163,8 +165,20 @@ export function werkbank(): Werkbank {
     const it = schwerstes();
     if (it) auf(it.materialId, grip.totalMassKg, lastAufschlagWucht(tempo), it.handle, b.grappleBody.translation());
   };
+  // E-187 wie main.ts: Haemmern und Anschlagen knautschen das Wrack; die leere Spinne meldet `spinne:aufschlag` (G5)
+  const istWrack = (h: number): boolean => composites.cars.some((c) => c.body.handle === h);
+  b.onSpinneAufschlag = (wucht, h, p) => {
+    bus.emit("spinne:aufschlag", { wucht, untergrund: h === null ? "beton" : istWrack(h) ? "wrack" : "schrott", x: p.x, y: p.y, z: p.z });
+    if (h !== null) composites.schlag(h, wucht, p);
+  };
   b.onAnschlag = (e) => {
-    if (!e.traegt) return;
+    const wucht = Math.min(e.tempoMs / SPINNE_WUCHT_VOLL_MS, 1);
+    if (e.koerper) composites.schlag(e.koerper.handle, wucht, e);
+    if (!e.traegt) {
+      const untergrund = anschlagUntergrund(e, { istWrack, istSchrott: (h) => items.items.some((i) => i.body.handle === h), stahlPunkt: () => false });
+      bus.emit("spinne:aufschlag", { wucht, untergrund, x: e.x, y: e.y, z: e.z });
+      return;
+    }
     const it = schwerstes();
     auf(it?.materialId ?? "steel", grip.totalMassKg, lastAufschlagWucht(e.tempoMs), it?.handle ?? grip.grippedBodies[0]?.handle, e);
   };

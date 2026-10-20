@@ -27,7 +27,7 @@ import { BAGGER_STAND, SCHWENK_AUSSEN, SCHWENK_INNEN, abstandVomStand } from "..
 import { EventBus, type GameEvents } from "../src/core/events";
 import { ChallengeLauf } from "../src/challenges/challenge";
 import { grundrissBelegt } from "./aufgabenplatz";
-import { DT, GRAD, bis, dreheAuf, fuehreUeber, koerperZahl, platzLeinwand, setzeAb, starteAufgabe, werkbank } from "./aufgabenwerkbank";
+import { DT, GRAD, bis, dreheAuf, fuehreUeber, koerperZahl, platzLeinwand, setzeAb, starteAufgabe, stelleArm, werkbank } from "./aufgabenwerkbank";
 
 const A2 = CHALLENGES.find((c) => c.id === "verladen")!;
 const WRACK = A2.aufbau.wracks![0]!;
@@ -182,8 +182,12 @@ describe("Aufgabe 2: Fallhoehe als harter Aufschlag (Attrappen)", () => {
   });
 });
 
-/** Der ganze Ablauf am echten Platz. `ablegen`: langsam absetzen oder aus Wandhoehe fallen lassen. */
-function durchlauf(ablegen: "absetzen" | "fallen") {
+/**
+ * Der ganze Ablauf am echten Platz. `ablegen`: langsam absetzen oder aus
+ * Wandhoehe fallen lassen. `griff`: mit vollem Tempo aufs Dach (die Spinne
+ * schlaegt auf und knautscht es, E-187) oder sanft (F nur jedes vierte Bild).
+ */
+function durchlauf(ablegen: "absetzen" | "fallen", griff: "voll" | "sanft" = "voll") {
   const k = werkbank();
   const { lauf, obj } = starteAufgabe(k, A2);
   const car = obj.wracks[0]!;
@@ -198,10 +202,17 @@ function durchlauf(ablegen: "absetzen" | "fallen") {
   const p0 = car.body.translation();
   dreheAuf(k, Math.atan2(p0.x - BAGGER_STAND.x, p0.z - BAGGER_STAND.z), jb);
   bis(k, () => false, 60, jb);
+  let bild = 0;
+  bis(k, () => k.b.armBlocked, 1200, () => {
+    k.tasten.down.clear();
+    if (griff === "voll" || bild++ % 4 === 0) k.tasten.down.add("KeyF");
+    jb();
+  });
+  k.tasten.down.clear();
   k.tasten.down.add("KeyF");
-  bis(k, () => k.b.armBlocked, 600, jb);
   bis(k, () => false, 20, jb);
   k.tasten.down.clear();
+  const knautschVorGriff = car.knautschgrad;
   const ausladungGriff = k.b.ausladungM;
   k.tasten.down.add("Space");
   bis(k, () => false, 90, jb);
@@ -212,11 +223,39 @@ function durchlauf(ablegen: "absetzen" | "fallen") {
   bis(k, () => spanne().unten >= 3.0, 300, jb);
   k.tasten.down.delete("KeyR");
   dreheAuf(k, Math.atan2(PRESS_CENTER.x - BAGGER_STAND.x, PRESS_CENTER.z - BAGGER_STAND.z), jb, ["Space"]);
-  const versatz = fuehreUeber(k, () => car.body.translation(), PRESS_CENTER, () => spanne().unten, KRONE + 0.3, jb);
+  /*
+   * G6: Erst auspendeln lassen, dann nachmessen und nachziehen — wie E-188 in
+   * `aufgabe6.test.ts`. Gemessen (G6, 21.10.2026): Wer gleich nach dem
+   * Zentrieren absenkt, laesst ein schwingendes Wrack hinunter — einmal
+   * 0,89 m neben der Mitte statt 0,14, und es blieb auf Westwand und offener
+   * Klappe liegen (Unterkante 1,95 m).
+   */
+  let versatz = fuehreUeber(k, () => car.body.translation(), PRESS_CENTER, () => spanne().unten, KRONE + 0.3, jb);
+  for (let i = 0; i < 3; i++) {
+    k.tasten.down.clear();
+    k.tasten.down.add("Space");
+    bis(k, () => false, 240, jb); // das freie Pendel braucht rund 4 s (E-132)
+    const p = car.body.translation();
+    versatz = Math.hypot(p.x - PRESS_CENTER.x, p.z - PRESS_CENTER.z);
+    if (versatz < 0.15) break;
+    fuehreUeber(k, () => car.body.translation(), PRESS_CENTER, () => spanne().unten, KRONE + 0.3, jb);
+  }
   // 3 — ablegen
   const harteVorher = k.aufpralle.filter((a) => a.handle === car.body.handle && a.wucht >= HART_AB_MS).length;
   const n0 = k.aufpralle.length;
-  if (ablegen === "absetzen") setzeAb(k, () => spanne().unten, jb);
+  if (ablegen === "absetzen") {
+    /*
+     * G6: SENKRECHT hinunter — gleiche Ausladung, Hauptarm und Ausleger
+     * zusammen, bis die Unterkante 0,8 m ueber dem Boden ist; erst dann wird
+     * getippt (`setzeAb`). Nur mit F zu senken faehrt den Arm dabei aus: Das
+     * Wrack wanderte von der Krone bis 1,1 m um 0,44 m auf die Westwand zu,
+     * laengs, wo ihm quer in der Kammer nur 0,37/0,42 m Luft bleiben, und
+     * streifte die Krone mit vollem Senktempo (3,4 m/s → 6,8, hart).
+     */
+    const ueberUnterkante = k.b.grappleGroup.position.y - spanne().unten;
+    stelleArm(k, k.b.ausladungM, ueberUnterkante + 0.8, jb, ["Space"], () => spanne().unten <= 0.8);
+    setzeAb(k, () => spanne().unten, jb);
+  }
   const untenBeimLoslassen = spanne().unten;
   k.tasten.down.clear();
   bis(k, () => false, 240, jb);
@@ -228,19 +267,27 @@ function durchlauf(ablegen: "absetzen" | "fallen") {
   const gestartet = lauf.pressenErlaubt() && k.press.start();
   bis(k, () => ende !== null, 900, jb);
   return {
-    k, lauf, schritte, gefasst, abrisseBeimGreifen, ausladungGriff, versatz, harteVorher, untenBeimLoslassen, wucht, bereit, gestartet,
+    k, lauf, schritte, gefasst, abrisseBeimGreifen, ausladungGriff, versatz, harteVorher, untenBeimLoslassen, wucht, bereit, gestartet, knautschVorGriff,
     ende: ende as GameEvents["challenge:geschafft"] | null,
     koerperStart,
   };
 }
 
 describe("Aufgabe 2: am echten Platz mit dem echten Bagger", () => {
-  it("drehen, senken, zu, heben, schwenken, absetzen, PRESSEN — nichts reisst ab, kein harter Aufschlag", () => {
-    const d = durchlauf("absetzen");
+  /*
+   * G6 (21.10.2026): ★★★ in beiden Griffarten. Mit vollem Tempo aufs Dach
+   * knautscht der Aufschlag das Wrack schon vor dem Biss (E-187, Grad 0,057);
+   * es passt trotzdem quer in die Kammer (0,35/0,44 m Luft gegen 0,38/0,45
+   * sanft gegriffen). Fuenf um ±10 cm verschobene Zentrierziele je Griff:
+   * 10 von 10 ★★★, Praezision 8–25 cm, Melder hoechstens 3,3 m/s.
+   */
+  it.each(["voll", "sanft"] as const)("Griff %s: drehen, senken, zu, heben, schwenken, absetzen, PRESSEN — nichts reisst ab, kein harter Aufschlag, ★★★", (griff) => {
+    const d = durchlauf("absetzen", griff);
     const physMittel = d.k.physMs.reduce((a, b) => a + b, 0) / d.k.physMs.length;
     // eslint-disable-next-line no-console
     console.log(
-      `A2 absetzen: Griff bei ${d.ausladungGriff.toFixed(2)} m, Versatz ueber der Kammer ${d.versatz.toFixed(2)} m, ` +
+      `A2 absetzen, Griff ${griff}: Knautschgrad vor dem Biss ${d.knautschVorGriff.toFixed(3)}, ` +
+        `Griff bei ${d.ausladungGriff.toFixed(2)} m, Versatz ueber der Kammer ${d.versatz.toFixed(2)} m, ` +
         `losgelassen ${d.untenBeimLoslassen.toFixed(2)} m, Wucht ${d.wucht.toFixed(2)} m/s, Schritte ${d.schritte.join(",")}, ` +
         `Messung ${JSON.stringify(d.ende?.messung)}, ${d.ende?.sterne} Sterne · Koerper Start ${JSON.stringify(d.koerperStart)}, ` +
         `Ende ${JSON.stringify(koerperZahl(d.k.world))}, Physik ${physMittel.toFixed(2)} ms/Schritt`
@@ -255,7 +302,10 @@ describe("Aufgabe 2: am echten Platz mit dem echten Bagger", () => {
     expect(d.wucht, "langsam abgesetzt und doch hart").toBeLessThan(HART_AB_MS);
     expect(d.ende!.messung.harteAufschlaege).toBe(0);
     expect(d.ende!.messung.praezisionCm).not.toBeNull();
-    expect(d.ende!.sterne).toBeGreaterThanOrEqual(2);
+    expect(d.ende!.messung.praezisionCm!).toBeLessThanOrEqual(A2.wertung.drei.praezisionCm!);
+    expect(d.ende!.sterne, "sauber abgesetzt und mittig, und doch kein ★★★").toBe(3);
+    if (griff === "voll") expect(d.knautschVorGriff, "voller Aufschlag aufs Dach knautscht (E-187)").toBeGreaterThan(0);
+    else expect(d.knautschVorGriff).toBe(0);
     expect(d.koerperStart.gesamt, "Physik-Last der Aufgabe").toBeLessThanOrEqual(30);
   }, 120_000);
 
