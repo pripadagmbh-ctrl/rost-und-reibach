@@ -20,6 +20,8 @@ import {
   BUCHT_X_VON,
   BUCHT_X_BIS,
   BUCHT_Z,
+  BUCHT_FASE_WEST,
+  BUCHT_FASE_OST,
 } from "../src/world/yard";
 import { einmauern } from "../src/world/daylight";
 import { HALLEN_X, HALLEN_Z, HALLE_BREITE, HALLE_TIEFE } from "../src/world/office";
@@ -75,6 +77,9 @@ function eindringtiefe(x: number, z: number, krone: number): number {
   const rechtecke: Array<[number, number, number, number]> = [
     [YARD_MIN_X, YARD_MAX_X, -HZ, HZ],
     [BUCHT_X_VON, BUCHT_X_BIS, BUCHT_Z, -HZ],
+    // Fasen an den vorderen Ecken (E-189)
+    [BUCHT_X_VON - BUCHT_FASE_WEST, BUCHT_X_VON, -HZ - BUCHT_FASE_WEST, -HZ],
+    [BUCHT_X_BIS, BUCHT_X_BIS + BUCHT_FASE_OST, -HZ - BUCHT_FASE_OST, -HZ],
   ];
   let tiefste = 0;
   for (const [x0, x1, z0, z1] of rechtecke) {

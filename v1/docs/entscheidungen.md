@@ -10,12 +10,13 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-189 | 20.10.2026 | Bucht wie vorher, Ecken angeschrägt: kein Anschlag beim Schwenken | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-187 | 20.10.2026 | Hämmern mit der Spinne knautscht das Wrack, halb so stark wie ein Biss | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-186 | 20.10.2026 | Ein Rad zählt als Reifen, lose wie vom Wrack | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-185 | 20.10.2026 | Zerlegen in Reihenfolge: Haube, Batterie, Kühler, Motorblock; Felgen, Sitze | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-184 | 20.10.2026 | Grüne Rost-&-Reibach-Mulden hebbar, Absetzkipper-Mulde übergeben | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-183 | 20.10.2026 | MÜLL-Mulde morgens direkt vor dem Bagger an der BUNT + VA | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
-| E-182 | 20.10.2026 | Stahlschrott schmaler, gerade Quermauer, schräge Mauer zur Presse | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
+| E-182 | 20.10.2026 | Stahlschrott schmaler, gerade Quermauer, schräge Mauer zur Presse | zurückgenommen (E-189) | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-181 | 20.10.2026 | Mulden sind Stahl, Mischschrott häufiger, Reifen nur als Rad | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-178 | 20.10.2026 | Sortenrein kommt im Kipper ins Lager, Fahrer hupt, Büro funkt | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-177 | 20.10.2026 | Abholer nach Sorte und m³, kommt zum Bagger, nimmt Wracks mit | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
@@ -193,6 +194,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-189 — Bucht-Ecken angeschrägt** (iPad)
+- Mit voller Ausladung hinter dir von links nach rechts schwenken, auch tief: schlägst du noch an einer Ecke der Bucht an?
+- Sieht die angeschrägte Ecke aus wie gemeint — oder sollte die Schräge oben an der Mauerkante sitzen?
+- Bucht so groß wie vorher, beide Autos wieder am alten Platz?
+
 **E-185 — Zerlegen in Reihenfolge, Felgen, Sitze** (iPad, dann iPhone mini)
 - Auf die geschlossene Haube beißen: springt sie auf und hängt schief? Zweiter Biss: kommt die Haube, nicht der Motor?
 - Aufs Dach beißen bis flach: kommt kein Motor, kein Getriebe heraus?
@@ -212,12 +218,6 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Sandkasten: steht die blaue MÜLL-Mulde direkt vor dir an der BUNT + VA, wie gemeint?
 - Müll hineinwerfen: ganze Mulde bequem erreichbar?
 - Geradeaus losfahren: stört das Vorbeilenken (sie steht 0,8 m in der Fahrlinie)?
-
-**E-182 — Stahlschrott schmaler, Quermauer, schräge Mauer** (iPad)
-- Hinter dich schauen: Stahlschrott schmal genug, beide Autos noch gut greifbar?
-- Quermauer Misch/Stahl gerade, 2,4 m: kommst du mit der Spinne bequem drüber?
-- Schräge Mauer: endet sie an der Presse so, wie gemeint? Frage: Variante A (gebaut, 14°) oder B (33°, Mischschrott hinten breiter) — Bilder im Bericht.
-- Kipper abladen lassen: bleibt der Haufen vor der Mauer, rutscht nichts in den Stahlschrott?
 
 **E-187 — Hämmern knautscht** (iPad)
 - Mit offener Spinne aufs Dach hauen: gibt es nach und knirscht es, etwa halb so viel wie Zudrücken?

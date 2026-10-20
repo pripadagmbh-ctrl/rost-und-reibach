@@ -192,14 +192,12 @@ describe("Der Kipper lädt seitlich ab", () => {
     /*
      * Auslauf nach Süden: Von der Abwurfkante bis zur Südmauer. Er muss groß
      * genug sein, damit nichts an der Mauer klemmt — und klein genug, dass
-     * nichts in die Ausbuchtung rollt, wo der Arm es nicht mehr holt. Bis
-     * E-182 öffnete sie sich zwischen x −6,5 und 7,5, der Abladeplatz lag mit
-     * x 6,3 mitten in dieser Öffnung. Seit der Stahlschrott schmaler ist
-     * (Ostschenkel x 5,9), steht hinter der Wagenmitte die hohe Südmauer: Was
-     * gekippt wird, läuft an ihr aus — genau das, was der Satz oben wollte.
+     * nichts in die Ausbuchtung rollt, wo der Arm es nicht mehr holt. Die
+     * Ausbuchtung öffnet sich bei z −29,0 zwischen x −6,5 und 7,5; der
+     * Abladeplatz liegt mit x 6,3 mitten in dieser Öffnung.
      */
     expect(ABLADE_SPUR_X).toBeGreaterThan(BUCHT_X_VON);
-    expect(ABLADE_SPUR_X, "hinter der Wagenmitte steht die Südmauer").toBeGreaterThan(BUCHT_X_BIS);
+    expect(ABLADE_SPUR_X).toBeLessThan(BUCHT_X_BIS);
     const auslauf = ABKIPP_ZONE[1] - -YARD_D / 2;
     expect(auslauf, `nur ${auslauf.toFixed(2)} m Auslauf nach Süden`).toBeGreaterThan(2.0);
     expect(auslauf, `${auslauf.toFixed(2)} m Auslauf — das rollt in die Bucht`).toBeLessThan(4.0);

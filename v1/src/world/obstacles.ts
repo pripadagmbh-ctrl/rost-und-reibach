@@ -18,7 +18,8 @@ import {
   TRENNSTEIN_X,
   TRENNSTEIN_L,
   TRENNSTEIN_T,
-  MISCH_SCHRAEG_VORN_X,
+  BUCHT_FASE_WEST,
+  BUCHT_FASE_OST,
   schraegeLaeufe,
 } from "./yard";
 import { officeFootprints, hallenWaende } from "./office";
@@ -191,21 +192,22 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
   });
 }
 
-/** Wo die Südmauer links der Bucht endet: an der schrägen Mauer (E-182). */
-const SUED_WEST_BIS = MISCH_SCHRAEG_VORN_X - WALL_T / 2;
+/** Seit E-189 enden die Südmauer und die Buchtschenkel an den Fasen. */
+const SUED_WEST_BIS = BUCHT_X_VON - BUCHT_FASE_WEST;
+const SUED_OST_VON = BUCHT_X_BIS + BUCHT_FASE_OST;
 
 /**
- * Eine schräge Mauer als Treppe aus achsparallelen Stücken (E-182).
+ * Eine schräge Mauer als Treppe aus achsparallelen Stücken (E-189).
  *
  * `hitsObstacle` und die Fahrzeugwächter rechnen mit Rechtecken. Die Strecke
  * wird in Stücke von höchstens `TREPPE_M` Länge geteilt; jedes Stück ist das
- * Rechteck um seinen Abschnitt der Mauer (Mittellinie ± halbe Dicke). An der
- * Ecke eines Stücks ragt das Rechteck damit höchstens
- * `TREPPE_M/2 · sin(Winkel)` über die Mauerfläche hinaus — bei 0,5 m und
- * 14° sind das 6 cm, bei 33° 14 cm. Der Kollider in `yard.ts` ist ein
- * gedrehter Quader und genau.
+ * Rechteck um seinen Abschnitt der Mauer (Mittellinie ± halbe Dicke). Bei 45°
+ * ragt eine Stufenecke damit gut 0,1 m über die Mauerfläche (mit 0,5 m waren
+ * es über 0,2 m — die Spinne schlug bei 9,2 m Ausladung an den Stufen der
+ * westlichen Fase an, nicht an der Mauer) — gerechnet in `tools/schwenkanschlag.ts`, der genau diese
+ * Liste fragt. Der Kollider in `yard.ts` ist ein gedrehter Quader und genau.
  */
-const TREPPE_M = 0.5; // SW
+const TREPPE_M = 0.2; // SW, Herleitung oben
 function schraegeHindernisse(): Obstacle[] {
   const out: Obstacle[] = [];
   for (const sl of schraegeLaeufe()) {
@@ -213,7 +215,6 @@ function schraegeHindernisse(): Obstacle[] {
     const dz = sl.z1 - sl.z0;
     const l = Math.hypot(dx, dz);
     const n = Math.ceil(l / TREPPE_M);
-    // Halbe Dicke, auf die Achsen umgelegt: senkrecht zur Strecke
     const qx = (Math.abs(dz) / l) * (WALL_T / 2);
     const qz = (Math.abs(dx) / l) * (WALL_T / 2);
     for (let i = 0; i < n; i++) {
@@ -223,7 +224,7 @@ function schraegeHindernisse(): Obstacle[] {
         hw: Math.abs(dx) / n / 2 + qx,
         hd: Math.abs(dz) / n / 2 + qz,
         top: sl.hoehe,
-        label: `Schräge Mauer ${i + 1}`,
+        label: `Buchtfase ${sl.name === "fase-west" ? "West" : "Ost"} ${i + 1}`,
       });
     }
   }
@@ -239,7 +240,6 @@ export const STATIC_OBSTACLES: Obstacle[] = [
    * ueber die ganze Breite laege quer vor ihrer Oeffnung eine unsichtbare
    * Wand, und der Bagger kaeme nicht in die Bucht.
    */
-  // Seit E-182 bis an die schräge Mauer am Mischschrott, hinter der Presse
   {
     x: (YARD_MIN_X + SUED_WEST_BIS) / 2,
     z: -HZ,
@@ -249,9 +249,9 @@ export const STATIC_OBSTACLES: Obstacle[] = [
     label: "Südwand West",
   },
   {
-    x: (BUCHT_X_BIS + YARD_MAX_X) / 2,
+    x: (SUED_OST_VON + YARD_MAX_X) / 2,
     z: -HZ,
-    hw: (YARD_MAX_X - BUCHT_X_BIS) / 2,
+    hw: (YARD_MAX_X - SUED_OST_VON) / 2,
     hd: WALL_T / 2,
     top: WALL_H,
     label: "Südwand Ost",
@@ -270,28 +270,35 @@ export const STATIC_OBSTACLES: Obstacle[] = [
     label: "Südwand hoch",
   },
   {
-    x: (BUCHT_X_BIS + YARD_MAX_X) / 2,
+    x: (SUED_OST_VON + YARD_MAX_X) / 2,
     z: -HZ,
-    hw: (YARD_MAX_X - BUCHT_X_BIS) / 2,
+    hw: (YARD_MAX_X - SUED_OST_VON) / 2,
     hd: WALL_T / 2,
     top: SUED_HOCH,
     label: "Südwand hoch Ost",
   },
   /*
    * Die Ausbuchtung: zwei Schenkel nach Sueden und die Rueckwand quer dazu,
-   * alle auf `SUED_HOCH` — „rundum mit hoher Wand" (E-010). Der Westschenkel
-   * ist seit E-182 schraeg (`schraegeLaeufe`); die Liste kennt nur Rechtecke,
-   * also steht er als Treppe aus kurzen Stuecken da (`schraegeHindernisse`).
+   * alle auf `SUED_HOCH` — „rundum mit hoher Wand" (E-010).
    */
-  ...schraegeHindernisse(),
+  {
+    x: BUCHT_X_VON,
+    z: (-HZ - BUCHT_FASE_WEST + BUCHT_Z) / 2,
+    hw: WALL_T / 2,
+    hd: (-HZ - BUCHT_FASE_WEST - BUCHT_Z) / 2,
+    top: SUED_HOCH,
+    label: "Buchtwand West",
+  },
   {
     x: BUCHT_X_BIS,
-    z: (-HZ + BUCHT_Z) / 2,
+    z: (-HZ - BUCHT_FASE_OST + BUCHT_Z) / 2,
     hw: WALL_T / 2,
-    hd: (-HZ - BUCHT_Z) / 2,
+    hd: (-HZ - BUCHT_FASE_OST - BUCHT_Z) / 2,
     top: SUED_HOCH,
     label: "Buchtwand Ost",
   },
+  // Die Fasen an den vorderen Ecken (E-189), als Treppe
+  ...schraegeHindernisse(),
   {
     x: (BUCHT_X_VON + BUCHT_X_BIS) / 2,
     z: BUCHT_Z,

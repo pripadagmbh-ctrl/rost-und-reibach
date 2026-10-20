@@ -3,7 +3,6 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { reihenstuecke } from "./legoreihe";
 import { baueWerbeschilder } from "./werbung";
 import { baueFirmenmulden } from "./firmenmulden";
-import { PRESS_CENTER, PRESS_FUSS } from "./press";
 
 /** Position der Brückenwaage in der Nordspur (SW) */
 /**
@@ -94,18 +93,7 @@ export const GATE_X = -22;
  * Zahlen aus `tools/platzkonzept.mjs` (`bxA`, `bxB`, `BUCHT_Z`).
  */
 export const BUCHT_X_VON = -6.5;
-/*
- * E-182 (20.10.2026): 7,5 → 5,9. Patrick: „Den Platz und die Ausbuchtung am
- * Stahlschrott reduzieren." Der Ostschenkel rückt 1,6 m nach Westen; die
- * Stahlschrott-Halde ist innen 4,8 statt 6,4 m breit. Weiter ging es nicht
- * ohne ein Auto zu verlieren: Beide Altfahrzeuge (`START_AUTOS`, je 1,7 m
- * breit) stehen nebeneinander darin, mit 0,25–0,3 m zu den Wänden und 0,85 m
- * zwischen sich (`grosswracks.test.ts` verlangt mehr als 0,8). Was wegfällt, lag ohnehin außer Reichweite: Die alte
- * Ostecke (7,2 | −29,3) ist 10,4 m vom Sitz (Band bis 9,2 m). Nebenwirkung:
- * Hinter dem Abladeplatz (x 6,3) steht jetzt die hohe Südmauer statt der
- * offenen Bucht — gekipptes läuft an der Mauer aus statt in die Halde.
- */
-export const BUCHT_X_BIS = 5.9;
+export const BUCHT_X_BIS = 7.5;
 /*
  * Flacher seit dem 14.09.2026 abends: −35,5 statt −38,5.
  *
@@ -117,33 +105,36 @@ export const BUCHT_X_BIS = 5.9;
  * Stauraum — 40,8 statt 61,2 m² je Halde, zusammen 81,6 statt 122,4 m².
  */
 export const BUCHT_Z = -35.5;
-/** Dicke eines Betonlegosteins (Bestand seit 29.08.2026), siehe `MAUER_STEIN`. */
-const MAUER_STEIN_DICKE = 0.6;
 /*
- * DIE SCHRÄGE MAUER AM MISCHSCHROTT (E-182).
+ * DIE BUCHT IST AN DEN ECKEN ANGESCHRÄGT (E-189, 20.10.2026).
  *
- * Patrick, 20.10.2026: „beim Mischschrott eine Quermauer setzen, damit eine
- * Mauer gerade, und eine Mauer zur Presse diagonal zur Presse hingeht, und mit
- * der Außenkante der Presse abschließt."
+ * Patrick: „die ausbuchtungen sollen weiterhin da sein, allerdings sollen
+ * jeweils die außenwände der ausbuchtung etwas angeschrägt sein, sodass man
+ * beim schwenken nicht immer anschlägt." Wo die 4,8 m hohe Südmauer auf einen
+ * Schenkel der Bucht trifft, stand eine scharfe Ecke in den Platz hinein —
+ * mit offener Spinne (Halbmesser 1,51 m) schlug man dort an, westlich schon
+ * ab 8,0 m Ausladung (−148° … −126°), östlich ab 9,0 m (123° … 135°),
+ * gemessen mit `tools/schwenkanschlag.ts`.
  *
- * Gebaut ist die Lesart „Halde mit zwei Seitenwänden": Die gerade Mauer ist
- * die Quermauer zum Stahlschrott (`TRENNSTEINE`, jetzt durchgehend), die
- * schräge ersetzt den Westschenkel der Bucht. Sie läuft von der hinteren
- * Ecke (`MISCH_SCHRAEG_HINTEN_X` | `BUCHT_Z`) nach vorn zur Presse und endet
- * dort, wo die Presse nach Osten aufhört: Ihre Außenseite liegt am Ende auf
- * der Außenkante des Pressenrahmens (x −5,125). Vorher lag hinter der
- * Pressenecke ein 1,4 m breiter Winkel der Halde, in den die Spinne nur über
- * den Rahmen hinweg kam — der ist jetzt zu.
+ * Jetzt ist jede Ecke im Grundriss abgeschrägt (eine Fase unter 45°): Die
+ * Südmauer hört `BUCHT_FASE_*` Meter vor dem Schenkel auf, der Schenkel
+ * ebenso viel hinter der Südmauerachse, dazwischen läuft eine schräge Mauer
+ * in voller Höhe. Die Bucht wird dadurch nicht kleiner — die Fase steht
+ * außerhalb ihrer alten Innenkanten, die Öffnung wird nur trichterförmig
+ * weiter.
  *
- * Die Zahl für hinten ist die Wahl zwischen den beiden gerenderten Varianten
- * (A: −6,5, die Ecke bleibt, die Mauer steht 14° schräg; B: −9,0, die Bucht
- * wird hinten breiter, 33° schräg). Gebaut ist A — Rückfrage an Patrick.
+ * Wie groß, ist gerechnet: Die offene Spinne soll bis zum Rand des
+ * Schwenkbands (9,2 m) frei herumkommen, also muss jede Mauerfläche an der
+ * Ecke mindestens 9,2 + 1,51 = 10,71 m vom Sitz (−0,5 | −22,5) weg sein.
+ *   Ost (Ecke 7,5 | −29,0, 10,3 m weg): nötig 1,07 m → 1,6 m (ein Stein)
+ *   West (Ecke −6,5 | −29,0, 8,9 m weg): nötig 3,07 m → 3,4 m
+ * Aufgerundet um die Treppe der Hindernisliste (`obstacles.ts`, bis 0,1 m
+ * über der Mauerfläche): Mit 3,2 m schlug die Spinne bei 9,2 m noch an einer
+ * Stufe an. Die westliche Fase endet hinter der Presse (x −9,9, Pressenrahmen bis
+ * −10,875 und erst ab z −28,6) — dort steht nichts im Weg.
  */
-export const MISCH_SCHRAEG_HINTEN_X = BUCHT_X_VON;
-/** Außenkante des Pressenrahmens nach Osten (−5,125, `press.ts`). */
-const PRESSE_AUSSEN_OST = PRESS_CENTER.x + PRESS_FUSS.hw;
-/** Mittellinie der schrägen Mauer am vorderen Ende, auf der Südmauerachse. */
-export const MISCH_SCHRAEG_VORN_X = PRESSE_AUSSEN_OST + MAUER_STEIN_DICKE / 2;
+export const BUCHT_FASE_WEST = 3.4;
+export const BUCHT_FASE_OST = 1.6;
 
 /** Eine schräge Mauer: Mittellinie von (x0 | z0) nach (x1 | z1), Höhe in m. */
 export interface SchraegLauf {
@@ -155,36 +146,13 @@ export interface SchraegLauf {
   hoehe: number;
 }
 
-/**
- * Die schrägen Mauerläufe — zurzeit nur der am Mischschrott. Hinten um eine
- * halbe Steindicke verlängert, damit die Ecke zur Rückwand geschlossen ist.
- */
+/** Die beiden Fasen der Bucht, je vom Schenkel zur Südmauer. */
 export function schraegeLaeufe(): SchraegLauf[] {
-  const x1 = MISCH_SCHRAEG_VORN_X;
-  const z1 = -YARD_D / 2;
-  const dx = x1 - MISCH_SCHRAEG_HINTEN_X;
-  const dz = z1 - BUCHT_Z;
-  const l = Math.hypot(dx, dz);
-  const t = MAUER_STEIN_DICKE / 2;
+  const hz = YARD_D / 2;
   return [
-    {
-      name: "misch-schraeg",
-      x0: MISCH_SCHRAEG_HINTEN_X - (dx / l) * t,
-      z0: BUCHT_Z - (dz / l) * t,
-      x1,
-      z1,
-      hoehe: SUED_HOCH,
-    },
+    { name: "fase-west", x0: BUCHT_X_VON, z0: -hz - BUCHT_FASE_WEST, x1: BUCHT_X_VON - BUCHT_FASE_WEST, z1: -hz, hoehe: SUED_HOCH },
+    { name: "fase-ost", x0: BUCHT_X_BIS, z0: -hz - BUCHT_FASE_OST, x1: BUCHT_X_BIS + BUCHT_FASE_OST, z1: -hz, hoehe: SUED_HOCH },
   ];
-}
-
-/**
- * Wo die schräge Mauer bei der Tiefe z steht (Mittellinie) — für Halde,
- * Hindernisliste und Wächter.
- */
-export function mischSchraegeX(z: number): number {
-  const t = (z - BUCHT_Z) / (-YARD_D / 2 - BUCHT_Z);
-  return MISCH_SCHRAEG_HINTEN_X + t * (MISCH_SCHRAEG_VORN_X - MISCH_SCHRAEG_HINTEN_X);
 }
 
 /*
@@ -219,19 +187,13 @@ export const TRENNSTEIN_X = 0.5;
  * Lagen laufen 1–4–4–1: in der Mitte 2,4 m, an beiden Enden 0,6 m. Die
  * Pyramide bleibt damit dieselbe Figur, nur kuerzer.
  */
-/*
- * E-182: aus der Pyramide 1–4–4–1 wird eine gerade Quermauer, durchgehend vier
- * Lagen (2,4 m) — Patrick: „eine Mauer grade". Vier Lagen statt der 4,8 m der
- * Bucht (SW): So greift die Spinne weiter über die Kante von einer Halde in
- * die andere (Ansage 14.09.2026: „Zugriff … flüssig").
- */
-export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [4, 4, 4, 4].map(
+export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [1, 4, 4, 1].map(
   (lagen, i) => ({ z: -29.9 - i * TRENNSTEIN_L, hoehe: lagen * TRENNSTEIN_H })
 );
 
 /* -------------------------------------------------- Die Mauerläufe ------- */
 /** Steinmaß der Umrandung (Bestand seit 29.08.2026). */
-export const MAUER_STEIN = { laenge: 1.6, hoehe: 0.6, dicke: MAUER_STEIN_DICKE };
+export const MAUER_STEIN = { laenge: 1.6, hoehe: 0.6, dicke: 0.6 };
 /** Halbe Breite der Einfahrtslücke in der Nordwand. */
 export const TOR_HALB = 4.5;
 
@@ -271,16 +233,16 @@ export function mauerLaeufe(): Mauerlauf[] {
     // Nordwand, links und rechts der Einfahrt — bündig an den Torpfosten
     { name: "nord-west", achse: "x", fest: hz, von: YARD_MIN_X - t, bis: gateL },
     { name: "nord-ost", achse: "x", fest: hz, von: gateR, bis: YARD_MAX_X + t },
-    // Südwand, links und rechts der Ausbuchtung. Links läuft sie seit E-182
-    // hinter der Presse bis an die schräge Mauer am Mischschrott.
-    { name: "sued-west", achse: "x", fest: -hz, von: YARD_MIN_X - t, bis: MISCH_SCHRAEG_VORN_X - t },
-    { name: "sued-ost", achse: "x", fest: -hz, von: BUCHT_X_BIS + t, bis: YARD_MAX_X + t },
+    // Südwand, links und rechts der Ausbuchtung — seit E-189 bis an die Fasen
+    { name: "sued-west", achse: "x", fest: -hz, von: YARD_MIN_X - t, bis: BUCHT_X_VON - BUCHT_FASE_WEST },
+    { name: "sued-ost", achse: "x", fest: -hz, von: BUCHT_X_BIS + BUCHT_FASE_OST, bis: YARD_MAX_X + t },
     // Ost- und Westwand stoßen innen an
     { name: "west", achse: "z", fest: YARD_MIN_X, von: -hz + t, bis: hz - t },
     { name: "ost", achse: "z", fest: YARD_MAX_X, von: -hz + t, bis: hz - t },
-    // Die Ausbuchtung: der Ostschenkel (mit der Ecke) und die Rückwand quer;
-    // der Westschenkel ist seit E-182 die schräge Mauer (`schraegeLaeufe`).
-    { name: "bucht-ost", achse: "z", fest: BUCHT_X_BIS, von: BUCHT_Z - t, bis: -hz - t },
+    // Die Ausbuchtung: zwei Schenkel (mit den hinteren Ecken) und die Rückwand
+    // quer; vorn enden die Schenkel an den Fasen (E-189, `schraegeLaeufe`)
+    { name: "bucht-west", achse: "z", fest: BUCHT_X_VON, von: BUCHT_Z - t, bis: -hz - BUCHT_FASE_WEST },
+    { name: "bucht-ost", achse: "z", fest: BUCHT_X_BIS, von: BUCHT_Z - t, bis: -hz - BUCHT_FASE_OST },
     { name: "bucht-sued", achse: "x", fest: BUCHT_Z, von: BUCHT_X_VON + t, bis: BUCHT_X_BIS - t },
   ];
 }
@@ -359,6 +321,9 @@ export function baumStandort(
   const gebaut: Array<[number, number, number, number]> = [
     [YARD_MIN_X, YARD_MAX_X, -hz, hz],
     [BUCHT_X_VON, BUCHT_X_BIS, BUCHT_Z, -hz],
+    // die Fasen an den vorderen Ecken (E-189), je als Quadrat um ihr Dreieck
+    [BUCHT_X_VON - BUCHT_FASE_WEST, BUCHT_X_VON, -hz - BUCHT_FASE_WEST, -hz],
+    [BUCHT_X_BIS, BUCHT_X_BIS + BUCHT_FASE_OST, -hz - BUCHT_FASE_OST, -hz],
   ];
   let px = x;
   let pz = z;
@@ -782,20 +747,23 @@ export class Yard {
     buchtTex.needsUpdate = true;
     buchtTex.repeat.set(9, 6);
     /*
-     * Seit E-182 ein Trapez: Die Westseite folgt der schrägen Mauer. Die
-     * Fläche liegt in (x | −z), deshalb nach dem Kippen um −90° richtig herum;
-     * die Texturkoordinaten sind Meter, also ein Kachelmaß von 14/9 × 6,5/6 m
-     * wie bisher.
+     * Seit E-189 mit den Fasen: ein Sechseck. Die Fläche liegt in (x | −z),
+     * nach dem Kippen um −90° also richtig herum; die Texturkoordinaten sind
+     * Meter, das Kachelmaß bleibt 14/9 × 6,5/6 m wie beim Rechteck vorher.
      */
     buchtTex.repeat.set(9 / 14, 6 / 6.5);
-    const form = new THREE.Shape([
-      new THREE.Vector2(MISCH_SCHRAEG_HINTEN_X, -BUCHT_Z),
-      new THREE.Vector2(BUCHT_X_BIS, -BUCHT_Z),
-      new THREE.Vector2(BUCHT_X_BIS, YARD_D / 2),
-      new THREE.Vector2(MISCH_SCHRAEG_VORN_X, YARD_D / 2),
-    ]);
+    const hzB = YARD_D / 2;
     const bucht = new THREE.Mesh(
-      new THREE.ShapeGeometry(form),
+      new THREE.ShapeGeometry(
+        new THREE.Shape([
+          new THREE.Vector2(BUCHT_X_VON, -BUCHT_Z),
+          new THREE.Vector2(BUCHT_X_BIS, -BUCHT_Z),
+          new THREE.Vector2(BUCHT_X_BIS, hzB + BUCHT_FASE_OST),
+          new THREE.Vector2(BUCHT_X_BIS + BUCHT_FASE_OST, hzB),
+          new THREE.Vector2(BUCHT_X_VON - BUCHT_FASE_WEST, hzB),
+          new THREE.Vector2(BUCHT_X_VON, hzB + BUCHT_FASE_WEST),
+        ])
+      ),
       new THREE.MeshStandardMaterial({ map: buchtTex, roughness: 1 })
     );
     bucht.rotation.x = -Math.PI / 2;
@@ -1172,7 +1140,7 @@ export class Yard {
     ): void => {
       const anteil = laenge / BL;
       const noppen = anteil < 0.7 ? [0] : [-0.45 * anteil, 0.45 * anteil];
-      // Schräge Läufe (E-182): Winkel um y, Noppen längs wie bei einem x-Lauf
+      // Schräge Läufe (E-189): Winkel um y, Noppen längs wie bei einem x-Lauf
       const schraeg = winkel !== undefined;
       for (let r = 0; r < reihen; r++) {
         const f = farben[n++ % 3]!;
@@ -1226,7 +1194,7 @@ export class Yard {
       }
     }
     this.buildTrennsteine(place);
-    // Die schräge Mauer am Mischschrott (E-182): dieselben Steine, gedreht
+    // Die Fasen an den Ecken der Bucht (E-189): dieselben Steine, gedreht
     for (const sl of schraegeLaeufe()) {
       const dx = sl.x1 - sl.x0;
       const dz = sl.z1 - sl.z0;
@@ -1270,13 +1238,16 @@ export class Yard {
      * ein durchgehender Quader liefe sie quer durch deren Oeffnung, und der
      * Bagger koennte nicht in die Bucht greifen.
      */
-    const suedWestBis = MISCH_SCHRAEG_VORN_X - BT / 2;
+    // Seit E-189 enden Südmauer und Schenkel an den Fasen
+    const suedWestBis = BUCHT_X_VON - BUCHT_FASE_WEST;
+    const suedOstVon = BUCHT_X_BIS + BUCHT_FASE_OST;
     addWall((YARD_MIN_X + suedWestBis) / 2, -hz, suedWestBis - YARD_MIN_X, BT);
-    addWall((BUCHT_X_BIS + YARD_MAX_X) / 2, -hz, YARD_MAX_X - BUCHT_X_BIS, BT);
-    // Die Waende der Ausbuchtung, alle auf voller Hoehe: Ostschenkel, Rueckwand
-    addWall(BUCHT_X_BIS, (-hz + BUCHT_Z) / 2, BT, -hz - BUCHT_Z, SUED_HOCH);
+    addWall((suedOstVon + YARD_MAX_X) / 2, -hz, YARD_MAX_X - suedOstVon, BT);
+    // Die drei Waende der Ausbuchtung, alle auf voller Hoehe
+    for (const [bx, fase] of [[BUCHT_X_VON, BUCHT_FASE_WEST], [BUCHT_X_BIS, BUCHT_FASE_OST]] as const)
+      addWall(bx, (-hz - fase + BUCHT_Z) / 2, BT, -hz - fase - BUCHT_Z, SUED_HOCH);
     addWall((BUCHT_X_VON + BUCHT_X_BIS) / 2, BUCHT_Z, BUCHT_X_BIS - BUCHT_X_VON, BT, SUED_HOCH);
-    // ... und die schraege Mauer am Mischschrott als gedrehter Quader (E-182)
+    // ... und die Fasen als gedrehte Quader (E-189)
     for (const sl of schraegeLaeufe()) {
       const dx = sl.x1 - sl.x0;
       const dz = sl.z1 - sl.z0;
@@ -1300,13 +1271,7 @@ export class Yard {
      */
     const hochVon = SUED_HOCH_VON - SUED_HOCH_RAMPE;
     addWall((hochVon + suedWestBis) / 2, -hz, suedWestBis - hochVon, BT, SUED_HOCH);
-    addWall(
-      (BUCHT_X_BIS + YARD_MAX_X) / 2,
-      -hz,
-      YARD_MAX_X - BUCHT_X_BIS,
-      BT,
-      SUED_HOCH
-    );
+    addWall((suedOstVon + YARD_MAX_X) / 2, -hz, YARD_MAX_X - suedOstVon, BT, SUED_HOCH);
     addWall(YARD_MIN_X, 0, BT, YARD_D);
     addWall(YARD_MAX_X, 0, BT, YARD_D);
     // Das erhoehte Stueck der Ostmauer — wie bei der Suedmauer ein zweiter
