@@ -453,12 +453,12 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
     id: "magnet",
     name: { de: "MAGNET", en: "MAGNET" },
     beschreibung: {
-      de: "Mit dem Lasthebemagnet alles Eisen aus dem Haufen in die Stahlhalde. Kupfer haftet nicht — es bleibt liegen.",
-      en: "Use the lifting magnet to move all the iron from the pile to the steel bay. Copper does not stick — leave it.",
+      de: "Mit dem Lasthebemagnet den Haufen sortieren: Eisen in die Stahlhalde, Späne in die Mischhalde. Kupfer haftet nicht — es bleibt liegen.",
+      en: "Sort the pile with the lifting magnet: iron to the steel bay, swarf to the mixed bay. Copper does not stick — leave it.",
     },
     ziel: {
-      de: "Hol alles Eisen in die Stahlhalde.",
-      en: "Move all the iron to the steel scrap bay.",
+      de: "Eisen auf STAHL, Späne auf MISCH, Kupfer liegen lassen.",
+      en: "Iron to STEEL, swarf to MIXED, leave the copper.",
     },
     /*
      * DER HAUFEN (Konzept Aufgabe 5): fuenf magnetische Teile — zwei
@@ -472,27 +472,35 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
      * Gang. Links vorn auf 48–69°, 6,4–9,0 m: vorn zwischen MUELL und
      * Besenplatz ist kein Platz fuer sieben Teile (Aufgabe 3, Kopf).
      *
-     * SPAENE SIND MISCHSCHROTT (E-147, Patrick 17.10.2026) — die Stahlhalde
-     * meldet sie dort als falsch (`itemEntered.correct`). Das Konzept will
-     * „alles Eisen in die Stahlhalde"; als Pflichtteil zaehlt ein Knaeuel dort
-     * weder als Fehlwurf noch als Fremdteil (`challenge.ts`). Rueckfrage an
-     * Patrick im Bericht G3.
+     * SPAENE SIND MISCHSCHROTT (E-147, Patrick 17.10.2026) — und gehoeren
+     * darum auch hier in die Mischhalde (Patrick 20.10.2026, G4): Jedes
+     * Knaeuel hat `ziel: "c_mixed"`, das Eisen geht auf `zielBehaelter`.
+     * Spaene in STAHL oder Eisen in MISCH ist ein Fehlwurf, Kupfer in einer
+     * der beiden Halden ein Fremdteil (`challenge.ts`).
+     *
+     * BEIDE HALDEN OHNE FAHREN — dieselbe Abwurf-Rechnung wie Sortieren
+     * (`abwurf` in `test/aufgabenplatz.ts`, 1 m Luft zu den Zonenraendern
+     * und Bauwerken, im Schwenkband): STAHL hinten links bei rund 160°, MISCH
+     * hinten rechts bei rund −160° (200° links herum). Vom Haufen (48–69°)
+     * geht es zu beiden nach links weiter ({cab+}), zu MISCH 40° mehr.
      */
     aufbau: {
       teile: [
-        { name: "Späneknäuel", ...vorDemBagger(48, 6.4) },
+        { name: "Späneknäuel", ...vorDemBagger(48, 6.4), ziel: "c_mixed" },
         { name: "Kupferrohr-Bund", ...vorDemBagger(61, 6.4), bleibtLiegen: true },
         { name: "Stahlknüppel", ...vorDemBagger(50, 7.8) },
         { name: "Kupferrohr", ...vorDemBagger(60, 8.0), bleibtLiegen: true },
-        { name: "Späneknäuel", ...vorDemBagger(69, 7.9) },
+        { name: "Späneknäuel", ...vorDemBagger(69, 7.9), ziel: "c_mixed" },
         { name: "LKW-Felge", ...vorDemBagger(53, 9.0) },
         { name: "Vierkantstahl", ...vorDemBagger(65, 9.0) },
       ],
       greifer: "magnet",
     },
+    // Eisen; die Spaene nennen ihr eigenes Ziel (oben)
     zielBehaelter: "c_steel",
     ablageziel: null,
-    zaehlwort: { de: "Eisen", en: "iron" },
+    // Ein Zaehler fuer alle fuenf (wie Sortieren) — welche Halde, zeigt die gruene Marke beim Halten
+    zaehlwort: { de: "richtig", en: "correct" },
     schritte: [
       {
         beobachtet: "teil_gefasst",
@@ -506,11 +514,11 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
       },
       {
         beobachtet: "teil_ueber_ziel",
-        titel: { de: "Zur Stahlhalde", en: "To the steel bay" },
-        // Stahlhalde hinten links (+x): vom Haufen auf ~55° nach links weiter = cabYaw steigt = plus
+        titel: { de: "Zur richtigen Halde", en: "To the right bay" },
+        // Beide Halden hinten: vom Haufen auf ~55° nach links weiter = cabYaw steigt = plus (STAHL ~160°, MISCH ~200°)
         text: {
-          de: "{boom+}: hoch, dann {cab+} bis über STAHLSCHROTT hinten.",
-          en: "{boom+}: up, then {cab+} until over STEEL SCRAP behind you.",
+          de: "{boom+}: hoch, {cab+} nach hinten — Eisen auf STAHL, Späne auf MISCH.",
+          en: "{boom+}: up, {cab+} to the back — iron to STEEL, swarf to MIXED.",
         },
         zeige: { fn: "cab", richtung: "plus" },
       },
@@ -518,19 +526,23 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
         beobachtet: "teil_im_ziel",
         titel: { de: "Magnet aus", en: "Magnet off" },
         text: {
-          de: "{grapple-}: aus, es fällt. Hol alles Eisen, das Kupfer bleibt.",
-          en: "{grapple-}: off, it drops. Fetch all the iron, leave the copper.",
+          de: "{grapple-}: aus, es fällt. Hol alles, nur das Kupfer bleibt.",
+          en: "{grapple-}: off, it drops. Fetch it all, leave only the copper.",
         },
         zeige: { fn: "grapple", richtung: "minus" },
       },
     ],
     /*
-     * Sterne (Konzept, Aufgabe 5): ★ alles Eisen drueben · ★★ unter 3:00 ·
-     * ★★★ unter 2:00 und kein Kupfer in der Stahlhalde. SW.
+     * Sterne (Konzept, Aufgabe 5; G4): ★ alles Magnetische richtig · ★★ unter
+     * 3:00 · ★★★ unter 2:00, kein Kupfer in einer Halde und kein Fehlwurf.
+     * Die Zeiten bleiben, obwohl MISCH 40° weiter liegt als STAHL: Der Magnet
+     * holt ein bis zwei Stuecke je Gang, der Test-Fahrer braucht gemessen
+     * (`test/aufgabe5.test.ts`) deutlich unter 2:00. „Kein Fehlwurf" ist neu,
+     * weil die Aufgabe jetzt sortiert wie Aufgabe 3 (dort ★★★ ebenso). SW.
      */
     wertung: {
       zwei: { zeitS: 180 }, // SW, Konzept 19.10.2026
-      drei: { zeitS: 120, fremdteile: 0 }, // SW, Konzept 19.10.2026
+      drei: { zeitS: 120, fremdteile: 0, fehlwuerfe: 0 }, // SW, Konzept 19.10.2026, Fehlwurf G4 (Patrick 20.10.2026)
     },
   },
   {
@@ -601,6 +613,8 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
       y: 0,
       z: BAGGER_STAND.z + SCHWER_ZIEL_M * Math.cos(SCHWER_WINKEL),
     },
+    // Der Kreis steht von Anfang an (Patrick 20.10.2026, G4) — man sieht, wohin es geht, bevor man greift
+    zielMarkeAbStart: true,
     tippNachUeberlast: {
       de: "Zu schwer so weit draußen: Stütz dich ab (STÜTZEN) und versuch es nochmal.",
       en: "Too heavy that far out: put the outriggers down (OUTRIGGER) and try again.",

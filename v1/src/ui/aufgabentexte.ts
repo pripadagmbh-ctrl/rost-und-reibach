@@ -26,6 +26,7 @@ export const WORTE = {
   ziel: { de: "Ziel", en: "Goal" },
   platt: { de: "platt", en: "flattened" },
   karteEinklappen: { de: "Karte einklappen", en: "Collapse card" },
+  karteAufklappen: { de: "Karte aufklappen", en: "Expand card" },
   // --- Stick-Woerter fuer `bedientext`
   linkerStick: { de: "linker Stick", en: "left stick" },
   rechterStick: { de: "rechter Stick", en: "right stick" },

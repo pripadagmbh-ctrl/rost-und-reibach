@@ -102,20 +102,64 @@ function kartenKasten(f: Fassung, fall: Fall = "schlimmst"): { karte: Kasten; in
   const y1 = f.h - oben;
   const karte: Kasten = { name: "Aufgabenkarte", x0: links, x1: rechts, y0: y1 - hoehe, y1 };
 
-  // Knoepfe am rechten Rand des Kopfs, von rechts nach links: ↻, Pause, PRESSEN
+  return { karte, innen, hoehe, knoepfe: kopfKnoepfe(f, true) };
+}
+
+/** Breite des Schrifthalters links im Kopf; null = er waechst mit dem Text (iPad, Telefon hoch). */
+const LINKS = ["#tutorial.aufgabe .kopf .links"];
+
+/**
+ * Trefferflaechen der Kopf-Knoepfe (::before ragt 3 px zur Seite und
+ * `ueberstand` px nach oben/unten).
+ *  - Schrifthalter frei: alle Knoepfe fest breit, rechtsbuendig — von rechts
+ *    nach links ↻, Pause, PRESSEN.
+ *  - Schrifthalter fest (Telefon quer, E-164): Knoepfe ab Halter + Luecke,
+ *    PRESSEN fest, ↻ fest, der Klappknopf fuellt den Rest.
+ * `schriftBreite` ueberschreibt den Halter (fuer die Gegenprobe).
+ */
+function kopfKnoepfe(f: Fassung, mitPressen: boolean, schriftBreite = pxOderNull(LINKS, "width", f)): Kasten[] {
+  const links = px(HALTER, "left", f);
+  const breite = pxOderNull(HALTER, "width", f);
+  const rechts = breite === null ? f.w - px(HALTER, "right", f) : links + breite;
+  const [padY, padX] = fassungInnen(KARTE, f);
   const luecke = px(["#tutorial .kopf .knoepfe"], "gap", f);
   const knopfHoehe = px(["#tutorial.aufgabe .kopf button"], "height", f);
   const ueberstand = -px(["#tutorial.aufgabe .kopf button::before"], "top", f);
-  const kopfOben = y1 - RAHMEN - padY;
-  const knoepfe: Kasten[] = [];
-  let x = rechts - RAHMEN - padX;
-  for (const id of ["tut-neu", "tut-pause", "tut-pressen"]) {
-    const b = px([`#tutorial.aufgabe #${id}`], "width", f);
-    // Trefferflaeche: ::before ragt 3 px zur Seite und `ueberstand` px nach oben/unten
-    knoepfe.push({ name: id, x0: x - b - 3, x1: x + 3, y0: kopfOben - knopfHoehe - ueberstand, y1: kopfOben + ueberstand });
-    x -= b + luecke;
+  const kopfOben = f.h - px(HALTER, "top", f) - RAHMEN - padY;
+  const kasten = (id: string, x0: number, x1: number): Kasten => ({
+    name: id, x0: x0 - 3, x1: x1 + 3, y0: kopfOben - knopfHoehe - ueberstand, y1: kopfOben + ueberstand,
+  });
+  const w = (id: string): number => px([`#tutorial.aufgabe #${id}`], "width", f);
+  const ende = rechts - RAHMEN - padX;
+  if (schriftBreite === null) {
+    const out: Kasten[] = [];
+    let x = ende;
+    for (const id of mitPressen ? ["tut-neu", "tut-pause", "tut-pressen"] : ["tut-neu", "tut-pause"]) {
+      out.push(kasten(id, x - w(id), x));
+      x -= w(id) + luecke;
+    }
+    return out;
   }
-  return { karte, innen, hoehe, knoepfe };
+  expect(wert(["#tutorial.aufgabe #tut-pause"], "flex", f), "Klappknopf fuellt den Kopf").toBe("1");
+  let x = links + RAHMEN_LINKS + padX + schriftBreite + px(KOPF, "gap", f);
+  const out: Kasten[] = [];
+  if (mitPressen) {
+    out.push(kasten("tut-pressen", x, x + w("tut-pressen")));
+    x += w("tut-pressen") + luecke;
+  }
+  const neuAb = ende - w("tut-neu");
+  out.push(kasten("tut-pause", x, neuAb - luecke), kasten("tut-neu", neuAb, ende));
+  return out;
+}
+
+/** Zusammengeklappt (E-164): nur Rahmen, Polster und Kopf. */
+function zuKasten(f: Fassung): Kasten {
+  const links = px(HALTER, "left", f);
+  const breite = pxOderNull(HALTER, "width", f);
+  const rechts = breite === null ? f.w - px(HALTER, "right", f) : links + breite;
+  const [padY] = fassungInnen(KARTE, f);
+  const y1 = f.h - px(HALTER, "top", f);
+  return { name: "Karte zu", x0: links, x1: rechts, y0: y1 - (2 * RAHMEN + 2 * padY + px(KOPF, "min-height", f)), y1 };
 }
 
 function geist(seite: "links" | "rechts", f: Fassung): Kasten {
@@ -203,6 +247,46 @@ describe("Aufgabenkarte und Geisterdaumen: Platz", () => {
           expect(f.h - karte.y0, "Unterkante schlimmster Fall").toBe(163);
           expect(f.h - ringe[0]!.y1, "Oberkante des linken Rings").toBe(190);
         });
+
+        // --- E-164: zusammengeklappt auf die Kopfzeile
+        it("mini quer zu: Karte hoechstens 50 px hoch, Unterkante bei hoechstens 60", () => {
+          const zu = zuKasten(f);
+          expect(zu.y1 - zu.y0, "Hoehe").toBeLessThanOrEqual(50);
+          expect(f.h - zu.y0, "Unterkante").toBeLessThanOrEqual(60);
+          expect([zu.y1 - zu.y0, f.h - zu.y0], "Zahlen im CSS-Kommentar").toEqual([38, 44]);
+        });
+        for (const mitPressen of [false, true]) {
+          it(`mini quer zu: Klappknopf ${mitPressen ? "neben PRESSEN" : "allein"} 44 x 44, ganz im Kamera-Mittelstreifen`, () => {
+            const kn = kopfKnoepfe(f, mitPressen);
+            const klapp = kn.find((k) => k.name === "tut-pause")!;
+            for (const k of kn) {
+              expect(k.x1 - k.x0, k.name).toBeGreaterThanOrEqual(44);
+              expect(k.y1 - k.y0, k.name).toBeGreaterThanOrEqual(44);
+              expect(k.x0, `${k.name} ragt in die linke Stick-Zone`).toBeGreaterThan(zoneLinksBis(f));
+              expect(k.x1, `${k.name} ragt in die rechte Stick-Zone`).toBeLessThan(zoneRechtsAb(f));
+            }
+            for (let i = 1; i < kn.length; i++) expect(luft(kn[i - 1]!, kn[i]!), "Knoepfe ueberlappen nicht").toBeGreaterThanOrEqual(0);
+            // die Zahlen im CSS-Kommentar (sichtbar, ohne die 3 px des ::before)
+            expect([klapp.x0 + 3, klapp.x1 - 3]).toEqual(mitPressen ? [391, 462] : [289, 462]);
+          });
+        }
+        it("mini quer zu: der Fortschritt passt neben Schritt und Uhr in den Kopf", () => {
+          const breite = px(LINKS, "width", f);
+          const schrift = schriftgroesse(KOPF, f);
+          for (const t of ["2/2 · 9:59 · 12/12 richtig", "2/2 · 9:59 · 12/12 correct", "2/2 · 9:59 · platt 99 %", "2/2 · 9:59 · flattened 99 %"])
+            expect(t.length * schrift * 0.55, t).toBeLessThanOrEqual(breite);
+          expect(wert(["#tutorial.aufgabe .kurz", "#tutorial.aufgabe.pausiert .kurz"], "display", f)).toBe("inline");
+        });
+      }
+
+      if (f.name === "iPad quer") {
+        it("iPad: Kopf wie vorher — kein fester Schrifthalter, Pause 72 px, kein Fortschritt im Kopf", () => {
+          expect(pxOderNull(LINKS, "width", f)).toBeNull();
+          expect(px(["#tutorial.aufgabe #tut-pause"], "width", f)).toBe(72);
+          expect(wert(["#tutorial.aufgabe .kurz", "#tutorial.aufgabe.pausiert .kurz"], "display", f)).toBe("none");
+          // Karte x 12..478, innen bis 464: ↻ 420..464, Pause 342..414, PRESSEN 240..336
+          expect(kopfKnoepfe(f, true).map((k) => [k.x0 + 3, k.x1 - 3])).toEqual([[420, 464], [342, 414], [240, 336]]);
+        });
       }
     });
   }
@@ -217,5 +301,13 @@ describe("Aufgabenkarte und Geisterdaumen: Platz", () => {
     // und eine Zeile mehr bei Schritt 1 (z. B. die Sternziele wieder in zwei Zeilen) reisst die 130
     const s1 = kartenKasten(f, "schritt1").karte;
     expect(f.h - (s1.y0 - zeile(ZUSATZ, f))).toBeGreaterThan(130);
+  });
+
+  it("GEGENPROBE E-164: ein schmalerer Schrifthalter schiebt den Klappknopf in die linke Stick-Zone, eine Zeile mehr reisst die 50 px", () => {
+    const f = FASSUNGEN.find((x) => x.name === "iPhone mini quer")!;
+    const klapp = kopfKnoepfe(f, false, px(LINKS, "width", f) - 8).find((k) => k.name === "tut-pause")!;
+    expect(klapp.x0).toBeLessThanOrEqual(zoneLinksBis(f));
+    const zu = zuKasten(f);
+    expect(zu.y1 - zu.y0 + zeile(ZUSATZ, f), "Zaehler als eigene Zeile statt im Kopf").toBeGreaterThan(50);
   });
 });

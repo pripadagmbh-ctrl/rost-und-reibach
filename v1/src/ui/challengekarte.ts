@@ -109,6 +109,61 @@ export function bedientext(text: string, c: ControlConfig, s: Sprache = sprache(
   return fertig.replace(/(^|\n)(\S)/g, (_, a: string, b: string) => a + b.toUpperCase());
 }
 
+/** SW: Patrick 20.10.2026, Entscheidung A „klappt nach 5 s auf die Kopfzeile zusammen" (E-164). */
+export const ZUKLAPPEN_S = 5;
+
+/**
+ * AUF ODER ZU (E-164) — ohne DOM, damit es pruefbar ist.
+ *
+ * Auf kleinen Bildschirmen (`auto`, Telefon quer) zeigt die Karte jeden
+ * neuen Schritt, jeden neuen Tipp und das Erscheinen von PRESSEN voll und
+ * klappt nach `ZUKLAPPEN_S` von selbst auf ihren Kopf zusammen. Ein Tipp auf
+ * den Klappknopf dreht um; aufgetippt gilt dieselbe Frist — der Daumen soll
+ * zurueck an den Stick, nicht ein zweites Mal zur Karte.
+ *
+ * Die Zeit ist die Aufgabenuhr (`challenge:stand.zeitS`): Sie steht in der
+ * Spielpause, und dann laeuft auch die Lesezeit nicht ab — wer aus dem Menue
+ * zurueckkommt, sieht die Karte so, wie er sie verlassen hat.
+ *
+ * Ohne `auto` (iPad, Telefon hoch) bleibt es beim Knopf wie bisher: nur er
+ * klappt, sonst nichts.
+ */
+export class Klappe {
+  zu = false;
+  private t = 0;
+  private bis = ZUKLAPPEN_S;
+  constructor(private readonly auto: () => boolean) {}
+
+  /** Neue Aufgabe oder ↻: Uhr von vorn, Karte auf. */
+  neustart(): void {
+    this.t = 0;
+    this.zu = false;
+    this.bis = ZUKLAPPEN_S;
+  }
+
+  /** Neuer Schritt, neuer Tipp, PRESSEN erscheint. */
+  zeige(): void {
+    if (!this.auto()) return;
+    this.zu = false;
+    this.bis = this.t + ZUKLAPPEN_S;
+  }
+
+  /** Der Klappknopf. */
+  tippe(): void {
+    if (!this.zu) this.zu = true;
+    else {
+      this.zu = false;
+      this.bis = this.t + ZUKLAPPEN_S;
+    }
+  }
+
+  /** Aufgabenuhr in Sekunden. */
+  zeit(t: number): void {
+    this.t = t;
+    if (this.auto() && !this.zu && t >= this.bis) this.zu = true;
+  }
+}
+
 /** Was die Karte von aussen braucht — mehr nicht. */
 export interface KartenAnschluss {
   bus: EventBus;
@@ -194,8 +249,11 @@ export function installChallengeKarte(m: KartenAnschluss): ChallengeKarte {
   links.className = "links";
   const uhrEl = document.createElement("span");
   uhrEl.className = "uhr";
+  // Zusammengeklappt (Telefon quer) steht der Fortschritt mit im Kopf: „1/2 · 0:42 · 4/6 richtig"
+  const kurzEl = document.createElement("span");
+  kurzEl.className = "kurz";
   kopf.insertBefore(links, schritt);
-  links.append(schritt, " · ", uhrEl);
+  links.append(schritt, " · ", uhrEl, kurzEl);
 
   const pressen = document.createElement("button");
   pressen.type = "button";
@@ -240,6 +298,7 @@ export function installChallengeKarte(m: KartenAnschluss): ChallengeKarte {
   const setzeZaehler = zeile(zaehlerEl);
   const setzeTipp = zeile(tippEl);
   const setzeSterne = zeile(sternEl);
+  const setzeKurz = zeile(kurzEl, false);
   // Knoepfe: Sichtbarkeit steuert der Zustand, nicht der Text
   const setzePause = zeile(pause, false);
   const setzePressen = zeile(pressen, false);
@@ -251,10 +310,35 @@ export function installChallengeKarte(m: KartenAnschluss): ChallengeKarte {
   let balkenProzent = -1;
   let pressenSichtbar = false;
   let laeuft = false;
+  let tippAlt = "";
+
+  // --- Auf/zu (E-164): dieselbe Grenze wie das flache Layout in index.html
+  const klein = matchMedia("(max-height: 430px)");
+  const klappe = new Klappe(() => klein.matches);
+  /*
+   * Ein Knopf, eine Bedienung: Auf dem Telefon quer heisst er ▾ / ▴ und ist
+   * die Trefferflaeche zum Aufklappen („Pause" klang nach Spielpause,
+   * Patrick 20.10.); sonst bleibt er „Pause" / „weiter".
+   */
+  const beschrifteKlappe = (s: Sprache): void => {
+    const zu = karte.classList.contains("pausiert");
+    if (klein.matches) {
+      setzePause(zu ? "▾" : "▴");
+      pause.setAttribute("aria-label", wort(zu ? "karteAufklappen" : "karteEinklappen", s));
+    } else {
+      setzePause(wort(zu ? "weiter" : "pause", s));
+      pause.setAttribute("aria-label", wort("karteEinklappen", s));
+    }
+  };
+  const zeigeKlappe = (): void => {
+    if (karte.classList.contains("pausiert") === klappe.zu) return;
+    karte.classList.toggle("pausiert", klappe.zu);
+    beschrifteKlappe(sprache());
+  };
+  klein.addEventListener("change", () => beschrifteKlappe(sprache()));
 
   const beschrifteFest = (s: Sprache): void => {
-    setzePause(wort(karte.classList.contains("pausiert") ? "weiter" : "pause", s));
-    pause.setAttribute("aria-label", wort("karteEinklappen", s));
+    beschrifteKlappe(s);
     neu.setAttribute("aria-label", wort("neustart", s));
     neu.title = wort("neustart", s);
     setzePressen(wort("pressen", s));
@@ -291,10 +375,27 @@ export function installChallengeKarte(m: KartenAnschluss): ChallengeKarte {
       }
     }
     setzeTipp(e.tipp ? waehle(e.tipp, s) : "");
+    setzeKurz(
+      e.zaehler
+        ? ` · ${e.zaehler.ist}/${e.zaehler.von} ${waehle(e.zaehler.wort, s)}`
+        : pct >= 0
+          ? ` · ${wort("platt", s)} ${pct} %`
+          : ""
+    );
+    // Ein neuer Tipp oder PRESSEN klappt die Karte auf (E-164). Verglichen
+    // wird der deutsche Text, damit ein Sprachwechsel nicht als neuer Tipp zaehlt.
+    const tipp = e.tipp?.de ?? "";
+    if (tipp !== tippAlt) {
+      tippAlt = tipp;
+      if (tipp !== "") klappe.zeige();
+    }
     if (e.pressenBereit !== pressenSichtbar) {
       pressenSichtbar = e.pressenBereit;
       pressen.hidden = !pressenSichtbar;
+      if (pressenSichtbar) klappe.zeige();
     }
+    klappe.zeit(e.zeitS);
+    zeigeKlappe();
   };
 
   const allesNeu = (): void => {
@@ -307,8 +408,8 @@ export function installChallengeKarte(m: KartenAnschluss): ChallengeKarte {
 
   // --- Knoepfe
   tippKnopf(pause, () => {
-    karte.classList.toggle("pausiert");
-    setzePause(wort(karte.classList.contains("pausiert") ? "weiter" : "pause", sprache()));
+    klappe.tippe();
+    zeigeKlappe();
   });
   let zuletztNeu = -Infinity;
   tippKnopf(neu, () => {
@@ -331,6 +432,9 @@ export function installChallengeKarte(m: KartenAnschluss): ChallengeKarte {
     balkenEl.hidden = true;
     pressenSichtbar = false;
     laeuft = true;
+    tippAlt = "";
+    klappe.neustart();
+    zeigeKlappe();
     const s = sprache();
     beschrifteFest(s);
     zeigeStart(s);
@@ -344,6 +448,8 @@ export function installChallengeKarte(m: KartenAnschluss): ChallengeKarte {
     letzterSchritt = e;
     laeuft = true;
     zeigeSchritt(sprache());
+    klappe.zeige();
+    zeigeKlappe();
     karte.classList.add("open");
   });
   m.bus.on("challenge:stand", (e) => {

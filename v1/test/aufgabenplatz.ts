@@ -11,7 +11,8 @@
  * Aufgaben faehrt kein Laster (`vehicles.acceptDeliveries = false` in
  * main.ts), darum sind Spuren und Abkippstelle eine Frage, keine Pflicht.
  */
-import { CONFIGS, bayHalb } from "../src/world/containers";
+import { CONFIGS, MUELL_START, bayHalb } from "../src/world/containers";
+import { SCHWENK_AUSSEN, SCHWENK_INNEN, abstandVomStand } from "../src/world/baggerstand";
 import { hitsObstacle } from "../src/world/obstacles";
 import { PRESS_CENTER, PRESS_KAMMER } from "../src/world/press";
 import { BESEN_PLATZ } from "../src/world/startplatz";
@@ -83,4 +84,23 @@ export function ecken(mx: number, mz: number, gier: number, halbB: number, halbL
   return [-1, 1].flatMap((sa) =>
     [-1, 1].map((sl) => ({ x: mx + sa * halbB * c + sl * halbL * s, z: mz - sa * halbB * s + sl * halbL * c }))
   );
+}
+
+/**
+ * Die Abwurfstelle eines Behaelters: im Schwenkband, mit `luft` Abstand zu
+ * den Zonenraendern und zu jedem Bauwerk, moeglichst nah an 8,1 m
+ * (Ausladung der Startpose). null = ohne Fahren nicht erreichbar.
+ */
+export function abwurf(id: string, luft: number): { x: number; z: number; r: number } | null {
+  const c = CONFIGS.find((x) => x.id === id)!;
+  const ort = id === "r_rubble" ? MUELL_START : c;
+  const [w, d] = c.size;
+  let best: { x: number; z: number; r: number } | null = null;
+  for (let x = ort.x - w / 2 + luft; x <= ort.x + w / 2 - luft + 1e-6; x += 0.1)
+    for (let z = ort.z - d / 2 + luft; z <= ort.z + d / 2 - luft + 1e-6; z += 0.1) {
+      const r = abstandVomStand(x, z);
+      if (r < SCHWENK_INNEN || r > SCHWENK_AUSSEN || hitsObstacle(x, z, luft)) continue;
+      if (!best || Math.abs(r - 8.1) < Math.abs(best.r - 8.1)) best = { x, z, r };
+    }
+  return best;
 }

@@ -21,11 +21,10 @@ import { CHALLENGES } from "../src/challenges/katalog";
 import { ChallengeLauf, sterne, type ChallengeQuellen, type Punkt } from "../src/challenges/challenge";
 import { aufbauKonflikte, formAusSpec, teilSpec } from "../src/challenges/aufbau";
 import { CONFIGS, gehoertHierhin, MUELL_START } from "../src/world/containers";
-import { hitsObstacle } from "../src/world/obstacles";
 import { umkugelRadius } from "../src/world/scrapItems";
 import { BAGGER_STAND, SCHWENK_AUSSEN, SCHWENK_INNEN, abstandVomStand } from "../src/world/baggerstand";
 import { EventBus, type GameEvents } from "../src/core/events";
-import { belegt } from "./aufgabenplatz";
+import { abwurf, belegt } from "./aufgabenplatz";
 import { DT, GRAD, greife, koerperZahl, legeAb, platzLeinwand, starteAufgabe, werkbank } from "./aufgabenwerkbank";
 
 const A3 = CHALLENGES.find((c) => c.id === "sortieren")!;
@@ -44,25 +43,6 @@ function zielVon(name: string): string {
   const ziele = CONFIGS.filter((c) => !c.nurHuelle && !c.lager && gehoertHierhin(c, s.materialId) && abstandVomStand(c.x, c.z) < SCHWENK_AUSSEN + 3);
   expect(ziele.length, `${name}: ${ziele.map((c) => c.id).join(",")}`).toBe(1);
   return ziele[0]!.id;
-}
-
-/**
- * Die Abwurfstelle eines Behaelters: im Schwenkband, mit `luft` Abstand zu
- * den Zonenraendern und zu jedem Bauwerk, moeglichst nah an 8,1 m
- * (Ausladung der Startpose). null = ohne Fahren nicht erreichbar.
- */
-function abwurf(id: string, luft: number): { x: number; z: number; r: number } | null {
-  const c = CONFIGS.find((x) => x.id === id)!;
-  const ort = id === "r_rubble" ? MUELL_START : c;
-  const [w, d] = c.size;
-  let best: { x: number; z: number; r: number } | null = null;
-  for (let x = ort.x - w / 2 + luft; x <= ort.x + w / 2 - luft + 1e-6; x += 0.1)
-    for (let z = ort.z - d / 2 + luft; z <= ort.z + d / 2 - luft + 1e-6; z += 0.1) {
-      const r = abstandVomStand(x, z);
-      if (r < SCHWENK_INNEN || r > SCHWENK_AUSSEN || hitsObstacle(x, z, luft)) continue;
-      if (!best || Math.abs(r - 8.1) < Math.abs(best.r - 8.1)) best = { x, z, r };
-    }
-  return best;
 }
 
 describe("Aufgabe 3: die Teile", () => {

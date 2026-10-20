@@ -760,7 +760,8 @@
          - Karte x 58..524 (max(8, 50+8) + 466). Die rechte Stick-Zone beginnt
            bei 0,65 x 812 = 527,8: 3,8 px Luft.
          - Knoepfe am rechten Rand des Kopfs: 524 - 2 Rahmen - 10 Polster = 512;
-           ↻ 468..512, Pause 390..462, PRESSEN 288..384 (je 6 px Luecke).
+           ↻ 468..512, Klappknopf ▾ 391..462, PRESSEN 289..385 (je 6 px
+           Luecke; seit E-164 von links gesetzt, siehe „Zusammenklappen").
            Die linke Stick-Zone endet bei 0,35 x 812 = 284,2 — alle drei
            Knoepfe liegen im Kamera-Mittelstreifen, auch mit der 3 px breiteren
            Trefferflaeche. Kein Daumen, der einen Stick setzt, trifft einen Knopf.
@@ -832,6 +833,24 @@
         #tutorial.aufgabe .kopf button::before { top: -8px; bottom: -8px; }
         #tutorial.aufgabe .zusatz, #tutorial.aufgabe p { line-height: 1.2; }
         #tutorial.aufgabe h3 { margin: 0; font-size: 14px; line-height: 1.2; }
+      }
+      /* Zusammenklappen auf dem Telefon quer (E-164, Patrick 20.10.2026 „A"):
+         Jeder neue Schritt steht 5 s voll da, dann bleibt nur der Kopf —
+         2 + 3 + 28 + 3 + 2 = 38 px, Unterkante 6 + 38 = 44. Der Fortschritt
+         rueckt in den Kopf („1/2 · 0:42 · 4/6 richtig", `.kurz`).
+         Der Klappknopf (#tut-pause, ▾ / ▴) ist die Trefferflaeche zum
+         Aufklappen und fuellt den Kopf von der linken Stick-Zone bis ↻:
+         Schrifthalter 73 + 208 + 8 Luecke = 289, mit ::before 286 — die linke
+         Stick-Zone endet bei 284,2. Ohne PRESSEN ▾ 289..462 (173 px), mit
+         PRESSEN 289..385 und ▾ 391..462. Der Text links nimmt keine
+         Beruehrung an: Ein Daumen dort setzt den Stick, nicht die Karte.
+         Gerechnet in test/aufgabenkarte-platz.test.ts. */
+      #tutorial.aufgabe .kurz { display: none; }
+      @media (max-height: 430px) {
+        #tutorial.aufgabe .kopf .links { flex: none; width: 208px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        #tutorial.aufgabe .kopf .knoepfe { flex: 1; }
+        #tutorial.aufgabe #tut-pause { flex: 1; width: auto; font-size: 22px; line-height: 1; }
+        #tutorial.aufgabe.pausiert .kurz { display: inline; }
       }
       /* Telefon hoch: volle Breite bis vor den Menueknopf (12 + 46 + 4 Rahmen
          + 8 Luft = 70 px vom rechten Rand). */

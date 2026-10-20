@@ -24,6 +24,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | E-172 | 19.10.2026 | Stummschalter auf lautlos: Spiel still, fremde Musik läuft weiter | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-171 | 19.10.2026 | Datenschutz, Lizenzen, Support als Seiten im App-Paket | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-170 | 19.10.2026 | Englisch im Spiel: Sprache vom Gerät, umschaltbar im Pausenmenü | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
+| E-164 | 20.10.2026 | Karte klappt auf dem Telefon zusammen, Magnet: Späne auf MISCH, Zielkreis ab Start | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-163 | 20.10.2026 | Aufgaben 2–6: Presse, Sortieren, Platt machen, Magnet, Schwere Last | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-162 | 20.10.2026 | Aufgaben zurück: Grundlage und Aufgabe 1 „Erster Griff“, ↻ ohne Neuladen | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-161 | 19.10.2026 | iOS-App ohne Mac: Capacitor 8, Cloud-Bau, TestFlight vorbereitet | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
@@ -273,6 +274,12 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - iPhone mini quer: Pausenmenü (jetzt drei Spalten) ohne Scrollen, alle Knöpfe lesbar?
 - Zurück auf Deutsch: alles wieder deutsch, ohne Neustart?
 - Frage: Schild „BUNT + VA“ heißt englisch „NON-FERROUS + SS“ (SS = stainless steel) — passt das, oder lieber „NON-FERROUS + STAINLESS“ (zu lang fürs Schild)?
+
+**E-164 — Karte klappt zusammen, Magnet, Zielkreis** (iPhone mini quer, dann iPad)
+- Nach 5 s nur noch die Kopfzeile, Wohnwagen in „Platt machen“ sichtbar?
+- ▾ öffnet für 5 s, ▴ schließt; Stick-Daumen oben links öffnet die Karte nicht?
+- Magnet: grüne Marke über MISCH bei Spänen, über STAHL bei Eisen? Späne auf STAHL kosten den dritten Stern?
+- Schwere Last: grüner Kreis gleich beim Start?
 
 **E-163 — Aufgaben 2–6** (iPad, dann iPhone mini quer; über das Menü nacheinander)
 - A2 Presse: Pkw schräg links vorn sichtbar? Am Dach greifen, ohne dass die Haube aufspringt? Sanft absetzen = kein harter Aufschlag? PRESSEN erst, wenn es drin liegt?

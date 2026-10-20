@@ -149,6 +149,19 @@ describe("Aufgabe 6: der Ablauf mit Attrappen", () => {
   }
   const imKreis = { x: ZIEL.x, y: 0, z: ZIEL.z };
 
+  it("gruener Kreis ab dem ersten Stand, gelbe Marke am Wrack nur bis zum Greifen (Patrick 20.10.2026, G4)", () => {
+    const a = attrappe();
+    const ziel = { ...A6.zielMarke!, art: "ziel" };
+    a.lauf.takt(1);
+    expect(a.staende).toHaveLength(1);
+    expect(a.staende[0]!.marken).toContainEqual(ziel);
+    expect(a.staende[0]!.marken.filter((m) => m.art === "teil")).toHaveLength(1);
+    a.w.griff = true;
+    a.w.unten = 1.0;
+    a.lauf.takt(1);
+    expect(a.staende.at(-1)!.marken).toEqual([ziel]);
+  });
+
   it("greifen → heben (Unterkante ≥ 0,3 m) → im Kreis absetzen → loslassen: geschafft", () => {
     const a = attrappe();
     a.lauf.takt(1);

@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { sternZiele, schwelleText, sterneText, uhr } from "../src/ui/aufgabentexte";
 import { aufgabeFrei, naechsteFreieAufgabe } from "../src/ui/hauptmenue";
-import { bedientext } from "../src/ui/challengekarte";
+import { bedientext, Klappe, ZUKLAPPEN_S } from "../src/ui/challengekarte";
 import { daumenBild } from "../src/ui/geisterdaumen";
 import { challengeZeilen } from "../src/ui/abrechnung";
 import { defaultConfig, type ControlConfig } from "../src/core/controlConfig";
@@ -210,5 +210,71 @@ describe("Zeilen der Abschlusstafel", () => {
     expect(z.map((r) => r.name)).toEqual(["Time", "Misses"]);
     expect(z[0]!.wert).toBe("✓ 2:20 min (★★★ max. 2:30 min)");
     expect(z[1]!.wert).toBe("✓ 0 (★★★ max. 0)");
+  });
+});
+
+describe("Aufgabenkarte klappt auf dem Telefon quer zusammen (E-164)", () => {
+  const telefon = (): Klappe => {
+    const k = new Klappe(() => true);
+    k.neustart();
+    return k;
+  };
+  it("neuer Schritt offen, nach 5 s Aufgabenzeit zu", () => {
+    const k = telefon();
+    k.zeige();
+    k.zeit(4.9);
+    expect(k.zu).toBe(false);
+    k.zeit(ZUKLAPPEN_S);
+    expect(k.zu).toBe(true);
+  });
+  it("ein neuer Schritt, Tipp oder PRESSEN oeffnet und gibt wieder 5 s", () => {
+    const k = telefon();
+    k.zeit(12);
+    expect(k.zu).toBe(true);
+    k.zeige(); // z. B. Schritt 2 bei 12 s
+    expect(k.zu).toBe(false);
+    k.zeit(16.9);
+    expect(k.zu, "noch innerhalb der 5 s").toBe(false);
+    k.zeit(17);
+    expect(k.zu).toBe(true);
+  });
+  it("Tipp auf den Klappknopf: zu → auf fuer 5 s, auf → zu", () => {
+    const k = telefon();
+    k.zeit(6);
+    expect(k.zu).toBe(true);
+    k.tippe();
+    expect(k.zu).toBe(false);
+    k.zeit(10.9);
+    expect(k.zu).toBe(false);
+    k.zeit(11);
+    expect(k.zu, "aufgetippt gilt dieselbe Frist").toBe(true);
+    k.tippe();
+    k.tippe();
+    expect(k.zu, "zweiter Tipp klappt sofort zu").toBe(true);
+  });
+  it("Spielpause: die Uhr steht, die Karte bleibt offen", () => {
+    const k = telefon();
+    k.zeit(3); // dann Pause — es kommt kein challenge:stand
+    expect(k.zu).toBe(false);
+  });
+  it("↻: die Aufgabenuhr beginnt bei 0, die Karte ist wieder 5 s offen", () => {
+    const k = telefon();
+    k.zeit(40);
+    k.neustart();
+    k.zeige();
+    k.zeit(0.5);
+    expect(k.zu).toBe(false);
+    k.zeit(5);
+    expect(k.zu).toBe(true);
+  });
+  it("GEGENPROBE iPad: nichts klappt von selbst, nur der Knopf", () => {
+    const k = new Klappe(() => false);
+    k.neustart();
+    k.zeit(60);
+    expect(k.zu).toBe(false);
+    k.tippe();
+    k.zeige();
+    k.zeit(61);
+    expect(k.zu, "ein neuer Schritt oeffnet auf dem iPad nicht (wie bisher)").toBe(true);
   });
 });

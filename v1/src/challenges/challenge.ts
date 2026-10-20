@@ -73,6 +73,14 @@ import type { Zweisprachig } from "./texte";
  *   balken01           mit `plattAb`: der Knautschgrad des Wracks, 0 … 1
  *   tipp               mit `tippNachUeberlast`: ab der ersten Ueberlast-
  *                      Meldung OHNE Pratzen (`greifer:ueberlast.abgestuetzt`)
+ *
+ * Seit G4 (20.10.2026, Aufgabe 5 mit zwei Halden):
+ *   Ein Teil darf sein EIGENES Ziel haben (`AufbauTeil.ziel`, sonst gilt
+ *   `zielBehaelter`). Gehoben, ueber dem Ziel, im Ziel, die gruene Marke und
+ *   der Fehlwurf richten sich dann nach dem Ziel dieses Teils. Fremdteil ist,
+ *   was in IRGENDEINEM dieser Ziele liegt und dort nicht hingehoert.
+ *   Mit `zielMarkeAbStart` steht die gruene Marke vom ersten Bild an
+ *   (Aufgabe 6, Patrick 20.10.2026), sonst erst, wenn das Wrack haengt.
  */
 export type Beobachtung =
   | "blick_auf_teil"
@@ -164,10 +172,13 @@ export interface AufbauTeil {
   gier?: number;
   /**
    * Gehoert NICHT ins Ziel (Aufgabe 5: das Kupfer im Eisenhaufen). Zaehlt
-   * nicht fuer Zaehler und Fertig; liegt es am Ende im Zielbehaelter, ist es
-   * ein Fremdteil, landet es in einer falschen Mulde, ein Fehlwurf.
+   * nicht fuer Zaehler und Fertig; liegt es in einem Ziel der Aufgabe, ist es
+   * ein Fremdteil — kein Fehlwurf (G4: Fehlwurf ist ein Pflichtteil im
+   * falschen Ziel).
    */
   bleibtLiegen?: boolean;
+  /** Eigenes Ziel dieses Teils (Container-ID), sonst `ChallengeDaten.zielBehaelter` — Aufgabe 5: Spaene auf MISCH */
+  ziel?: string;
 }
 
 export interface AufbauWrack {
@@ -208,6 +219,8 @@ export interface ChallengeDaten {
   ablageRadiusM?: number;
   /** Wo die gruene Marke steht, solange das Wrack gefasst ist (ohne Zielbehaelter: Kammer, Ablagekreis) */
   zielMarke?: Punkt;
+  /** Die gruene Marke steht schon vor dem Greifen (Aufgabe 6: der Kreis von Anfang an) */
+  zielMarkeAbStart?: boolean;
   /** Zaehler auf der Karte: „4/6 richtig" — das Wort dahinter */
   zaehlwort?: Zweisprachig;
   /** Balken „platt" auf der Karte und `wrack_platt` ab diesem Knautschgrad (0 … 1) */
@@ -413,8 +426,8 @@ export class ChallengeLauf {
   knautschgrad = 0;
   /** Teile, deren falscher Einwurf schon gezaehlt ist — frei erst nach erneutem Greifen */
   private falschGezaehlt = new Set<string>();
-  /** Falsche Teile, die gerade im Zielbehaelter liegen */
-  private fremdImZiel = new Set<string>();
+  /** Falsche Teile, die gerade in einem Ziel liegen: Teil → Ziel */
+  private fremdIn = new Map<string, string>();
   /** Liegehoehe je Teil (tiefste Mitte, solange es nicht gefasst war) */
   private liegeY = new Map<string, number>();
   /** Aufgaben-Teile, die richtig eingeworfen wurden: Teil → Mulde (bis `itemLeft`) */
@@ -436,6 +449,10 @@ export class ChallengeLauf {
   /** Teile, die ins Ziel muessen (ohne `bleibtLiegen`) */
   private readonly pflichtIds: ReadonlySet<string>;
   private readonly eigeneHandles: ReadonlySet<number>;
+  /** Pflichtteil → sein Ziel (eigenes `ziel` oder `zielBehaelter`); fehlt = Sortieren nach `itemEntered.correct` */
+  private readonly zielJe = new Map<string, string>();
+  /** Alle Ziele der Aufgabe — was dort falsch liegt und kein Pflichtteil ist, ist ein Fremdteil */
+  private readonly alleZiele = new Set<string>();
 
   constructor(
     readonly daten: ChallengeDaten,
@@ -448,29 +465,34 @@ export class ChallengeLauf {
     this.teilIds = new Set(objekte.teile.map((t) => t.id));
     // `baueAufgabe` legt die Teile in der Reihenfolge der Daten an
     this.pflichtIds = new Set(objekte.teile.filter((_, i) => !daten.aufbau.teile?.[i]?.bleibtLiegen).map((t) => t.id));
+    objekte.teile.forEach((t, i) => {
+      const z = daten.aufbau.teile?.[i]?.ziel ?? daten.zielBehaelter;
+      if (z && this.pflichtIds.has(t.id)) this.zielJe.set(t.id, z);
+    });
+    if (daten.zielBehaelter) this.alleZiele.add(daten.zielBehaelter);
+    for (const z of this.zielJe.values()) this.alleZiele.add(z);
     this.eigeneHandles = new Set([
       ...objekte.teile.map((t) => t.body.handle),
       ...objekte.wracks.map((w) => w.body.handle),
     ]);
     const zaehlt = (): boolean => this.laeuft && !this.aus && !this.geschafft;
-    const ziel = daten.zielBehaelter;
     bus.on("itemEntered", (e) => {
       if (!zaehlt()) return;
-      const eigen = this.teilIds.has(e.itemId);
       const pflicht = this.pflichtIds.has(e.itemId);
-      if (eigen && e.correct) this.richtigIn.set(e.itemId, e.containerId);
-      // Fremd im Ziel ist, was dort nicht hingehoert — ein Pflichtteil gehoert hin (Spaene in Aufgabe 5)
-      if (!e.correct && !pflicht && e.containerId === ziel) this.fremdImZiel.add(e.itemId);
-      if (!eigen || this.falschGezaehlt.has(e.itemId)) return;
-      // Mit Zielbehaelter zaehlt fuer Pflichtteile der Behaelter, sonst die Sorte
-      const falsch = pflicht && ziel ? e.containerId !== ziel : !e.correct;
+      if (this.teilIds.has(e.itemId) && e.correct) this.richtigIn.set(e.itemId, e.containerId);
+      // Fremd ist, was in einem Ziel liegt und dort nicht hingehoert; ein Pflichtteil im falschen Ziel ist ein Fehlwurf
+      if (!e.correct && !pflicht && this.alleZiele.has(e.containerId)) this.fremdIn.set(e.itemId, e.containerId);
+      if (!pflicht || this.falschGezaehlt.has(e.itemId)) return;
+      // Mit Ziel zaehlt fuer Pflichtteile der Behaelter, sonst die Sorte
+      const z = this.zielJe.get(e.itemId);
+      const falsch = z ? e.containerId !== z : !e.correct;
       if (!falsch) return;
       this.falschGezaehlt.add(e.itemId);
       this.fehlwuerfe++;
     });
     bus.on("itemLeft", (e) => {
       if (!zaehlt()) return;
-      if (e.containerId === ziel) this.fremdImZiel.delete(e.itemId);
+      if (this.fremdIn.get(e.itemId) === e.containerId) this.fremdIn.delete(e.itemId);
       if (this.richtigIn.get(e.itemId) === e.containerId) this.richtigIn.delete(e.itemId);
     });
     bus.on("schrott:aufprall", (e) => {
@@ -569,7 +591,6 @@ export class ChallengeLauf {
   private beobachte(dt: number): { jetzt: Record<Beobachtung, boolean>; marken: Marke[]; imZiel: number } {
     const q = this.q;
     const d = this.daten;
-    const ziel = d.zielBehaelter;
     const griff = new Set(q.gegriffen().map((b) => b.handle));
     const marken: Marke[] = [];
 
@@ -582,13 +603,14 @@ export class ChallengeLauf {
      * (qa-Befund 19.10.2026: Die Zone zaehlt das Teil, waehrend es noch ueber
      * der 2-m-Wand faellt — prallte es heraus, waere die Aufgabe trotzdem
      * geschafft). Mitte unter der Oberkante = es ist drin, nicht darueber.
-     * Mit Zielbehaelter zaehlt der Behaelter, ohne (Aufgabe 3) die Mulde, in
+     * Mit Ziel zaehlt der Behaelter des Teils, ohne (Aufgabe 3) die Mulde, in
      * der das Teil richtig ist (`itemEntered.correct`).
      */
     const imZiel = (t: { id: string; body: AufgabenKoerper }): boolean => {
       if (griff.has(t.body.handle)) return false;
       const c = q.behaelterVon(t.id);
-      if (!c || (ziel ? c !== ziel : this.richtigIn.get(t.id) !== c)) return false;
+      const z = this.zielJe.get(t.id);
+      if (!c || (z ? c !== z : this.richtigIn.get(t.id) !== c)) return false;
       return t.body.translation().y < (q.behaelter(c)?.oberkante ?? Infinity);
     };
     for (const t of lebend) {
@@ -604,6 +626,7 @@ export class ChallengeLauf {
       if (this.pflichtIds.has(t.id) && !imZiel(t)) marken.push({ x: p.x, y: p.y + this.liegeY.get(t.id)!, z: p.z, art: "teil" });
     }
     const teil = gefasst ?? pflicht.find((t) => !imZiel(t)) ?? null;
+    const ziel = teil ? this.zielJe.get(teil.id) : undefined;
     const zielOrt = ziel ? q.behaelter(ziel) : null;
     if (gefasst && zielOrt) marken.push({ x: zielOrt.x, y: zielOrt.oberkante, z: zielOrt.z, art: "ziel" });
 
@@ -667,7 +690,7 @@ export class ChallengeLauf {
       this.wrackWarGefasst = wGefasst;
       const fertig = this.inKammer || this.gepresst || abgelegt || (d.plattAb !== undefined && this.knautschgrad >= d.plattAb);
       if (!wGefasst && !fertig) marken.push({ x: wp.x, y: spanne.oben, z: wp.z, art: "teil" });
-      if (wGefasst && d.zielMarke) marken.push({ ...d.zielMarke, art: "ziel" });
+      if (d.zielMarke && (wGefasst || d.zielMarkeAbStart)) marken.push({ ...d.zielMarke, art: "ziel" });
     }
 
     return {
@@ -701,7 +724,7 @@ export class ChallengeLauf {
       harteAufschlaege: this.harteAufschlaege + (this.fall?.hart ? 1 : 0),
       praezisionCm: this.zyklus?.praezisionCm ?? null,
       ueberlasten: this.ueberlasten,
-      fremdteile: this.fremdImZiel.size,
+      fremdteile: this.fremdIn.size,
     };
   }
 
