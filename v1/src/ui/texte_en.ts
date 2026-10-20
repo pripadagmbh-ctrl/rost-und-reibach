@@ -772,12 +772,13 @@ export const MUSTER: Array<[RegExp, string]> = [
   [/^Mehrfach belegt: (.+)$/, "Assigned more than once: $1"],
   [/^(.+) angebaut\.$/, "$1 fitted."],
   [
-    /^Zu schwer: ([\d,]+) t – hier hebt die Maschine ([\d,]+) t\. Näher heranziehen\.$/,
-    "Too heavy: $1 t – the machine lifts $2 t here. Bring it closer.",
+    // E-162 Nachtrag (Orchestrator): Ueberlast-Text geaendert — eine Last am Boden laesst sich nicht heranziehen
+    /^Zu schwer: ([\d,]+) t – hier hebt die Maschine ([\d,]+) t\. Näher am Bagger greifen\.$/,
+    "Too heavy: $1 t – the machine lifts $2 t here. Grab it closer to the machine.",
   ],
   [
-    /^Zu schwer: ([\d,]+) t – hier hebt die Maschine ([\d,]+) t\. Näher heranziehen oder abstützen \(O\)\.$/,
-    "Too heavy: $1 t – the machine lifts $2 t here. Bring it closer or lower the outriggers (O).",
+    /^Zu schwer: ([\d,]+) t – hier hebt die Maschine ([\d,]+) t\. Abstützen \(O\) und näher greifen\.$/,
+    "Too heavy: $1 t – the machine lifts $2 t here. Lower the outriggers (O) and grab closer.",
   ],
   [/^(.+) braucht Werkzeug\.$/, "$1 needs tools."],
   [/^Zerlegt: (.+)$/, "Taken apart: $1"],

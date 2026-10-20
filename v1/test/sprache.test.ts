@@ -86,10 +86,13 @@ describe("Übersetzen", () => {
       ["Greifer → Fünfschalengreifer", "Grapple → Orange peel grapple"],
       ["Lasthebemagnet angebaut.", "Lifting magnet fitted."],
       [
-        "Zu schwer: 3,2 t – hier hebt die Maschine 2,1 t. Näher heranziehen oder abstützen (O).",
-        "Too heavy: 3.2 t – the machine lifts 2.1 t here. Bring it closer or lower the outriggers (O).",
+        "Zu schwer: 3,2 t – hier hebt die Maschine 2,1 t. Abstützen (O) und näher greifen.",
+        "Too heavy: 3.2 t – the machine lifts 2.1 t here. Lower the outriggers (O) and grab closer.",
       ],
-      ["Zu schwer: 9,0 t – hier hebt die Maschine 5,5 t. Näher heranziehen.", "Too heavy: 9.0 t – the machine lifts 5.5 t here. Bring it closer."],
+      [
+        "Zu schwer: 9,0 t – hier hebt die Maschine 5,5 t. Näher am Bagger greifen.",
+        "Too heavy: 9.0 t – the machine lifts 5.5 t here. Grab it closer to the machine.",
+      ],
       ["Zerlegt: Kupfer + Kabel + Holz", "Taken apart: Copper + Cable + Wood"],
       ["Kühlschrank braucht Werkzeug.", "Fridge needs tools."],
       ["Das Teil braucht Werkzeug.", "The part needs tools."],
