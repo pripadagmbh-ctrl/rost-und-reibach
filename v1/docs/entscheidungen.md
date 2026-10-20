@@ -22,6 +22,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | E-172 | 19.10.2026 | Stummschalter auf lautlos: Spiel still, fremde Musik läuft weiter | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-171 | 19.10.2026 | Datenschutz, Lizenzen, Support als Seiten im App-Paket | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-170 | 19.10.2026 | Englisch im Spiel: Sprache vom Gerät, umschaltbar im Pausenmenü | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
+| E-163 | 20.10.2026 | Aufgaben 2–6: Presse, Sortieren, Platt machen, Magnet, Schwere Last | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-162 | 20.10.2026 | Aufgaben zurück: Grundlage und Aufgabe 1 „Erster Griff“, ↻ ohne Neuladen | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-161 | 19.10.2026 | iOS-App ohne Mac: Capacitor 8, Cloud-Bau, TestFlight vorbereitet | gebaut | [E-161_bis_E-180.md](log/E-161_bis_E-180.md) |
 | E-160 | 19.10.2026 | Ein Wrack, das aufschlägt, klingt — auch ohne Knautschen | gebaut | [E-141_bis_E-160.md](log/E-141_bis_E-160.md) |
@@ -262,6 +263,13 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - iPhone mini quer: Pausenmenü (jetzt drei Spalten) ohne Scrollen, alle Knöpfe lesbar?
 - Zurück auf Deutsch: alles wieder deutsch, ohne Neustart?
 - Frage: Schild „BUNT + VA“ heißt englisch „NON-FERROUS + SS“ (SS = stainless steel) — passt das, oder lieber „NON-FERROUS + STAINLESS“ (zu lang fürs Schild)?
+
+**E-163 — Aufgaben 2–6** (iPad, dann iPhone mini quer; über das Menü nacheinander)
+- A2 Presse: Pkw schräg links vorn sichtbar? Am Dach greifen, ohne dass die Haube aufspringt? Sanft absetzen = kein harter Aufschlag? PRESSEN erst, wenn es drin liegt?
+- A3 Sortieren: Zähler „n/6 richtig“? MÜLL-Mulde bleibt stehen? Anschlagen an der Mauerecke beim Schwenk zur Stahlhalde?
+- A4 Platt machen: Vier Bisse über 80 %? Stört es, dass Hämmern nicht knautscht?
+- A5 Magnet: Start mit Magnet, Kupfer bleibt liegen, „n/5 Eisen“ zählt?
+- A6 Schwere Last: Ohne Pratzen Überlast und Tipp? Mit STÜTZEN in den grünen Kreis unter 2 min? Nach ↻ Pratzen eingefahren?
 
 **E-162 — Aufgabe 1 „Erster Griff“** (iPad, dann iPhone mini quer)
 - Erststart: ohne Menü in „ERSTER GRIFF“? Kupfer-Boiler mit gelbem Ring links vorn sichtbar, auf dem iPhone mini unter (nicht hinter) der Karte?

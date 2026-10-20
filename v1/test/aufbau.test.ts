@@ -133,8 +133,8 @@ describe("Neustart ohne Neuladen: raeumeAuf", () => {
     expect(box.itemIds.size).toBe(0);
     expect(box.contentKg).toBe(0);
     expect(verlassen).toContainEqual({ itemId: teil.id, containerId: "r_bunt" });
-    // das Wrack und sein Motor standen in der Stahlhalde (Platz des zweiten Startautos)
-    expect(verlassen.filter((e) => e.containerId === "c_steel")).toHaveLength(2);
+    // G3: Das Wrack der Aufgabe 2 steht schraeg vorn, in keinem Behaelter (vorher Platz des zweiten Startautos, in der Stahlhalde)
+    expect(verlassen.filter((e) => e.containerId === "c_steel")).toHaveLength(0);
     for (const e of verlassen) expect(grund.items.has(e.itemId), "Grundbestand als verlassen gemeldet").toBe(false);
     // und meldet jedes nur einmal
     const n = verlassen.length;

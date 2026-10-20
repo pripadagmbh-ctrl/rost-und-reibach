@@ -654,10 +654,13 @@ describe("Aufgabe 1: der Ablauf mit Attrappen", () => {
     expect(a.lauf.messung().harteAufschlaege).toBe(1);
   });
 
-  it("Ueberlast-Meldungen werden gezaehlt", () => {
+  it("Ueberlast-Meldungen werden gezaehlt — dicht hintereinander als ein Versuch (G3, UEBERLAST_PAUSE_S)", () => {
     const a = attrappe();
     a.lauf.start();
     a.bus.emit("greifer:ueberlast", { massKg: 9000, grenzeKg: 5000, ausladungM: 8, abgestuetzt: false });
+    a.bus.emit("greifer:ueberlast", { massKg: 9000, grenzeKg: 5000, ausladungM: 8, abgestuetzt: false });
+    expect(a.lauf.messung().ueberlasten, "im selben Augenblick").toBe(1);
+    a.lauf.takt(2);
     a.bus.emit("greifer:ueberlast", { massKg: 9000, grenzeKg: 5000, ausladungM: 8, abgestuetzt: true });
     expect(a.lauf.messung().ueberlasten).toBe(2);
   });

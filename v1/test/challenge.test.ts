@@ -251,8 +251,9 @@ describe("Am echten Wrack in der echten Presse", () => {
     return { world, items, composites, press, takt };
   }
 
-  it("der Startplatz ist der des zweiten Startautos, das Ziel die Kammermitte", () => {
-    expect(VERLADEN.aufbau.wracks).toEqual([{ art: "pkw", ...START_AUTOS[1] }]);
+  // G3: Der Standort (schraeg vorn) ist in test/aufgabe2.test.ts bewacht
+  it("das Ziel ist die Kammermitte, das Wrack steht nicht in der Presse", () => {
+    expect(VERLADEN.aufbau.wracks).toHaveLength(1);
     expect(VERLADEN.ablageziel).toEqual({ x: PRESS_CENTER.x, z: PRESS_CENTER.z });
     expect(VERLADEN.zielBehaelter, "ein Zielbehaelter verlegte die Praezision weg von der Kammer").toBeUndefined();
   });
@@ -263,7 +264,7 @@ describe("Am echten Wrack in der echten Presse", () => {
     expect(press.inChamber({ x: c.x, y: 1, z: c.z })).toBe(true);
     expect(press.inChamber({ x: c.x, y: 6, z: c.z }), "hoch ueber der Kammer").toBe(false);
     expect(press.ueberKammer({ x: c.x, z: c.z })).toBe(true);
-    const a = START_AUTOS[1]!;
+    const a = VERLADEN.aufbau.wracks![0]!;
     expect(press.ueberKammer(a)).toBe(false);
   });
 

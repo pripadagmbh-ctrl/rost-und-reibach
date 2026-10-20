@@ -12,13 +12,16 @@ import {
   type ScrapItem,
   type ScrapShape,
 } from "../world/scrapItems";
+import { SPAENE_NAME, SPAENE_VARIANTEN, SPAENE_ZUSAMMENSETZUNG } from "../world/spaene";
+import { fraktionVonTeil } from "../materials/purity";
 import type { ChallengeDaten } from "./challenge";
 
 /**
  * DER PLATZ EINER AUFGABE (E-162) — aufbauen und wieder abraeumen.
  *
  * `baueAufgabe` legt hin, was die Daten nennen: Teile aus dem Teilekatalog
- * (mit ihrer Katalog-Form, Bau und Namen) und Wracks. `raeumeAuf` nimmt beim
+ * (mit ihrer Katalog-Form, Bau und Namen, dazu das Spaeneknaeuel, G3) und
+ * Wracks — auf Wunsch ausgeschlachtet (alle Teile ab, `restoreState`, G3). `raeumeAuf` nimmt beim
  * Neustart (↻) ohne Neuladen alles wieder weg, was NICHT zum Grundbestand
  * gehoert — auch was waehrend der Aufgabe entstanden ist: abgerissene Teile,
  * Presspakete, Bruchstuecke.
@@ -45,8 +48,30 @@ export function grundbestandVon(w: { items: ItemManager; composites: CompositeMa
   };
 }
 
-/** Ein Teil nach Namen aus dem Katalog (Kleinteile, Grossteile, Schwergewichte). */
+/**
+ * Das Spaeneknaeuel (E-147) steht in keinem Katalog: `spaeneCargo` baut es
+ * fuer die Absetzmulde. Fuer Aufgaben die mittlere der drei Groessen (14 kg),
+ * die Fraktion wie dort aus der Zusammensetzung (`fraktionVonTeil`).
+ */
+const SPAENE_GROESSE = 1; // mittlere Variante in `SPAENE_VARIANTEN`
+const SPAENE_SPEC: PileSpec = {
+  materialId: fraktionVonTeil({
+    materialId: "steel",
+    massKg: SPAENE_VARIANTEN[SPAENE_GROESSE]!.massKg,
+    kind: "box",
+    dims: [...SPAENE_VARIANTEN[SPAENE_GROESSE]!.dims],
+    zusammensetzung: SPAENE_ZUSAMMENSETZUNG,
+  }),
+  massKg: SPAENE_VARIANTEN[SPAENE_GROESSE]!.massKg,
+  kind: "box",
+  dims: [...SPAENE_VARIANTEN[SPAENE_GROESSE]!.dims],
+  name: SPAENE_NAME,
+  zusammensetzung: SPAENE_ZUSAMMENSETZUNG,
+};
+
+/** Ein Teil nach Namen aus dem Katalog (Kleinteile, Grossteile, Schwergewichte) — dazu das Spaeneknaeuel. */
 export function teilSpec(name: string): PileSpec | null {
+  if (name === SPAENE_NAME) return SPAENE_SPEC;
   for (const liste of [SPECS, BIG_SPECS, HUGE_SPECS]) {
     const s = liste.find((x) => x.name === name);
     if (s) return s;
@@ -66,6 +91,7 @@ export function formAusSpec(spec: PileSpec): ScrapShape {
     massiv: spec.massiv,
     trennbar: spec.trennbar,
     nurWerkzeug: spec.nurWerkzeug,
+    ...(spec === SPAENE_SPEC ? { spaene: SPAENE_GROESSE } : {}),
   };
 }
 
@@ -121,9 +147,12 @@ export function baueAufgabe(
 ): AufgabenObjekte {
   const fehler = aufbauKonflikte(daten);
   if (fehler.length > 0) throw new Error(`Aufgabe ${daten.id}: ${fehler.join("; ")}`);
-  const wracks = (daten.aufbau.wracks ?? []).map((a) =>
-    w.composites.spawnCar(new THREE.Vector3(a.x, 0.5, a.z), a.art, a.gier ?? 0)
-  );
+  const wracks = (daten.aufbau.wracks ?? []).map((a) => {
+    const car = w.composites.spawnCar(new THREE.Vector3(a.x, 0.5, a.z), a.art, a.gier ?? 0);
+    // Ausgeschlachtet wie aus dem Spielstand: alle Teile ab, ohne lose Teile — der Rumpf allein
+    if (a.ausgeschlachtet) car.restoreState({ crushStage: 0, torn: WRACKDATEN[a.art].parts.map((p) => p.id), brokenWindows: [] });
+    return car;
+  });
   const teile = (daten.aufbau.teile ?? []).map((t) => {
     const s = teilSpec(t.name)!;
     const form = formAusSpec(s);

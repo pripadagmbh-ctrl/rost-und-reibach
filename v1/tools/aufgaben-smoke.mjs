@@ -11,7 +11,8 @@
  *
  * Aufruf (in v1/):  node tools/aufgaben-smoke.mjs <Ausgabeordner>
  * Schalter (Umgebung): SMOKE_PORT (Vorgabe 5199), LAEUFE (3), SMOKE_NUR=durchlauf
- * (nur iPad-Bild + Durchlauf + Menue), SMOKE_ANGLE (d3d11 | swiftshader), SMOKE_SPUR=1 (CDP-Aufrufe zeigen).
+ * (nur iPad-Bild + Durchlauf + Menue), SMOKE_NUR=aufgaben (Q2: je Aufgabe aus SMOKE_AUFGABE=id,id …,
+ * Vorgabe 2-6, auf mini und iPad: Erstbild, Projektion der Marken, F3, ↻ Bus + Finger, Geisterdaumen-Probe; ~10 min), SMOKE_ANGLE (d3d11 | swiftshader), SMOKE_SPUR=1 (CDP-Aufrufe zeigen).
  * Dauer: rund 12 min (Ladezeiten 12 Seiten, Durchlauf ~1 min).
  * Ergebnis: <Ausgabeordner>/aufgaben-smoke.json + PNGs. Liest nur, schreibt nichts im Spiel.
  */
@@ -186,6 +187,48 @@ const LAGE = `(() => {
   };
 })()`;
 
+/** Q2: Zustand fuer ↻-Vergleich — Koerper, Karte, Uhr, Greifer, Pratzen, Magnet. */
+const ZUSTAND = `(() => {
+  const g = window.__game, x = g.excavator, c = g.physics.counts();
+  return { koerper: c.bodies, wach: c.awake, kollider: g.physics.world.colliders.len(), gelenke: g.physics.world.impulseJoints.len(),
+    items: g.items.items.length, wracks: g.composites.cars.length,
+    schritt: document.getElementById("tut-schritt")?.textContent, uhr: document.querySelector("#tutorial .uhr")?.textContent,
+    karteText: document.getElementById("tutorial")?.innerText.replace(/\\n+/g, " | "),
+    greifer: x.form && (x.form.id ?? x.form.name), magnetForm: !!(x.form && x.form.magnet), magnetAn: x.magnetAn,
+    schliessung: +x.closure.toFixed(3), gierGrad: +(x.cabinBaseYaw * 180 / Math.PI).toFixed(2),
+    abgestuetzt: x.abgestuetzt, pratzeUnten: +x.outriggerDown.toFixed(2), pratzeSoll: x.outriggerTarget, gegriffen: g.grip.grippedCount,
+    heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null,
+    nan: [x.position.x, x.position.y, x.position.z, x.cabinBaseYaw, x.closure].some((v) => !Number.isFinite(v)) };
+})()`;
+
+/** Q2: Aufgabenobjekte (Teile, Wracks, Marken, Zielmarke) auf den Bildschirm rechnen — Kamera ueber onBeforeRender abgegriffen. */
+const PROJEKTION = (id) => `(async () => {
+  const g = window.__game, T = g.THREE;
+  let sc = g.excavator.root; while (sc.parent) sc = sc.parent;
+  let netz = null; g.excavator.root.traverse((o) => { if (!netz && o.isMesh && o.visible) netz = o; });
+  const alt = netz.onBeforeRender; let cam = null;
+  netz.onBeforeRender = function (r, s, c) { cam = c; return alt.apply(this, arguments); };
+  for (let k = 0; k < 3 && !cam; k++) await new Promise((r) => requestAnimationFrame(r));
+  netz.onBeforeRender = alt;
+  if (!cam) return { fehler: "keine Kamera" };
+  const { challengeNach } = await import("/src/challenges/katalog.ts");
+  const d = challengeNach(${JSON.stringify(id)});
+  const marken = await new Promise((ok) => { const ab = g.bus.on("challenge:stand", (e) => { ok(e.marken.map((m) => ({ ...m }))); if (typeof ab === "function") ab(); }); setTimeout(() => ok(null), 1500); });
+  const auf = (x, y, z) => { const v = new T.Vector3(x, y, z).project(cam); return { x: Math.round((v.x + 1) / 2 * innerWidth), y: Math.round((1 - v.y) / 2 * innerHeight), vorKamera: v.z < 1 && v.z > -1 }; };
+  const namen = (d.aufbau.teile ?? []).map((t) => t.name);
+  const teile = g.items.items.slice(-namen.length).map((i) => { const p = i.body.translation(); return { name: i.shape && i.shape.name, ...auf(p.x, p.y, p.z) }; });
+  const wracks = g.composites.cars.map((c) => { const p = c.body.translation(); return { art: c.def && c.def.id, ...auf(p.x, p.y, p.z) }; });
+  const k = document.getElementById("tutorial").getBoundingClientRect();
+  const unterKarte = (q) => q.x >= k.left && q.x <= k.right && q.y >= k.top && q.y <= k.bottom;
+  const alle = [...teile.map((q) => ({ was: "teil " + q.name, ...q })), ...wracks.map((q) => ({ was: "wrack", ...q })),
+    ...(marken ?? []).map((m) => ({ was: "marke " + m.art, ...auf(m.x, m.y, m.z) })),
+    ...(d.zielMarke ? [{ was: "zielMarke", ...auf(d.zielMarke.x, d.zielMarke.y, d.zielMarke.z) }] : []),
+    ...(d.ablageziel ? [{ was: "ablageziel", ...auf(d.ablageziel.x, 0, d.ablageziel.z) }] : [])];
+  return { karte: { links: Math.round(k.left), oben: Math.round(k.top), rechts: Math.round(k.right), unten: Math.round(k.bottom) },
+    punkte: alle.map((q) => ({ ...q, imBild: q.vorKamera && q.x >= 0 && q.x <= innerWidth && q.y >= 0 && q.y <= innerHeight, unterKarte: unterKarte(q) })),
+    namenSoll: namen };
+})()`;
+
 /** F3 an, 3 s warten, Overlay lesen. */
 const F3_LESEN = `(async () => {
   const d = document.getElementById("debug");
@@ -340,7 +383,7 @@ try {
       await s("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     };
     const zu = () => cdp.send("Target.disposeBrowserContext", { browserContextId }).catch(() => null);
-    return { s, werte, warte, bild, tippe, zu };
+    return { s, sid: sessionId, werte, warte, bild, tippe, zu };
   };
   /** Bis die Karte offen ist und zwei Bilder gezeichnet sind (ms ab Navigationsstart). */
   const karteBereit = (p) => p.warte("window.__smoke && window.__smoke.karteMs > 0 && window.__game && window.__smoke.karteMs");
@@ -350,6 +393,88 @@ try {
   };
 
   const NUR = process.env.SMOKE_NUR ?? "";
+  ablauf: {
+  if (NUR === "aufgaben") {
+    // Q2: Aufgaben 2-6 je Geraet — Erstbild, Lage, F3, ↻, Geisterdaumen-Probe
+    const ids = (process.env.SMOKE_AUFGABE ?? "verladen,sortieren,platt-machen,magnet,schwere-last").split(",");
+    ergebnis.aufgaben = {};
+    for (const id of ids) {
+      for (const geraet of ["mini", "ipad"]) {
+        const p = await neueSeite(geraet);
+        const konsole = [];
+        const hoer = (d) => {
+          if (d.sessionId !== p.sid) return;
+          if (d.method === "Runtime.consoleAPICalled" && ["error", "warning", "warn", "assert"].includes(d.params.type))
+            konsole.push(`${d.params.type}: ${d.params.args.map((a) => a.value ?? a.description ?? "").join(" ")}`.slice(0, 300));
+          if (d.method === "Runtime.exceptionThrown") konsole.push(`exception: ${d.params.exceptionDetails.exception?.description ?? d.params.exceptionDetails.text}`.slice(0, 300));
+        };
+        cdp.hoerer.push(hoer);
+        await p.s("Page.navigate", { url: `${BASIS}#challenge=${id}` });
+        await karteBereit(p);
+        const r = { erstes: await p.bild(`${id}_${geraet}_1_erstes-bild`), lage1: await p.werte(LAGE), proj1: await p.werte(PROJEKTION(id)) };
+        await pause(3000);
+        r.nach3 = await p.bild(`${id}_${geraet}_2_nach-3s`);
+        r.lage2 = await p.werte(LAGE);
+        r.proj2 = await p.werte(PROJEKTION(id));
+        r.f3 = await p.werte(F3_LESEN);
+        await p.s("HeapProfiler.collectGarbage");
+        r.vorher = await p.werte(ZUSTAND);
+        if (id === "schwere-last") {
+          // Pratzen ab (Taste O), warten bis ganz unten — ↻ muss sie einfahren (main.ts starteAufgabe)
+          await p.werte(`(() => { window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyO" })); setTimeout(() => window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyO" })), 100); return true; })()`);
+          await p.warte("__game.excavator.abgestuetzt", 15000).catch(() => null);
+          r.pratzenVorNeustart = await p.werte(ZUSTAND);
+        }
+        await p.werte(`__game.bus.emit("challenge:neustart", {}); true`);
+        await pause(2000);
+        await p.s("HeapProfiler.collectGarbage");
+        r.nachBus = await p.werte(ZUSTAND);
+        r.nachBusBild = await p.bild(`${id}_${geraet}_3_nach-neustart`);
+        // Geisterdaumen: dort aufsetzen, in Pfeilrichtung ziehen, ~1 s halten — bewegt sich die Funktion des Schritts richtig?
+        r.geist = await p.werte(`(() => { const e = document.querySelector("#geisterdaumen .geist.an"); if (!e) return null; const b = e.getBoundingClientRect();
+          return { seite: e.classList.contains("links") ? "links" : "rechts", pfeil: e.dataset.pfeil, x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+        if (r.geist && ["links", "rechts", "hoch", "runter"].includes(r.geist.pfeil)) {
+          const { x, y, pfeil } = r.geist;
+          const weg = { links: [-1, 0], rechts: [1, 0], hoch: [0, -1], runter: [0, 1] }[pfeil];
+          const vor = await p.werte(ZUSTAND);
+          // Start und erster Zug ohne Warten dazwischen: bei 6-12 fps (headless) waeren sonst zwei Bilder
+          // "still" = 0,5 s >= RADIAL_HOLD_S, und rechts klappt der Funktionskranz auf (touch.ts update)
+          const anf = p.s("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y, id: 7, force: 0.5 }] });
+          await p.s("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x + weg[0] * 14, y: y + weg[1] * 14, id: 7, force: 0.5 }] });
+          await anf;
+          for (let k = 2; k <= 6; k++) {
+            await pause(30);
+            await p.s("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x + weg[0] * 14 * k, y: y + weg[1] * 14 * k, id: 7, force: 0.5 }] });
+          }
+          await pause(1200);
+          const nach = await p.werte(ZUSTAND);
+          await p.s("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+          const los = await p.werte(ZUSTAND);
+          await pause(1500);
+          const spaeter = await p.werte(ZUSTAND);
+          r.geistBild = await p.bild(`${id}_${geraet}_4_geist-gezogen`);
+          r.geistProbe = { gierVor: vor.gierGrad, gierNach: nach.gierGrad, gierLos: los.gierGrad, gierLos15: spaeter.gierGrad, zuVor: vor.schliessung, zuNach: nach.schliessung, zuLos15: spaeter.schliessung,
+            magnetVor: vor.magnetAn, magnetNach: nach.magnetAn, magnetLos15: spaeter.magnetAn, pratzeSollNach: spaeter.pratzeSoll, kranz: await p.werte("!!document.querySelector(\".radial.open, #radial.open\")").catch(() => null) };
+        }
+        await pause(500);
+        // ↻ per Finger auf den Knopf (nach Drehen/Schliessen — kein Fahren, also ohne Neuladen)
+        await p.werte("window.__marke = 'gleiche Seite'; true");
+        await p.tippe("#tut-neu");
+        await pause(2000);
+        await p.s("HeapProfiler.collectGarbage");
+        r.nachFinger = await p.werte(ZUSTAND);
+        r.nachFinger.gleicheSeite = await p.werte("window.__marke === 'gleiche Seite'").catch(() => false);
+        r.seitenfehler = await p.werte("__smoke.fehler");
+        r.konsole = konsole;
+        cdp.hoerer.splice(cdp.hoerer.indexOf(hoer), 1);
+        ergebnis.aufgaben[`${id}/${geraet}`] = r;
+        log(id, geraet, "Karte", JSON.stringify(r.lage1.karte), "Koerper", r.vorher.koerper, r.nachBus.koerper, r.nachFinger.koerper, "Geist", JSON.stringify(r.geist), JSON.stringify(r.geistProbe ?? null), "Konsole", konsole.length);
+        writeFileSync(join(AUS, "aufgaben-smoke.json"), JSON.stringify(ergebnis, null, 2));
+        await p.zu();
+      }
+    }
+    break ablauf;
+  }
   if (!NUR) {
   /* --- 0: Server-Erstlauf (Vite wandelt beim allerersten Abruf um; nicht Teil der Tabelle) */
   {
@@ -512,6 +637,7 @@ try {
   await p.bild("ipad_8_f3-sandkasten");
   ergebnis.seitenfehler = await p.werte("__smoke.fehler");
   await p.zu();
+  } // Ende ablauf
 } catch (e) {
   ergebnis.abbruch = String(e?.stack ?? e);
   console.error(e);

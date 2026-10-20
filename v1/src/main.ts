@@ -414,6 +414,8 @@ async function main(): Promise<void> {
     const starteAufgabe = (d: ChallengeDaten): void => {
       challenge?.beenden();
       grip.releaseAll();
+      // E-163: Jede Aufgabe beginnt ohne Pratzen — sonst waere Aufgabe 6 nach ↻ ohne Ueberlast-Lehre (welt G3)
+      if (excavator.abgestuetzt) excavator.toggleOutriggers();
       if (grundbestand) raeumeAuf(grundbestand, { items, composites });
       grundbestand ??= grundbestandVon({ items, composites });
       const objekte = baueAufgabe(d, { items, composites });

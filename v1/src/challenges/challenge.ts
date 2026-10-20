@@ -50,6 +50,29 @@ import type { Zweisprachig } from "./texte";
  *                      (gemessen, `tools/challenge-ruhe.ts`).
  *   wrack_gepresst     die Presse hat zugeschlagen, nachdem sie mit dem Wrack
  *                      in der Kammer gestartet wurde
+ *
+ * Seit G3 (20.10.2026, Aufgaben 3–6):
+ *   teil_im_ziel       ohne `zielBehaelter` (Aufgabe 3, Sortieren): jedes
+ *                      Pflichtteil liegt in einer Mulde, in der es RICHTIG
+ *                      ist (`itemEntered.correct`), losgelassen und unter der
+ *                      Krone. Teile mit `bleibtLiegen` (Kupfer in Aufgabe 5)
+ *                      zaehlen nicht mit.
+ *   wrack_geknautscht  das Aufgaben-Wrack ist sichtbar angeknautscht
+ *                      (`wrack:geknautscht.grad` ≥ `ANGEKNAUTSCHT_AB`)
+ *   wrack_platt        … und mindestens `plattAb` (Aufgabe 4)
+ *   wrack_gehoben      gefasst und mit der Unterkante `WRACK_HUB_M` ueber dem
+ *                      Boden (Aufgabe 6)
+ *   wrack_abgelegt     losgelassen, liegt mit der Mitte im Ablagekreis
+ *                      (`ablageziel`, `ablageRadiusM`) — und war VORHER
+ *                      gehoben: Setzt es gefasst ausserhalb des Kreises auf,
+ *                      zaehlt das Heben nicht mehr. Unter Ueberlast schleift
+ *                      ein Wrack sonst ueber den Boden ins Ziel (Befund M6).
+ *
+ * Und auf der Karte (`challenge:stand`):
+ *   zaehler            mit `zaehlwort`: Pflichtteile im Ziel / alle
+ *   balken01           mit `plattAb`: der Knautschgrad des Wracks, 0 … 1
+ *   tipp               mit `tippNachUeberlast`: ab der ersten Ueberlast-
+ *                      Meldung OHNE Pratzen (`greifer:ueberlast.abgestuetzt`)
  */
 export type Beobachtung =
   | "blick_auf_teil"
@@ -61,7 +84,11 @@ export type Beobachtung =
   | "wrack_gefasst"
   | "wrack_ueber_kammer"
   | "wrack_in_kammer"
-  | "wrack_gepresst";
+  | "wrack_gepresst"
+  | "wrack_geknautscht"
+  | "wrack_platt"
+  | "wrack_gehoben"
+  | "wrack_abgelegt";
 
 /**
  * Was der Geisterdaumen zeigt — die Form steht in `core/events.ts`.
@@ -109,7 +136,7 @@ export interface ChallengeMessung {
   zeitS: number;
   /** Aufgaben-Teile, die in einer falschen Mulde gelandet sind — je Teil und Einwurf einmal */
   fehlwuerfe: number;
-  /** Aufschlaege eigener Teile/Wracks ab `HART_AB_MS` */
+  /** Aufschlaege eigener Teile/Wracks ab `HART_AB_MS`, dazu Wracks aus `FALLHOEHE_HART_M` fallen gelassen */
   harteAufschlaege: number;
   /** Fahrkunst Praezision (E-119): Abstand zum Ablageziel im Liegen (cm); null = ohne Ziel/Zyklus */
   praezisionCm: number | null;
@@ -135,6 +162,12 @@ export interface AufbauTeil {
   z: number;
   /** Drehung um die Hochachse (rad) */
   gier?: number;
+  /**
+   * Gehoert NICHT ins Ziel (Aufgabe 5: das Kupfer im Eisenhaufen). Zaehlt
+   * nicht fuer Zaehler und Fertig; liegt es am Ende im Zielbehaelter, ist es
+   * ein Fremdteil, landet es in einer falschen Mulde, ein Fehlwurf.
+   */
+  bleibtLiegen?: boolean;
 }
 
 export interface AufbauWrack {
@@ -142,6 +175,8 @@ export interface AufbauWrack {
   x: number;
   z: number;
   gier?: number;
+  /** Alle abreissbaren Teile ab, wie aus dem Spielstand (`restoreState`) — der Rumpf allein (Aufgabe 6) */
+  ausgeschlachtet?: boolean;
 }
 
 /** Was auf dem sonst leeren Platz steht (gebaut von `aufbau.ts`). */
@@ -169,6 +204,16 @@ export interface ChallengeDaten {
   zielBehaelter?: string;
   /** Ablageziel fuer die Praezision (`Fahrkunst.ziel`); null = keins */
   ablageziel: { x: number; z: number } | null;
+  /** Mit `ablageziel`: Halbmesser des Ablagekreises fuer `wrack_abgelegt` (m) */
+  ablageRadiusM?: number;
+  /** Wo die gruene Marke steht, solange das Wrack gefasst ist (ohne Zielbehaelter: Kammer, Ablagekreis) */
+  zielMarke?: Punkt;
+  /** Zaehler auf der Karte: „4/6 richtig" — das Wort dahinter */
+  zaehlwort?: Zweisprachig;
+  /** Balken „platt" auf der Karte und `wrack_platt` ab diesem Knautschgrad (0 … 1) */
+  plattAb?: number;
+  /** Hinweis auf der Karte nach der ersten Ueberlast ohne Pratzen */
+  tippNachUeberlast?: Zweisprachig;
   schritte: readonly Lernschritt[];
   wertung: ChallengeWertung;
 }
@@ -199,8 +244,29 @@ export function sterne(w: ChallengeWertung, m: ChallengeMessung): number {
  * (2,13 m/s) 4,3 — nicht hart; ruhig abgesetzt meldet der Melder 1,5. Der
  * Ton macht ab 1,5 einen eigenen Schlag (`SCHLAG_AB_MS`) — „hart" liegt
  * deutlich darueber, sonst zaehlte jedes Ablegen.
+ *
+ * GEMESSEN AM WRACK (G3, 20.10.2026, `test/aufgabe2.test.ts`, echter Pkw in
+ * der echten Presse): Langsam abgesetzt meldet es 2,7 m/s, mit vollem
+ * Senktempo aufgesetzt 6,2 — die Schwelle trennt das. Aus der Wandkrone
+ * (2,2 m) fallen gelassen trifft es zwar mit 6,1 m/s auf, der Melder sieht
+ * aber nur 2,6–2,9: Rapier bremst die 950 kg ueber zwei bis drei Schritte ab,
+ * und gemeldet wird der Verlust je Schritt. Erst ab rund 3,5 m Fallhoehe
+ * meldet er ≥ 5 (6,7 / 9,4). Darum zaehlt beim Wrack zusaetzlich die
+ * Fallhoehe beim Loslassen (`FALLHOEHE_HART_M`).
  */
 export const HART_AB_MS = 5.0;
+
+/**
+ * Ein Wrack, das aus dieser Hoehe ueber der Stelle losgelassen wird, an der
+ * es dann liegen bleibt, ist hart aufgeschlagen — auch wenn der Melder es
+ * (siehe oben) zu weich meldet. // SW: 0,5 m — langsam abgesetzt sind es
+ * gemessen 0,0 m (Unterkante 0,25 beim Oeffnen, 0,30 liegend), von der
+ * Wandkrone 1,95 m. Ein Aufschlag je Loslassen, auch wenn beides zutrifft.
+ */
+export const FALLHOEHE_HART_M = 0.5;
+
+/** So lange nach dem Loslassen wird der Fall eines Wracks beobachtet. // SW: 2 s, ein Fall aus 5 m dauert 1 s */
+export const FALL_BEOBACHTEN_S = 2.0;
 
 /**
  * „Der Oberwagen schaut aufs Teil": Winkel zwischen Blickrichtung und
@@ -239,6 +305,39 @@ export const HUB_LUFT_M = 0.3;
 /** Ohne Zielbehaelter: so hoch ueber seiner Liegehoehe gilt ein Teil als gehoben. // SW: 1,0 m, deutlich mehr als jedes Zucken beim Zupacken */
 export const HUB_OHNE_ZIEL_M = 1.0;
 
+/**
+ * „Angeknautscht" (Aufgabe 4, Schritt 1): ab diesem mittleren Knautschgrad.
+ * // SW: 0,05 — ein voller Biss bringt gemessen 0,06 bis 0,2
+ * (`test/aufgabe4.test.ts`), ein Zucken beim Aufsetzen nichts.
+ */
+export const ANGEKNAUTSCHT_AB = 0.05;
+
+/**
+ * „Gehoben" (Aufgabe 6): Unterkante des gefassten Wracks so hoch ueber dem
+ * Boden. // SW: 0,3 m — eine Handbreit wie `HUB_LUFT_M`; ein Wrack, das mit
+ * einem Ende schleift, steht dort bei 0.
+ */
+export const WRACK_HUB_M = 0.3;
+
+/**
+ * „Liegt" bzw. „setzt auf": Unterkante hoechstens so hoch. // SW: 0,15 m —
+ * ein liegendes Wrack misst gemessen 0,00 bis 0,05 m (Raeder, Beton-
+ * Eindringtiefe), ein haengendes deutlich mehr.
+ */
+export const WRACK_LIEGT_M = 0.15;
+
+/**
+ * Ueberlast-Meldungen, die so dicht aufeinander folgen, sind EIN Versuch.
+ * // SW: 1,0 s — gemessen (`test/aufgabe6.test.ts`): Wer den Ausleger an der
+ * Grenze 1,5 s gedrueckt haelt, bekommt vom Bagger fuenf Meldungen bei 5,61–5,62 m
+ * (die Sperre gibt kurz frei, der Ausleger rueckt nach). Ein neuer Versuch
+ * ist erst, was nach einer Sekunde ohne Meldung kommt.
+ */
+export const UEBERLAST_PAUSE_S = 1.0;
+
+/** Ohne `hoehenspanne` (Attrappen): Marke so hoch ueber der Wrackmitte. // SW: 1,5 m, Dach eines Pkw */
+export const WRACK_MARKE_OHNE_SPANNE_M = 1.5;
+
 /* ------------------------------------------------------------------------ */
 /* Was der Lauf von der Welt liest — mehr nicht                              */
 /* ------------------------------------------------------------------------ */
@@ -272,6 +371,12 @@ export interface ChallengeQuellen {
   ueberKammer(p: { x: number; z: number }): boolean;
   /** `PressManager.inChamber` */
   inKammer(p: Punkt): boolean;
+  /**
+   * Tiefster und hoechster Punkt eines Koerpers (m ueber Boden), aus seinen
+   * Kollidern; null = unbekannt. Ohne diese Quelle (Attrappen) rechnet der
+   * Lauf mit der Mitte: unten = Hub ueber der Liegehoehe.
+   */
+  hoehenspanne?(handle: number): { unten: number; oben: number } | null;
 }
 
 /** Was ein Koerper der Aufgabe koennen muss — ein `RAPIER.RigidBody` kann es. */
@@ -312,8 +417,24 @@ export class ChallengeLauf {
   private fremdImZiel = new Set<string>();
   /** Liegehoehe je Teil (tiefste Mitte, solange es nicht gefasst war) */
   private liegeY = new Map<string, number>();
+  /** Aufgaben-Teile, die richtig eingeworfen wurden: Teil → Mulde (bis `itemLeft`) */
+  private richtigIn = new Map<string, string>();
+  /** Liegehoehe des Wracks (tiefste Mitte, ungefasst) — Ersatz, wenn `hoehenspanne` fehlt */
+  private wrackLiegeY: number | null = null;
+  /** Das Wrack war gehoben und hat seitdem nicht ausserhalb des Ablagekreises aufgesetzt */
+  private wrackGehoben = false;
+  /** Ueberlast ohne Pratzen gemeldet → Tipp auf der Karte */
+  private ueberlastFrei = false;
+  /** Spielzeit der letzten Ueberlast-Meldung (gezaehlt oder nicht) */
+  private letzteUeberlastS = -Infinity;
+  /** War das Wrack im letzten Bild gefasst? */
+  private wrackWarGefasst = false;
+  /** Das Wrack faellt nach dem Loslassen: Unterkante dabei, tiefste seitdem, Zeit, schon hart gemeldet */
+  private fall: { ab: number; tief: number; s: number; hart: boolean } | null = null;
 
   private readonly teilIds: ReadonlySet<string>;
+  /** Teile, die ins Ziel muessen (ohne `bleibtLiegen`) */
+  private readonly pflichtIds: ReadonlySet<string>;
   private readonly eigeneHandles: ReadonlySet<number>;
 
   constructor(
@@ -325,28 +446,47 @@ export class ChallengeLauf {
     private objekte: ChallengeObjekte
   ) {
     this.teilIds = new Set(objekte.teile.map((t) => t.id));
+    // `baueAufgabe` legt die Teile in der Reihenfolge der Daten an
+    this.pflichtIds = new Set(objekte.teile.filter((_, i) => !daten.aufbau.teile?.[i]?.bleibtLiegen).map((t) => t.id));
     this.eigeneHandles = new Set([
       ...objekte.teile.map((t) => t.body.handle),
       ...objekte.wracks.map((w) => w.body.handle),
     ]);
     const zaehlt = (): boolean => this.laeuft && !this.aus && !this.geschafft;
+    const ziel = daten.zielBehaelter;
     bus.on("itemEntered", (e) => {
       if (!zaehlt()) return;
-      if (!e.correct && e.containerId === daten.zielBehaelter) this.fremdImZiel.add(e.itemId);
-      if (e.correct || !this.teilIds.has(e.itemId) || this.falschGezaehlt.has(e.itemId)) return;
+      const eigen = this.teilIds.has(e.itemId);
+      const pflicht = this.pflichtIds.has(e.itemId);
+      if (eigen && e.correct) this.richtigIn.set(e.itemId, e.containerId);
+      // Fremd im Ziel ist, was dort nicht hingehoert — ein Pflichtteil gehoert hin (Spaene in Aufgabe 5)
+      if (!e.correct && !pflicht && e.containerId === ziel) this.fremdImZiel.add(e.itemId);
+      if (!eigen || this.falschGezaehlt.has(e.itemId)) return;
+      // Mit Zielbehaelter zaehlt fuer Pflichtteile der Behaelter, sonst die Sorte
+      const falsch = pflicht && ziel ? e.containerId !== ziel : !e.correct;
+      if (!falsch) return;
       this.falschGezaehlt.add(e.itemId);
       this.fehlwuerfe++;
     });
     bus.on("itemLeft", (e) => {
       if (!zaehlt()) return;
-      if (e.containerId === daten.zielBehaelter) this.fremdImZiel.delete(e.itemId);
+      if (e.containerId === ziel) this.fremdImZiel.delete(e.itemId);
+      if (this.richtigIn.get(e.itemId) === e.containerId) this.richtigIn.delete(e.itemId);
     });
     bus.on("schrott:aufprall", (e) => {
       if (!zaehlt() || e.handle === undefined || !this.eigeneHandles.has(e.handle)) return;
-      if (e.wucht >= HART_AB_MS) this.harteAufschlaege++;
+      if (e.wucht < HART_AB_MS) return;
+      // Faellt gerade das Wrack: der Fall zaehlt einmal, wenn er vorbei ist
+      if (this.fall && e.handle === this.objekte.wracks[0]?.body.handle) this.fall.hart = true;
+      else this.harteAufschlaege++;
     });
-    bus.on("greifer:ueberlast", () => {
-      if (zaehlt()) this.ueberlasten++;
+    bus.on("greifer:ueberlast", (e) => {
+      if (!zaehlt()) return;
+      if (!e.abgestuetzt) this.ueberlastFrei = true;
+      // Ein Versuch, eine Meldung: was binnen UEBERLAST_PAUSE_S nach der letzten Meldung kommt, gehoert dazu
+      const neu = this.zeitS - this.letzteUeberlastS >= UEBERLAST_PAUSE_S;
+      this.letzteUeberlastS = this.zeitS;
+      if (neu) this.ueberlasten++;
     });
     bus.on("wrack:geknautscht", (e) => {
       if (zaehlt() && this.eigeneHandles.has(e.handle)) this.knautschgrad = Math.max(this.knautschgrad, e.grad);
@@ -381,19 +521,20 @@ export class ChallengeLauf {
   takt(dt: number): void {
     if (!this.laeuft || this.aus || this.geschafft) return;
     this.zeitS += dt;
-    const { jetzt, marken } = this.beobachte();
+    const { jetzt, marken, imZiel } = this.beobachte(dt);
     // Was der Spieler schon richtig macht, wird uebersprungen: Ein spaeterer
     // Schritt, der schon zu sehen ist, nimmt die frueheren mit.
     this.daten.schritte.forEach((s, i) => {
       if (jetzt[s.beobachtet] && i > this.erreicht) this.erreicht = i;
     });
+    const d = this.daten;
     this.bus.emit("challenge:stand", {
-      id: this.daten.id,
+      id: d.id,
       zeitS: this.zeitS,
-      zaehler: null,
-      balken01: null,
+      zaehler: d.zaehlwort ? { ist: imZiel, von: this.pflichtIds.size, wort: d.zaehlwort } : null,
+      balken01: d.plattAb !== undefined ? Math.min(1, this.knautschgrad) : null,
       pressenBereit: this.pressenBereit,
-      tipp: null,
+      tipp: d.tippNachUeberlast && this.ueberlastFrei ? d.tippNachUeberlast : null,
       marken,
     });
     this.melde();
@@ -425,24 +566,31 @@ export class ChallengeLauf {
   }
 
   /** Was gerade zu sehen ist — und wo die Markierungen hingehoeren. */
-  private beobachte(): { jetzt: Record<Beobachtung, boolean>; marken: Marke[] } {
+  private beobachte(dt: number): { jetzt: Record<Beobachtung, boolean>; marken: Marke[]; imZiel: number } {
     const q = this.q;
-    const ziel = this.daten.zielBehaelter;
+    const d = this.daten;
+    const ziel = d.zielBehaelter;
     const griff = new Set(q.gegriffen().map((b) => b.handle));
     const marken: Marke[] = [];
 
     // --- Teile -----------------------------------------------------------
     const lebend = this.objekte.teile.filter((t) => t.body.isValid());
+    const pflicht = lebend.filter((t) => this.pflichtIds.has(t.id));
     let gefasst: (typeof lebend)[number] | null = null;
     /*
      * Im Ziel heisst: losgelassen, in der Zone UND schon unter der Wandkrone
      * (qa-Befund 19.10.2026: Die Zone zaehlt das Teil, waehrend es noch ueber
      * der 2-m-Wand faellt — prallte es heraus, waere die Aufgabe trotzdem
      * geschafft). Mitte unter der Oberkante = es ist drin, nicht darueber.
+     * Mit Zielbehaelter zaehlt der Behaelter, ohne (Aufgabe 3) die Mulde, in
+     * der das Teil richtig ist (`itemEntered.correct`).
      */
-    const zielKrone = ziel ? (q.behaelter(ziel)?.oberkante ?? Infinity) : Infinity;
-    const imZiel = (t: { id: string; body: AufgabenKoerper }): boolean =>
-      !!ziel && !griff.has(t.body.handle) && q.behaelterVon(t.id) === ziel && t.body.translation().y < zielKrone;
+    const imZiel = (t: { id: string; body: AufgabenKoerper }): boolean => {
+      if (griff.has(t.body.handle)) return false;
+      const c = q.behaelterVon(t.id);
+      if (!c || (ziel ? c !== ziel : this.richtigIn.get(t.id) !== c)) return false;
+      return t.body.translation().y < (q.behaelter(c)?.oberkante ?? Infinity);
+    };
     for (const t of lebend) {
       const p = t.body.translation();
       if (griff.has(t.body.handle)) {
@@ -453,9 +601,9 @@ export class ChallengeLauf {
       }
       const alt = this.liegeY.get(t.id);
       if (alt === undefined || p.y < alt) this.liegeY.set(t.id, p.y);
-      if (!imZiel(t)) marken.push({ x: p.x, y: p.y + this.liegeY.get(t.id)!, z: p.z, art: "teil" });
+      if (this.pflichtIds.has(t.id) && !imZiel(t)) marken.push({ x: p.x, y: p.y + this.liegeY.get(t.id)!, z: p.z, art: "teil" });
     }
-    const teil = gefasst ?? lebend.find((t) => !imZiel(t)) ?? null;
+    const teil = gefasst ?? pflicht.find((t) => !imZiel(t)) ?? null;
     const zielOrt = ziel ? q.behaelter(ziel) : null;
     if (gefasst && zielOrt) marken.push({ x: zielOrt.x, y: zielOrt.oberkante, z: zielOrt.z, art: "ziel" });
 
@@ -479,14 +627,48 @@ export class ChallengeLauf {
         ueberZiel = !!ziel && q.ueberBehaelter(ziel, p);
       }
     }
-    const alleImZiel = !!ziel && lebend.length > 0 && lebend.every(imZiel);
+    const nImZiel = pflicht.filter(imZiel).length;
+    const alleImZiel = pflicht.length > 0 && nImZiel === pflicht.length;
 
-    // --- Wrack (E-125) -----------------------------------------------------
+    // --- Wrack (E-125; G3: Knautschen, Heben, Ablegen) ---------------------
     const w = this.objekte.wracks[0];
     const wb = w && w.body.isValid() ? w.body : null;
     const wp = wb?.translation();
     const wGefasst = !!wb && griff.has(wb.handle);
     this.inKammer = !!wb && !wGefasst && q.inKammer(wp!);
+    let wGehoben = false;
+    let abgelegt = false;
+    if (wb && wp) {
+      if (!wGefasst && (this.wrackLiegeY === null || wp.y < this.wrackLiegeY)) this.wrackLiegeY = wp.y;
+      // Unter- und Oberkante aus den Kollidern; ohne Quelle die Mitte ueber der Liegehoehe
+      const spanne = q.hoehenspanne?.(wb.handle) ?? { unten: wp.y - (this.wrackLiegeY ?? wp.y), oben: wp.y + WRACK_MARKE_OHNE_SPANNE_M };
+      const a = d.ablageziel;
+      const imKreis = !!a && d.ablageRadiusM !== undefined && Math.hypot(wp.x - a.x, wp.z - a.z) <= d.ablageRadiusM;
+      if (wGefasst) {
+        wGehoben = spanne.unten >= WRACK_HUB_M;
+        if (wGehoben) this.wrackGehoben = true;
+        // Gefasst aufgesetzt ausserhalb des Kreises: ab hier wird geschleift, nicht getragen
+        else if (spanne.unten <= WRACK_LIEGT_M && !imKreis) this.wrackGehoben = false;
+      }
+      abgelegt = !wGefasst && this.wrackGehoben && imKreis && spanne.unten <= WRACK_LIEGT_M;
+      // Fallhoehe: beim Loslassen merken, dann sehen, wo es liegen bleibt
+      if (this.wrackWarGefasst && !wGefasst) this.fall = { ab: spanne.unten, tief: spanne.unten, s: 0, hart: false };
+      if (wGefasst) this.fall = null;
+      const f = this.fall;
+      if (f) {
+        f.tief = Math.min(f.tief, spanne.unten);
+        f.s += dt;
+        if (f.ab - f.tief >= FALLHOEHE_HART_M) f.hart = true;
+        if (f.s >= FALL_BEOBACHTEN_S) {
+          if (f.hart) this.harteAufschlaege++;
+          this.fall = null;
+        }
+      }
+      this.wrackWarGefasst = wGefasst;
+      const fertig = this.inKammer || this.gepresst || abgelegt || (d.plattAb !== undefined && this.knautschgrad >= d.plattAb);
+      if (!wGefasst && !fertig) marken.push({ x: wp.x, y: spanne.oben, z: wp.z, art: "teil" });
+      if (wGefasst && d.zielMarke) marken.push({ ...d.zielMarke, art: "ziel" });
+    }
 
     return {
       jetzt: {
@@ -500,8 +682,13 @@ export class ChallengeLauf {
         wrack_ueber_kammer: wGefasst && q.ueberKammer(wp!),
         wrack_in_kammer: this.inKammer,
         wrack_gepresst: this.gepresst,
+        wrack_geknautscht: this.knautschgrad >= ANGEKNAUTSCHT_AB,
+        wrack_platt: d.plattAb !== undefined && this.knautschgrad >= d.plattAb,
+        wrack_gehoben: wGehoben,
+        wrack_abgelegt: abgelegt,
       },
       marken,
+      imZiel: nImZiel,
     };
   }
 
@@ -510,7 +697,8 @@ export class ChallengeLauf {
     return {
       zeitS: this.zeitS,
       fehlwuerfe: this.fehlwuerfe,
-      harteAufschlaege: this.harteAufschlaege,
+      // ein Fall, der noch beobachtet wird, zaehlt schon, wenn er hart war (Aufgabe 6 endet beim Aufsetzen)
+      harteAufschlaege: this.harteAufschlaege + (this.fall?.hart ? 1 : 0),
       praezisionCm: this.zyklus?.praezisionCm ?? null,
       ueberlasten: this.ueberlasten,
       fremdteile: this.fremdImZiel.size,

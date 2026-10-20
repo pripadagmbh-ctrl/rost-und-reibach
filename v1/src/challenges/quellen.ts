@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
 import type { Excavator } from "../excavator/excavator";
 import type { GripSystem } from "../physics/gripSystem";
 import {
@@ -51,6 +52,11 @@ export function weltQuellen(w: {
     behaelterVon: (itemId) => w.items.items.find((i) => i.id === itemId)?.containerId ?? null,
     ueberKammer: (p) => w.press?.ueberKammer(p) ?? false,
     inKammer: (p) => w.press?.inChamber(p) ?? false,
+    // Wracks stehen auch in der Itemliste (derselbe Koerper, `raeumeAuf` in `aufbau.ts`)
+    hoehenspanne: (handle) => {
+      const b = w.items.items.find((i) => i.body.handle === handle)?.body;
+      return b && b.isValid() ? hoehenspanne(b) : null;
+    },
   };
 }
 
@@ -66,4 +72,32 @@ export function behaelterOberkante(cfg: ContainerConfig): number {
   if (cfg.kind === "rolloff") return rolloffOberkante(cfg.size[2]);
   const flanken = muldenWaende(cfg).filter((m) => m.teil === "flanke+" || m.teil === "flanke-");
   return flanken.length > 0 ? Math.max(...flanken.map((m) => m.top)) : cfg.size[2];
+}
+
+/**
+ * Tiefster und hoechster Punkt eines Koerpers (m) — die Ecken seiner Quader-
+ * Kollider, gedreht wie sie liegen (Wracks bestehen aus Quadern, E-128).
+ * Andere Formen zaehlen nicht mit; ohne Quader null. Nur lesen.
+ */
+export function hoehenspanne(body: RAPIER.RigidBody): { unten: number; oben: number } | null {
+  let unten = Infinity;
+  let oben = -Infinity;
+  const q = new THREE.Quaternion();
+  const v = new THREE.Vector3();
+  for (let i = 0; i < body.numColliders(); i++) {
+    const c = body.collider(i);
+    if (c.shapeType() !== RAPIER.ShapeType.Cuboid) continue;
+    const h = c.halfExtents();
+    const t = c.translation();
+    const r = c.rotation();
+    q.set(r.x, r.y, r.z, r.w);
+    for (const sx of [-1, 1])
+      for (const sy of [-1, 1])
+        for (const sz of [-1, 1]) {
+          const y = t.y + v.set(sx * h.x, sy * h.y, sz * h.z).applyQuaternion(q).y;
+          if (y < unten) unten = y;
+          if (y > oben) oben = y;
+        }
+  }
+  return unten <= oben ? { unten, oben } : null;
 }
