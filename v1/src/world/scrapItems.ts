@@ -228,7 +228,8 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
 /**
  * Ist das Teil ein Rad — Reifen auf Felge? Dann die Farbe der Felge, sonst null.
  *
- * E-181, Patrick 20.10.2026: „Reifen haben immer felge." Erkannt wird das Rad
+ * E-181, Patrick 20.10.2026: „Reifen haben immer felge." (Fraktion: Reifen, E-186,
+ * `purity.istRad`.) Erkannt wird das Rad
  * an seiner Stueckliste (Reifen plus Stahl oder Alu), nicht am Namen: Ein Rad
  * aus einem alten Spielstand bekommt die Stueckliste vom Katalog nachgetragen
  * (`katalogFuer`) und sieht dann genauso aus.
@@ -1026,7 +1027,7 @@ export const SPECS: PileSpec[] = [
   // E-181 (Patrick 20.10.2026: „Reifen haben immer felge"): war „Traktorreifen", 11 kg
   // ohne Felge. Traktor-Vorderrad 7.50-16: Aussen-Ø 0,80 m, Breite 0,20 m; Reifen
   // rund 25 kg + Felge 5.50x16 12 kg = 37 kg (SW).
-  { materialId: "mixed", massKg: 37, kind: "torus", dims: [0.3, 0.1], name: "Traktor-Vorderrad", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.68 }, { materialId: "steel", anteil: 0.32 }] },
+  { materialId: "tires", massKg: 37, kind: "torus", dims: [0.3, 0.1], name: "Traktor-Vorderrad", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.68 }, { materialId: "steel", anteil: 0.32 }] },
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
   ...KATALOG_SPECS,
@@ -1160,18 +1161,15 @@ function colorFor(spec: PileSpec, seed: number): number {
  * die Finger davon gelassen). `test/abfall.test.ts` misst den Anteil.
  */
 /*
- * E-181 (20.10.2026): REIFEN SIND RAEDER, und Raeder sind Mischschrott.
- * Patrick: „Reifenstapel gibt es nicht mehr, nur einzel reifen" und „Reifen
- * haben immer felge". Damit hat `tires` keinen einzigen Katalogeintrag mehr —
- * ein Reifen-Los faende nichts und fiele auf ein beliebiges Teil zurueck
- * (`pool[Math.random() …]`). Seine drei Lose gehen an die drei anderen
- * Abfallsorten: jede VIER statt drei. Der Abfall behaelt damit genau seine
- * 12 von 36 Losen (ein Drittel des Topfes), nur ohne Reifen. Reifen gibt es
- * weiter — aus dem Rad getrennt (Werkzeug) oder vom Wrack.
+ * E-181 (20.10.2026): Reifen gibt es nur noch als Rad mit Felge. E-181 hatte
+ * die Raeder zu Mischschrott gemacht und die Reifen-Lose verteilt; E-186
+ * (Patrick 20.10.2026: „Rad zählt als Reifen", `purity.istRad`) macht sie
+ * wieder zu Reifen — damit gilt der Topf wieder wie seit dem 16.09.: vier
+ * Abfallsorten mit je drei Losen, 12 von 36.
  */
 const REST_LOSE: string[] = [
   ...["va", "copper", "brass", "zinc", "battery", "cable"].flatMap((f) => [f, f, f, f]),
-  ...ABFALLFRAKTIONEN.filter((f) => f !== "tires").flatMap((f) => [f, f, f, f]),
+  ...ABFALLFRAKTIONEN.flatMap((f) => [f, f, f]),
 ];
 
 /**

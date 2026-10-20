@@ -377,6 +377,13 @@ describe("Was aus einem zerlegten Wrack fällt, trägt seine Fraktion", () => {
     }
     // Ohne diese Zeile wäre der Wächter grün, wenn die Liste leer wäre.
     expect(geprueft, "die Wrack-Definition hat keine Anbauteile mehr").toBeGreaterThanOrEqual(6);
+    // E-186, Patrick 20.10.2026: „Rad zählt als Reifen" (`purity.istRad`) —
+    // ein abgerissenes Rad (Reifen 70 % / Stahlfelge 30 %) gehört zu Reifen;
+    // die Motorhaube (Lackblech) bleibt Mischschrott.
+    const raeder = CAR_DEF.parts.filter((p) => p.kind === "wheel");
+    expect(raeder.length).toBe(4);
+    for (const p of raeder) expect(p.materialId, p.id).toBe("tires");
+    expect(CAR_DEF.parts.find((p) => p.name === "Motorhaube")?.materialId).toBe("mixed");
   });
 
   it("GEGENPROBE: ein Anbauteil mit falschem Etikett wird gemeldet", () => {

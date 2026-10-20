@@ -25,6 +25,7 @@ import {
   aussenflaeche,
   fraktionAus,
   fraktionVonTeil,
+  istRad,
   wandstaerkeMm,
 } from "../src/materials/purity";
 import type { PileSpec } from "../src/world/objektkatalog";
@@ -145,7 +146,8 @@ export function leitstoff(spec: PileSpec): { id: string; anteil: number } {
 /* ------------------------------------------------------------------------ */
 
 /** Warum ein Stück so einsortiert ist. */
-export type Grund = "premium" | "uebersteuert" | "kein-stahl" | "duennwandig" | "verbund";
+/** `rad` seit E-186 (Patrick 20.10.2026: „Rad zählt als Reifen", `purity.istRad`). */
+export type Grund = "premium" | "uebersteuert" | "kein-stahl" | "duennwandig" | "verbund" | "rad";
 
 export interface Urteil {
   spec: PileSpec;
@@ -176,7 +178,8 @@ export function urteile(spec: PileSpec, liste = ""): Urteil {
     : spec.materialId;
 
   let grund: Grund = "premium";
-  if (id !== "steel") grund = "kein-stahl";
+  if (istRad(spec.zusammensetzung ?? [])) grund = "rad";
+  else if (id !== "steel") grund = "kein-stahl";
   else if (fremd > VERBUND_BIS + 1e-9) grund = "verbund";
   else if (spec.massiv !== undefined) grund = "uebersteuert";
   else if (wand < WAND_AB_MM) grund = "duennwandig";

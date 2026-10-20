@@ -261,6 +261,40 @@ export interface TeilMass {
 }
 
 /**
+ * Ab diesem Gummi-Anteil ist ein Teil aus Reifen und Felge ein RAD (E-186).
+ *
+ * SW, gesetzt in die Luecke des Katalogs vom 20.10.2026: Die Raeder tragen
+ * 48 % (Pkw-Rad, schwere Stahlfelge) bis 80 % Reifen (Vollgummi-Stapler),
+ * die Wrackraeder 70 %. Die einzigen anderen Teile, die nur aus Reifen und
+ * Stahl bestehen, liegen weit darunter: Minibagger-Raupenunterwagen 20 %
+ * (Gummiketten), Baggerloeffel 3 % (Gumminoppen). Beide bleiben, was die
+ * Regel sonst sagt.
+ */
+export const RAD_REIFEN_AB = 0.4;
+
+/**
+ * Ist das ein Rad — Reifen auf Felge, sonst nichts?
+ *
+ * Patrick, 20.10.2026 (Auswahl auf „Rad mit Felge ist Verbund → Mischschrott,
+ * passt das?"): **„Rad zählt als Reifen"**. Auf dem Platz nimmt niemand ein
+ * Rad auseinander, um die Felge in den Stahl zu werfen; es geht zum
+ * Altreifenhaendler, Felge dran. Das ist die EINE begruendete Ausnahme vom
+ * Verbund (wie `massiv` beim Seecontainer) — sie steht hier, nicht an jedem
+ * Rad, weil lose Raeder (Katalog) und abgerissene Wrackraeder (`carDef`)
+ * dieselbe Stueckliste haben und dieselbe Antwort brauchen.
+ *
+ * Erkannt an der Stueckliste: nur Reifen und Felgenmetall (Stahl oder Alu),
+ * Reifen mindestens `RAD_REIFEN_AB`. Alles mit Kunststoff, Kupfer, Holz o. Ae.
+ * daneben (Quad, Golfwagen, Motorroller) ist kein Rad, sondern ein Fahrzeug.
+ */
+export function istRad(zusammensetzung: Anteil[]): boolean {
+  if (zusammensetzung.length !== 2) return false;
+  const reifen = zusammensetzung.find((a) => a.materialId === "tires");
+  const felge = zusammensetzung.find((a) => a.materialId === "steel" || a.materialId === "alu");
+  return !!reifen && !!felge && reifen.anteil >= RAD_REIFEN_AB;
+}
+
+/**
  * Welche Fraktion ein Teil ist — die vollstaendige Regel (E-042).
  *
  * Zwei Faelle:
@@ -281,6 +315,8 @@ export interface TeilMass {
  */
 export function fraktionVonTeil(teil: TeilMass): string {
   const zus = teil.zusammensetzung ?? [];
+  // E-186, Patrick 20.10.2026: „Rad zählt als Reifen" — die eine Ausnahme vom Verbund
+  if (istRad(zus)) return "tires";
   let leitId = teil.materialId;
   let leitAnteil = 1;
   if (zus.length > 0) {

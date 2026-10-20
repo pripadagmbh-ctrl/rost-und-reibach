@@ -33,7 +33,8 @@ import {
   radGeometrie,
   randomCargo,
 } from "../src/world/scrapItems";
-import { fraktionVonTeil, wandstaerkeMm, WAND_AB_MM } from "../src/materials/purity";
+import { fraktionVonTeil, istRad, wandstaerkeMm, WAND_AB_MM } from "../src/materials/purity";
+import { CAR_DEF, LKW_DEF, WOHNWAGEN_DEF } from "../src/dismantle/carDef";
 import { getMaterial } from "../src/materials/catalog";
 import type { PileSpec } from "../src/world/objektkatalog";
 import { festerZufall } from "./kipperlauf";
@@ -149,30 +150,54 @@ describe("Mischschrott ist haeufiger als Stahlschrott (Patrick 20.10.2026)", () 
 /* ------------------------------------------------------------------------ */
 
 describe("Nur Einzelreifen, und jeder mit Felge (Patrick 20.10.2026)", () => {
-  const istRad = (s: PileSpec) =>
+  const hatReifen = (s: PileSpec) =>
     (s.zusammensetzung ?? []).some((a) => a.materialId === "tires" && a.anteil >= 0.4);
 
-  it("kein Katalogeintrag ist ein nackter Reifen", () => {
-    expect(ALLE.filter((s) => s.materialId === "tires").map((s) => s.name)).toEqual([]);
+  it("kein Katalogeintrag ist ein nackter Reifen — jeder Reifen ist ein Rad", () => {
+    const nackt = ALLE.filter((s) => s.materialId === "tires" && !istRad(s.zusammensetzung ?? []));
+    expect(nackt.map((s) => s.name)).toEqual([]);
   });
 
   it("kein Stapel, Haufen oder Bund aus Reifen", () => {
     const sammel = ALLE.filter(
-      (s) => /reifen/i.test(s.name ?? "") || (istRad(s) && ["stapel", "haufen", "buendel"].includes(s.bau ?? ""))
+      (s) => /reifen/i.test(s.name ?? "") || (hatReifen(s) && ["stapel", "haufen", "buendel"].includes(s.bau ?? ""))
     );
     expect(sammel.map((s) => s.name)).toEqual([]);
   });
 
-  it("jedes Rad hat eine Felge, ist Mischschrott und mit Werkzeug trennbar", () => {
-    const raeder = ALLE.filter(istRad);
+  it("jedes Rad hat eine Felge, zaehlt als Reifen (E-186) und ist mit Werkzeug trennbar", () => {
+    const raeder = ALLE.filter(hatReifen);
     expect(raeder.length).toBeGreaterThanOrEqual(9);
     for (const r of raeder) {
       const shape = { kind: r.kind, dims: r.dims, color: 0, zusammensetzung: r.zusammensetzung };
       expect(radFelge(shape), `${r.name} ohne Felge`).not.toBeNull();
-      expect(fraktionVonTeil(r), r.name).toBe("mixed");
+      // E-186, Patrick 20.10.2026: „Rad zählt als Reifen"
+      expect(fraktionVonTeil(r), r.name).toBe("tires");
       expect(r.trennbar && r.nurWerkzeug, `${r.name} nicht trennbar`).toBe(true);
       expect(r.bau, `${r.name}: ein Bau ersetzte die Radform`).toBeUndefined();
     }
+  });
+
+  it("E-186: Wrackraeder sind Reifen, die Motorhaube bleibt Mischschrott", () => {
+    for (const d of [CAR_DEF, LKW_DEF, WOHNWAGEN_DEF]) {
+      const raeder = d.parts.filter((p) => p.kind === "wheel");
+      expect(raeder.length).toBeGreaterThan(0);
+      for (const p of raeder) expect(p.materialId, p.id).toBe("tires");
+    }
+    const haube = CAR_DEF.parts.find((p) => p.name === "Motorhaube");
+    expect(haube, "Motorhaube fehlt").toBeDefined();
+    expect(haube!.materialId).toBe("mixed");
+  });
+
+  it("GEGENPROBE: zwei Stoffe mit wenig Gummi sind kein Rad, ein Quad auch nicht", () => {
+    // Raupenunterwagen (Gummiketten 20 %) und Baggerloeffel (Noppen 3 %)
+    for (const n of ["Minibagger-Raupenunterwagen", "Baggerlöffel"]) {
+      const s = ALLE.find((x) => x.name === n)!;
+      expect(istRad(s.zusammensetzung ?? []), n).toBe(false);
+      expect(fraktionVonTeil(s), n).not.toBe("tires");
+    }
+    const quad = ALLE.find((x) => x.name === "Quad")!;
+    expect(fraktionVonTeil(quad)).toBe("mixed");
   });
 
   it("GEGENPROBE: Kabelring und Kupferbund sind keine Raeder", () => {

@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-186 | 20.10.2026 | Ein Rad zählt als Reifen, lose wie vom Wrack | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-185 | 20.10.2026 | Zerlegen in Reihenfolge: Haube, Batterie, Kühler, Motorblock; Felgen, Sitze | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-184 | 20.10.2026 | Grüne Rost-&-Reibach-Mulden hebbar, Absetzkipper-Mulde übergeben | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-183 | 20.10.2026 | MÜLL-Mulde morgens direkt vor dem Bagger an der BUNT + VA | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -216,13 +217,17 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Schräge Mauer: endet sie an der Presse so, wie gemeint? Frage: Variante A (gebaut, 14°) oder B (33°, Mischschrott hinten breiter) — Bilder im Bericht.
 - Kipper abladen lassen: bleibt der Haufen vor der Mauer, rutscht nichts in den Stahlschrott?
 
+**E-186 — Rad zählt als Reifen** (iPad)
+- Loses Rad greifen: steht „Reifen“ an, gehört es in die MÜLL-Mulde?
+- Rad vom Auto abreißen, in die MÜLL-Mulde: als richtig gezählt?
+- Motorhaube abreißen: bleibt sie Mischschrott?
+
 **E-181 — Mulden Stahl, Misch häufiger, Räder statt Reifen** (iPad)
 - Neues Spiel: im Starthaufen deutlich mehr fleckiger Mischschrott als rostiger Stahl (etwa doppelt so viel)?
 - Ein Rad greifen: Reifen auf Felge zu erkennen, Griff-Info „Mischschrott“? Rollt kurz und bleibt liegen?
 - Absetzmulde oder Kippbehälter als Einzelstück: Griff-Info „Stahlschrott“?
 - Frage: Kipper-Mulde (Lkw-Brücke) auch Stahl? Empfehlung: nein, sie ist kein Muldencontainer.
 - Frage: Werkzeugcontainer (Baustelle) auch Stahl? Empfehlung: nein, Holzboden, Trapezblech.
-- Frage: Reifen-Fraktion ohne eigene Teile lassen (nur aus Rad und Wrack)? Empfehlung: ja.
 
 **E-178 — Sortenrein im Kipper, Hupe, Büro-Funk** (iPad)
 - Sortenreine Fuhre: steht „Büro an Bagger: Kipper mit … kommt, kippt ins …-LAGER", und kippt er dort?

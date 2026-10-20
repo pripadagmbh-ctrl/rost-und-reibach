@@ -240,14 +240,15 @@ describe("Die Reihenfolge Haube → Batterie, Kühler → Motor mit Getriebe (B4
 });
 
 describe("Räder mit Felge (B2)", () => {
-  it("jedes Rad an jedem Wrack ist Reifen mit Stahlfelge, 70 / 30, und damit Mischschrott", () => {
+  it("jedes Rad an jedem Wrack ist Reifen mit Stahlfelge, 70 / 30, und zählt als Reifen (E-186)", () => {
     for (const def of [CAR_DEF, LKW_DEF, WOHNWAGEN_DEF]) {
       for (const p of def.parts.filter((q) => q.kind === "wheel")) {
         expect(p.zusammensetzung).toEqual([
           { materialId: "tires", anteil: 0.7 },
           { materialId: "steel", anteil: 0.3 },
         ]);
-        expect(p.materialId).toBe("mixed");
+        // E-186, Patrick 20.10.2026: „Rad zählt als Reifen" (`purity.istRad`); bis dahin Mischschrott
+        expect(p.materialId).toBe("tires");
       }
     }
   });

@@ -160,8 +160,9 @@ export const FELGE_FARBE = 0xa9adb2;
 /**
  * Was ein Rad ist (E-185): Reifen mit Stahlfelge, immer zusammen. Anteile
  * Reifen 70 % / Felge 30 % (Zerstörungskonzept 20.10.2026, Ansage 12.09.).
- * Nach der einen Regel (`purity.fraktionVonTeil`, 95 % für sortenrein) ist
- * ein solches Rad MISCHSCHROTT — wie die losen Räder im Katalog (E-173).
+ * Fraktion REIFEN (E-186, Patrick 20.10.2026: „Rad zählt als Reifen") — die
+ * eine Ausnahme vom Verbund steht in `purity.istRad`, für lose Räder im
+ * Katalog (E-181) und abgerissene Wrackräder gleich.
  */
 export const RAD_ZUSAMMENSETZUNG = [
   { materialId: "tires", anteil: 0.7 },
@@ -357,10 +358,10 @@ export const CAR_DEF: CarDef = {
         /*
          * Reifen mit Stahlfelge, ungetrennt (Ansage 12.09.2026: „Reifen
          * muessen nicht zerlegt werden, es sei denn, es ist ne Alufelge").
-         * Seit E-185 mit Felge im Bild und in der Stückliste — und damit nach
-         * der 95-%-Regel Mischschrott, wie die losen Räder im Katalog.
+         * Seit E-185 mit Felge im Bild und in der Stückliste; seit E-186
+         * Fraktion Reifen („Rad zählt als Reifen", `purity.istRad`).
          */
-        materialId: "mixed",
+        materialId: "tires",
         zusammensetzung: RAD_ZUSAMMENSETZUNG,
         massKg: 25,
         tearSeconds: 1.2,
@@ -496,7 +497,8 @@ export const LKW_DEF: CarDef = {
         id: `wheel_${i}`,
         name: "Rad",
         // E-185: Stahlfelge, dieselben Anteile wie am Pkw. // SW: bei Lkw-Rädern trägt die Felge eher 35–40 %
-        materialId: "mixed",
+        // E-186: Fraktion Reifen („Rad zählt als Reifen")
+        materialId: "tires",
         zusammensetzung: RAD_ZUSAMMENSETZUNG,
         massKg: kg,
         // SW: zehn Radmuttern statt vier oder fünf
@@ -561,8 +563,8 @@ export const WOHNWAGEN_DEF: CarDef = {
       (x, i): PartDef => ({
         id: `wheel_${i}`,
         name: "Rad",
-        // E-185: Stahlfelge wie am Pkw
-        materialId: "mixed",
+        // E-185: Stahlfelge wie am Pkw; E-186: Fraktion Reifen
+        materialId: "tires",
         zusammensetzung: RAD_ZUSAMMENSETZUNG,
         massKg: 16,
         tearSeconds: 1.2,

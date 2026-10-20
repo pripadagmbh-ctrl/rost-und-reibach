@@ -153,16 +153,19 @@ describe("Was der Katalog daraus macht", () => {
     expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(72);
   });
 
-  it("von den 72 werden 66 zu Mischschrott, genau 6 bleiben sortenrein", () => {
+  it("von den 72 werden 57 zu Mischschrott, 6 bleiben sortenrein, 9 Raeder sind Reifen", () => {
     const mitZus = ALLE.filter((s) => s.zusammensetzung);
     // E-150: Gitterroste, Leitungsrinnen, Geruestrahmen sind duennwandig -> Misch;
     // die Geruestrohre (7,7 mm rechnerisch) sind Stahlschrott.
-    // E-181: die acht Raeder sind Verbund -> Mischschrott (58 -> 66).
-    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(66);
+    // E-181: die acht Raeder waren Verbund -> Mischschrott (58 -> 66).
+    // E-186 (Patrick 20.10.2026: „Rad zählt als Reifen", `purity.istRad`): alle
+    // neun Raeder (mit dem Rad mit Alufelge) sind Reifen -> 57 Misch.
+    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(57);
+    expect(mitZus.filter((s) => s.materialId === "tires").length).toBe(9);
     // E-123: Der Minibagger-Ausleger kommt dazu — 4 % Schlaeuche, massives Blech.
     // E-138: Beide Minibagger (14 % Fremdstoff, massiv) mit `VERBUND_BIS` 0,15
     // — Patrick, 17.10.2026: „Minibagger sind eher Stahl als Mischschrott."
-    const rein = mitZus.filter((s) => s.materialId !== "mixed").map((s) => s.name);
+    const rein = mitZus.filter((s) => s.materialId !== "mixed" && s.materialId !== "tires").map((s) => s.name);
     expect(rein.sort()).toEqual([
       "Baggerlöffel",
       "Gerüstrohre verzinkt (Bund)",

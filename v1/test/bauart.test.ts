@@ -360,7 +360,8 @@ describe("Ein Kupferkessel ist kupfern, ein Stahltank bleibt grau", () => {
 describe("Was der Name verspricht, haelt die Fraktion", () => {
   const NAMENSSTOFF: Array<[RegExp, string[], string]> = [
     [/\bHolz(?!bruch)|Lattenrost|Bohlen|Dachstuhl/i, ["wood", "mixed"], "Holz"],
-    [/\bAlu(?!minium-?frei)/i, ["alu", "mixed"], "Aluminium"],
+    // E-186: „…(Alufelge)" nennt die Felge eines Rades, und ein Rad zählt als Reifen
+    [/\bAlu(?!minium-?frei|felge)/i, ["alu", "mixed"], "Aluminium"],
     [/\bVA-|Edelstahl|V2A/i, ["va"], "Edelstahl"],
     [/Kupfer/i, ["copper", "mixed"], "Kupfer"],
     [/Messing/i, ["brass"], "Messing"],
@@ -469,13 +470,13 @@ describe("Was eine Fuhre ansagt, liegt auch drauf", () => {
     vi.spyOn(Math, "random").mockImplementation(festerZufall(1));
     const ladung = randomCargo(4000, 0, 0);
     const anteil = (id: string) => ladung.filter((c) => c.materialId === id).length / ladung.length;
-    // Ein Sechsunddreissigstel des letzten Fuenftels x 4 Lose = 2,22 % (seit
-    // E-181 vier statt drei Lose: die Reifen-Lose sind verteilt).
-    expect(anteil("rubble")).toBeGreaterThan(0.012);
-    expect(anteil("rubble")).toBeLessThan(0.032);
-    // E-181 (Patrick 20.10.2026: „Reifen haben immer felge"): Ein Reifen
-    // ohne Felge kommt nicht mehr — er kommt als Rad, und das ist Mischschrott.
-    expect(anteil("tires"), "ein Reifen ohne Felge kam an").toBe(0);
+    // Ein Sechsunddreissigstel des letzten Fuenftels x 3 Lose = 1,67 %
+    // (E-181 hatte vier Lose, E-186 nimmt das mit den Reifen-Losen zurueck).
+    expect(anteil("rubble")).toBeGreaterThan(0.008);
+    expect(anteil("rubble")).toBeLessThan(0.026);
+    // E-186 (Patrick 20.10.2026: „Rad zählt als Reifen"): Reifen kommen
+    // wieder — als Rad mit Felge.
+    expect(anteil("tires"), "Reifen werden nicht angeliefert").toBeGreaterThan(0.008);
     // E-181 (Patrick 20.10.2026: „Mischschrott ist häufiger"): 50 % Misch,
     // 22 % Stahl (`FRAKTIONSMIX`). Bei 4000 Zuegen streut 0,22 um 0,007 und
     // 0,50 um 0,008 je Standardabweichung — die Schranken liegen bei 4 bis 5.

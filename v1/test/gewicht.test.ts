@@ -339,9 +339,12 @@ describe("Eine sortenreine Fuhre wiederholt sich nicht sofort (E-063)", () => {
      * stehen jetzt bei den Raedern (naechster Test). Reifen als Fraktion gibt
      * es weiter: aus dem Rad getrennt oder vom Wrack.
      */
-    for (const frak of ["wood", "rubble", "plastic"])
+    /*
+     * E-186 (Patrick 20.10.2026: „Rad zählt als Reifen"): Die Raeder sind die
+     * Reifen — die Fraktion hat ihre acht wieder (`purity.istRad`).
+     */
+    for (const frak of ["tires", "wood", "rubble", "plastic"])
       expect(sorten(frak, "klein"), `${frak} ist weiter duenn`).toBeGreaterThanOrEqual(8);
-    expect(sorten("tires", "klein"), "ein Reifen ohne Felge ist zurueck").toBe(0);
   });
 
   it("E-181: acht Raeder in der Kleinteil-Klasse, jedes mit Felge", () => {
@@ -361,7 +364,8 @@ describe("Eine sortenreine Fuhre wiederholt sich nicht sofort (E-063)", () => {
     for (const e of raeder) {
       const zus = e.spec.zusammensetzung ?? [];
       expect(zus.some((a) => a.materialId === "steel" || a.materialId === "alu"), `${e.spec.name} ohne Felge`).toBe(true);
-      expect(fraktionVonTeil(e.spec), `${e.spec.name}`).toBe("mixed");
+      // E-186: „Rad zählt als Reifen"
+      expect(fraktionVonTeil(e.spec), `${e.spec.name}`).toBe("tires");
       expect(["torus", "cyl"], `${e.spec.name} rollt nicht als Achtkant`).toContain(e.spec.kind);
     }
   });

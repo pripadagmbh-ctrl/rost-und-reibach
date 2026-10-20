@@ -147,6 +147,13 @@ describe("Die Regel", () => {
       expect(u.jetzt, u.spec.name ?? u.spec.materialId).toBe(u.vorher);
     }
   });
+
+  it("E-186: ein Rad (Reifen + Felge) zählt als Reifen, nicht als Verbund", () => {
+    // Patrick, 20.10.2026: „Rad zählt als Reifen" (`purity.istRad`).
+    const raeder = alle.filter((u) => u.grund === "rad");
+    expect(raeder.length).toBe(9);
+    for (const u of raeder) expect(u.jetzt, u.spec.name).toBe("tires");
+  });
 });
 
 describe("Die Übersteuerungen — Patricks zwei Korrekturen und die Folgefälle", () => {

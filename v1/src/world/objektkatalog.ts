@@ -236,17 +236,18 @@ export const KATALOG_SPECS: PileSpec[] = [
    * und „Reifen haben immer felge". Hier standen Reifenstapel (Pkw) und (LKW).
    * Jedes Rad ist ein Torus [Ringhalbmesser, Rohrhalbmesser]: Aussenhalbmesser =
    * Summe, Breite = 2 x Rohr. Gezeichnet mit Felge (`scrapItems.radGeometrie`),
-   * Kollider Achtkant (v2 E-011). Gummi + Felge ist Verbund -> Mischschrott nach
-   * der einen Regel; trennen wie beim Rad mit Alufelge nur mit Werkzeug. */
+   * Kollider Achtkant (v2 E-011). Gummi + Felge waere Verbund (Mischschrott);
+   * seit E-186 (Patrick 20.10.2026: „Rad zählt als Reifen") zaehlt es als Reifen
+   * (`purity.istRad`). Trennen wie beim Rad mit Alufelge nur mit Werkzeug. */
   // Pkw-Rad 205/55 R16: Aussen-Ø 0,632 m, Breite 0,205 m. Reifen 8,5 kg + Stahlfelge
   // 6,5Jx16 9 kg = 17,5 kg (Groessenordnung Handelsangaben, SW) -> 18 kg.
-  { materialId: "mixed", massKg: 18, kind: "torus", dims: [0.215, 0.1], name: "Pkw-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "steel", anteil: 0.52 }, { materialId: "tires", anteil: 0.48 }] },
+  { materialId: "tires", massKg: 18, kind: "torus", dims: [0.215, 0.1], name: "Pkw-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "steel", anteil: 0.52 }, { materialId: "tires", anteil: 0.48 }] },
   // Transporter-Rad 235/65 R16C: Aussen-Ø 0,711 m, Breite 0,235 m. Reifen 13 kg +
   // Stahlfelge 11 kg = 24 kg (SW).
-  { materialId: "mixed", massKg: 24, kind: "torus", dims: [0.24, 0.115], name: "Transporter-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.54 }, { materialId: "steel", anteil: 0.46 }] },
+  { materialId: "tires", massKg: 24, kind: "torus", dims: [0.24, 0.115], name: "Transporter-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.54 }, { materialId: "steel", anteil: 0.46 }] },
   // Alufelge statt Stahlfelge: Das lohnt zu trennen — aber nicht mit der
   // Spinne, sondern mit Flex oder Abdrueckmaschine (Ansage 12.09.2026).
-  { materialId: "mixed", massKg: 24, kind: "cyl", dims: [0.34, 0.24], name: "Rad mit Alufelge", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.58 }, { materialId: "alu", anteil: 0.42 }] },
+  { materialId: "tires", massKg: 24, kind: "cyl", dims: [0.34, 0.24], name: "Rad mit Alufelge", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.58 }, { materialId: "alu", anteil: 0.42 }] },
   { materialId: "steel", massKg: 95, kind: "cyl", dims: [0.28, 1.1], bau: "stapel", name: "Felgenstapel (Stahl)", massiv: true }, // E-042: derselbe Gegenstand wie die LKW-Felge, nur gestapelt
   { materialId: "steel", massKg: 190, kind: "box", dims: [0.75, 0.7, 0.8], bau: "motor", name: "Motorblock (V8, ausgebaut)", zusammensetzung: [{ materialId: "steel", anteil: 0.82 }, { materialId: "alu", anteil: 0.14 }, { materialId: "copper", anteil: 0.04 }] },
   { materialId: "alu", massKg: 85, kind: "box", dims: [0.6, 0.65, 0.9], bau: "maschine", name: "Automatikgetriebe" },
@@ -323,7 +324,7 @@ export const KATALOG_SPECS: PileSpec[] = [
   // E-181: war „Reifenhaufen" (95 kg) — Haufen gibt es nicht mehr, nur Einzelraeder.
   // Anhaenger-Rad 155/80 R13: Aussen-Ø 0,578 m, Breite 0,155 m. Reifen 6 kg +
   // Stahlfelge 4,5Jx13 5 kg = 11 kg (SW).
-  { materialId: "mixed", massKg: 11, kind: "torus", dims: [0.21, 0.078], name: "Anhänger-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.55 }, { materialId: "steel", anteil: 0.45 }] },
+  { materialId: "tires", massKg: 11, kind: "torus", dims: [0.21, 0.078], name: "Anhänger-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.55 }, { materialId: "steel", anteil: 0.45 }] },
   { materialId: "steel", massKg: 205, kind: "box", dims: [0.55, 0.55, 1.3], bau: "stapel", name: "Schrottschere-Abschnitte" },
   /* --- Massives Kleinzeug (E-042, 15.09.2026) ---------------------------
    *
@@ -510,16 +511,16 @@ export const KATALOG_SPECS: PileSpec[] = [
    * der genannten 1,08 m); die Masse unten kommen aus den Reifengroessen. */
   // LKW-Rad 315/80 R22.5: Aussen-Ø 1,08 m, Breite 0,315 m. Reifen 62 kg (bisheriger
   // Eintrag, Herstellerangabe) + Stahlfelge 9.00x22.5 46 kg (wie „LKW-Felge") = 108 kg.
-  { materialId: "mixed", massKg: 108, kind: "torus", dims: [0.38, 0.16], name: "LKW-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.57 }, { materialId: "steel", anteil: 0.43 }] },
+  { materialId: "tires", massKg: 108, kind: "torus", dims: [0.38, 0.16], name: "LKW-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.57 }, { materialId: "steel", anteil: 0.43 }] },
   // Motorrad-Hinterrad 180/55 ZR17: Aussen-Ø 0,63 m, Breite 0,18 m. Reifen 6 kg +
   // Alu-Gussfelge 5 kg = 11 kg (SW).
-  { materialId: "mixed", massKg: 11, kind: "torus", dims: [0.225, 0.09], name: "Motorrad-Hinterrad (Alufelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.55 }, { materialId: "alu", anteil: 0.45 }] },
+  { materialId: "tires", massKg: 11, kind: "torus", dims: [0.225, 0.09], name: "Motorrad-Hinterrad (Alufelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.55 }, { materialId: "alu", anteil: 0.45 }] },
   // Stapler-Rad 18x7-8, Vollgummi: Aussen-Ø 0,457 m, Breite 0,178 m. Der Torus
   // [0,135 | 0,095] (Ø 0,46 m, 0,19 m breit) fasst als Vollkoerper rund 0,024 m³;
   // bei der Feststoffdichte aus `test/gewicht.test.ts` traegt er 31 kg. Vollgummi
   // 24 kg + geteilte Stahlfelge 8 Zoll 6 kg = 30 kg (SW; der alte Eintrag nannte
   // 30 kg fuer den Reifen allein, das sprengt das Volumen).
-  { materialId: "mixed", massKg: 30, kind: "torus", dims: [0.135, 0.095], name: "Stapler-Rad (Vollgummi)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.8 }, { materialId: "steel", anteil: 0.2 }] },
+  { materialId: "tires", massKg: 30, kind: "torus", dims: [0.135, 0.095], name: "Stapler-Rad (Vollgummi)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.8 }, { materialId: "steel", anteil: 0.2 }] },
 
   /* --- Holz: 6 -> 8 Kleinteile ------------------------------------------ */
   // Europalette 1,2 x 0,8 m wiegt 25 kg; vier gestapelt = 100 kg bei 0,6 m.
@@ -538,7 +539,7 @@ export const KATALOG_BIG: PileSpec[] = [
   // E-181: der Erdbaureifen (bis dahin Kleinteil, ohne Felge), jetzt mit Felge.
   // Radlader-Rad 17.5 R25: Aussen-Ø 1,45 m, Breite 0,445 m. Reifen 160 kg (bisheriger
   // Eintrag) + Felge 14.00-25 rund 95 kg (SW) = 255 kg — ueber der Kleinteil-Grenze.
-  { materialId: "mixed", massKg: 255, kind: "torus", dims: [0.5, 0.22], name: "Radlader-Rad", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.63 }, { materialId: "steel", anteil: 0.37 }] },
+  { materialId: "tires", massKg: 255, kind: "torus", dims: [0.5, 0.22], name: "Radlader-Rad", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.63 }, { materialId: "steel", anteil: 0.37 }] },
   // --- Landwirtschaft ---
   { materialId: "steel", massKg: 320, kind: "box", dims: [1.6, 1.7, 1.5], bau: "kabine", name: "Traktorkabine", zusammensetzung: [{ materialId: "steel", anteil: 0.8 }, { materialId: "rubble", anteil: 0.06 }, { materialId: "plastic", anteil: 0.1 }, { materialId: "alu", anteil: 0.04 }] },
   { materialId: "steel", massKg: 480, kind: "box", dims: [2.4, 0.7, 0.7], bau: "achse", name: "Traktor-Hinterachse" },
