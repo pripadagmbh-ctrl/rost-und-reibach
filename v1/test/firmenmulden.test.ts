@@ -203,13 +203,13 @@ describe("Firmenmulden bauen (E-133, E-184)", () => {
     const eintrag = alleHindernisse().find((o) => o.label === `Firmenmulde ${m.name}`)!;
     koerper[2]!.setTranslation({ x: m.x - 3, y: 0, z: m.z + 1 }, true);
     // Die Szene führt die Netze vor jedem Bild nach — hier von Hand ausgelöst
-    scene.onBeforeRender(undefined as never, scene, undefined as never, null);
+    scene.onBeforeRender(undefined as never, scene, undefined as never, null as never, undefined as never, null as never);
     expect(eintrag.x).toBeCloseTo(m.x - 3, 6);
     expect(eintrag.z).toBeCloseTo(m.z + 1, 6);
     expect(netz.position.x).toBeCloseTo(m.x - 3, 6);
     // zurückstellen, sonst rechnen spätere Wächter mit der versetzten Mulde
     koerper[2]!.setTranslation({ x: m.x, y: 0, z: m.z }, true);
-    scene.onBeforeRender(undefined as never, scene, undefined as never, null);
+    scene.onBeforeRender(undefined as never, scene, undefined as never, null as never, undefined as never, null as never);
     expect(eintrag.x).toBeCloseTo(m.x, 6);
   });
 
