@@ -19,6 +19,35 @@ export const DAY_LENGTH_S = 900;
 /** Tageszeit, bei der das Spiel beginnt: früher Morgen */
 export const START_TIME = 0.28;
 
+/*
+ * DIE SCHICHT-UHR (E-203, 21.10.2026) — keine zweite Uhr, sondern dieselbe mit
+ * einer anderen Tageslaenge.
+ *
+ * Patrick, 21.10.2026: Eine Schicht dauert rund zehn Minuten, die Uhr im Bild
+ * laeuft von 06:00 bis 16:00 (`docs/schicht-konzept.md`, Abschnitt 2). Zehn
+ * Spielstunden in 600 s sind 60 s je Spielstunde, ein voller Tag also
+ * 24 x 60 = 1 440 s statt 900 s. Die Sonne wandert mit: Um 16:00 steht sie
+ * noch bei `daylight` 0,98 (sin 150° = 0,5), das Flutlicht kaeme erst gegen
+ * 17:30 (`daylight` < 0,45) — in der Schicht also nie.
+ *
+ * Regel aus E-113: Es gibt genau EINE Uhr (`Daylight.time`). Die Schicht
+ * schaltet nur die Tageslaenge um (`schichtTag()`), sie zaehlt keine eigene
+ * Zeit. Der Sandkasten ruft `schichtTag()` nie auf und rechnet bitgleich wie
+ * vorher (`dt / 900`, Start 0,28 — Waechter in `test/schichtuhr.test.ts`).
+ */
+/** Länge eines Schicht-Tages in Sekunden: 24 Spielstunden zu je 60 s (siehe oben). */
+export const SCHICHT_TAG_S = 1440;
+/** Schichtbeginn 06:00 = 6/24 Tag. */
+export const SCHICHT_START = 6 / 24;
+/**
+ * Torschluss 15:00 = 15/24 Tag — ab hier kommt keine neue Fuhre mehr (wie
+ * `shift.TORSCHLUSS_TIME` im Sandkasten, E-113). Bei 60 s je Spielstunde nach
+ * 9 x 60 = 540 s Schicht; die letzte Stunde gehoert dem Abarbeiten.
+ */
+export const SCHICHT_TORSCHLUSS = 15 / 24;
+/** Feierabend 16:00 = 16/24 Tag, nach (16 − 6) x 60 = 600 s Schicht. */
+export const SCHICHT_FEIERABEND = 16 / 24;
+
 /** Farben für Himmel und Sonne über den Tag */
 const SKY_NIGHT = new THREE.Color(0x151b26);
 const SKY_DAWN = new THREE.Color(0xd8a07a);
@@ -29,6 +58,12 @@ const SUN_HIGH = new THREE.Color(0xfff4e0);
 export class Daylight {
   /** 0 = Mitternacht, 0.25 = Sonnenaufgang, 0.5 = Mittag, 0.75 = Sonnenuntergang */
   time = START_TIME;
+  /**
+   * Wie viele Sekunden ein voller Tag dauert: im Sandkasten `DAY_LENGTH_S`
+   * (900), in der Schicht `SCHICHT_TAG_S` (1 440). Umgeschaltet nur ueber
+   * `schichtTag()`, damit es bei einer Uhr bleibt (E-113, E-203).
+   */
+  tageslaengeS = DAY_LENGTH_S;
   /** 0 = tiefe Nacht, 1 = heller Tag — auch fürs Flutlicht ausgewertet */
   daylight = 1;
   private sky = new THREE.Color();
@@ -44,6 +79,26 @@ export class Daylight {
   get clock(): string {
     const min = Math.floor(this.time * 24 * 60);
     return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+  }
+
+  /**
+   * Auf den Schicht-Tag umschalten (E-203): Uhr auf 06:00, ein Tag dauert
+   * 1 440 s. Aufzurufen beim Bau einer Schicht, bevor die Uhr laeuft. Der
+   * Tageszaehler `tag` bleibt, wie er ist — er gehoert dem Platzinventar.
+   */
+  schichtTag(): void {
+    this.tageslaengeS = SCHICHT_TAG_S;
+    this.time = SCHICHT_START;
+  }
+
+  /** Laeuft die Uhr im Schicht-Takt? */
+  get istSchicht(): boolean {
+    return this.tageslaengeS === SCHICHT_TAG_S;
+  }
+
+  /** Sekunden seit Schichtbeginn (06:00), aus der einen Uhr gerechnet. */
+  get schichtSekunden(): number {
+    return (this.time - SCHICHT_START) * this.tageslaengeS;
   }
 
   get isNight(): boolean {
@@ -72,7 +127,7 @@ export class Daylight {
 
   update(dt: number): void {
     const vorher = this.time;
-    this.time = (this.time + dt / DAY_LENGTH_S) % 1;
+    this.time = (this.time + dt / this.tageslaengeS) % 1;
     /*
      * MITTERNACHT — der einzige Tageswechsel, den das Spiel hat.
      *

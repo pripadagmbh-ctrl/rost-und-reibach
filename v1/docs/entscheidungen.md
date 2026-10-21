@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-203 | 21.10.2026 | Schicht-Kasse mit festen Preisen, Bilanz, Sterne und Schicht-Uhr | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-196 | 21.10.2026 | Lehrgang Etappe 1: Vorführung im Spiel, dann nachmachen; Lektionen 1–3 | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-195 | 21.10.2026 | Bestenliste auf dem Gerät: beste 5 je Aufgabe, drei Sandkasten-Rekorde | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-194 | 21.10.2026 | Privatperson statt Firma: Pripada/GmbH raus, Repo rost-und-reibach, neue Bundle-ID | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -210,6 +211,10 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Geisterdaumen folgen dem Bagger; Finger-Geist für Kamera-Gesten; „ANSICHT: 2× tippen“?
 - Lektion 3 Schritt 5: grüner Ring links am Boden, zwei Geisterdaumen?
 - Menü iPhone mini ohne Scrollen, Texte ohne „…“?
+**E-203 — Schicht-Kasse und Schicht-Uhr** (iPad; erst sichtbar nach der Verdrahtung S2 und der Tafel)
+- Schicht Montag: Uhr 06:00, um 15:00 keine neue Fuhre, um 16:00 die Tafel — nach rund 10 Minuten?
+- Kupfer auf den Misch-Verlader, Kupfer in BUNT: zeigt die Tafel den Unterschied?
+- Ein Holzbrett auf den Misch-Verlader: ein Fehlwurf zu 25 € auf der Tafel?
 
 **E-195 — Bestenliste** (iPad, dann iPhone mini quer)
 - Aufgabe 1 zweimal: „★ Neuer Rekord!“, dann „Platz 2 von 5“? Menüknopf mit Bestzeit?
