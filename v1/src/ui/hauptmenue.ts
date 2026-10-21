@@ -39,12 +39,17 @@ import { sterneText, uhrGenau, wort } from "./aufgabentexte";
 import { leseBestenliste } from "../core/bestenliste";
 import { installBestenliste } from "./bestenliste";
 import { FIRMA } from "../world/werbung";
+import type { Schichtstufe } from "../economy/kasse";
+import { schichtAusAdresse, schichtKnoepfe } from "./schichtmenue";
+import { schichtWort } from "./schichttexte";
 
 export type Spielwahl =
   | { art: "sandkasten" }
   | { art: "challenge"; id: string }
   /** E-196: eine Lektion des Lehrgangs */
-  | { art: "lektion"; id: string };
+  | { art: "lektion"; id: string }
+  /** E-205: eine Schicht (ui/schichtmenue.ts) */
+  | { art: "schicht"; stufe: Schichtstufe };
 
 /** Was das Menü von einer Lektion braucht — die Lektionsdaten (`challenges/lektion.ts`) passen von selbst. */
 export interface LektionEintrag {
@@ -170,6 +175,12 @@ export function waehleSpielart(lektionen: readonly LektionEintrag[] = []): Promi
   installBestenliste();
   // Pausiert (E-129): kein Menue, keine Aufgabe — direkt in den Sandkasten.
   if (CHALLENGES_PAUSIERT) return Promise.resolve({ art: "sandkasten" });
+  // E-205: `#schicht=<stufe>` fuehrt direkt hinein (NOCHMAL/WEITER der Schicht-Tafel)
+  const schichtAdresse = schichtAusAdresse(location.hash);
+  if (schichtAdresse) {
+    adresseLoeschen();
+    return Promise.resolve({ art: "schicht", stufe: schichtAdresse });
+  }
   const stand = leseChallenges();
   const lehrgang = leseLehrgang();
   const ids = CHALLENGES.map((c) => c.id);
@@ -209,7 +220,7 @@ export function waehleSpielart(lektionen: readonly LektionEintrag[] = []): Promi
     };
 
     /** Stufe 2 zeigen: Titel, Knöpfe, Zurück. */
-    const zeigeListe = (titel: string, art: "pruefungen", knoepfe: HTMLButtonElement[]): void => {
+    const zeigeListe = (titel: string, art: "pruefungen" | "schichten", knoepfe: HTMLButtonElement[]): void => {
       listenTitel.textContent = titel;
       eintraege.className = art;
       eintraege.replaceChildren(...knoepfe);
@@ -265,6 +276,9 @@ export function waehleSpielart(lektionen: readonly LektionEintrag[] = []): Promi
     }
     haupt("hm-pruefungen", wort("pruefungen", s), wort("pruefungenText", s), () =>
       zeigeListe(wort("pruefungen", s), "pruefungen", pruefungsKnoepfe())
+    );
+    haupt("hm-schicht", schichtWort("schicht", s), schichtWort("schichtText", s), () =>
+      zeigeListe(schichtWort("schichten", s), "schichten", schichtKnoepfe(besten, s, beschrifte, (stufe) => waehle_({ art: "schicht", stufe })))
     );
     haupt("hm-sandkasten", wort("sandkasten", s), wort("sandkastenText", s), () => waehle_({ art: "sandkasten" }));
     // BESTENLISTE oeffnet `ui/bestenliste.ts` selbst (installBestenliste oben)

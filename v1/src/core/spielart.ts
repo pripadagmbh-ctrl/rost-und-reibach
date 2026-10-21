@@ -78,3 +78,19 @@ export const NUR_IM_SANDKASTEN: readonly string[] = [
   "pause-save", // eine Challenge-Welt darf den Sandkasten-Stand nicht ueberschreiben
   "pause-new", // „Neues Spiel" loescht den Sandkasten-Stand
 ];
+
+/*
+ * DIE SCHICHT (E-205) IST AUCH KEINE SPIELART — eine Wahl im Hauptmenue wie
+ * Pruefung und Sandkasten. Sie hat Uhr und Kasse, aber ihre eigene Anzeige
+ * (`ui/schichtanzeige.ts`): Konto, Tagesablauf und Ladeanzeige des Betriebs
+ * (`NUR_IM_BETRIEB`) bleiben aus. Dazu kommt, was eine Schicht als EINEN Lauf
+ * stoeren wuerde. Im Kranz bleiben ABHOLEN, HUPE und ZUR WAAGE (Konzept
+ * Abschnitt 9). `main.ts` blendet in der Schicht beide Listen aus.
+ */
+export const NUR_AUSSER_SCHICHT: readonly string[] = [
+  "btn-nachschub", // Kranz: der Fahrplan bringt die Fuhren (E-202)
+  "btn-lambert", // Kranz: es gibt keinen Lambert
+  "pause-shop", // Platz ausbauen
+  "pause-save", // eine Schicht ist ein Lauf, kein Spielstand
+  "pause-new", // „Neues Spiel" loescht den Sandkasten-Stand
+];

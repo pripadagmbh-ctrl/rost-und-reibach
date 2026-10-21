@@ -267,6 +267,49 @@
         left: 50%; transform: translateX(-50%);
         opacity: 0; transition: opacity 0.4s; color: #f0d060;
       }
+      /* --- Schicht-Anzeige (E-205, ui/schichtanzeige.ts) ---
+         Uhr, Kasse, Buchung, Warnung, Verlader und drei Boxbalken. Auf Touch
+         oben links und ganz im linken Drittel: nicht im Kamera-Mittelstreifen
+         (35 % bis 65 %), fern vom Funktionskranz am rechten Daumen, ueber der
+         Ruhelage des linken Daumens und den Pedalen. Ohne Touch oben rechts,
+         wo im Betrieb das Konto stand (links steht dort die Tastenhilfe).
+         border-box, damit die Breite das Sichtbare ist (Lehre 14.09.2026).
+         SW (Startwerte, Geraetetest): iPad 250 px, 15 px Schrift; iPhone mini quer 220 px ab 58 px
+         (Notch-Rand 50) = rechte Kante 278 < 284 (35 % von 812), 14 px
+         Schrift (Kap. 20). Rechnung: test/schichtanzeige.test.ts. */
+      #schichtanzeige {
+        box-sizing: border-box; width: 250px; font-size: 15px; line-height: 1.3; padding: 6px 10px;
+        top: max(12px, calc(var(--sa-t) + 8px)); right: max(12px, calc(var(--sa-r) + 8px));
+      }
+      body.touch #schichtanzeige { right: auto; left: max(12px, calc(var(--sa-l) + 8px)); }
+      #schichtanzeige[hidden], #schichtanzeige div[hidden] { display: none; }
+      #schichtanzeige .uhr, #schichtanzeige .kasse { color: #f0d060; }
+      #schichtanzeige .buchung { color: #7ec96a; }
+      #schichtanzeige .buchung.minus, #schichtanzeige .warn { color: #e08a5a; }
+      #schichtanzeige .sa-balken { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+      #schichtanzeige .sa-balken .name { flex: 0 0 auto; min-width: 8ch; }
+      #schichtanzeige .sa-balken .bahn {
+        flex: 1 1 auto; min-width: 20px; height: 8px; border: 1px solid rgba(255,255,255,0.35); border-radius: 3px;
+      }
+      #schichtanzeige .sa-balken .bahn i { display: block; height: 100%; width: 0; background: #f0d060; }
+      #schichtanzeige .sa-balken.voll .bahn i { background: #7ec96a; }
+      #schichtanzeige .sa-balken.voll .wert { color: #7ec96a; }
+      /* Einblendungen weichen der Anzeige: rechts daneben statt mittig darueber.
+         iPad: 12 + 250 + 8 = 270; rechts 68 (Menueknopf). */
+      body.touch #schichtanzeige:not([hidden]) ~ #toast {
+        left: calc(var(--sa-l) + 270px); transform: none; max-width: calc(100% - var(--sa-l) - 338px);
+      }
+      @media (max-height: 430px) {
+        #schichtanzeige {
+          width: 220px; font-size: 14px; line-height: 1.25; padding: 4px 8px;
+          top: max(8px, calc(var(--sa-t) + 8px));
+        }
+        body.touch #schichtanzeige { left: max(8px, calc(var(--sa-l) + 8px)); }
+        /* 50 + 236 = 286 = 58 + 220 + 8; rechts 50 + 8 + 40 + 8 = 106 */
+        body.touch #schichtanzeige:not([hidden]) ~ #toast {
+          left: calc(var(--sa-l) + 236px); max-width: calc(100% - var(--sa-l) - 342px);
+        }
+      }
       #loading {
         position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
         color: #e8e8e4; font: 16px "Consolas", monospace; background: #1a1c1e;
@@ -1201,6 +1244,22 @@
         #bestenliste .kopf { padding: 6px 12px; }
         #bestenliste th, #bestenliste td { padding: 3px 8px; }
       }
+      /* --- Bestenliste: SCHICHTEN (E-205) ---
+         Eine Reihe zwischen Pruefungen und Sandkasten-Rekorden; die
+         Ueberschrift ist ihre erste Zelle, damit die Reihe nur eine Knopfhoehe
+         kostet. Auf dem Telefon quer stehen Wert und Datum eines Rekords in
+         einer Zeile — so passt die Uebersicht weiter ohne Scrollen
+         (Rechnung in test/bestenliste.test.ts). */
+      #bestenliste .bl-schichten {
+        display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 8px;
+        align-items: center; margin-top: 8px;
+      }
+      #bestenliste .bl-schichten h3 { margin: 0 4px 0 0; }
+      #bestenliste .bl-rekord .name { display: block; }
+      @media (max-height: 430px) {
+        #bestenliste .bl-rekord b, #bestenliste .bl-rekord small { display: inline; }
+        #bestenliste .bl-rekord b { margin-right: 8px; }
+      }
       /* --- Dialoge: Abholung bestellen, Verhandeln, Platz ausbauen ---
          Ein gemeinsamer Stil für alle drei. Sie waren zuvor ohne jede Regel
          im Dokument und wurden dadurch unsichtbar hinter dem Bild gerendert:
@@ -1273,6 +1332,49 @@
          `hidden` muss gegen `display: block` der Knopfregel oben ankommen. */
       #abr-menue, #abr-naechste { min-height: 44px; }
       #abrechnung button[hidden] { display: none; }
+      /* --- Feierabend-Tafel der Schicht (E-205, ui/schichttafel.ts) ---
+         Wie die Abrechnung (E-113), eigenes Feld: zehn Zeilen. iPad und
+         Telefon hoch einspaltig, Knoepfe untereinander; iPhone mini quer
+         zweispaltig, Knoepfe nebeneinander — kein Scrollen. Schrift 14 px
+         (Kap. 20), Knoepfe 44 px. Rechnung: test/schichttafel.test.ts. */
+      #schichttafel {
+        display: none; position: fixed; inset: 0; z-index: 22; background: rgba(12, 14, 16, 0.72);
+        align-items: center; justify-content: center; box-sizing: border-box; touch-action: none;
+        padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
+      }
+      #schichttafel.open { display: flex; }
+      #schichttafel .panel {
+        box-sizing: border-box; width: 100%; max-width: 460px; padding: 18px 24px; text-align: center;
+        background: rgba(24, 27, 30, 0.97); border: 2px solid rgba(255,255,255,0.18); border-radius: 14px;
+        color: #e8e8e4; font-family: "Consolas", monospace;
+      }
+      #schichttafel h2 { margin: 0 0 4px; font-size: 19px; letter-spacing: 3px; color: #f0b429; }
+      #st-sterne { margin: 0 0 8px; font-size: 20px; letter-spacing: 2px; color: #f0b429; }
+      #st-zahlen { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 18px; }
+      #schichttafel .zeile {
+        display: flex; justify-content: space-between; gap: 12px; text-align: left;
+        font-size: 14px; line-height: 1.5; padding: 4px 2px; border-bottom: 1px solid rgba(255,255,255,0.08);
+      }
+      #schichttafel .zeile .wert { font-weight: 700; white-space: nowrap; }
+      #schichttafel .zeile.summe { font-size: 16px; grid-column: 1 / -1; }
+      #schichttafel .zeile.rang { grid-column: 1 / -1; }
+      #st-knoepfe { display: block; margin-top: 10px; }
+      #schichttafel button {
+        display: block; width: 100%; min-height: 44px; margin: 8px 0 0; padding: 10px 12px; cursor: pointer;
+        background: rgba(46,52,57,0.95); color: #e8e8e4; font: 600 14px "Consolas", monospace;
+        border: 2px solid rgba(255,255,255,0.22); border-radius: 9px; touch-action: manipulation;
+      }
+      #schichttafel button:hover, #schichttafel button:active { background: rgba(240,180,41,0.75); color: #1a1c1e; }
+      #schichttafel button[hidden] { display: none; }
+      @media (max-height: 430px) {
+        #schichttafel .panel { max-width: 680px; padding: 10px 16px; }
+        #schichttafel h2 { font-size: 15px; letter-spacing: 2px; }
+        #st-sterne { font-size: 18px; margin: 0 0 6px; }
+        #st-zahlen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #schichttafel .zeile { padding: 2px 2px; }
+        #st-knoepfe { display: flex; gap: 8px; margin-top: 8px; }
+        #schichttafel button { flex: 1 1 0; margin: 0; }
+      }
       /* --- Radio: Senderwahl ---
          Gleiches Feld wie der Platzausbau, damit nichts Neues zu lernen ist.
          Die Knoepfe stehen auf mindestens 44 px, auch auf flachen Displays:
@@ -1448,6 +1550,8 @@
       </div>
       <div id="load" class="hud"></div>
     </div>
+    <!-- E-205: Schicht-Anzeige — Inhalt baut ui/schichtanzeige.ts an schicht:*; vor #toast (Ausweichregel im CSS) -->
+    <div id="schichtanzeige" class="hud" translate="no" hidden></div>
     <div id="toast" class="hud"></div>
     <!-- Hörparcours (E-159): welche Station gerade klingt — Nummer zum Benoten -->
     <div id="hoerprobe-zeile" hidden></div>
@@ -1665,6 +1769,19 @@
         <button id="abr-menue" hidden>ZUM MENÜ</button>
       </div>
     </div>
+    <!-- E-205: Feierabend-Tafel der Schicht — Texte setzt ui/schichttafel.ts -->
+    <div id="schichttafel" translate="no">
+      <div class="panel">
+        <h2 id="st-kopf"></h2>
+        <p id="st-sterne"></p>
+        <div id="st-zahlen"></div>
+        <div id="st-knoepfe">
+          <button id="st-nochmal"></button>
+          <button id="st-weiter" hidden></button>
+          <button id="st-menue"></button>
+        </div>
+      </div>
+    </div>
     <!-- Hauptmenue (E-118, zweistufig seit E-196). Steht vor dem Aufbau der
          Welt; main.ts wartet auf die Wahl. Alle Texte setzt ui/hauptmenue.ts
          in der gewaehlten Sprache (darum translate="no").
@@ -1680,6 +1797,8 @@
         <div id="hm-haupt" translate="no">
           <button id="hm-lehrgang"></button>
           <button id="hm-pruefungen"></button>
+          <!-- E-205: SCHICHT, zweite Stufe aus ui/schichtmenue.ts -->
+          <button id="hm-schicht"></button>
           <button id="hm-sandkasten"></button>
           <!-- E-195: oeffnet ui/bestenliste.ts -->
           <button id="hm-bestenliste"></button>

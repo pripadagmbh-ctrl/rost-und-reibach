@@ -14,6 +14,7 @@ import { FASSUNGEN, fassungInnen, px, schriftgroesse, wert, zeilen, type Fassung
 import { CHALLENGES } from "../src/challenges/katalog";
 import { sterneText, uhrGenau, wort } from "../src/ui/aufgabentexte";
 import type { Sprache } from "../src/challenges/texte";
+import { schichtWort } from "../src/ui/schichttexte";
 
 const NORMAL = 1.2;
 const RAHMEN = 2; // border 2px der Knöpfe und des Felds
@@ -66,7 +67,7 @@ function raster(hoehen: number[], spalten: number, luecke: number): number {
 const HAUPT_TEXTE = (s: Sprache): string[] => [
   wort("lehrgangSchritt", s).replace("{n}", "60").replace("{m}", "60"), // L4: SW-Obergrenze, 12 Themen x 5 Schritte
   wort("pruefungenText", s),
-  "Ein Arbeitstag auf dem Platz, Schicht für Schicht.", // SCHICHT: Platzhalter in typischer Länge
+  schichtWort("schichtText", s), // E-205
   wort("sandkastenText", s),
   "",
 ];
@@ -83,9 +84,9 @@ describe("Hauptmenü Stufe 1: fünf Hauptknöpfe ohne Scrollen", () => {
         const fs = schriftgroesse(KNOPF, f);
         const sfs = zahl(HSMALL, "font-size", f);
         const einzeilig = wert(HSMALL, "white-space", f) === "nowrap";
-        // L2b: einzeilig heißt hier auch „nichts mit … gekürzt" (qa 21.10.2026) — nur echte Texte, SCHICHT ist Platzhalter
+        // L2b: einzeilig heißt hier auch „nichts mit … gekürzt" (qa 21.10.2026) — seit E-205 auch SCHICHT
         if (einzeilig) {
-          for (const t of [HAUPT_TEXTE(s)[0]!, HAUPT_TEXTE(s)[1]!, HAUPT_TEXTE(s)[3]!]) expect(zeilen(t, breite, sfs), t).toBe(1);
+          for (const t of HAUPT_TEXTE(s).slice(0, 4)) expect(zeilen(t, breite, sfs), t).toBe(1);
         }
         const hoehen = HAUPT_TEXTE(s).map((t) => {
           const kleinZeilen = t === "" ? 0 : einzeilig ? 1 : zeilen(t, breite, sfs);

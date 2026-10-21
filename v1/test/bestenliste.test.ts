@@ -13,13 +13,20 @@ import {
   merkeLauf,
   merkeRekord,
   REKORD_LEADERBOARD_IDS,
+  SCHICHT_LEADERBOARD_IDS,
+  besteSchichtSterne,
+  eintragenSchicht,
+  merkeSchicht,
+  pruefeAblage,
   type Lauf,
   type RekordId,
 } from "../src/core/bestenliste";
 import { installSandkastenRekorde, QUOTE_AB_KG, WURF_FENSTER_S } from "../src/core/rekorde";
 import { EventBus } from "../src/core/events";
 import { CHALLENGES } from "../src/challenges/katalog";
-import { detailTabelle, rekordZeilen } from "../src/ui/bestenliste";
+import { detailTabelle, rekordZeilen, schichtKarte, schichtTabelle, tagText } from "../src/ui/bestenliste";
+import { SCHICHTSTUFEN, schichtLauf as ausBilanz, type SchichtLauf, type Schichtstufe } from "../src/economy/kasse";
+import { schichtWort } from "../src/ui/schichttexte";
 import { rangZeile } from "../src/ui/abrechnung";
 import { uhrGenau } from "../src/ui/aufgabentexte";
 import { NUR_IM_BETRIEB } from "../src/core/spielart";
@@ -96,17 +103,17 @@ describe("Speicher", () => {
     expect(merkeLauf("sortieren", lauf(3, 150))).toBe(1);
     expect(merkeLauf("sortieren", lauf(2, 90))).toBe(2);
     expect(leseBestenliste().aufgaben.sortieren!.map((l) => l.sterne)).toEqual([3, 2, 2]);
-    expect(JSON.parse(m.get(BESTENLISTE_KEY)!).v).toBe(1);
+    expect(JSON.parse(m.get(BESTENLISTE_KEY)!).v).toBe(2); // E-205: Schema 2
   });
   it("kaputter Speicher ergibt eine leere Liste, ohne Wurf", () => {
     const m = speicher();
-    for (const roh of ["{kein json", "42", "null", '"text"', "[]", '{"v":0,"aufgaben":{"x":[]}}', '{"v":2}', '{"aufgaben":{}}']) {
+    for (const roh of ["{kein json", "42", "null", '"text"', "[]", '{"v":0,"aufgaben":{"x":[]}}', '{"v":2}', '{"v":3,"aufgaben":{}}', '{"aufgaben":{}}']) {
       m.set(BESTENLISTE_KEY, roh);
-      expect(leseBestenliste(), roh).toEqual({ v: 1, aufgaben: {}, sandkasten: {} });
+      expect(leseBestenliste(), roh).toEqual({ v: 2, aufgaben: {}, sandkasten: {}, schichten: {} });
     }
-    // falsche Form im Einzelnen: kaputte Einträge fallen heraus, gute bleiben
+    // falsche Form im Einzelnen: kaputte Einträge fallen heraus, gute bleiben — und Schema 1 wird übernommen (E-205)
     m.set(BESTENLISTE_KEY, JSON.stringify({ v: 1, aufgaben: { a: [lauf(3, 9), { sterne: "drei" }, null, lauf(7, 1)], b: "x" }, sandkasten: { quoteBp: { wert: "viel" } } }));
-    expect(leseBestenliste()).toEqual({ v: 1, aufgaben: { a: [lauf(3, 9)] }, sandkasten: {} });
+    expect(leseBestenliste()).toEqual({ v: 2, aufgaben: { a: [lauf(3, 9)] }, sandkasten: {}, schichten: {} });
   });
   it("localStorage wirft oder fehlt: leer lesen, Platz trotzdem melden", () => {
     speicher(true);
@@ -128,7 +135,11 @@ describe("Speicher", () => {
 });
 
 describe("Game-Center-Kennungen", () => {
-  const alle = [...Object.values(LEADERBOARD_IDS), ...Object.values(REKORD_LEADERBOARD_IDS)];
+  const alle = [...Object.values(LEADERBOARD_IDS), ...Object.values(REKORD_LEADERBOARD_IDS), ...Object.values(SCHICHT_LEADERBOARD_IDS)];
+  it("E-205: je Schichtstufe eine Verdienst-Kennung, feste Form", () => {
+    expect(Object.keys(SCHICHT_LEADERBOARD_IDS)).toEqual([...SCHICHTSTUFEN]);
+    for (const st of SCHICHTSTUFEN) expect(SCHICHT_LEADERBOARD_IDS[st]).toBe(`de.rostundreibach.app.schicht.${st}.verdienst`);
+  });
   it("jede Aufgabe aus CHALLENGES hat eine, keine überzählige", () => {
     expect(Object.keys(LEADERBOARD_IDS).sort()).toEqual(CHALLENGES.map((c) => c.id).sort());
   });
@@ -211,7 +222,8 @@ describe("Sandkasten-Rekorde", () => {
 
 describe("Texte DE + EN", () => {
   const d = {
-    v: 1 as const,
+    v: 2 as const,
+    schichten: {},
     aufgaben: { verladen: [{ ...lauf(3, 83.45), werte: { praezisionCm: 38, harteAufschlaege: null } }] },
     sandkasten: { sortiertKg: { wert: 3450, datum: "2026-10-21T10:00:00.000Z" }, quoteBp: { wert: 9730, datum: "2026-10-21T10:00:00.000Z" } },
   };
@@ -329,13 +341,25 @@ describe("Ansicht BESTENLISTE passt ohne Scrollen", () => {
           karte = Math.max(karte, Math.max(44, 2 * kPadY + 4 + z * fs * lh));
         });
       }
+      // E-205: auf dem Telefon quer stehen Wert und Datum in einer Zeile (`.bl-rekord b` inline)
+      const wertZeilen = wert(["#bestenliste .bl-rekord b"], "display", f) === "inline" ? 1 : 2;
       const rek = Math.max(
         ...(["de", "en"] as const).flatMap((s) =>
-          rekordZeilen({ v: 1, aufgaben: {}, sandkasten: {} }, s).map((r) => (zeilen(r.name, spalteB - 20, fs) + 2) * fs * lh + 12)
+          rekordZeilen({ v: 2, aufgaben: {}, sandkasten: {}, schichten: {} }, s).map((r) => (zeilen(r.name, spalteB - 20, fs) + wertZeilen) * fs * lh + 12)
         )
       );
       const h3 = schriftgroesse(["#bestenliste h3"], f) * NORMAL + 18;
-      const gebraucht = kopf(f) + 2 * karte + luecke + h3 + rek + 12;
+      // E-205: Reihe SCHICHTEN — Überschrift als erste Zelle, drei einzeilige Karten
+      const schichtSp = (innenB(f) - schichtWort("schichten", "de").length * schriftgroesse(["#bestenliste h3"], f) * 0.55 - 4 - 3 * luecke) / 3;
+      for (const s of ["de", "en"] as const) {
+        for (const st of SCHICHTSTUFEN) {
+          const t = schichtKarte(st, { v: 2, aufgaben: {}, sandkasten: {}, schichten: { [st]: [{ ...schichtLauf(st), verdienstEur: -12345 }] } }, s);
+          expect(zeilen(t, schichtSp - 2 * kPadX - 4, fs), t).toBe(1);
+        }
+      }
+      const schichtReihe = px(["#bestenliste .bl-schichten"], "margin-top", f) + Math.max(44, 2 * kPadY + 4 + fs * lh);
+      const gebraucht = kopf(f) + 2 * karte + luecke + schichtReihe + h3 + rek + 12;
+      if (process.env["MASS"]) console.log(f.name, "Bestenliste", gebraucht, hoehe(f));
       expect(gebraucht, `Karte ${karte.toFixed(0)} px, Rekord ${rek.toFixed(0)} px`).toBeLessThanOrEqual(hoehe(f));
       expect(fs).toBeGreaterThanOrEqual(14);
       expect(px(KN, "min-height", f)).toBeGreaterThanOrEqual(44);
@@ -345,7 +369,8 @@ describe("Ansicht BESTENLISTE passt ohne Scrollen", () => {
       const fs = schriftgroesse(S, f);
       const [padY, padX] = fassungInnen(["#bestenliste th", "#bestenliste td"], f);
       const voll = {
-        v: 1 as const,
+        v: 2 as const,
+    schichten: {},
         aufgaben: Object.fromEntries(
           CHALLENGES.map((c) => [c.id, Array.from({ length: 5 }, () => ({ ...lauf(3, 754.56), werte: { praezisionCm: 120, harteAufschlaege: 10, fehlwuerfe: 10, ueberlasten: 10, fremdteile: 10 } }))])
         ),
@@ -372,6 +397,153 @@ describe("Abschlusstafel mit Rang-Zeile und drei Knöpfen passt", () => {
       const ohneZeilen = m.gebraucht - m.bloecke.find((b) => b.name.includes("Zahlenzeilen"))!.hoehe;
       const gebraucht = ohneZeilen + (meisteKriterien + 1) * m.zeilenHoehe + 2 * (m.knopfHoehe + 7);
       expect(gebraucht).toBeLessThanOrEqual(m.platz);
+    });
+  }
+});
+
+/* ------------------------------------------------------------------------ */
+/* SCHICHTEN (E-205): Schema 2, Migration, Sortierung, Gegenproben           */
+/* ------------------------------------------------------------------------ */
+
+/** Ein beendeter Schichtlauf — die Form, die `schichtLauf` (economy/kasse.ts) baut. */
+function schichtLauf(stufe: Schichtstufe, verdienstEur = 5000, sterne: 0 | 1 | 2 | 3 = 2, datum = "2026-10-21"): SchichtLauf {
+  return { stufe, verdienstEur, tonnen: 24.5, quoteBp: 8800, warteS: 95, sterne, datum };
+}
+
+describe("SCHICHTEN: Rangfolge nach Tagesverdienst", () => {
+  it("höher vor tiefer, höchstens 5, Gleichstand: der ältere bleibt vorn", () => {
+    let l: SchichtLauf[] = [];
+    for (const e of [3000, 7000, 5000, -200, 9000]) l = eintragenSchicht(l, schichtLauf("montag", e)).liste;
+    expect(l.map((x) => x.verdienstEur)).toEqual([9000, 7000, 5000, 3000, -200]);
+    expect(eintragenSchicht(l, schichtLauf("montag", -300)).platz).toBeNull();
+    const gleich = eintragenSchicht(l, schichtLauf("montag", 5000, 3, "2026-10-22"));
+    expect(gleich.platz).toBe(4);
+    expect(gleich.liste[2]!.datum).toBe("2026-10-21");
+    expect(gleich.liste).toHaveLength(5);
+  });
+  it("aus der Bilanz: ganze Euro, Tonnen eine Stelle, Quote in Basispunkten, Tag in Ortszeit", () => {
+    const l = ausBilanz(
+      {
+        stufe: "mittwoch", tonnenUmgeschlagen: 31.27, sortierquote: 0.91234, warteS: 74.6, erloesEur: 9000,
+        standgeldEur: 14.6, fehlwurfEur: 50, schadenEur: 0, lagerwertEur: 600, verdienstEur: 9535.4, sterne: 3,
+      },
+      new Date(2026, 9, 21, 23, 30)
+    );
+    expect(l).toEqual({ stufe: "mittwoch", verdienstEur: 9535, tonnen: 31.3, quoteBp: 9123, warteS: 75, sterne: 3, datum: "2026-10-21" });
+  });
+});
+
+describe("SCHICHTEN: Speicher", () => {
+  it("Lauf wird gespeichert, sein Platz kommt zurück; geschrieben wird Schema 2", () => {
+    const m = speicher();
+    expect(merkeSchicht(schichtLauf("montag", 4000))).toBe(1);
+    expect(merkeSchicht(schichtLauf("montag", 6000))).toBe(1);
+    expect(merkeSchicht(schichtLauf("montag", 5000))).toBe(2);
+    expect(merkeSchicht(schichtLauf("freitag", 100, 1))).toBe(1);
+    const d = leseBestenliste();
+    expect(d.schichten.montag!.map((l) => l.verdienstEur)).toEqual([6000, 5000, 4000]);
+    expect(JSON.parse(m.get(BESTENLISTE_KEY)!).v).toBe(2);
+    expect(besteSchichtSterne(d)).toEqual({ montag: 2, freitag: 1 });
+  });
+  it("eine abgebrochene Schicht (0 Sterne) kommt nicht hinein", () => {
+    speicher();
+    expect(merkeSchicht(schichtLauf("montag", 99999, 0))).toBeNull();
+    expect(leseBestenliste().schichten).toEqual({});
+  });
+  it("MIGRATION: ein Stand aus Schema 1 behält Aufgaben und Rekorde, SCHICHTEN beginnt leer", () => {
+    const m = speicher();
+    const alt = { v: 1, aufgaben: { sortieren: [lauf(2, 80)] }, sandkasten: { sortiertKg: { wert: 900, datum: "2026-10-20T10:00:00.000Z" } } };
+    m.set(BESTENLISTE_KEY, JSON.stringify(alt));
+    expect(leseBestenliste()).toEqual({ ...alt, v: 2, schichten: {} });
+    // der nächste Lauf schreibt Schema 2 — die Aufgaben sind noch da
+    merkeSchicht(schichtLauf("montag"));
+    const neu = JSON.parse(m.get(BESTENLISTE_KEY)!);
+    expect(neu.v).toBe(2);
+    expect(neu.aufgaben.sortieren).toHaveLength(1);
+    expect(neu.schichten.montag).toHaveLength(1);
+  });
+  it("Schema 1 mit einem (fremden) Feld schichten: wird nicht übernommen", () => {
+    const d = pruefeAblage({ v: 1, aufgaben: {}, sandkasten: {}, schichten: { montag: [schichtLauf("montag")] } });
+    expect(d.schichten).toEqual({});
+  });
+  it("GEGENPROBEN: kaputte Schichtläufe fallen heraus, gute bleiben und werden sortiert", () => {
+    const gut = schichtLauf("mittwoch", 7000);
+    const besser = schichtLauf("mittwoch", 8000);
+    const d = pruefeAblage({
+      v: 2,
+      aufgaben: {},
+      sandkasten: {},
+      schichten: {
+        mittwoch: [
+          gut,
+          { ...gut, verdienstEur: 1.5 }, // keine ganze Zahl
+          { ...gut, stufe: "freitag" }, // falsche Stufe im Fach
+          { ...gut, quoteBp: 10001 },
+          { ...gut, sterne: 0 },
+          { ...gut, sterne: 4 },
+          { ...gut, warteS: -1 },
+          { ...gut, tonnen: Number.NaN },
+          { ...gut, datum: "21.10.2026" },
+          null,
+          "x",
+          besser,
+        ],
+        montag: "keine Liste",
+        sonntag: [schichtLauf("montag")],
+      },
+    });
+    expect(d.schichten).toEqual({ mittwoch: [besser, gut] });
+  });
+  it("GEGENPROBE: mehr als 5 im Speicher — es bleiben die besten 5", () => {
+    const viele = [1, 6, 2, 5, 3, 4, 7].map((k) => schichtLauf("freitag", k * 1000));
+    const d = pruefeAblage({ v: 2, aufgaben: {}, sandkasten: {}, schichten: { freitag: viele } });
+    expect(d.schichten.freitag!.map((l) => l.verdienstEur)).toEqual([7000, 6000, 5000, 4000, 3000]);
+  });
+  it("Speicher wirft: Platz kommt trotzdem, Lesen bleibt leer", () => {
+    speicher(true);
+    expect(merkeSchicht(schichtLauf("montag"))).toBe(1);
+    expect(leseBestenliste().schichten).toEqual({});
+  });
+});
+
+describe("SCHICHTEN: Ansicht", () => {
+  const d = { v: 2 as const, aufgaben: {}, sandkasten: {}, schichten: { montag: [schichtLauf("montag", 12345, 3), schichtLauf("montag", -250, 1, "2026-10-02")] } };
+  it("Übersicht: eine Zeile je Stufe, „–\" ohne Lauf", () => {
+    expect(schichtKarte("montag", d, "de")).toBe("MONTAG 12.345 €");
+    expect(schichtKarte("montag", d, "en")).toBe("MONDAY 12,345 €");
+    expect(schichtKarte("freitag", d, "de")).toBe("FREITAG –");
+  });
+  it("die besten 5 einer Stufe: Verdienst, Tonnen, Quote, Wartezeit, Datum", () => {
+    expect(schichtTabelle("montag", d, "de")).toEqual({
+      kopf: ["Platz", "Sterne", "Verdienst", "Tonnen", "Quote", "Wartezeit", "Datum"],
+      zeilen: [
+        ["1.", "★★★", "12.345 €", "24,5 t", "88 %", "1:35", "21.10.2026"],
+        ["2.", "★☆☆", "−250 €", "24,5 t", "88 %", "1:35", "02.10.2026"],
+      ],
+    });
+    expect(schichtTabelle("montag", d, "en").kopf).toEqual(["Rank", "Stars", "Earnings", "Tonnes", "Accuracy", "Waiting", "Date"]);
+    expect(schichtTabelle("montag", d, "en").zeilen[0]!.slice(2, 4)).toEqual(["12,345 €", "24.5 t"]);
+  });
+  it("Kalendertag ohne Zeitzonen-Verschiebung; Unsinn wird „–\"", () => {
+    expect(tagText("2026-01-01", "de")).toBe("01.01.2026");
+    expect(tagText("2026-01-01", "en")).toBe("01/01/2026");
+    expect(tagText("gestern", "de")).toBe("–");
+  });
+
+  for (const f of FASSUNGEN.filter((x) => x.w > x.h)) {
+    it(`${f.name}: die besten 5 einer Stufe passen — Höhe und Breite`, () => {
+      const fs = schriftgroesse(["#bestenliste"], f);
+      const [padY, padX] = fassungInnen(["#bestenliste th", "#bestenliste td"], f);
+      const breit = schichtLauf("mittwoch", -12345, 3);
+      const voll = { v: 2 as const, aufgaben: {}, sandkasten: {}, schichten: { mittwoch: Array.from({ length: 5 }, () => ({ ...breit, tonnen: 123.4, quoteBp: 10000, warteS: 3599 })) } };
+      for (const s of ["de", "en"] as const) {
+        const t = schichtTabelle("mittwoch", voll, s);
+        const spaltenB = t.kopf.map((k, i) => Math.max(k.length, ...t.zeilen.map((z) => z[i]!.length)) * fs * 0.55 + 2 * padX);
+        const innen = f.w - f.sa.l - f.sa.r - 2 * zahlen(wert(["#bl-inhalt"], "padding", f))[1]!;
+        expect(spaltenB.reduce((a, b) => a + b, 0), s).toBeLessThanOrEqual(innen);
+        const kopf = 2 * fassungInnen(["#bestenliste .kopf"], f)[0] + px(["#bestenliste button"], "min-height", f);
+        expect(kopf + 6 * (fs * 1.35 + 2 * padY + 1) + 12).toBeLessThanOrEqual(f.h - f.sa.t - f.sa.b);
+      }
     });
   }
 });

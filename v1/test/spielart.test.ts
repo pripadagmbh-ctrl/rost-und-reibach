@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { seite, wurzel } from "./cssmass";
-import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SANDKASTEN, NUR_IM_SIMULATOR, SPIELART } from "../src/core/spielart";
+import { BETRIEB, NUR_AUSSER_SCHICHT, NUR_IM_BETRIEB, NUR_IM_SANDKASTEN, NUR_IM_SIMULATOR, SPIELART } from "../src/core/spielart";
 import { griffZiel } from "../src/ui/hud";
 
 /*
@@ -97,7 +97,7 @@ describe("Ein Schalter fuer die Spielart", () => {
   });
 
   it("jede Kennung der beiden Listen gibt es auf der Seite", () => {
-    for (const id of [...NUR_IM_BETRIEB, ...NUR_IM_SIMULATOR, ...NUR_IM_SANDKASTEN]) {
+    for (const id of [...NUR_IM_BETRIEB, ...NUR_IM_SIMULATOR, ...NUR_IM_SANDKASTEN, ...NUR_AUSSER_SCHICHT]) {
       expect(seite.includes(`id="${id}"`), `${id} steht nicht in index.html`).toBe(true);
     }
   });
@@ -117,6 +117,19 @@ describe("Ein Schalter fuer die Spielart", () => {
     expect(simulator).toContain("btn-hupe");
     expect(simulator.length).toBeLessThanOrEqual(8);
     expect(betrieb.length).toBe(8);
+    // E-205: in der Schicht beide Listen aus — ABHOLEN, HUPE, ZUR WAAGE bleiben, NACHSCHUB und LAMBERT nicht
+    const schicht = ids.filter((id) => !NUR_IM_BETRIEB.includes(id) && !NUR_AUSSER_SCHICHT.includes(id));
+    for (const id of ["btn-pickup", "btn-hupe", "btn-away"]) expect(schicht).toContain(id);
+    expect(schicht).not.toContain("btn-nachschub");
+    expect(schicht).not.toContain("btn-lambert");
+    expect(schicht.length).toBeLessThanOrEqual(8);
+  });
+
+  it("E-205: in der Schicht kein Speichern, kein Neues Spiel, kein Ausbau, keine Betriebsanzeige", () => {
+    const aus = new Set([...NUR_IM_BETRIEB, ...NUR_AUSSER_SCHICHT]);
+    for (const id of ["pause-save", "pause-new", "pause-shop", "money", "shift", "load", "tutorial"]) expect(aus.has(id), id).toBe(true);
+    // was bleibt: Bestenliste, Sprache, Steuerung — und die Schicht-Anzeige selbst
+    for (const id of ["pause-bestenliste", "pause-sprache", "pause-controls", "schichtanzeige"]) expect(aus.has(id), id).toBe(false);
   });
 });
 
