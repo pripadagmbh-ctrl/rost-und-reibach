@@ -554,6 +554,9 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 21.10.2026, Müll** — Patrick, wörtlich: „Der Müllcontainer soll ein
+      abholcontainer werden der raufgezogen wird."
+
 - [ ] **Antwort 21.10.2026 zu E-188** — Unter Überlast „langsam schleppen" (10 %),
       nicht ganz stehen bleiben. Gebaut so, live b0978ff.
 
