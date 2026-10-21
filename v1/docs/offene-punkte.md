@@ -585,6 +585,11 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       fast immer bereit, für Sortiertes kommt er bei voller Mulde, Hupe schickt
       früher weg; Kasse mit festen Preisen je Sorte, Abzug für Standgeld,
       Fehlwürfe, Schäden; kein Verhandeln. Store-Start **Ende November** mit allem.
+      Schicht-Konzept (v1/docs/schicht-konzept.md), Antworten: Platz **A „Kreis in
+      der Ecke"**; sortenreine Fuhren **selten, du fährst hin** (Pritsche wartet am
+      Lager, Standgeld läuft); Geld für Sortiertes **wenn es vom Hof fährt** (Rest
+      in den Boxen 70 %); Fuhren **wie heute ca. 8 t**; Stufen nacheinander
+      freischalten (Empfehlung übernommen).
 
 - [ ] **Ansage 21.10.2026** — Patrick, wörtlich: „High Score Board Konzept und pay
       to win Konzept vorschlagen". Antworten nach Vorschlag: Bestenliste in 1.0
