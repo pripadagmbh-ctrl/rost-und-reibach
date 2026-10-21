@@ -11,7 +11,9 @@ ausführen.
 - **manifest.webmanifest** mit Name, Farben, Vollbild und Querformat
 - **App-Icons** (192, 512, maskierbar 512, 1024) — erzeugt aus Code über
   `npm run icons`, kein Grafikprogramm nötig
-- **capacitor.config.json** mit der Anwendungskennung `de.pripada.schrottplatz`
+- **capacitor.config.json** mit der Anwendungskennung — für die Store-Fassung
+  (`v1/`) seit E-194 (21.10.2026) `de.rostundreibach.app`; der eingefrorene
+  Prototyp trägt noch die alte Kennung `de.pripada.schrottplatz`
 - **Skripte** in `prototype/package.json`: `android:add`, `android:sync`,
   `android:open`
 
@@ -41,7 +43,7 @@ verloren, lässt sich die App nicht mehr aktualisieren — sichere ihn an zwei
 Orten und notiere die Passwörter im Passwortmanager.
 
 ```bash
-keytool -genkey -v -keystore pripada-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias pripada
+keytool -genkey -v -keystore rostundreibach-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias rostundreibach
 ```
 
 Die Datei gehört **nicht** ins Git-Verzeichnis. Trage sie in Android Studio
@@ -98,7 +100,7 @@ eingeschalteten Schildern, damit man erkennt, was wo passiert.
 
 **Beschreibung (Entwurf)**
 
-> Du sitzt am Steuer eines Umschlagbaggers auf dem Schrottplatz PRIPADA.
+> Du sitzt am Steuer eines Umschlagbaggers auf dem Schrottplatz Rost & Reibach.
 > Lastwagen fahren an die Waage, kippen ab und lassen dir einen Berg aus
 > Blech, Kabeln, Motorblöcken und Altfahrzeugen.
 >

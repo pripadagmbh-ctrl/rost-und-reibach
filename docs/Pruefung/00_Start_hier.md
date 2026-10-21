@@ -1,7 +1,7 @@
 # Prüfmappe Schrottplatz-App
 
 **Für einen Agenten, der kalt startet und alles nachprüfen soll.**
-Angelegt am 02.09.2026 von Claude (Opus 5) im Auftrag von Patrick (PRIPADA).
+Angelegt am 02.09.2026 von Claude (Opus 5) im Auftrag von Patrick.
 
 Diese Mappe ist absichtlich misstrauisch aufgebaut: Sie behauptet nichts, was
 nicht mit einem Befehl nachzurechnen wäre. Wo eine Zahl aus einer früheren

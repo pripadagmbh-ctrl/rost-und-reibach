@@ -3,7 +3,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import RAPIER from "@dimforge/rapier3d-compat";
 import { BED_HALF_W } from "./routes";
 import { ladeHoeheGrenze } from "./fuellgrad";
-import { werbeAtlas, atlasFeld, PRIPADA_GRUEN } from "../world/werbung";
+import { werbeAtlas, atlasFeld, FIRMEN_GRUEN } from "../world/werbung";
 import type { Fahrwerk } from "./lenkung";
 import { baueAbsetzmulde, zapfenLage, type MuldenBau } from "./absetzmulde";
 import { hakenGeometrie, type HakenGeometrie } from "./hakenlift";
@@ -1175,7 +1175,7 @@ function leiterrahmen(laenge: number): THREE.BufferGeometry {
  * alles wie bisher.
  */
 let logoStoff: THREE.MeshStandardMaterial | null = null;
-function pripadaLogoStoff(): THREE.MeshStandardMaterial | null {
+function firmenLogoStoff(): THREE.MeshStandardMaterial | null {
   if (logoStoff) return logoStoff;
   const atlas = werbeAtlas();
   if (!atlas) return null;
@@ -1195,8 +1195,8 @@ function logoWand(wallH: number, bedLen: number, dir: -1 | 1): THREE.BoxGeometry
   const geo = new THREE.BoxGeometry(0.08, wallH, bedLen);
   const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
   const aussen = dir > 0 ? 0 : 1;
-  const logo = atlasFeld("pripadaGruen", bedLen / wallH);
-  const gruen = atlasFeld("pripadaGruenRand");
+  const logo = atlasFeld("firmenGruen", bedLen / wallH);
+  const gruen = atlasFeld("firmenGruenRand");
   for (let i = 0; i < uv.count; i++) {
     const f = Math.floor(i / 4) === aussen ? logo : gruen;
     uv.setXY(i, f.u0 + uv.getX(i) * (f.u1 - f.u0), f.v0 + uv.getY(i) * (f.v1 - f.v0));
@@ -1398,7 +1398,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const aufbau = v.bodyStyle ?? "flach";
   const wallH = wandHoehe(v.kind, v.bodyStyle);
   const sideMat = isContainer
-    ? new THREE.MeshStandardMaterial({ color: PRIPADA_GRUEN, roughness: 0.75, metalness: 0.35 })
+    ? new THREE.MeshStandardMaterial({ color: FIRMEN_GRUEN, roughness: 0.75, metalness: 0.35 })
     : aufbau === "koffer"
       ? new THREE.MeshStandardMaterial({ color: 0x53585d, roughness: 0.8, metalness: 0.3 })
       : bedMat;
@@ -1408,7 +1408,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
     const hinge = new THREE.Group();
     hinge.name = BAUGRUPPE.bordwand;
     hinge.position.set(dir * (BED_HALF_W + 0.05), 0.02, v.bedLen / 2);
-    const logo = isContainer ? pripadaLogoStoff() : null;
+    const logo = isContainer ? firmenLogoStoff() : null;
     const side = new THREE.Mesh(
       logo ? logoWand(wallH, v.bedLen, dir) : new THREE.BoxGeometry(0.08, wallH, v.bedLen),
       logo ?? sideMat

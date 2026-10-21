@@ -91,7 +91,7 @@ E-038 mitgeprüft: Vier von ihnen ließen sich nicht mehr starten, ohne dass es 
 aufgefallen wäre.
 
 Veröffentlicht wird v1 nach einem Merge auf `main` unter
-`pripadagmbh-ctrl.github.io/schrottplatz-app/v1/` (E-005). Der Merge braucht Patricks
+`pripadagmbh-ctrl.github.io/rost-und-reibach/v1/` (E-005). Der Merge braucht Patricks
 Freigabe und ist nach rund 70 Sekunden live.
 
 ## Die zweite Greiferform ansehen

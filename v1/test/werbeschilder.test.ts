@@ -15,7 +15,7 @@ import { join, resolve } from "node:path";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { initPhysics } from "../src/physics/physicsWorld";
-import { FIRMA, FIRMA_KURZ, werbeschilder, baueWerbeschilder, werbeAtlas, atlasFeld, PRIPADA_GRUEN } from "../src/world/werbung";
+import { FIRMA, FIRMA_KURZ, werbeschilder, baueWerbeschilder, werbeAtlas, atlasFeld, FIRMEN_GRUEN } from "../src/world/werbung";
 import { YARD_D, YARD_MIN_X, YARD_MAX_X, GATE_X, BUCHT_Z, WEIGH_X, WEIGH_Z } from "../src/world/yard";
 import { alleHindernisse } from "../src/world/obstacles";
 import { BAGGER_STAND, VERLADE_STAND, SCHWENK_AUSSEN } from "../src/world/baggerstand";
@@ -36,36 +36,42 @@ function dateien(ordner: string): string[] {
 /*
  * E-173 — Patrick, 20.10.2026: „Nenn das Spiel wieder Rost&Reibach. Auch die
  * Werbetafeln entsprechend umbenennen." Auf Nachfrage: Auf dem Platz wird
- * ALLES Rost & Reibach, Pripada verschwindet aus dem Spiel (Anbieter im Store
- * bleibt die Pripada GmbH — das steht auf den Rechtsseiten, nicht im Spiel).
+ * ALLES Rost & Reibach, Pripada verschwindet aus dem Spiel.
+ * E-194 — Patrick, 21.10.2026: „Pripada und gmbh raus, ich vertreibe es als
+ * Privatperson." Seitdem auch kein „GmbH", und auch nicht auf den
+ * Rechtsseiten, im Manifest, in der App-Kennung (Bundle-ID).
  */
-describe("Der Spielname (E-131, E-173)", () => {
+describe("Der Spielname (E-131, E-173, E-194)", () => {
   it("heisst Rost & Reibach", () => {
     expect(FIRMA).toBe("Rost & Reibach");
   });
 
-  /*
-   * Noch offen: Ausleger und Bordinstrument schreiben „PRIPADA" — das ist der
-   * Bagger-Bereich (`src/excavator/`), bestellt über den Orchestrator. Steht
-   * dort kein Pripada mehr, meldet der Test, dass die Ausnahme weg kann.
-   */
-  const NOCH_OFFEN: string[] = [];
-
-  it("kein Text im Spiel nennt noch Pripada oder Rust’n’Reibach", () => {
+  it("kein Text im Spiel nennt noch Pripada, GmbH oder Rust’n’Reibach", () => {
     // Zeichenketten in Anfuehrungszeichen — Kommentare duerfen die Geschichte erzaehlen
-    const zeichenkette = /["'`][^"'`\n]*(Pripada|PRIPADA|RUSTN|Rust’n)[^"'`\n]*["'`]/;
+    const zeichenkette = /["'`][^"'`\n]*(Pripada|PRIPADA|GmbH|GMBH|RUSTN|Rust’n)[^"'`\n]*["'`]/;
     const treffer: string[] = [];
     for (const p of [...dateien(join(wurzel, "src")), join(wurzel, "index.html")]) {
       const text = readFileSync(p, "utf8");
       const ohneKommentare = p.endsWith(".html")
         ? text.replace(/<!--[\s\S]*?-->/g, "")
         : text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-      if (p.endsWith(".html") ? /Pripada|PRIPADA|RUSTN/.test(ohneKommentare) : zeichenkette.test(ohneKommentare)) {
+      if (p.endsWith(".html") ? /Pripada|PRIPADA|GmbH|GMBH|RUSTN/.test(ohneKommentare) : zeichenkette.test(ohneKommentare)) {
         treffer.push(p);
       }
     }
-    expect(treffer.filter((p) => !NOCH_OFFEN.includes(p))).toEqual([]);
-    for (const p of NOCH_OFFEN) expect(treffer, `${p} ist sauber — Ausnahme streichen`).toContain(p);
+    expect(treffer).toEqual([]);
+  });
+
+  it("Rechtsseiten, Manifest und App-Kennung nennen weder Pripada noch GmbH (E-194)", () => {
+    const dateienMitAnzeige = [
+      "public/datenschutz.html", "public/support.html", "public/lizenzen.html", "public/manifest.webmanifest",
+      "capacitor.config.json", "ios/App/App/Info.plist", "ios/App/App.xcodeproj/project.pbxproj",
+    ];
+    for (const d of dateienMitAnzeige) {
+      const text = readFileSync(join(wurzel, d), "utf8").replace(/<!--[\s\S]*?-->/g, "");
+      expect(text, d).not.toMatch(/pripada|gmbh/i);
+    }
+    expect(JSON.parse(readFileSync(join(wurzel, "capacitor.config.json"), "utf8")).appId).toBe("de.rostundreibach.app");
   });
 
   it("Titel, Manifest und App-Name heissen Rost & Reibach, unter dem Symbol ohne Leerzeichen", () => {
@@ -195,7 +201,7 @@ describe("Zwei Netze für alle Schilder (E-025)", () => {
  */
 describe("Echte Firmen statt erfundener (E-133)", () => {
   const schilder = werbeschilder();
-  const pripada = schilder.filter((s) => s.bild.name === FIRMA);
+  const eigene = schilder.filter((s) => s.bild.name === FIRMA);
 
   it("keine erfundenen Betriebe mehr", () => {
     const texte = schilder.flatMap((s) => [s.bild.name, ...s.bild.zeilen]).join(" | ");
@@ -220,13 +226,13 @@ describe("Echte Firmen statt erfundener (E-133)", () => {
   });
 
   it("der Name steht höchstens 10 m von der Waage", () => {
-    const naechste = Math.min(...pripada.map((s) => Math.hypot(s.x - WEIGH_X, s.z - WEIGH_Z)));
+    const naechste = Math.min(...eigene.map((s) => Math.hypot(s.x - WEIGH_X, s.z - WEIGH_Z)));
     expect(naechste).toBeLessThanOrEqual(10);
   });
 
   it("der Name steht höchstens 20 m vom Abladeplatz-Halt", () => {
     const [hx, hz] = alleAbholPlaetze()[0]!.halt;
-    const naechste = Math.min(...pripada.map((s) => Math.hypot(s.x - hx, s.z - hz)));
+    const naechste = Math.min(...eigene.map((s) => Math.hypot(s.x - hx, s.z - hz)));
     expect(naechste).toBeLessThanOrEqual(20);
   });
 
@@ -249,7 +255,7 @@ describe("Echte Firmen statt erfundener (E-133)", () => {
   });
 
   it("der Name auch hinter der Bucht, über deren Rückwand", () => {
-    const bucht = pripada.find((s) => s.z < BUCHT_Z);
+    const bucht = eigene.find((s) => s.z < BUCHT_Z);
     expect(bucht, "keine Tafel hinter der Bucht").toBeDefined();
     expect(bucht!.y - bucht!.h / 2).toBeGreaterThan(4.8); // SUED_HOCH
   });
@@ -264,7 +270,7 @@ describe("Der gemeinsame Atlas (E-133)", () => {
     const a = werbeAtlas();
     expect(a).not.toBeNull();
     expect(werbeAtlas()).toBe(a);
-    const f = atlasFeld("pripadaGruen", 2);
+    const f = atlasFeld("firmenGruen", 2);
     // Zelle x 0…1024, y 768…1024 auf 1024 × 1024 (v nach oben)
     expect(a!.image.width).toBe(1024);
     expect(a!.image.height).toBe(1024);
@@ -272,12 +278,12 @@ describe("Der gemeinsame Atlas (E-133)", () => {
     expect(f.u1).toBeCloseTo(0.75, 6);
     expect(f.v0).toBeCloseTo(0, 6);
     expect(f.v1).toBeCloseTo(0.25, 6);
-    const r = atlasFeld("pripadaGruenRand");
+    const r = atlasFeld("firmenGruenRand");
     expect(r.u0).toBeGreaterThan(0);
     expect(r.u1).toBeLessThan(f.u0);
     // Breiter als die Zelle geht nicht
-    const breit = atlasFeld("pripadaGruen", 10);
+    const breit = atlasFeld("firmenGruen", 10);
     expect(breit.u1 - breit.u0).toBeCloseTo(1, 6);
-    expect(PRIPADA_GRUEN).toBe("#2f7a4f");
+    expect(FIRMEN_GRUEN).toBe("#2f7a4f");
   });
 });

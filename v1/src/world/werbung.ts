@@ -9,13 +9,15 @@ import { HALLEN_X, HALLEN_Z, HALLE_TIEFE, OFFICE_X, OFFICE_Z } from "./office";
  *
  * Patrick, 20.10.2026: „Nenn das Spiel wieder Rost&Reibach. Auch die
  * Werbetafeln entsprechend umbenennen." Auf Nachfrage: Im Store heißt es
- * „Rost & Reibach" (Anbieter bleibt die Pripada GmbH), und auf dem Platz wird
+ * „Rost & Reibach", und auf dem Platz wird
  * ALLES Rost & Reibach — Tafeln, grüne Mulden, Abholer, Waage, Halle.
  * Vom 16. bis 20.10.2026 stand hier „Pripada.de" (E-131/E-143), davor vom
  * 12.09. bis 16.10. „Rust’n’Reibach". Wer den Namen zeigt — Tafeln,
  * Mulden-Aufkleber, Abholer, Hauptmenü —, liest ihn hier. Paketname, Ordner,
- * Bezeichner (`PRIPADA_GRUEN`, `"pripadaGruen"`) und alte Log-Einträge
- * bleiben, wie sie sind; das sind Namen im Code, keine Anzeige.
+ * Bezeichner und alte Log-Einträge bleiben, wie sie sind; das sind Namen im
+ * Code, keine Anzeige. Seit E-194 (21.10.2026) vertreibt Patrick das Spiel als
+ * Privatperson: weder „Pripada" noch „GmbH" steht im Spiel oder auf den
+ * Rechtsseiten (Wächter: test/werbeschilder.test.ts).
  */
 export const FIRMA = "Rost & Reibach";
 /**
@@ -35,7 +37,7 @@ export const FIRMA_KURZ = "Rost&Reibach";
  * (`firmenmulden.ts`, E-133). Eine Zahl, damit Lack und Aufkleber nicht
  * auseinanderlaufen.
  */
-export const PRIPADA_GRUEN = "#2f7a4f";
+export const FIRMEN_GRUEN = "#2f7a4f";
 
 /** Was auf einer Tafel steht und in welchen Farben. */
 interface Bild {
@@ -140,11 +142,11 @@ export interface AtlasFeld {
  * Flächen, die einfarbig grün sein sollen. 64 px Abstand zu den Nachbarzellen,
  * damit die Mipmaps kein Weiß hereinziehen (SW).
  */
-export function atlasFeld(feld: "pripadaGruen" | "pripadaGruenRand", seitenverhaeltnis = 2): AtlasFeld {
+export function atlasFeld(feld: "firmenGruen" | "firmenGruenRand", seitenverhaeltnis = 2): AtlasFeld {
   const px = (x0: number, y0: number, x1: number, y1: number): AtlasFeld => ({
     u0: x0 / ATLAS_B, u1: x1 / ATLAS_B, v0: 1 - y1 / ATLAS_H, v1: 1 - y0 / ATLAS_H,
   });
-  if (feld === "pripadaGruenRand") return px(GRUEN.x + 64, GRUEN.y + 64, GRUEN.x + 192, GRUEN.y + GRUEN.h - 64);
+  if (feld === "firmenGruenRand") return px(GRUEN.x + 64, GRUEN.y + 64, GRUEN.x + 192, GRUEN.y + GRUEN.h - 64);
   const b = Math.min(GRUEN.h * seitenverhaeltnis, GRUEN.b);
   const mx = GRUEN.x + GRUEN.b / 2;
   return px(mx - b / 2, GRUEN.y, mx + b / 2, GRUEN.y + GRUEN.h);
@@ -390,14 +392,14 @@ function maleTafel(ctx: CanvasRenderingContext2D, bild: Bild, z: Zelle, saat: nu
 const GRUEN_SCHRIFT = "#f2efe6";
 
 /**
- * Die grüne Zelle: überall `PRIPADA_GRUEN`, im mittleren 512 × 256-Feld das
+ * Die grüne Zelle: überall `FIRMEN_GRUEN`, im mittleren 512 × 256-Feld das
  * Signet über dem Namen (`FIRMA`). Links und rechts davon je 256 px reines Grün —
- * dort tastet `atlasFeld("pripadaGruenRand")` die Flächenfarbe ab. Keine
+ * dort tastet `atlasFeld("firmenGruenRand")` die Flächenfarbe ab. Keine
  * Verwitterung: Das ist Lack auf einem Behälter, kein Blechschild.
  */
 function maleGruen(ctx: CanvasRenderingContext2D, z: Zelle): void {
   ctx.save();
-  ctx.fillStyle = PRIPADA_GRUEN;
+  ctx.fillStyle = FIRMEN_GRUEN;
   ctx.fillRect(z.x, z.y, z.b, z.h);
   const mx = z.x + z.b / 2;
   // Signet auf 55 % (gut 100 px hoch), darunter der Name — Satz wie die große Tafel

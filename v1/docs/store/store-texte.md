@@ -24,7 +24,7 @@ Die Zeichenzahlen sind nachgezählt. Grenzen laut Apple ([App information](https
 
 ## 1. Name und Untertitel — drei Varianten zur Wahl
 
-**Entschieden 20.10.2026 (Patrick, E-173):** Der Name im Store ist **„Rost & Reibach"** (14 Zeichen), deutsch wie englisch; Anbieter bleibt die Pripada GmbH. Unter dem App-Symbol steht „Rost&Reibach" (`Info.plist`, CFBundleDisplayName), weil „Rost & Reibach" dort zu „Rost & Rei…" gekürzt würde. Die Untertitel unten gelten weiter; die Namensspalte ist der Stand vor der Entscheidung.
+**Entschieden 20.10.2026 (Patrick, E-173):** Der Name im Store ist **„Rost & Reibach"** (14 Zeichen), deutsch wie englisch. Anbieter ist seit E-194 (21.10.2026) Patrick als Privatperson; im Store steht unter dem Namen sein echter Vor- und Nachname (siehe `apple-konto.md`). Unter dem App-Symbol steht „Rost&Reibach" (`Info.plist`, CFBundleDisplayName), weil „Rost & Reibach" dort zu „Rost & Rei…" gekürzt würde. Die Untertitel unten gelten weiter; die Namensspalte ist auf den entschiedenen Namen umgestellt (die früheren Firmennamen-Varianten stehen in der Git-Geschichte).
 
 Der Name ist das Stärkste, was Apple bei der Suche liest; der Untertitel das Zweitstärkste. Wörter aus Name und Untertitel müssen nicht noch einmal in die Schlüsselwörter.
 
@@ -32,19 +32,19 @@ Der Name ist das Stärkste, was Apple bei der Suche liest; der Untertitel das Zw
 
 | | Name | Zeichen | Untertitel | Zeichen |
 |---|---|---|---|---|
-| **A (Empfehlung)** | Pripada Schrottplatz | 20 | Umschlagbagger-Simulator | 24 |
-| B | Schrottplatz-Bagger Pripada | 27 | Greifen, sortieren, pressen | 27 |
-| C | Pripada: Umschlagbagger | 23 | Greifer, Magnet und Presse | 26 |
+| **A (Empfehlung)** | Rost & Reibach | 14 | Umschlagbagger-Simulator | 24 |
+| B | Rost & Reibach | 14 | Greifen, sortieren, pressen | 27 |
+| C | Rost & Reibach | 14 | Greifer, Magnet und Presse | 26 |
 
-**Warum A:** Der Name ist der, unter dem das Spiel schon heißt (Titel, Manifest, Schilder im Spiel). „Schrottplatz“ ist das Wort, das Leute suchen; „Umschlagbagger-Simulator“ sagt in einem Wort, was man tut, und „Simulator“ ist der Gattungsbegriff, unter dem solche Spiele gesucht werden. Wer „Bagger“ sucht, findet es über die Schlüsselwörter.
+**Warum A:** Der Name ist der, unter dem das Spiel schon heißt (Titel, Manifest, Schilder im Spiel). „Schrottplatz“ ist das Wort, das Leute suchen — es gehört darum in die Schlüsselwörter; „Umschlagbagger-Simulator“ sagt in einem Wort, was man tut, und „Simulator“ ist der Gattungsbegriff, unter dem solche Spiele gesucht werden. Wer „Bagger“ sucht, findet es über die Schlüsselwörter.
 
 ### Englisch
 
 | | Name | Zeichen | Untertitel | Zeichen |
 |---|---|---|---|---|
-| **A (Empfehlung)** | Pripada Scrapyard | 17 | Material handler simulator | 26 |
-| B | Pripada Scrapyard Excavator | 27 | Grab, sort and crush scrap | 26 |
-| C | Pripada: Scrap Handler | 22 | Grapple, magnet and baler | 25 |
+| **A (Empfehlung)** | Rost & Reibach | 14 | Material handler simulator | 26 |
+| B | Rost & Reibach | 14 | Grab, sort and crush scrap | 26 |
+| C | Rost & Reibach | 14 | Grapple, magnet and baler | 25 |
 
 „Material handler“ ist das englische Fachwort für Umschlagbagger. Kaum ein Laie sucht danach — darum stehen „excavator“ und „crane“ in den Schlüsselwörtern.
 
@@ -94,7 +94,7 @@ DER TON
 Echte Aufnahmen: Bagger, Hydraulik, Stahl, Blech und Glas.
 
 GEMACHT AUF EINEM ECHTEN SCHROTTPLATZ
-Hinter dem Spiel steht die Pripada GmbH, ein Schrott- und Metallhandel. Was im Spiel in welche Mulde gehört, ist so sortiert, wie wir es auch draußen sortieren.
+[Absatz neu fassen, ohne Firmennamen — Vorschlag: „Gemacht von jemandem, der den Schrotthandel kennt. Was im Spiel in welche Mulde gehört, ist so sortiert, wie man es auch draußen sortiert.“]
 
 · Einmal kaufen, alles drin: keine Werbung, keine Käufe im Spiel, kein Konto
 · Läuft komplett offline
@@ -123,7 +123,7 @@ THE SOUND
 Real recordings: excavators, hydraulics, steel, sheet metal and glass.
 
 MADE ON A REAL SCRAPYARD
-The game comes from Pripada GmbH, a German scrap and metal trader. What goes into which skip is sorted the way we sort it in the yard.
+[Rewrite without company name — suggestion: “Made by someone who knows the scrap trade. What goes into which skip is sorted the way it is sorted in a real yard.”]
 
 · Buy once, get everything: no ads, no in-app purchases, no account
 · Works fully offline
@@ -188,4 +188,4 @@ Bei der ersten Version nicht nötig, ab dem ersten Update Pflicht (bis 4000 Zeic
 
 1. **Name/Untertitel:** A, B oder C? *Empfehlung: A.*
 2. **Englisch zum Start?** Möglichkeiten: (a) Spiel und Store sofort zweisprachig — dafür müssen alle Knöpfe, Menüs und Hinweise im Spiel übersetzt werden, das ist eigene Arbeit im Spiel; (b) Start nur auf Deutsch, Englisch kommt mit dem ersten Update; (c) englischer Store-Text zu deutschem Spiel. *Empfehlung: (a), wenn die Übersetzung bis zum 09.11. im Build ist, sonst (b). Von (c) rate ich ab — es führt zu enttäuschten Käufern und schlechten Bewertungen.*
-3. **Absatz „Gemacht auf einem echten Schrottplatz“** — drin lassen? *Empfehlung: ja, er ist wahr und unterscheidet das Spiel.*
+3. **Absatz „Gemacht auf einem echten Schrottplatz“** — seit E-194 ohne Firmennamen: Vorschlag übernehmen, anders fassen oder streichen? *Empfehlung: Vorschlag übernehmen, wenn er stimmt — er unterscheidet das Spiel.*

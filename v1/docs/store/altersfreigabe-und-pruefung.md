@@ -102,40 +102,18 @@ Warum der erste Absatz so betont, dass alles im Paket liegt: Apple lehnt Apps ab
 
 | Feld | Pflicht? | Vorschlag | Quelle |
 |---|---|---|---|
-| **Support URL** | ja | `https://www.pripada.de/app.html` (neue Seite, Entwurf unten). Muss echte Kontaktangaben zeigen | [Platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/), [Richtlinie 1.5](https://developer.apple.com/app-store/review/guidelines/#developer-information) |
-| **Marketing URL** | nein | `https://www.pripada.de` oder leer | ebd. |
-| **Privacy Policy URL** | ja | siehe `datenschutz.md` | [App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/) |
-| **Copyright** | ja | `2026 Pripada GmbH` (das © setzt Apple selbst davor) | [Platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/) |
+| **Support URL** | ja | [https://pripadagmbh-ctrl.github.io/rost-und-reibach/v1/support.html](https://pripadagmbh-ctrl.github.io/rost-und-reibach/v1/support.html) (seit E-171 gebaut, Impressum seit E-194 auf derselben Seite). Muss echte Kontaktangaben zeigen | [Platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/), [Richtlinie 1.5](https://developer.apple.com/app-store/review/guidelines/#developer-information) |
+| **Marketing URL** | nein | leer lassen (oder später eine eigene Spielseite) | ebd. |
+| **Privacy Policy URL** | ja | [https://pripadagmbh-ctrl.github.io/rost-und-reibach/v1/datenschutz.html](https://pripadagmbh-ctrl.github.io/rost-und-reibach/v1/datenschutz.html) | [App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/) |
+| **Copyright** | ja | `2026 [Vor- und Nachname]` (das © setzt Apple selbst davor) | [Platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/) |
 | **Kontakt für die Prüfer** | ja | Name, Telefon, E-Mail **[du]** | [App Review](https://developer.apple.com/distribute/app-review/) |
 | **Content Rights** | ja | „enthält Inhalte Dritter: **ja**“ (Klänge, freie Software) und „Rechte vorhanden: **ja**“ | [App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/) |
 
-Wenn pripada.de nicht erweiterbar ist: Support- und Datenschutzseite können auch auf GitHub Pages liegen; die Support-Seite muss dann trotzdem Firmenanschrift und E-Mail zeigen und auf das Impressum von pripada.de verweisen.
-
-### Entwurf Support-Seite (`pripada.de/app.html`)
-
-```
-Rost & Reibach – Hilfe und Kontakt
-
-Fragen, Fehler, Ideen? Schreiben Sie uns: [kontakt@pripada.de]
-Wir antworten in der Regel innerhalb von [zwei Werktagen].
-
-Häufige Fragen
-· Wie greife ich? Rechte Bildschirmhälfte: Daumen nach rechts schließt den Greifer, nach links öffnet er.
-· Wo ist mein Spielstand? Nur auf Ihrem Gerät. Wenn Sie die App löschen, ist er weg.
-· Braucht das Spiel Internet? Nein.
-· Gibt es Werbung oder Käufe im Spiel? Nein.
-
-Datenschutz: [Link]
-Impressum: https://www.pripada.de/impressum.html
-
-Pripada GmbH · [Straße] · [PLZ Ort]
-```
-
-(Englische Fassung derselben Seite, falls Englisch zum Start kommt.)
+**Seit E-194 (21.10.2026):** Patrick verkauft als Privatperson. Support- und Datenschutzseite liegen auf GitHub Pages und im App-Paket (`v1/public/support.html`, `datenschutz.html`); die Support-Seite trägt das Impressum mit den Platzhaltern `[Vor- und Nachname]`, `[Anschrift]`, `[E-Mail]`, `[Telefon]`. Der frühere Entwurf für eine Firmenseite steht in der Git-Geschichte. Der Kontoname `pripadagmbh-ctrl` in den Adressen ändert sich noch, wenn Patrick das GitHub-Konto umbenennt — dann die Adressen auch in App Store Connect nachziehen.
 
 ---
 
 ## Fragen an dich
 
-1. **Kann auf pripada.de eine Seite `app.html` (Support) und eine Datenschutzseite angelegt werden?** Wer pflegt die Website? *Empfehlung: ja, dort; sonst GitHub Pages.*
+1. **Name, Anschrift, Telefon und die neue Spiel-E-Mail** für Support-Seite und Impressum — sobald es sie gibt.
 2. **Welche Telefonnummer gibst du Apple für Rückfragen der Prüfer?** (nicht öffentlich)

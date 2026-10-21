@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { PRIPADA_GRUEN, werbeAtlas, atlasFeld } from "./werbung";
+import { FIRMEN_GRUEN, werbeAtlas, atlasFeld } from "./werbung";
 import type { Obstacle } from "./obstacles";
 
 /**
@@ -90,7 +90,7 @@ export function firmenmuldenHindernisse(): Obstacle[] {
 /* ------------------------------------------------------------ Bauart ----- */
 
 /*
- * Farben: Grün aus `werbung.PRIPADA_GRUEN`; Stahl dunkel und Rost wie
+ * Farben: Grün aus `werbung.FIRMEN_GRUEN`; Stahl dunkel und Rost wie
  * `objektbau.ts` (STAHL_DUNKEL, ROST); Warnmarkierung rot #c8232c / weiß
  * (Vorgabe Bauleiter nach Patricks Vorlagebild).
  */
@@ -117,7 +117,7 @@ interface Bauplan {
 function mulde(w: number, h: number, d: number, feld: ReturnType<typeof atlasFeld> | null): Bauplan {
   const teile: Bauplan["teile"] = [];
   // Beim Bau gelesen, nicht beim Laden: werbung.ts lädt über yard.ts diese Datei mit
-  const LACK = new THREE.Color(PRIPADA_GRUEN).getHex();
+  const LACK = new THREE.Color(FIRMEN_GRUEN).getHex();
   const q = (bw: number, bh: number, bd: number, farbe: number, x: number, y: number, z: number): void => {
     teile.push({ geo: new THREE.BoxGeometry(bw, bh, bd).translate(x, y + h / 2, z), farbe });
   };
@@ -236,7 +236,7 @@ function mulde(w: number, h: number, d: number, feld: ReturnType<typeof atlasFel
  */
 export function baueFirmenmulden(scene: THREE.Scene, world: RAPIER.World): RAPIER.RigidBody[] {
   const atlas = werbeAtlas();
-  const feld = atlas ? atlasFeld("pripadaGruen", 2) : null;
+  const feld = atlas ? atlasFeld("firmenGruen", 2) : null;
   const farbe = new THREE.Color();
   const yAchse = new THREE.Vector3(0, 1, 0);
   // Grün, Rost und Stahl wie der Abroller (`vehicleModel.ts`: 0,75 / 0,35)

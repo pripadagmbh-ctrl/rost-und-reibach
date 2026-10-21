@@ -1,6 +1,6 @@
 # Datenschutz — Erklärung, Apple-Angaben, Prüfliste
 
-Stand 19.10.2026. **Das hier ist ein Entwurf, keine Rechtsberatung.** Er beschreibt ehrlich, was das Spiel technisch tut; ob er rechtlich ausreicht, muss jemand prüfen, der das darf (Liste am Ende).
+Stand 19.10.2026, Anbieter seit 21.10.2026 (E-194) Privatperson. **Das hier ist ein Entwurf, keine Rechtsberatung.** Er beschreibt ehrlich, was das Spiel technisch tut; ob er rechtlich ausreicht, muss jemand prüfen, der das darf (Liste am Ende).
 
 ## Was das Spiel tatsächlich tut — die Grundlage für alles Weitere
 
@@ -18,17 +18,13 @@ Nachgeschaut im Code am 19.10.2026:
 
 Apple verlangt eine **öffentlich erreichbare Adresse (URL)** der Datenschutzerklärung — auch wenn nichts erhoben wird ([App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/), [App privacy details](https://developer.apple.com/app-store/app-privacy-details/)). Zusätzlich muss **im Spiel selbst** ein Link darauf stehen ([Richtlinie 5.1.1](https://developer.apple.com/app-store/review/guidelines/#data-collection-and-storage)).
 
-Zwei Möglichkeiten:
+**Entschieden (E-171, Adresse E-194):** Die Erklärung liegt auf GitHub Pages neben dem Spiel und zugleich im App-Paket:
+[pripadagmbh-ctrl.github.io/rost-und-reibach/v1/datenschutz.html](https://pripadagmbh-ctrl.github.io/rost-und-reibach/v1/datenschutz.html).
+GitHub protokolliert beim Aufruf im Browser IP-Adressen — das steht als Abschnitt 7 auf der Seite. Der Kontoname `pripadagmbh-ctrl` in der Adresse ändert sich noch, wenn Patrick das GitHub-Konto umbenennt; dann diese Adresse auch in App Store Connect nachziehen.
 
-| | **pripada.de** (Empfehlung) | GitHub Pages neben dem Spiel |
-|---|---|---|
-| Adresse | z. B. `https://www.pripada.de/app-datenschutz.html` | z. B. `https://pripadagmbh-ctrl.github.io/schrottplatz-app/datenschutz.html` |
-| Vorteil | gehört sichtbar zur Firma, Impressum liegt schon daneben, wirkt vertrauenswürdig | können wir selbst anlegen, ist 70 s nach Merge live |
-| Nachteil | wer pflegt pripada.de? | fremde Domain; GitHub protokolliert beim Aufruf der Seite selbst IP-Adressen — das gehört dann in einen Hinweis auf der Seite |
+Im Spiel: Knopf **„Datenschutz“** im Pausenmenü (E-171), zeigt die Seite aus dem App-Paket.
 
-**Empfehlung:** pripada.de, wenn dort jemand eine Seite anlegen kann. Sonst GitHub Pages — dann legen wir die Seite an, sobald du den Text freigibst.
-
-Im Spiel: ein Knopf **„Datenschutz“** im Pausenmenü, der diese Adresse im Browser öffnet. Den gibt es noch nicht — das ist Arbeit im Spiel (Bereich `ui`).
+**Maßgeblich ist die Seite `v1/public/datenschutz.html`.** Die Texte unten sind der Entwurf vom 19.10.; der Abschnitt „Verantwortlicher“ ist seit E-194 auf die Privatperson umgestellt, alles andere steht auf der Seite in neuerer Fassung (u. a. Abschnitt 7 „Diese Webseite“).
 
 ---
 
@@ -42,14 +38,11 @@ Datenschutzerklärung für die App „Rost & Reibach“
 Stand: [Datum]
 
 1. Verantwortlicher
-Pripada GmbH
-[Straße Hausnummer]
-[PLZ Ort]
+[Vor- und Nachname]
+[Anschrift]
 Deutschland
-E-Mail: [kontakt@pripada.de]
-Telefon: [Telefonnummer]
-Vertreten durch die Geschäftsführung: [Name]
-[Falls bestellt: Datenschutzbeauftragter: Name, Kontakt]
+E-Mail: [E-Mail]
+Telefon: [Telefon]
 
 2. Kurz gesagt
 Die App erhebt keine personenbezogenen Daten. Sie braucht kein Konto, zeigt keine Werbung, enthält keine Analyse- oder Tracking-Werkzeuge und baut während des Spielens keine Verbindung zum Internet auf. Wir erhalten von der App keinerlei Daten über Sie.
@@ -69,7 +62,7 @@ Wenn Sie in den Einstellungen Ihres Geräts erlaubt haben, Analysedaten mit App-
 Wenn Sie uns schreiben, verarbeiten wir Ihre E-Mail-Adresse und den Inhalt Ihrer Nachricht nur, um Ihre Anfrage zu beantworten (Art. 6 Abs. 1 lit. b bzw. f DSGVO). [Speicherdauer: z. B. Löschung nach Erledigung, soweit keine gesetzlichen Aufbewahrungspflichten bestehen.]
 
 7. Ihre Rechte
-Sie haben nach der DSGVO das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch. Da die App keine Daten über Sie an uns übermittelt, liegen uns aus der Nutzung der App keine Daten über Sie vor. Sie haben außerdem das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, zum Beispiel bei der für uns zuständigen Behörde: [Name der Landesdatenschutzbehörde des Firmensitzes].
+Sie haben nach der DSGVO das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch. Da die App keine Daten über Sie an uns übermittelt, liegen uns aus der Nutzung der App keine Daten über Sie vor. Sie haben außerdem das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, zum Beispiel bei der für uns zuständigen Behörde: [Name der Landesdatenschutzbehörde am Wohnsitz].
 
 8. Änderungen
 Ändert sich die App so, dass Daten verarbeitet werden, passen wir diese Erklärung vorher an.
@@ -83,14 +76,11 @@ Privacy Policy for the app "Rost & Reibach"
 Last updated: [date]
 
 1. Controller
-Pripada GmbH
-[Street and number]
-[Postcode City]
+[Vor- und Nachname]
+[Anschrift]
 Germany
-Email: [kontakt@pripada.de]
-Phone: [phone number]
-Represented by the managing director: [name]
-[If appointed: Data protection officer: name, contact]
+Email: [E-Mail]
+Phone: [Telefon]
 
 2. In short
 The app does not collect any personal data. It requires no account, shows no ads, contains no analytics or tracking tools and does not connect to the internet while you play. We receive no data about you from the app.
@@ -140,17 +130,16 @@ Für den iOS-Build gehört dazu eine **Privacy-Manifest-Datei** (`PrivacyInfo.xc
 
 Ich kann den Stand der Technik ehrlich beschreiben, aber nicht sagen, ob er rechtlich genügt. Prüfen lassen — Datenschutz/IT-Recht durch Anwalt oder Datenschutzberater, Steuerliches durch den Steuerberater:
 
-1. **Die Datenschutzerklärung oben** — insbesondere Abschnitt 5 (Absturzberichte über Apple) und 6 (E-Mail-Kontakt), und ob ein Datenschutzbeauftragter genannt werden muss.
-2. **Impressum / Anbieterkennzeichnung:** Muss die App selbst oder die Support-Seite ein Impressum zeigen (Digitale-Dienste-Gesetz)? Vorschlag: Support-Seite verlinkt auf `pripada.de/impressum.html`, im Spiel ein Knopf „Impressum“ neben „Datenschutz“.
-3. **DSA-Händlerangaben** — welche Telefonnummer/E-Mail öffentlich stehen (siehe `apple-konto.md`, 4d).
-4. **Markenrecht:** Ist „Rost & Reibach“ als App-Name unbedenklich, und will die GmbH „Rost & Reibach“ für Spiele (Klasse 9/41) schützen lassen? Recherche beim DPMA/EUIPO.
+1. **Die Datenschutzerklärung** (`v1/public/datenschutz.html`) — insbesondere Abschnitt 5 (Absturzberichte über Apple) und 6 (E-Mail-Kontakt).
+2. **Impressum / Anbieterkennzeichnung (§ 5 DDG):** Wer ein kostenpflichtiges Angebot macht, braucht vermutlich ein Impressum mit **ladungsfähiger Anschrift** (kein Postfach), E-Mail und einem zweiten schnellen Kontaktweg (meist Telefon) — auch als Privatperson. Seit E-194 steht ein Impressum mit Platzhaltern auf der Support-Seite (`v1/public/support.html#impressum`), erreichbar im Spiel über den Knopf „Support“. Prüfen lassen: Reicht das, und muss es die Wohnanschrift sein (oder geht eine Geschäfts- bzw. Zustelladresse)?
+3. **DSA-Händlerangaben** — welche Telefonnummer/E-Mail öffentlich stehen (siehe `apple-konto.md`, 3d) — sie werden im EU-Store öffentlich.
+4. **Markenrecht:** Ist „Rost & Reibach“ als App-Name unbedenklich, und soll „Rost & Reibach“ für Spiele (Klasse 9/41) schützen lassen? Recherche beim DPMA/EUIPO.
 5. **Klänge:** Alle CC0 außer einer Pixabay-Aufnahme (Pixabay Content License: Einbau ins Spiel erlaubt, die Datei für sich allein weitergeben nicht). Quellen: `v1/public/ton/QUELLEN.md`. Bestätigen lassen, dass ein **kostenpflichtiges** Spiel davon gedeckt ist ([Pixabay-Lizenz](https://pixabay.com/service/license-summary/)).
 6. **Fremde Software im Spiel:** Three.js (MIT-Lizenz), Rapier (Apache-2.0), Capacitor (MIT). Diese Lizenzen verlangen, dass ihr Lizenztext mitgeliefert wird. Vorschlag: Seite „Lizenzen“ im Pausenmenü — Arbeit im Spiel.
-7. **Steuer:** Wie die Auszahlungen von Apple und Apples Provision bei der GmbH zu verbuchen sind (Umsatzsteuer, W-8BEN-E). Apple verweist dafür selbst auf den Steuerberater ([Understanding taxes](https://developer.apple.com/help/app-store-connect/making-payments-to-apple/understanding-taxes)).
-8. **Verbraucherrecht beim Verkauf** (Widerruf, Gewährleistung): Den Verkauf wickelt Apple ab; prüfen lassen, ob die GmbH als Händler darüber hinaus etwas angeben muss.
+7. **Steuer:** Gewerbeanmeldung nötig? Wie die Auszahlungen von Apple zu versteuern sind (Einkommensteuer, Umsatzsteuer/Kleinunternehmerregelung, W-8BEN). Apple verweist dafür selbst auf den Steuerberater ([Understanding taxes](https://developer.apple.com/help/app-store-connect/making-payments-to-apple/understanding-taxes)).
+8. **Verbraucherrecht beim Verkauf** (Widerruf, Gewährleistung): Den Verkauf wickelt Apple ab; prüfen lassen, ob du als Händler darüber hinaus etwas angeben muss.
 
 ## Fragen an dich
 
-1. **Wo soll die Datenschutzerklärung liegen?** *Empfehlung: pripada.de, falls dort jemand eine Seite anlegen kann; sonst GitHub Pages, das machen wir.*
-2. **Wer prüft die Texte rechtlich?** (Anwalt, Datenschutzberater, IHK-Merkblatt …)
-3. **Gibt es bei der GmbH einen Datenschutzbeauftragten?** Dann gehört er in Abschnitt 1.
+1. **Wer prüft die Texte rechtlich?** (Anwalt, Datenschutzberater, IHK-Merkblatt …)
+2. **Name, Anschrift, Telefon und die neue Spiel-E-Mail** für Datenschutz und Impressum — sobald es sie gibt.

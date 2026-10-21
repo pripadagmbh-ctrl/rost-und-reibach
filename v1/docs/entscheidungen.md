@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-194 | 21.10.2026 | Privatperson statt Firma: Pripada/GmbH raus, Repo rost-und-reibach, neue Bundle-ID | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-193 | 21.10.2026 | Laster warten aufeinander, Warteplatz aus der Schleppkurve, Müll kommt von selbst | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-192 | 21.10.2026 | Müll vor dem Bagger in zwei Fahrten, Spuren frei, Bagger nie durchfahren | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-191 | 21.10.2026 | Bagger hupt: Abholer fährt los; Schere heißt Presse; Maschendraht raus | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -199,6 +200,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-194 — Privatperson statt Firma, neue Adresse** (iPad, iPhone mini)
+- Pausenmenü → Support: unten „Impressum" mit gelben Platzhaltern und „© 2026 [Vor- und Nachname]"? Springt der Link „Impressum" dorthin, ohne Safari?
+- Pausenmenü → Datenschutz: Abschnitt 1 nur Platzhalter, nirgends „Pripada" oder „GmbH"?
+- Nach dem Merge [pripadagmbh-ctrl.github.io/rost-und-reibach/v1/](https://pripadagmbh-ctrl.github.io/rost-und-reibach/v1/): Spiel startet, Klang da?
 
 **E-193 — Laster gegen Laster, Waage, Müll zum Start** (iPad)
 - Sandkasten neu: bringt der Abroller als erstes den leeren Müll-Container rechts vor dich, ohne Bestellung? Holt ihn keiner, bis du ABHOLEN → Müll wählst?

@@ -41,7 +41,7 @@ function netze(ctx: VehicleModelContext): number {
 }
 const karte = (m: THREE.Mesh): THREE.Texture | null => (m.material as THREE.MeshStandardMaterial).map;
 
-describe("Pripada-Zeichen am Abholer (E-133)", () => {
+describe("Firmenzeichen am Abholer (E-133)", () => {
   it("gleiche Netzzahl mit und ohne Atlas; beide Seitenwände tragen ihn", () => {
     // Längen aus `vehicles.ts` (wie test/vehicleModel.test.ts)
     const ohne = bauen("abholer", 5.4);

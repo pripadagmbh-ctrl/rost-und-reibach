@@ -49,14 +49,14 @@ Der Cloud-Bau läuft **nicht** bei jedem Speichern auf `main`. Die Webseite
 ## 2. Bundle-ID anlegen **[du]**
 
 Die Bundle-ID ist der feste Name der App bei Apple, wie ein Kennzeichen. Sie
-lautet `de.pripada.schrottplatz` und lässt sich nach dem ersten Upload nie mehr
+lautet `de.rostundreibach.app` (seit E-194, 21.10.2026; vorher `de.pripada.schrottplatz`) und lässt sich nach dem ersten Upload nie mehr
 ändern.
 
 1. [developer.apple.com/account](https://developer.apple.com/account) →
    **Certificates, IDs & Profiles** → **Identifiers** → blaues **+**
 2. **App IDs** → Continue → **App** → Continue
-3. Description: `Schrottplatz` · Bundle ID: **Explicit**,
-   `de.pripada.schrottplatz`
+3. Description: `Rost und Reibach` · Bundle ID: **Explicit**,
+   `de.rostundreibach.app`
 4. Bei den Capabilities **nichts** anhaken → Continue → **Register**
 
 ## 3. App in App Store Connect anlegen **[du]**
@@ -64,11 +64,11 @@ lautet `de.pripada.schrottplatz` und lässt sich nach dem ersten Upload nie mehr
 1. [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → **Apps**
    → **+** → **Neue App**
 2. Plattform: **iOS**
-3. Name: **Pripada Schrottplatz** (so heißt die App im Store; der Name muss im
+3. Name: **Rost & Reibach** (so heißt die App im Store; der Name muss im
    ganzen Store einmalig sein)
 4. Primärsprache: **Deutsch**
-5. Bundle-ID: `de.pripada.schrottplatz` aus der Liste wählen
-6. SKU: `schrottplatz-ios` (eine interne Nummer, sieht niemand)
+5. Bundle-ID: `de.rostundreibach.app` aus der Liste wählen
+6. SKU: `rost-und-reibach-ios` (eine interne Nummer, sieht niemand)
 7. Benutzerzugriff: **Voller Zugriff** → **Erstellen**
 
 ## 4. Die vier Geheimnisse für GitHub **[du]**
@@ -105,7 +105,7 @@ ihren Inhalt kopieren.
 
 ### 4c. In GitHub eintragen
 
-1. [GitHub → Repo → Settings → Secrets and variables → Actions](https://github.com/pripadagmbh-ctrl/schrottplatz-app/settings/secrets/actions)
+1. [GitHub → Repo → Settings → Secrets and variables → Actions](https://github.com/pripadagmbh-ctrl/rost-und-reibach/settings/secrets/actions)
 2. Viermal **New repository secret**, Name genau so schreiben:
 
 | Name | Inhalt |
@@ -122,7 +122,7 @@ behebt man durch Überschreiben (**Update**).
 
 **Von Hand** (geht, sobald `ios.yml` auf `main` liegt):
 
-1. [GitHub → Actions → „iOS-App bauen“](https://github.com/pripadagmbh-ctrl/schrottplatz-app/actions/workflows/ios.yml)
+1. [GitHub → Actions → „iOS-App bauen“](https://github.com/pripadagmbh-ctrl/rost-und-reibach/actions/workflows/ios.yml)
 2. Rechts **Run workflow** → Branch wählen (meist `main`) → grüner Knopf
    **Run workflow**
 
@@ -140,9 +140,9 @@ dann den Lauf anklicken und den roten Schritt dem Orchestrator schicken.
 
 1. Nach einem grünen Bau mit Teil **testflight**:
    [App Store Connect](https://appstoreconnect.apple.com) → **Apps** →
-   **Pripada Schrottplatz** → **TestFlight**. Der Build erscheint nach
+   **Rost & Reibach** → **TestFlight**. Der Build erscheint nach
    5–30 Minuten („Wird verarbeitet“, danach „Bereit zum Testen“).
-2. Links **Interne Tests** → **+** → Gruppe `Pripada` → dich selbst als Tester
+2. Links **Interne Tests** → **+** → Gruppe `Tester` → dich selbst als Tester
    hinzufügen → den Build der Gruppe zuweisen.
 3. Auf iPad und iPhone die App
    [TestFlight](https://apps.apple.com/de/app/testflight/id899247664) aus dem
@@ -169,9 +169,9 @@ einreichen**.
 - **Signatur ohne Mac**: Xcode signiert mit dem API-Schlüssel selbst
   („Cloud Signing“) und lädt direkt hoch. Verworfen: *fastlane match* — braucht
   ein zweites Repo für Zertifikate und ein Passwort mehr, das man verlieren kann.
-- **Name unter dem Icon**: `Schrottplatz` — „Pripada Schrottplatz“ wäre auf
-  dem Home-Bildschirm zu „Pripada Schr…“ abgeschnitten. Im Store steht der volle
-  Name. Frage an dich offen (E-161).
+- **Name unter dem Icon**: `Rost&Reibach` (ohne Leerzeichen, E-173) — mit
+  Leerzeichen würde es auf dem Home-Bildschirm zu „Rost & Rei…“ abgeschnitten.
+  Im Store steht der volle Name „Rost & Reibach“.
 
 ## 9. Was erst mit dem Apple-Konto geht
 

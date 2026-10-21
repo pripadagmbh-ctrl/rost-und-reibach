@@ -33,14 +33,24 @@ describe("die drei Seiten in public/ (landen in dist/ und im App-Paket)", () => 
     });
   }
 
-  it("Datenschutz: Name, Kontakt, Telefon bleibt Platzhalter", () => {
+  // E-194: Anbieter ist eine Privatperson; Name, Anschrift, E-Mail, Telefon trägt Patrick ein
+  const ANBIETER = ["[Vor- und Nachname]", "[Anschrift]", "[E-Mail]", "[Telefon]"].map((t) => `<span class="platz">${t}</span>`);
+
+  it("Datenschutz: Verantwortlicher ist die Privatperson, Angaben noch Platzhalter", () => {
     const html = lies("public/datenschutz.html");
-    // E-173: Das Spiel heißt „Rost & Reibach", Anbieter bleibt die Pripada GmbH
     expect(html).toContain("„Rost &amp; Reibach“");
     expect(html).toContain("“Rost &amp; Reibach”");
-    expect(html).toContain("Pripada GmbH");
-    expect(html).toContain("kontakt@pripada.de");
-    expect(html).toContain("[Telefonnummer]");
+    for (const p of ANBIETER) expect(html, p).toContain(p);
+  });
+
+  it("Support: Impressum auf der Seite selbst (DE+EN), mit Copyright", () => {
+    const html = lies("public/support.html");
+    expect(html).toContain('href="#impressum"');
+    expect(html).toContain('id="impressum"');
+    expect(html).toContain('id="legal"');
+    for (const p of ANBIETER) expect(html, p).toContain(p);
+    expect(html).toContain('© 2026 <span class="platz">[Vor- und Nachname]</span>');
+    expect(lies("public/lizenzen.html")).toContain('© 2026 <span class="platz">[Vor- und Nachname]</span>');
   });
 
   it("Lizenzen: three.js, Rapier, Capacitor samt Lizenztext, und jede Tonquelle", () => {

@@ -2,7 +2,7 @@
  * Erzeugt die App-Icons aus reinem Code — kein Grafikprogramm, keine Assets.
  *
  * Motiv: die geöffnete Spinne über einem Schrotthaufen, in den Hausfarben
- * (Anthrazit, PRIPADA-Grün, Warngelb). Aufruf:
+ * (Anthrazit, Firmengrün, Warngelb). Aufruf:
  *
  *   node tools/make-icons.mjs
  */

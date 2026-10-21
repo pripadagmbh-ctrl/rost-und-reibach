@@ -2,9 +2,9 @@ name: Deploy zu GitHub Pages
 
 # Baut den Prototyp (unverändert auf die Root-URL), v1 (Unterpfad /v1/) und
 # Bagerana v2 (Unterpfad /v2/).
-# Prototyp-URL bleibt: https://<user>.github.io/schrottplatz-app/
-# v1-URL:              https://<user>.github.io/schrottplatz-app/v1/
-# v2-URL:              https://<user>.github.io/schrottplatz-app/v2/
+# Prototyp-URL bleibt: https://<user>.github.io/rost-und-reibach/
+# v1-URL:              https://<user>.github.io/rost-und-reibach/v1/
+# v2-URL:              https://<user>.github.io/rost-und-reibach/v2/
 #
 # Alle drei bauen mit `base: "./"`, also relativen Pfaden — deshalb braucht
 # keiner von ihnen seinen Unterpfad zu kennen.

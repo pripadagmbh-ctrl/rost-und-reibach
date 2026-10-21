@@ -701,7 +701,7 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
       | # | Punkt |
       |---|---|
-      | 22a | Apple-Entwicklerkonto GmbH + D-U-N-S beantragen (Patrick) |
+      | 22a | Apple-Entwicklerkonto als Einzelperson beantragen (Patrick; seit E-194 keine D-U-N-S nötig) |
       | 22b | iOS-Build in der Cloud bis TestFlight |
       | 22c | Aufgaben (6–8 Challenges mit Sternen) zurück, erste als Einführung |
       | 22d | Leistung iPhone mini, offline, Speichern |
@@ -721,6 +721,10 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       Englisch zum Start „ja, wenn bis 09.11. übersetzt"; Stummschalter →
       Spiel still (ambient); ab iOS 16; Datenschutz/Support auf GitHub Pages;
       Kontakt im Store: Büro-Festnetz + kontakt@pripada.de.
+      Überholt 21.10. (E-194): „Pripada und gmbh raus, ich vertreibe es als
+      Privatperson“ — Anbieter, Kontakt und Impressum jetzt Platzhalter
+      [Vor- und Nachname], [Anschrift], [E-Mail], [Telefon]; Repo
+      rost-und-reibach; Bundle-ID de.rostundreibach.app.
       Antworten 19.10. (Englisch, E-170): Schild „BUNT + VA" auf Englisch
       „NON-FERROUS + SS"; Hörprobe vor dem Einreichen raus (bleibt bis dahin).
 

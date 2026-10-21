@@ -1,6 +1,6 @@
 # Prüfliste „Bereit zum Einreichen“
 
-Stand 19.10.2026. Nur die Punkte, die für dieses Spiel zählen. Grundlage: [App Store Review Guidelines](https://developer.apple.com/app-store/review/guidelines/), [Upcoming requirements](https://developer.apple.com/news/upcoming-requirements/) und die anderen Dateien in diesem Ordner.
+Stand 19.10.2026, Anbieter seit 21.10.2026 Privatperson (E-194). Nur die Punkte, die für dieses Spiel zählen. Grundlage: [App Store Review Guidelines](https://developer.apple.com/app-store/review/guidelines/), [Upcoming requirements](https://developer.apple.com/news/upcoming-requirements/) und die anderen Dateien in diesem Ordner.
 
 **Wer:** **[du]** = Patrick · **iOS** = wer den iOS-Build baut · **ui** = Bedienung/Menüs im Spiel · **Spiel** = Spielinhalt (Orchestrator verteilt) · **Store** = Texte und Bilder in diesem Ordner.
 Abgehakt wird erst, wenn es erledigt **und** von dir abgenommen ist.
@@ -9,13 +9,12 @@ Abgehakt wird erst, wenn es erledigt **und** von dir abgenommen ist.
 
 | ☐ | Punkt | Was zu tun | Status | Wer |
 |---|---|---|---|---|
-| ☐ | Apple-ID | Apple-ID mit **@pripada.de**-Adresse, Zwei-Faktor an, amtlicher Name | offen | [du] |
-| ☐ | D-U-N-S | nachschlagen, sonst beantragen (bis 5 + 2 Werktage) | offen | [du] |
-| ☐ | Mitgliedschaft | über die Apple-Developer-App am iPad beantragen, nach Freigabe 99 € zahlen | offen | [du] |
+| ☐ | Apple-ID | Zwei-Faktor an, **amtlicher Vor- und Nachname** (erscheint im Store als Verkäufer) | offen | [du] |
+| ☐ | Mitgliedschaft | als **Einzelperson** über die Apple-Developer-App am iPad beantragen (keine D-U-N-S-Nummer nötig), nach Freigabe 99 €/Jahr zahlen | offen | [du] |
 | ☐ | Paid Apps Agreement | in App Store Connect unterschreiben — ohne geht nur „kostenlos“ | offen | [du] |
-| ☐ | Steuer | W-8BEN-E (App Store Connect führt hin) | offen | [du] |
-| ☐ | Bank | GmbH-Konto mit IBAN | offen | [du] |
-| ☐ | EU-Händlerangaben (DSA) | „trader“, Telefon und E-Mail bestätigen, Handelsregisterauszug hochladen — sonst nicht in EU-Stores | offen | [du] |
+| ☐ | Steuer | W-8BEN (App Store Connect führt hin); Gewerbe/Steuer mit dem Steuerberater klären | offen | [du] |
+| ☐ | Bank | eigenes Konto mit IBAN | offen | [du] |
+| ☐ | EU-Händlerangaben (DSA) | „trader“: Anschrift (oder Postfach), Telefon, E-Mail bestätigen, Nachweis der Anschrift hochladen — **alles drei wird im EU-Store öffentlich** ([Apple: DSA](https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements/)); sonst nicht in EU-Stores | offen | [du] |
 | ☐ | Small Business Program | anmelden (15 % statt 30 %), möglichst vor dem ersten Verkauf | offen | [du] |
 | ☐ | Preis | Basisland Deutschland, Preisstufe gesetzt (Empfehlung 4,99 €) — Pflicht vor dem Einreichen | offen | [du] |
 
@@ -27,7 +26,7 @@ Einzelheiten: `apple-konto.md`.
 |---|---|---|---|---|
 | ☐ | Xcode 26 / iOS-26-SDK | Seit 28.04.2026 Pflicht für jeden Upload ([Upcoming requirements](https://developer.apple.com/news/upcoming-requirements/)) | offen | iOS |
 | ☐ | Mindestversion | Deployment Target **iOS 13 oder höher** (seit 09.09.2026 Pflicht) | offen | iOS |
-| ☐ | Bundle-ID | `de.pripada.schrottplatz` (steht in `capacitor.config.json`). **Nach dem ersten Upload nicht mehr änderbar** ([App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/)) — vorher von dir bestätigen lassen | offen | iOS + [du] |
+| ☐ | Bundle-ID | `de.rostundreibach.app` (seit E-194; steht in `capacitor.config.json` und `ios/App/App.xcodeproj/project.pbxproj`). **Nach dem ersten Upload nicht mehr änderbar** ([App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/)) — vorher von dir bestätigen lassen | offen | iOS + [du] |
 | ☐ | Alles im Paket | Spiel lädt aus dem App-Paket, **nichts** von GitHub Pages oder sonst aus dem Netz (Richtlinien [2.5.2](https://developer.apple.com/app-store/review/guidelines/#software-requirements), [4.2](https://developer.apple.com/app-store/review/guidelines/#minimum-functionality)) | offen | iOS |
 | ☐ | Offline-Probe | Flugmodus an, App frisch installieren, starten, spielen, speichern, neu starten — alles geht | offen | iOS + [du] |
 | ☐ | Privacy Manifest | `PrivacyInfo.xcprivacy`: kein Tracking, keine erhobenen Daten, Begründungen für genutzte Systemfunktionen. Ohne wird der Upload abgelehnt | offen | iOS |
@@ -78,10 +77,10 @@ Texte: `store-texte.md` · Bilder: `bildmaterial.md`.
 
 | ☐ | Punkt | Was zu tun | Status | Wer |
 |---|---|---|---|---|
-| ☐ | Datenschutzerklärung online | Text aus `datenschutz.md` freigeben, Platzhalter füllen, rechtlich prüfen lassen, veröffentlichen | offen | [du] |
+| ☐ | Datenschutzerklärung online | `v1/public/datenschutz.html` liegt unter […/rost-und-reibach/v1/datenschutz.html](https://pripadagmbh-ctrl.github.io/rost-und-reibach/v1/datenschutz.html); Platzhalter (Name, Anschrift, E-Mail, Telefon) füllen, rechtlich prüfen lassen | offen | [du] |
 | ☐ | Link im Spiel | Knopf „Datenschutz“ im Pausenmenü, öffnet die Erklärung in Safari ([5.1.1](https://developer.apple.com/app-store/review/guidelines/#data-collection-and-storage): Link in App Store Connect **und** in der App) | offen | ui |
 | ☐ | App Privacy | „No, we do not collect data from this app“ → Publish | offen | [du] |
-| ☐ | Impressum | Support-Seite mit Anschrift und Kontakt, Verweis auf Impressum ([1.5](https://developer.apple.com/app-store/review/guidelines/#developer-information)) | offen | [du] |
+| ☐ | Impressum | Impressum steht auf der Support-Seite ([…/v1/support.html](https://pripadagmbh-ctrl.github.io/rost-und-reibach/v1/support.html), E-194) — Platzhalter füllen, ladungsfähige Anschrift rechtlich prüfen lassen ([1.5](https://developer.apple.com/app-store/review/guidelines/#developer-information)) | offen | [du] |
 
 ## G. Rechte an Inhalten — Richtlinie 5.2
 
@@ -99,7 +98,7 @@ Texte: `store-texte.md` · Bilder: `bildmaterial.md`.
 | ☐ | Exportkontrolle | „None of the algorithms mentioned above“ (bzw. durch Info.plist erledigt) | offen | [du] / iOS |
 | ☐ | Hinweise für Prüfer | Text aus `altersfreigabe-und-pruefung.md`, am Build gegengelesen | offen | Store + [du] |
 | ☐ | Kontakt für Prüfer | Name, Telefon, E-Mail | offen | [du] |
-| ☐ | Support-URL, Copyright | `2026 Pripada GmbH` | offen | [du] |
+| ☐ | Support-URL, Copyright | Support: [pripadagmbh-ctrl.github.io/rost-und-reibach/v1/support.html](https://pripadagmbh-ctrl.github.io/rost-und-reibach/v1/support.html) · Copyright: `2026 [Vor- und Nachname]` | offen | [du] |
 | ☐ | Käufe im Spiel | keine — also nichts anzulegen; 3.1.1 betrifft uns nicht | — | — |
 | ☐ | Veröffentlichung | „Manuell veröffentlichen“ wählen, damit die App nach der Freigabe erst live geht, wenn du es sagst | offen | [du] |
 
