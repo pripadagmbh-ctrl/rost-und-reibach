@@ -369,7 +369,22 @@ import {
   abholPlatzNahe,
   setzeAbholPlatz,
   umsetzZug,
+  verladeplatzVorn,
+  VERLADER_VORN,
 } from "./routes";
+import {
+  NACHRUECK_SLOT,
+  NACHRUECK_ABSTAND_M,
+  BAGGER_AM_LAGER_M,
+  HALT_PHASEN,
+  warteplatzZugVonWaage,
+  verladerVomWarteplatz,
+  kassenTeilAus,
+  annahmeAusfahrt,
+} from "./schichtfuhrpark";
+import { rollSchichtKunde } from "./customers";
+import type { Fahrt } from "../economy/schichtplan";
+import type { KassenTeil } from "../economy/kasse";
 
 type Phase =
   | "settleCargo"
@@ -618,8 +633,10 @@ class DeliveryVehicle {
   }
 
   private get craneSide(): 1 | -1 {
-    const dx = BAGGER_STAND.x - this.group.position.x;
-    const dz = BAGGER_STAND.z - this.group.position.z;
+    // Am Lager (Schicht, E-202) steht der Bagger am Baggerstand dieses Verladeplatzes
+    const bagger = this.festerPlatz?.stand ?? BAGGER_STAND;
+    const dx = bagger.x - this.group.position.x;
+    const dz = bagger.z - this.group.position.z;
     const yaw = this.group.rotation.y;
     const baggerLinks = dx * Math.cos(yaw) - dz * Math.sin(yaw);
     if (!Number.isFinite(baggerLinks)) return 1;
@@ -1212,6 +1229,123 @@ class DeliveryVehicle {
     this.phase = "approach";
     this.phaseT = 0;
     this.routeS = 0;
+  }
+
+  /* ------------------------------------------------- SCHICHT (E-202) --- */
+
+  /**
+   * EIN FESTER HALT statt Bestellung oder Baggernähe: der Verlader vorn
+   * (`verladeplatzVorn`, E-201) oder die sortenreine Pritsche am Verladeplatz
+   * ihres Lagers. Im Sandkasten bleibt es `null`, und alles läuft wie vorher.
+   */
+  festerPlatz: AbholPlatz | null = null;
+  /**
+   * Fährt erst auf diesen Warteplatz und wartet dort auf den Ruf — der
+   * Nachrücker (E-202). Am Ziel steht er an wie ein Ansteher (E-131).
+   */
+  warteplatzZiel: [number, number] | null = null;
+  /**
+   * Darf er jetzt Richtung Tor losfahren? Tor und Waage sind einspurig: In der
+   * Schicht fährt nur los, wer den Torabschnitt für sich hat — sonst wartet
+   * er an seinem Halt, wo er niemandem im Weg steht. Gesetzt vom Fuhrpark;
+   * im Sandkasten immer ja.
+   */
+  ausfahrtFrei: () => boolean = () => true;
+  /**
+   * Steht vorn ein Verlader (Schicht, E-202)? Dann fährt er von der Annahme
+   * auf einem Weg zum Tor, der um ihn herumführt (`annahmeAusfahrt`).
+   */
+  amVerladerVorbei = false;
+  /** Die Fuhre aus dem Fahrplan, deren Standzeit dieser Wagen trägt (E-202). */
+  schichtFuhre: SchichtFuhre | null = null;
+
+  /** Klappen und Heckklappe hart auf die Lage setzen — wie `snapBodiesToPose`, vor dem ersten Schritt. */
+  private snapKlappen(): void {
+    const bp = new THREE.Vector3();
+    const bq = new THREE.Quaternion();
+    const flaps = this.tailGate ? [...this.sideWalls, this.tailGate] : this.sideWalls;
+    for (const w of flaps) {
+      w.mesh.updateWorldMatrix(true, false);
+      w.mesh.getWorldPosition(bp);
+      w.mesh.getWorldQuaternion(bq);
+      w.body.setTranslation({ x: bp.x, y: bp.y, z: bp.z }, false);
+      w.body.setRotation({ x: bq.x, y: bq.y, z: bq.z, w: bq.w }, false);
+    }
+  }
+
+  /** Den festen Halt übernehmen: Platz und seine drei Strecken. */
+  private uebernimmPlatz(p: AbholPlatz, anfahrt = p.anfahrt, rueckweg = p.rueckweg): void {
+    this.festerPlatz = p;
+    if (this.isPickup) {
+      this.platz = p;
+      setzeAbholPlatz(p);
+    }
+    this.meineAnfahrt = anfahrt;
+    this.meinRueckweg = rueckweg;
+    this.meineAusfahrt = p.ausfahrt;
+  }
+
+  /**
+   * ZUR SCHICHT STEHT ER SCHON DA (E-202): gleich nach dem Bau an das Ende
+   * seines Rückwegs gestellt, leer gewogen, bereit zum Laden. Wie der
+   * Ansteher (E-131) — gesetzt, bevor der erste Physikschritt läuft (v2 E-058).
+   */
+  stelleAmHaltAuf(p: AbholPlatz): void {
+    this.uebernimmPlatz(p);
+    this.weighedIn = true;
+    if (this.isPickup) this.taraKg = this.ladeflaecheKg() + this.containerTaraKg;
+    const r = p.rueckweg;
+    this.placeAt(r, this.routeLength(r), true);
+    this.wendeFederungAn();
+    this.federLetztePos.copy(this.group.position);
+    this.snapBodiesToPose();
+    this.snapKlappen();
+    this.phase = this.isPickup ? "waitLoad" : "waitUnload";
+    this.phaseT = 0;
+    this.routeS = 0;
+  }
+
+  /** Der Nachrücker zur Schicht: steht schon auf seinem Warteplatz an (E-131-Muster), leer gewogen. */
+  stelleNachrueckerAuf(slot: [number, number]): void {
+    this.stelleAnstehendAuf(slot);
+    this.snapKlappen();
+    this.taraKg = this.containerTaraKg;
+  }
+
+  /**
+   * VOM WARTEPLATZ AN DEN FESTEN HALT — der Nachrücker rückt nach (E-202).
+   * Derselbe Ablauf wie `rueckeVor` (E-131): aus der Bucht, Rangierzug,
+   * zurücksetzen; ab dann ist er ein Abholer wie jeder andere.
+   */
+  rueckeVorAn(p: AbholPlatz, zug: { anfahrt: Array<[number, number]>; rueckweg: Array<[number, number]> }): void {
+    this.stehtAn = false;
+    this.parkSpot = null;
+    this.uebernimmPlatz(p, zug.anfahrt, zug.rueckweg);
+    this.onZielFest?.();
+    this.phase = "approach";
+    this.phaseT = 0;
+    this.routeS = 0;
+  }
+
+  /** Liegt dieser Körper auf seiner Ladefläche (dasselbe Fenster wie Waage und Verriegeln)? */
+  liegtAuf(b: RAPIER.RigidBody): boolean {
+    this.bedGroup.updateWorldMatrix(true, false);
+    return this.aufDerFlaeche(b);
+  }
+
+  /** Steht er an seinem Halt (Abladen, Kippen, Mulde) — läuft dort Standzeit? */
+  get amHalt(): boolean {
+    return HALT_PHASEN.has(this.phase);
+  }
+
+  /** Steht er auf dem Warteplatz an und wartet auf den Ruf? */
+  get wartetAufRuf(): boolean {
+    return this.stehtAn && this.phase === "parked";
+  }
+
+  /** Ist die Ausfahrtswiegung schon vorbei (er ist so gut wie vom Hof)? */
+  get ausgewogen(): boolean {
+    return this.weighedOut;
   }
 
   /** Steht das Fahrzeug auf dem Warteplatz und macht Pause? */
@@ -2018,6 +2152,24 @@ class DeliveryVehicle {
    * dem Bagger mit, beide werden hier eingefroren.
    */
   private legeAbladestelleFest(): void {
+    /*
+     * SCHICHT (E-202): Der Nachrücker fährt zuerst auf seinen Warteplatz, der
+     * Verlader und die Silo-Pritsche an ihren festen Halt. Im Sandkasten ist
+     * beides `null`, und es geht weiter wie bisher.
+     */
+    if (this.warteplatzZiel) {
+      const zug = warteplatzZugVonWaage();
+      this.meineAnfahrt = zug.anfahrt;
+      this.meinRueckweg = zug.rueckweg;
+      this.meineAusfahrt = parkAusfahrt(this.warteplatzZiel);
+      this.onZielFest?.();
+      return;
+    }
+    if (this.festerPlatz) {
+      this.uebernimmPlatz(this.festerPlatz);
+      this.onZielFest?.();
+      return;
+    }
     if (this.isPickup) {
       /*
        * WO DER ABHOLER HAELT, HAENGT AN DER BESTELLUNG (E-056).
@@ -2058,7 +2210,7 @@ class DeliveryVehicle {
       const zug = rangierAbsetzplatz();
       this.meineAnfahrt = zug.anfahrt;
       this.meinRueckweg = zug.rueckweg;
-      this.meineAusfahrt = absetzAusfahrt();
+      this.meineAusfahrt = this.amVerladerVorbei ? annahmeAusfahrt(absetzAusfahrt()) : absetzAusfahrt();
       this.onZielFest?.();
       return;
     }
@@ -2073,7 +2225,7 @@ class DeliveryVehicle {
     neueAbladestelle();
     this.meineAnfahrt = routeApproach();
     this.meinRueckweg = routeInRev();
-    this.meineAusfahrt = routeOut();
+    this.meineAusfahrt = this.amVerladerVorbei ? annahmeAusfahrt(routeOut()) : routeOut();
     this.onZielFest?.();
   }
 
@@ -3744,6 +3896,17 @@ class DeliveryVehicle {
         break;
       case "reverseIn":
         this.advance(this.routeRev, SPEED * 0.6 * dt, true, dt); // rückwärts langsamer (SW)
+        if (this.routeS >= this.routeLength(this.routeRev) && this.warteplatzZiel) {
+          // Der Nachrücker (E-202) steht auf seinem Warteplatz an — wie ein Ansteher (E-131)
+          this.parkSpot = this.warteplatzZiel;
+          this.warteplatzZiel = null;
+          this.stehtAn = true;
+          this.kaffeeGehabt = true;
+          this.phase = "parked";
+          this.phaseT = 0;
+          this.routeS = 0;
+          break;
+        }
         if (this.routeS >= this.routeLength(this.routeRev)) {
           this.phase = "pauseBeforeUnload";
           this.phaseT = 0;
@@ -4126,10 +4289,16 @@ class DeliveryVehicle {
          * bisher uebersprungen hat.
          */
         this.sideOpenTarget = 0;
+        // Schicht (E-202): Richtung Tor erst, wenn der Torabschnitt frei ist — bis dahin am Halt
+        if (this.ausfaedelFolge === "out" && !this.weighedOut && !this.ausfahrtFrei()) {
+          this.phaseT = 0; // die Ausfädelfrist läuft erst ab dem Losfahren
+          break;
+        }
         this.ausfaedelSchritt(dt);
         break;
       case "out":
         this.sideOpenTarget = 0; // Bordwände zu, bevor es vom Platz geht
+        if (!this.weighedOut && !this.ausfahrtFrei()) break; // Schicht (E-202), wie oben
         // Jeder Laster haelt auf der Waage, solange Mario die Ladung ansieht
         if (this.wiegeHaltS > 0) {
           this.wiegeHaltS -= dt;
@@ -4423,10 +4592,38 @@ function ladungImFunk(v: DeliveryVehicle): string {
  */
 export function bueroFunk(v: DeliveryVehicle): string {
   if (v.holtNur) return `Büro an Bagger: ${v.fahrzeugName} holt seine Mulde.`;
+  // Schicht (E-202): Die sortenreine Pritsche hält am Verladeplatz ihres Lagers
+  const lager = !v.isPickup ? v.festerPlatz?.ziel : null;
+  if (lager) return `Büro an Bagger: ${v.fahrzeugName} mit ${ladungImFunk(v)} kommt ans ${lager.label}.`;
   const silo = v.zielSilo;
   return silo
     ? `Büro an Bagger: ${v.fahrzeugName} mit ${ladungImFunk(v)} kommt, kippt ins ${silo.label}.`
     : `Büro an Bagger: ${v.fahrzeugName} mit ${ladungImFunk(v)} kommt an den Abladeplatz.`;
+}
+
+/** Eine Fuhre aus dem Schicht-Fahrplan, mit ihrer Standzeit (E-202). */
+export interface SchichtFuhre extends Fahrt {
+  /** Sekunden, die sie wartend oder am Halt gestanden hat (Fahren zählt nicht). */
+  standS: number;
+  /** Stand sie schon an ihrem Halt? Beim Verlassen wird gemeldet. */
+  amHalt: boolean;
+  gemeldet: boolean;
+}
+
+/** Abfahrt eines Verladers oder Box-Abholers — genau das, was `Kasse.bucheAbfahrt` braucht (E-203). */
+export interface VerladerAbfahrt {
+  order: string | null;
+  teile: KassenTeil[];
+}
+
+/** Was der Disponent (`schichtbetrieb.ts`) dem Fuhrpark mitgibt. */
+export interface SchichtHaken {
+  /** Für welche Sorte der nächste Verlader kommt: eine volle Box, sonst `mixed`. */
+  nachrueckerOrder(): string;
+  /** Welcher Wagen dafür kommt (E-177: Abroller bei viel, Absetzkipper bei wenig). */
+  aufbauFuer(order: string): AbholAufbau;
+  onVerladerAbfahrt(e: VerladerAbfahrt): void;
+  onStandzeit(e: { standzeitS: number; fahrzeug: string }): void;
 }
 
 export class VehicleManager {
@@ -4467,8 +4664,8 @@ export class VehicleManager {
     const jetzt: Box[] = [];
     v.boxen(jetzt);
     const andere: Box[] = [];
-    for (const o of [this.active, ...this.parked]) {
-      if (!o || o === v) continue;
+    for (const o of this.alle()) {
+      if (o === v) continue;
       andere.length = 0;
       o.boxen(andere);
       let tv = 0;
@@ -4499,8 +4696,8 @@ export class VehicleManager {
    * (x −34 … −8, z 6 … 45). Wer dort parkt, belegt nichts.
    */
   private torBelegt(ausser: DeliveryVehicle | null = null): boolean {
-    for (const o of [this.active, ...this.parked]) {
-      if (!o || o === ausser || o.phaseName === "parked") continue;
+    for (const o of this.alle()) {
+      if (o === ausser || o.phaseName === "parked") continue;
       const p = o.group.position;
       if (p.x > -34 && p.x < -8 && p.z > 6 && p.z < 45) return true;
     }
@@ -4772,6 +4969,18 @@ export class VehicleManager {
     if (bringt) wagen.nimmLeereWanne();
     // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
     wagen.bestellung = this.pickupOrder;
+    this.verdrahteAbholer(wagen);
+    this.onMeldung?.(
+      this.muellRueckfahrt && bringt
+        ? "Büro an Bagger: Der Abroller bringt den leeren Müll-Container."
+        : `Büro an Bagger: ${this.abholAngebot(this.pickupOrder, aufbau).fahrzeug} für ${abholWas(this.pickupOrder)} ist unterwegs.`
+    );
+    this.muellRueckfahrt = false;
+    wagen.loadCargo(this.items, this.composites);
+  }
+
+  /** Was jeder Abholer mitbekommt — Funk, Wiegungen, voll fährt los, zum Bagger (aus `spawnAbholer`). */
+  private verdrahteAbholer(wagen: DeliveryVehicle): void {
     /*
      * Und daran haengt auch, was er funkt, wenn er steht (E-056). Der Ort
      * kommt aus dem Schild des Behaelters, an dem er haelt — dieselbe Quelle,
@@ -4793,13 +5002,6 @@ export class VehicleManager {
     wagen.baggerPos = this.getExcavatorPos;
     wagen.abladeplatzZu = () => this.mulde !== null;
     wagen.onMeldung = (text) => this.onMeldung?.(text);
-    this.onMeldung?.(
-      this.muellRueckfahrt && bringt
-        ? "Büro an Bagger: Der Abroller bringt den leeren Müll-Container."
-        : `Büro an Bagger: ${this.abholAngebot(this.pickupOrder, aufbau).fahrzeug} für ${abholWas(this.pickupOrder)} ist unterwegs.`
-    );
-    this.muellRueckfahrt = false;
-    wagen.loadCargo(this.items, this.composites);
   }
 
   /** Der nächste Müll-Abroller ist die Rückfahrt mit dem leeren (E-192). */
@@ -4961,6 +5163,7 @@ export class VehicleManager {
 
   /** Der Platz, an dem der Abholer gerade wirklich steht bzw. hinfaehrt. */
   get aktuellerAbholPlatz(): AbholPlatz | null {
+    if (this.schichtAn) return this.verlader?.abholPlatzJetzt ?? null;
     const a = this.active;
     if (!a || !a.isPickup) return null;
     return a.abholPlatzJetzt ?? abholPlatzFuer(a.bestellung);
@@ -4999,6 +5202,16 @@ export class VehicleManager {
     /** Welcher Wagen kommen soll — so, wie ihn die Bestellliste angezeigt hat (E-177). */
     aufbauGewuenscht?: AbholAufbau
   ): "gerufen" | "abgefahren" | "vorgemerkt" | "unmoeglich" {
+    /*
+     * SCHICHT (E-202): Der Verlader kommt von selbst — ABHOLEN und Hupe heißen
+     * dort nur „fahr los", und zwar ab 1 kg Ladung (wie die Hupe, E-191).
+     */
+    if (this.schichtAn) {
+      const v = this.verlader;
+      if (!v || !(v.waitingForLoad || v.setztUm) || v.ladeflaecheKg() < 1) return "unmoeglich";
+      v.requestRelease();
+      return "abgefahren";
+    }
     // Wartet er schon (oder setzt er gerade um), heisst ABHOLEN: fertig, losfahren
     if (this.active?.isPickup && (this.active.waitingForLoad || this.active.setztUm)) {
       this.active.requestRelease();
@@ -5054,6 +5267,17 @@ export class VehicleManager {
     this.active = null;
     for (const v of this.parked) v.despawn();
     this.parked.length = 0;
+    // Schicht (E-202)
+    for (const v of [this.verlader, this.nachruecker, this.siloWagen, ...this.raus]) v?.despawn();
+    this.verlader = null;
+    this.nachruecker = null;
+    this.siloWagen = null;
+    this.raus.length = 0;
+    this.alterVerlader = null;
+    this.torHalter = null;
+    this.mischWarten.length = 0;
+    this.siloWarten.length = 0;
+    this.muldeFuhre = null;
     if (this.mulde) {
       this.mulde.group.removeFromParent();
       this.world.removeRigidBody(this.mulde.body);
@@ -5093,8 +5317,8 @@ export class VehicleManager {
    * für jedes (Patrick, 06.10.2026: „Er soll immer noch an der Waage halten").
    */
   wiegeKontrolle(): THREE.Vector3 | null {
-    for (const v of [this.active, ...this.parked]) {
-      if (v && v.aufDerWaage) return v.group.position;
+    for (const v of this.alle()) {
+      if (v.aufDerWaage) return v.group.position;
     }
     return null;
   }
@@ -5106,8 +5330,7 @@ export class VehicleManager {
    */
   fahrzeugBoxen(): Box[] {
     this.boxCache.length = 0;
-    if (this.active) this.active.boxen(this.boxCache);
-    for (const v of this.parked) v.boxen(this.boxCache);
+    for (const v of this.alle()) v.boxen(this.boxCache);
     // Der Container am Haken des Müll-Abrollers steht ebenso im Weg (E-190)
     const wb = this.active?.wannenBox();
     if (wb) this.boxCache.push(wb);
@@ -5131,12 +5354,15 @@ export class VehicleManager {
    * Fläche zählen dort als Tara, wie bei ZUR WAAGE.
    */
   get anliefererWartet(): boolean {
+    // Schicht (E-202): Die Hupe meint den Verlader — nur am Lager die Silo-Pritsche
+    if (this.schichtAn) return this.siloWagen?.phaseName === "waitUnload" && this.baggerAmLager();
     const a = this.active;
     return !!a && !a.isPickup && a.phaseName === "waitUnload";
   }
 
-  /** Der wartende Abhol-LKW (für Beladung/Verkauf), sonst null. */
+  /** Der wartende Abhol-LKW (für Beladung/Verkauf), sonst null. In der Schicht der Verlader vorn (E-202). */
   get pickupTruck(): DeliveryVehicle | null {
+    if (this.schichtAn) return this.verlader;
     return this.active && this.active.isPickup ? this.active : null;
   }
 
@@ -5164,6 +5390,7 @@ export class VehicleManager {
    * bezahlt wird, was tatsaechlich abgeladen wurde.
    */
   zurWaage(): "geschickt" | "niemandDa" {
+    if (this.schichtAn) return this.zurWaageSchicht();
     if (!this.active) return "niemandDa";
     return this.active.sendAway() ? "geschickt" : "niemandDa";
   }
@@ -5175,7 +5402,8 @@ export class VehicleManager {
     const wk = this.active?.wannenKoerper();
     if (wk) out.add(wk.handle);
     // Auch die Wartenden stehen im Weg — der Arm darf nicht hindurchfahren
-    for (const v of this.parked) v.collectBodyHandles(out);
+    // (in der Schicht auch Verlader, Nachrücker, Silo-Pritsche, Abfahrende, E-202)
+    for (const v of this.alle()) if (v !== this.active) v.collectBodyHandles(out);
     if (this.mulde?.body.isValid()) out.add(this.mulde.body.handle);
     return out;
   }
@@ -5297,7 +5525,424 @@ export class VehicleManager {
     this.active.loadCargo(this.items, this.composites);
   }
 
+  /* ========================================================================
+   * DER SCHICHT-FUHRPARK (E-202, Patrick 21.10.2026)
+   *
+   * Im Sandkasten fährt EIN Laster zur Zeit am Bagger vor (`active`, E-029);
+   * wer abgeladen hat, macht Kaffeepause (`parked`). In der Schicht stehen
+   * mehrere zugleich auf dem Platz, jeder in seinem eigenen Fach:
+   *
+   *   active       der Anlieferer an der Annahme (Abladeplatz Ost, wie heute)
+   *   verlader     der Abroller quer vor dem Bagger (E-201) — zur Schicht schon da
+   *   nachruecker  der nächste Verlader, auf dem Warteplatz an der Nordmauer
+   *   siloWagen    die sortenreine Pritsche am Verladeplatz ihres Lagers
+   *   raus         wer schon abfährt (Verlader, auf dem Weg zum Tor)
+   *
+   * Vergleich: ein Bahnhof mit Gleisen. Jedes Gleis hat höchstens einen Zug;
+   * die Einfahrt (Tor und Waage) ist eingleisig — wer hinein- oder hinausfährt,
+   * belegt sie für sich (`torHalter`), alle anderen warten an ihrem Bahnsteig.
+   *
+   * Der Takt kommt NICHT von hier: Der Disponent (`schichtbetrieb.ts`) meldet
+   * fällige Fuhren nach dem Fahrplan; dieser Teil lässt sie fahren, sobald ihr
+   * Gleis frei ist, und zählt ihre Standzeit. Im Sandkasten ist `schichtAn`
+   * falsch, und keine Zeile hiervon läuft.
+   * ===================================================================== */
+
+  private schichtAn = false;
+  private schichtHaken: SchichtHaken | null = null;
+  private verlader: DeliveryVehicle | null = null;
+  private nachruecker: DeliveryVehicle | null = null;
+  private siloWagen: DeliveryVehicle | null = null;
+  private raus: DeliveryVehicle[] = [];
+  /** Der zuletzt abgefahrene Verlader — erst wenn er weg ist, rückt der nächste nach. */
+  private alterVerlader: DeliveryVehicle | null = null;
+  /** Fällige Fuhren, die noch nicht losfahren konnten (Misch an die Annahme, sortenrein ans Lager). */
+  private mischWarten: SchichtFuhre[] = [];
+  private siloWarten: SchichtFuhre[] = [];
+  /** Die Fuhre, deren Mulde abgesetzt an der Annahme steht (E-141) — ihre Standzeit läuft weiter. */
+  private muldeFuhre: SchichtFuhre | null = null;
+  /** Wer Tor und Waage gerade für sich hat (eingleisig, siehe oben). */
+  private torHalter: DeliveryVehicle | null = null;
+  private schichtVorbei = false;
+  /** Wie viele Verlader (auch Box-Abholer) schon vom Hof sind — für Messung und HUD. */
+  verladerAbfahrten = 0;
+
+  /** Alle Fahrzeuge auf dem Hof. Im Sandkasten genau `active` und die Wartenden, wie bisher. */
+  private alle(): DeliveryVehicle[] {
+    const out: DeliveryVehicle[] = [];
+    if (this.active) out.push(this.active);
+    if (this.verlader) out.push(this.verlader);
+    if (this.nachruecker) out.push(this.nachruecker);
+    if (this.siloWagen) out.push(this.siloWagen);
+    for (const v of this.raus) out.push(v);
+    for (const v of this.parked) out.push(v);
+    return out;
+  }
+
+  /** Alle Fahrzeuge auf dem Hof (für Wächter und Messung). */
+  get fahrzeuge(): readonly DeliveryVehicle[] {
+    return this.alle();
+  }
+
+  /** Läuft der Schicht-Fuhrpark? */
+  get istSchicht(): boolean {
+    return this.schichtAn;
+  }
+
+  /** Fällige Fuhren, die noch nicht an ihren Halt fahren konnten. */
+  get schichtWartend(): number {
+    return this.mischWarten.length + this.siloWarten.length;
+  }
+
+  /** Wie viele Laster gerade auf dem Hof sind (für die Messung). */
+  get lasterAufDemHof(): number {
+    return this.alle().length + (this.mulde ? 1 : 0);
+  }
+
+  /** Der Verlader vorn (am Halt oder auf dem Weg dorthin), sonst null. */
+  get schichtVerlader(): DeliveryVehicle | null {
+    return this.verlader;
+  }
+
+  /** Der Nachrücker (auf dem Weg zum oder am Warteplatz), sonst null. */
+  get schichtNachruecker(): DeliveryVehicle | null {
+    return this.nachruecker;
+  }
+
+  /** Die sortenreine Pritsche am Lager, sonst null. */
+  get schichtSiloWagen(): DeliveryVehicle | null {
+    return this.siloWagen;
+  }
+
+  /** Der Anlieferer an der Annahme, sonst null. */
+  get schichtAnlieferer(): DeliveryVehicle | null {
+    return this.active;
+  }
+
+  /**
+   * Liegt dieser Körper auf der Ladefläche eines Lasters? Für die Messung des
+   * losen Schrotts (`main.ts`): Was auf dem Verlader liegt, ist verladen, nicht
+   * „lose auf dem Platz" — sonst machte die Annahme zu, während man lädt.
+   */
+  liegtAufLaster(b: RAPIER.RigidBody): boolean {
+    for (const v of this.alle()) if (v.liegtAuf(b)) return true;
+    return false;
+  }
+
+  /**
+   * DIE SCHICHT BEGINNT: Der Verlader steht schon quer vor dem Bagger, der
+   * nächste auf dem Warteplatz an der Nordmauer. Beide werden direkt an ihren
+   * Platz gestellt (wie die Ansteher, E-131) — nie am Ursprung angelegt.
+   */
+  starteSchicht(haken: SchichtHaken): void {
+    this.schichtAn = true;
+    this.schichtHaken = haken;
+    this.schichtVorbei = false;
+    this.vollFaehrtLos = true; // E-120: voll fährt er von selbst
+    this.acceptDeliveries = true;
+    this.einfahrtWarOffen = true;
+    const order = haken.nachrueckerOrder();
+    const v = this.baueSchichtAbholer(order);
+    v.stelleAmHaltAuf(verladeplatzVorn(order));
+    this.verlader = v;
+    this.pickupOrder = order;
+    const n = this.baueSchichtAbholer(order);
+    n.stelleNachrueckerAuf(NACHRUECK_SLOT);
+    this.nachruecker = n;
+  }
+
+  /** Der Disponent meldet eine fällige Fuhre (Fahrplan, `schichtbetrieb.ts`). */
+  schichtFaellig(f: Fahrt): void {
+    if (!this.schichtAn || this.schichtVorbei) return;
+    const fuhre: SchichtFuhre = { ...f, standS: 0, amHalt: false, gemeldet: false };
+    (f.art === "sortenrein" ? this.siloWarten : this.mischWarten).push(fuhre);
+  }
+
+  /**
+   * FEIERABEND (16:00): Wer noch wartet oder steht, meldet seine Standzeit;
+   * ein beladener Verlader fährt mit dem, was er hat (gebucht wie jede
+   * Abfahrt). Danach kommt niemand mehr.
+   */
+  schichtFeierabend(): void {
+    if (!this.schichtAn || this.schichtVorbei) return;
+    this.schichtVorbei = true;
+    const v = this.verlader;
+    if (v && v.waitingForLoad && v.ladeflaecheKg() >= 1 && v.sendAway()) this.pruefeVerladerAbfahrt();
+    for (const f of [...this.mischWarten, ...this.siloWarten]) this.meldeStandzeit(f);
+    this.mischWarten.length = 0;
+    this.siloWarten.length = 0;
+    for (const w of [this.active, this.siloWagen]) if (w?.schichtFuhre) this.meldeStandzeit(w.schichtFuhre);
+    if (this.muldeFuhre) this.meldeStandzeit(this.muldeFuhre);
+  }
+
+  /** Ein Abholer für die Schicht: Aufbau nach Bestellung (E-177), fester Halt vorn, kein Nachfahren. */
+  private baueSchichtAbholer(order: string): DeliveryVehicle {
+    const aufbau = this.schichtHaken!.aufbauFuer(order);
+    const wagen = this.baueWagen(aufbau === "absetzer" ? "absetzer" : "abholer", null, null, true);
+    wagen.bestellung = order;
+    this.verdrahteAbholer(wagen);
+    wagen.vollFaehrtLos = true;
+    wagen.zumBagger = false; // er hält vorn, egal wo der Bagger steht
+    wagen.festerPlatz = verladeplatzVorn(order);
+    wagen.ausfahrtFrei = () => this.torFuer(wagen);
+    wagen.loadCargo(this.items, this.composites);
+    return wagen;
+  }
+
+  /**
+   * ZUR WAAGE in der Schicht (E-202): Steht der Bagger am Lager (oder ist an
+   * der Annahme niemand), ist die Silo-Pritsche gemeint, sonst der Anlieferer
+   * an der Annahme. Den Verlader schickt die Hupe bzw. ABHOLEN.
+   */
+  private zurWaageSchicht(): "geschickt" | "niemandDa" {
+    const silo = this.siloWagen;
+    const wer = silo && (this.baggerAmLager() || !this.active) ? silo : this.active;
+    if (!wer) return "niemandDa";
+    return wer.sendAway() ? "geschickt" : "niemandDa";
+  }
+
+  /** Steht der Bagger am Baggerstand des Lagers, an dem die Silo-Pritsche hält? */
+  private baggerAmLager(): boolean {
+    const p = this.siloWagen?.festerPlatz;
+    const ex = this.getExcavatorPos?.();
+    return !!p && !!ex && Math.hypot(ex.x - p.stand.x, ex.z - p.stand.z) <= BAGGER_AM_LAGER_M;
+  }
+
+  /* ----------------------------------------- Tor und Waage: eingleisig --- */
+
+  /** Ist der Torabschnitt in der Hand von `h` noch gebraucht? Sonst freigeben. */
+  private pruefeTor(): void {
+    const h = this.torHalter;
+    if (!h) return;
+    if (h.done || !this.alle().includes(h)) {
+      this.torHalter = null;
+      return;
+    }
+    const ph = h.phaseName;
+    if (ph === "out" || ph === "ausfaedeln") return; // hinaus: bis er vom Hof ist
+    if (ph === "settleCargo" || ph === "in" || ph === "weighIn") return; // herein: bis er von der Waage weg ist
+    const p = h.group.position;
+    if (p.x > -34 && p.x < -8 && p.z > 6 && p.z < 45) return; // noch im Torabschnitt (wie `torBelegt`)
+    this.torHalter = null;
+  }
+
+  /** Darf `v` Richtung Tor? Ja, wenn er den Abschnitt hat oder er frei ist — dann gehört er ihm. */
+  private torFuer(v: DeliveryVehicle): boolean {
+    this.pruefeTor();
+    if (this.torHalter === v) return true;
+    if (this.torHalter || this.torBelegt(v)) return false;
+    this.torHalter = v;
+    return true;
+  }
+
+  /** Darf ein Neuer durchs Tor herein? */
+  private torFrei(): boolean {
+    this.pruefeTor();
+    return !this.torHalter && !this.torBelegt();
+  }
+
+  /* ------------------------------------------------------- Standzeit --- */
+
+  private meldeStandzeit(f: SchichtFuhre): void {
+    if (f.gemeldet) return;
+    f.gemeldet = true;
+    this.schichtHaken?.onStandzeit({ standzeitS: f.standS, fahrzeug: f.fahrzeug });
+  }
+
+  /** Steht er am Halt, läuft die Uhr; hat er ihn verlassen, wird einmal gemeldet. */
+  private zaehleStand(v: DeliveryVehicle | null, dt: number): void {
+    const f = v?.schichtFuhre;
+    if (!v || !f || f.gemeldet) return;
+    if (v.amHalt) {
+      f.standS += dt;
+      f.amHalt = true;
+    } else if (f.amHalt) {
+      this.meldeStandzeit(f);
+    }
+  }
+
+  /* --------------------------------------------------------- Abfahrten --- */
+
+  /** Ist der Verlader eben losgefahren? Dann buchen und ab auf die Ausfahrt. */
+  private pruefeVerladerAbfahrt(): void {
+    const v = this.verlader;
+    if (!v || !v.consumeDeparted()) return;
+    const teile: KassenTeil[] = v.containedItems(this.items).map(kassenTeilAus);
+    this.verladerAbfahrten++;
+    this.schichtHaken?.onVerladerAbfahrt({ order: v.bestellung, teile });
+    this.raus.push(v);
+    this.alterVerlader = v;
+    this.verlader = null;
+  }
+
+  /** Ist der Platz vorn frei für den Nachrücker? Erst wenn der alte ein Stück weg ist. */
+  private vornFrei(): boolean {
+    const a = this.alterVerlader;
+    if (!a || a.done || !this.raus.includes(a)) return true;
+    return Math.hypot(a.group.position.x - VERLADER_VORN.x, a.group.position.z - VERLADER_VORN.z) >= NACHRUECK_ABSTAND_M;
+  }
+
+  /* ---------------------------------------------------------- Einfahren --- */
+
+  /** Gemeinsames für jeden Schicht-Anlieferer: Standzeit, Tor. */
+  private schichtAnmelden(v: DeliveryVehicle, f: SchichtFuhre | null): void {
+    v.schichtFuhre = f;
+    v.ausfahrtFrei = () => this.torFuer(v);
+    v.amVerladerVorbei = true; // von der Annahme um den Verlader herum zum Tor
+    // Setzt er die Mulde ab (E-141), läuft seine Standzeit an der Mulde weiter
+    const abgesetzt = v.onMuldeAbgesetzt;
+    v.onMuldeAbgesetzt = (m) => {
+      abgesetzt?.(m);
+      if (v.schichtFuhre) {
+        this.muldeFuhre = v.schichtFuhre;
+        v.schichtFuhre = null;
+      }
+    };
+    this.torHalter = v;
+  }
+
+  /** Eine Misch-Fuhre an die Annahme — Kundschaft wie heute, Fahrzeug nach Fahrplan. */
+  private schichtAnliefern(f: SchichtFuhre): void {
+    const kunde = rollSchichtKunde(f.fahrzeug);
+    const v = this.baueWagen(f.fahrzeug, kunde);
+    if (f.fahrzeug === "absetzer") {
+      v.absetzModus = !this.mulde && Math.random() < ABSETZEN_ANTEIL ? "absetzen" : "kippen";
+    }
+    v.bestellung = null;
+    this.active = v;
+    this.schichtAnmelden(v, f);
+    this.onCustomerArrived?.(kunde);
+    v.loadCargo(this.items, this.composites);
+    this.deliveries++;
+  }
+
+  /**
+   * Die sortenreine Pritsche ans Lager ihrer Sorte (Patrick 21.10.2026: „du
+   * fährst hin"): Halt am Verladeplatz des Lagersilos — dieselben geprüften
+   * Strecken wie die Abholer an den Silos (`abholPlatzFuer`, E-063/E-140).
+   */
+  private schichtSiloAnliefern(f: SchichtFuhre): void {
+    const sorte = f.sorte ?? "copper";
+    const kunde = rollSchichtKunde("pritsche", sorte);
+    const v = this.baueWagen("pritsche", kunde);
+    v.bestellung = null;
+    v.festerPlatz = abholPlatzFuer(sorte);
+    this.siloWagen = v;
+    this.schichtAnmelden(v, f);
+    const lager = v.festerPlatz.ziel?.label ?? "Lager";
+    const angekommen = v.onAngekommen;
+    v.onAngekommen = () => {
+      angekommen?.();
+      this.onMeldung?.(
+        `Büro an Bagger: ${v.fahrzeugName} mit ${getMaterial(sorte).name} wartet am ${lager} — fahr hin und lad ab.`
+      );
+    };
+    this.onCustomerArrived?.(kunde);
+    v.loadCargo(this.items, this.composites);
+    this.deliveries++;
+  }
+
+  /** Der nächste Verlader fährt durchs Tor auf den Warteplatz an der Nordmauer. */
+  private schichtNachrueckerRufen(): void {
+    const n = this.baueSchichtAbholer(this.schichtHaken!.nachrueckerOrder());
+    n.warteplatzZiel = NACHRUECK_SLOT;
+    this.nachruecker = n;
+    this.torHalter = n;
+  }
+
+  /** Ein Bild des Schicht-Fuhrparks. */
+  private updateSchicht(dt: number): void {
+    this.t += dt;
+    this.uhr += dt;
+    this.pruefeMulde(dt);
+    // Annahme voll / wieder frei — dieselbe Ansage wie im Sandkasten (E-192)
+    if (this.acceptDeliveries !== this.einfahrtWarOffen) {
+      this.einfahrtWarOffen = this.acceptDeliveries;
+      this.onMeldung?.(
+        this.acceptDeliveries
+          ? "Büro an Bagger: Platz wieder frei — die nächste Fuhre kommt."
+          : "Büro an Bagger: Der Platz ist voll — neue Fuhren warten am Tor, bis aufgeräumt ist."
+      );
+    }
+    // Wer am Tor wartet, wartet auf Kosten des Platzes
+    for (const f of this.mischWarten) f.standS += dt;
+    for (const f of this.siloWarten) f.standS += dt;
+    if (this.muldeFuhre && this.mulde) this.muldeFuhre.standS += dt;
+
+    for (const v of this.alle()) v.update(dt);
+    this.zaehleStand(this.active, dt);
+    this.zaehleStand(this.siloWagen, dt);
+    this.pruefeVerladerAbfahrt();
+
+    // Wer vom Hof ist, verschwindet
+    for (let i = this.raus.length - 1; i >= 0; i--) {
+      const v = this.raus[i]!;
+      if (!v.done) continue;
+      v.despawn();
+      this.raus.splice(i, 1);
+      if (this.alterVerlader === v) this.alterVerlader = null;
+    }
+    if (this.active?.done) {
+      if (this.active.schichtFuhre) this.meldeStandzeit(this.active.schichtFuhre);
+      this.active.despawn();
+      this.active = null;
+    }
+    if (this.siloWagen?.done) {
+      if (this.siloWagen.schichtFuhre) this.meldeStandzeit(this.siloWagen.schichtFuhre);
+      this.siloWagen.despawn();
+      this.siloWagen = null;
+    }
+    if (this.schichtVorbei) return;
+
+    // Der Nachrücker rückt vor, sobald vorn frei ist (Box voll → er holt die Box)
+    const n = this.nachruecker;
+    if (!this.verlader && n?.wartetAufRuf && this.vornFrei()) {
+      /*
+       * Für welche Sorte er kommt, steht erst jetzt fest — nicht beim Losschicken
+       * (gemessen, Mittwoch: Ein zweiter BUNT-Abholer kam für 0,35 t, weil der
+       * erste die Box inzwischen geleert hatte). Der Wagen bleibt, wie er
+       * gerufen wurde; ein Abroller nimmt jede Sorte, die Absetzmulde auch Misch.
+       */
+      n.bestellung = this.schichtHaken!.nachrueckerOrder();
+      n.rueckeVorAn(verladeplatzVorn(n.bestellung), verladerVomWarteplatz());
+      this.verlader = n;
+      this.nachruecker = null;
+      this.pickupOrder = n.bestellung;
+      this.onMeldung?.(
+        `Büro an Bagger: ${this.abholAngebot(n.bestellung, n.kind === "absetzer" ? "absetzer" : "abroller").fahrzeug} für ${abholWas(n.bestellung)} ist unterwegs.`
+      );
+    }
+
+    // Durchs Tor: erst die Mulde holen, dann der Nachrücker, dann wer am längsten wartet
+    if (!this.torFrei()) return;
+    if (this.mulde && !this.active) {
+      if (this.muldeAbholbereit()) {
+        this.holeMulde();
+        const f = this.muldeFuhre;
+        if (f) f.amHalt = false; // die Fahrt herein zählt nicht
+        this.schichtAnmelden(this.active!, f);
+        this.muldeFuhre = null;
+        return;
+      }
+    }
+    if (!this.nachruecker) {
+      this.schichtNachrueckerRufen();
+      return;
+    }
+    const misch = !this.active && !this.mulde && this.acceptDeliveries ? this.mischWarten[0] : undefined;
+    const silo = !this.siloWagen ? this.siloWarten[0] : undefined;
+    if (silo && (!misch || silo.tS <= misch.tS)) {
+      this.schichtSiloAnliefern(this.siloWarten.shift()!);
+    } else if (misch) {
+      this.schichtAnliefern(this.mischWarten.shift()!);
+    }
+  }
+
   update(dt: number): void {
+    if (this.schichtAn) {
+      this.updateSchicht(dt);
+      return;
+    }
     this.t += dt;
     this.uhr += dt;
     this.pruefeMulde(dt);

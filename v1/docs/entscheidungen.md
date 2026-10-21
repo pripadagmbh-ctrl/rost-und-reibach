@@ -10,6 +10,8 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-202 | 21.10.2026 | Schicht-Fahrplan, Verlader mit Nachrücker, Box-Abholer, Silo-Pritsche, Standzeit | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
+| E-201 | 21.10.2026 | Schicht-Platz: Verlader quer vorn, rechte Halde wird MÜLL | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-203 | 21.10.2026 | Schicht-Kasse mit festen Preisen, Bilanz, Sterne und Schicht-Uhr | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-196 | 21.10.2026 | Lehrgang Etappe 1: Vorführung im Spiel, dann nachmachen; Lektionen 1–3 | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-195 | 21.10.2026 | Bestenliste auf dem Gerät: beste 5 je Aufgabe, drei Sandkasten-Rekorde | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -211,6 +213,17 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Geisterdaumen folgen dem Bagger; Finger-Geist für Kamera-Gesten; „ANSICHT: 2× tippen“?
 - Lektion 3 Schritt 5: grüner Ring links am Boden, zwei Geisterdaumen?
 - Menü iPhone mini ohne Scrollen, Texte ohne „…“?
+**E-202 — Schicht-Fahrplan, Verlader, Nachrücker, Silo-Pritsche** (iPad; erst nach der Verdrahtung in `main.ts` und der Schicht-Wahl im Menü)
+- Schicht Montag: um 06:00 Abroller quer vor dir und ein zweiter an der Nordmauer? Erster Kipper kippt an der Annahme?
+- Misch auf den Verlader bis voll: fährt er los, steht der nächste nach rund 25 s vor dir, und kommt der Kipper sauber an ihm vorbei zum Tor?
+- STAHL-Halde voll: kommt als nächster Verlader einer „für Stahlschrott"? Leerer Verlader auf die Hupe: bleibt er stehen?
+- Mittwoch: Pritsche am Lager gemeldet — hinfahren, ins Silo laden, fährt sie leer weg? Ladekran von dir weg?
+
+**E-201 — Schicht-Platz „Kreis in der Ecke"** (iPad; erst nach der Verdrahtung in `main.ts`)
+- Schicht starten: Platz leer — kein Haufen, keine Autos, kein blauer Müll-Container, keine wartenden Laster?
+- ABHOLEN „gemischt": Abroller setzt quer vor dir zurück — alle vier Ecken der Ladefläche ohne Fahren erreichbar?
+- Holzbrett in die rechte Halde hinter dir: Schild „MÜLL", und es zählt dort?
+
 **E-203 — Schicht-Kasse und Schicht-Uhr** (iPad; erst sichtbar nach der Verdrahtung S2 und der Tafel)
 - Schicht Montag: Uhr 06:00, um 15:00 keine neue Fuhre, um 16:00 die Tafel — nach rund 10 Minuten?
 - Kupfer auf den Misch-Verlader, Kupfer in BUNT: zeigt die Tafel den Unterschied?

@@ -35,18 +35,13 @@ export const START_TIME = 0.28;
  * Zeit. Der Sandkasten ruft `schichtTag()` nie auf und rechnet bitgleich wie
  * vorher (`dt / 900`, Start 0,28 — Waechter in `test/schichtuhr.test.ts`).
  */
-/** Länge eines Schicht-Tages in Sekunden: 24 Spielstunden zu je 60 s (siehe oben). */
-export const SCHICHT_TAG_S = 1440;
-/** Schichtbeginn 06:00 = 6/24 Tag. */
-export const SCHICHT_START = 6 / 24;
-/**
- * Torschluss 15:00 = 15/24 Tag — ab hier kommt keine neue Fuhre mehr (wie
- * `shift.TORSCHLUSS_TIME` im Sandkasten, E-113). Bei 60 s je Spielstunde nach
- * 9 x 60 = 540 s Schicht; die letzte Stunde gehoert dem Abarbeiten.
+/*
+ * Die Zahlen selbst stehen seit E-202 in `world/schichtzeit.ts` (ohne three.js,
+ * damit der Fahrplan sie lesen kann) und werden hier weitergereicht — es bleibt
+ * eine Stelle.
  */
-export const SCHICHT_TORSCHLUSS = 15 / 24;
-/** Feierabend 16:00 = 16/24 Tag, nach (16 − 6) x 60 = 600 s Schicht. */
-export const SCHICHT_FEIERABEND = 16 / 24;
+import { SCHICHT_TAG_S, SCHICHT_START } from "./schichtzeit";
+export { SCHICHT_TAG_S, SCHICHT_START, SCHICHT_TORSCHLUSS, SCHICHT_FEIERABEND } from "./schichtzeit";
 
 /** Farben für Himmel und Sonne über den Tag */
 const SKY_NIGHT = new THREE.Color(0x151b26);
