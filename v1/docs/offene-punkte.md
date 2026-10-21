@@ -554,6 +554,31 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Vorschläge 21.10.2026: Intro und Spielprinzip** — Patrick (Sprachnachricht,
+      sinngemäß wörtlich): ausführliches Intro zu allen Funktionen (Perspektivwechsel,
+      Stützen, Pressen und was sonst verfügbar ist) mit Erklärung, gern mit
+      Beispielvideo vorweg; so sollen die ersten Challenges aufgebaut sein. Kein
+      reines Sandkastenspiel mehr: sehr viele Fuhren, viel Schrott umschlagen,
+      Schnelligkeit und Präzision, Sortierskills; fast alles kommt als Mischschrott,
+      sortenreine Lieferungen weiter zu den einzelnen Mulden (dort hinfahren);
+      Stahl und Buntmetalle aus dem Misch herausfischen; zeitkritisch wieder
+      verladen; offen, ob der Verlade-LKW gerufen werden muss oder von selbst
+      kommt; Kasse gern wieder einbauen, aber Handelskonzept außen vor — nur Baggern.
+      Bitte Platzgestaltung mit überarbeiten und mehr Vorschläge machen.
+
+      | # | Punkt |
+      |---|---|
+      | 37a | Ausführliches Intro zu allen Funktionen, mit Erklärung |
+      | 37b | Vorab-Beispielvideo je Funktion, wenn möglich |
+      | 37c | Erste Challenges nach diesem Intro aufbauen |
+      | 38a | Kein reines Sandkasten-Spiel: viele Fuhren, viel umschlagen |
+      | 38b | Schnelligkeit, Präzision, Sortierskills zählen |
+      | 38c | Fast alles kommt als Mischschrott, sortenreine weiter zu den Mulden |
+      | 38d | Stahl/Buntmetalle aus dem Misch fischen, zeitkritisch verladen |
+      | 38e | Verlade-LKW: rufen oder kommt von selbst? |
+      | 38f | Kasse ja, Handelskonzept nein |
+      | 38g | Platzgestaltung dazu überarbeiten, weitere Vorschläge |
+
 - [ ] **Ansage 21.10.2026** — Patrick, wörtlich: „High Score Board Konzept und pay
       to win Konzept vorschlagen". Antworten nach Vorschlag: Bestenliste in 1.0
       „eigene auf dem Gerät" (Top 5 je Aufgabe + Sandkasten-Rekorde), Game Center
