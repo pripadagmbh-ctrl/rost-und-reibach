@@ -42,7 +42,7 @@ Unter `.claude/agents/`: `orchestrator` (Bauleiter), `bagger` (excavator/, physi
 
 ## Veröffentlichen
 
-GitHub Pages, ein Workflow, drei Ziele: Root-URL = `prototype/` (unverändert), `/v2/` = Archiv, **`/v1/` = Arbeitsstand**. Live-URL für Gerätetests: `pripadagmbh-ctrl.github.io/schrottplatz-app/v1/`. Push auf `main` nur nach Patricks Freigabe.
+GitHub Pages, ein Workflow, drei Ziele: Root-URL = `prototype/` (unverändert), `/v2/` = Archiv, **`/v1/` = Arbeitsstand**. Live-URL für Gerätetests: `pripadagmbh-ctrl.github.io/rost-und-reibach/v1/`. Push auf `main` nur nach Patricks Freigabe.
 
 ## Starten
 
