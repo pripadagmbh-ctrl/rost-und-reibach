@@ -1602,6 +1602,7 @@ export class CarComposite {
       teil: d.id,
       name: d.name,
       massKg: d.massKg,
+      rest: this.teileDran.length, // E-195: 0 = ausgeweidet (Sandkasten-Rekord)
       x: worldPos.x,
       y: worldPos.y,
       z: worldPos.z,

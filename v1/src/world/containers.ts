@@ -2298,6 +2298,7 @@ export class ContainerManager {
           materialId: item.materialId,
           containerId: to,
           correct: gehoertHierhin(c.cfg, item.materialId),
+          massKg: item.massKg, // E-195: Sandkasten-Rekorde (sortierte Tonnen)
         });
       }
     }

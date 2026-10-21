@@ -79,6 +79,7 @@ export const EN: Record<string, string> = {
   "Musik an/aus": "Music on/off",
   Radio: "Radio",
   Lautstärke: "Volume",
+  Bestenliste: "Leaderboard", // E-195: Pausenknopf
   Speichern: "Save",
   "Stand laden": "Load game",
   "Zum Hauptmenü": "Main menu",

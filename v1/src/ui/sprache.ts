@@ -20,6 +20,7 @@
  * übersetzt, `onSprache(cb)` meldet den Wechsel im Pausenmenü.
  */
 import { EN, MUSTER } from "./texte_en";
+import { setzeSprachquelle } from "../challenges/texte";
 
 export type Sprache = "de" | "en";
 
@@ -47,6 +48,12 @@ function startSprache(): Sprache {
 }
 
 let aktuell: Sprache = startSprache();
+/*
+ * EINE Sprachwahl (E-195): Die Aufgaben-Texte (`challenges/texte.ts` — Menü,
+ * Karte, Tafel, Bestenliste) fragten bis hier die Gerätesprache und blieben
+ * nach „Sprache: English" deutsch. Jetzt fragen sie diese Stelle.
+ */
+setzeSprachquelle(() => aktuell);
 const hoerer: Array<(s: Sprache) => void> = [];
 
 export function sprache(): Sprache {

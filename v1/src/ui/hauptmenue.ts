@@ -22,7 +22,9 @@ import { CHALLENGES } from "../challenges/katalog";
 import { sprache, waehle } from "../challenges/texte";
 import { leseChallenges, type ChallengeStand } from "../core/save";
 import { CHALLENGES_PAUSIERT } from "../core/spielart";
-import { sterneText, wort } from "./aufgabentexte";
+import { sterneText, uhrGenau, wort } from "./aufgabentexte";
+import { leseBestenliste } from "../core/bestenliste";
+import { installBestenliste } from "./bestenliste";
 import { FIRMA } from "../world/werbung";
 
 export type Spielwahl = { art: "sandkasten" } | { art: "challenge"; id: string };
@@ -81,6 +83,8 @@ function beschrifte(b: HTMLElement, kopf: string, klein: string): void {
 
 /** Menü zeigen und auf die Wahl warten — oder gleich in eine Aufgabe. */
 export function waehleSpielart(): Promise<Spielwahl> {
+  // E-195: Bestenliste aus Haupt- und Pausenmenue — vor jedem Rueckweg, damit der Pausenknopf immer haengt
+  installBestenliste();
   // Pausiert (E-129): kein Menue, keine Aufgabe — direkt in den Sandkasten.
   if (CHALLENGES_PAUSIERT) return Promise.resolve({ art: "sandkasten" });
   const stand = leseChallenges();
@@ -94,9 +98,12 @@ export function waehleSpielart(): Promise<Spielwahl> {
   el.querySelector("h1")!.textContent = FIRMA;
   const liste = document.getElementById("hm-challenges")!;
   const sandkasten = document.getElementById("hm-sandkasten")!;
+  const bestenKnopf = document.getElementById("hm-bestenliste");
+  if (bestenKnopf) bestenKnopf.textContent = wort("bestenliste", s);
+  const besten = leseBestenliste();
   // Diese Knöpfe beschriftet das Menü selbst in der gewählten Sprache —
   // die Seitenübersetzung (`ui/sprache.ts`) lässt sie darum aus.
-  for (const k of [sandkasten, liste]) k.setAttribute("translate", "no");
+  for (const k of [sandkasten, liste, bestenKnopf]) k?.setAttribute("translate", "no");
   beschrifte(sandkasten, wort("sandkasten", s), wort("sandkastenText", s));
   el.classList.add("open");
   return new Promise((fertig) => {
@@ -108,10 +115,14 @@ export function waehleSpielart(): Promise<Spielwahl> {
     CHALLENGES.forEach((c, i) => {
       const b = document.createElement("button");
       const sterne = stand[c.id]?.sterne ?? 0;
+      // E-195: Bestzeit = Zeit des besten Laufs (erst Sterne, dann Zeit)
+      const best = besten.aufgaben[c.id]?.[0];
+      // geschuetzte Leerzeichen: „· Bestzeit 1:23,45" bricht nicht auseinander
+      const bestzeit = best ? `\u00a0· ${wort("bestzeit", s)}\u00a0${uhrGenau(best.zeitHs, s)}` : "";
       const frei = aufgabeFrei(i, ids, stand);
       const kopf = `${frei ? "" : "🔒 "}${wort("aufgabe", s)} ${i + 1} · ${waehle(c.name, s)}`;
       const klein = frei
-        ? `${waehle(c.beschreibung, s)} ${sterne > 0 ? sterneText(sterne, s) : wort("nochNicht", s)}`
+        ? `${waehle(c.beschreibung, s)} ${sterne > 0 ? sterneText(sterne, s) : wort("nochNicht", s)}${bestzeit}`
         : `🔒 ${wort("gesperrt", s).replace("{n}", String(i))}`;
       beschrifte(b, kopf, klein);
       b.disabled = !frei;

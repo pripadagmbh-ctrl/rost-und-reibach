@@ -611,6 +611,12 @@
       }
       #pause h1, #pause .hint, #pause .grund { grid-column: 1 / -1; }
       #pause .panel button { margin: 0; }
+      /* E-195: Mit BESTENLISTE sind es im Sandkasten 15 Knoepfe — zweispaltig
+         acht Reihen, rund 685 px bei 676 px Feld (iPad quer 768 px hoch).
+         Breite Bildschirme stehen darum dreispaltig wie das Telefon quer. */
+      @media (min-width: 900px) {
+        #pause .panel { grid-template-columns: repeat(3, 1fr); min-width: min(820px, 90vw); }
+      }
       /* E-171: Datenschutz/Lizenzen/Support — ganze Flaeche, Zurueck oben links */
       #seite {
         display: none; position: fixed; inset: 0; z-index: 24; background: #1a1c1e;
@@ -956,6 +962,49 @@
       }
       #hauptmenue button:hover:not(:disabled) small { color: #3a3020; }
       #hauptmenue button:disabled { opacity: 0.45; cursor: default; }
+      /* --- Bestenliste (E-195) ---
+         Deckt alles ab (ueber Pausen- und Hauptmenue), Zurueck oben links.
+         Kein Scrollen: Uebersicht = Karten je Aufgabe + Sandkasten-Rekorde,
+         die besten 5 erst nach Tipp auf eine Karte. Schrift 16 px, auf dem
+         Telefon quer 14 px (Untergrenze Kap. 20). */
+      #bestenliste {
+        display: none; position: fixed; inset: 0; z-index: 32; background: #1a1c1e;
+        flex-direction: column; box-sizing: border-box; touch-action: none;
+        padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
+        color: #e8e8e4; font: 16px "Consolas", monospace;
+      }
+      #bestenliste.open { display: flex; }
+      #bestenliste .kopf { display: flex; align-items: center; gap: 14px; padding: 8px 12px; }
+      #bestenliste h2 { margin: 0; font-size: 19px; letter-spacing: 3px; color: #f0b429; }
+      #bestenliste button {
+        min-height: 44px; padding: 8px 14px; cursor: pointer; touch-action: none;
+        background: rgba(46,52,57,0.95); color: #e8e8e4; font: 700 16px "Consolas", monospace;
+        border: 2px solid rgba(255,255,255,0.22); border-radius: 9px; text-align: left;
+      }
+      #bestenliste button:hover, #bestenliste button:active { background: rgba(240,180,41,0.75); color: #1a1c1e; }
+      #bl-inhalt { padding: 0 12px 12px; }
+      #bestenliste .bl-karten, #bestenliste .bl-rekorde {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      }
+      #bestenliste .bl-karte { line-height: 1.35; }
+      #bestenliste small { font-size: inherit; }
+      #bestenliste .bl-karte small { display: block; font-weight: 400; color: #c8ced2; }
+      #bestenliste h3 { margin: 12px 0 6px; font-size: 16px; letter-spacing: 2px; color: #9aa2a8; }
+      #bestenliste .bl-rekord {
+        padding: 6px 10px; line-height: 1.35; border-radius: 9px; background: rgba(46,52,57,0.55);
+      }
+      #bestenliste .bl-rekord b, #bestenliste .bl-rekord small { display: block; }
+      #bestenliste .bl-rekord small { color: #9aa2a8; }
+      #bestenliste table { border-collapse: collapse; }
+      #bestenliste th, #bestenliste td { padding: 4px 10px; line-height: 1.35; text-align: left; white-space: nowrap; }
+      #bestenliste th { color: #9aa2a8; font-weight: 400; border-bottom: 1px solid rgba(255,255,255,0.15); }
+      #bestenliste tr:nth-child(2) td { color: #f0b429; font-weight: 700; }
+      @media (max-height: 430px) {
+        #bestenliste, #bestenliste button, #bestenliste h3 { font-size: 14px; }
+        #bestenliste h2 { font-size: 15px; letter-spacing: 2px; }
+        #bestenliste .kopf { padding: 6px 12px; }
+        #bestenliste th, #bestenliste td { padding: 3px 8px; }
+      }
       /* --- Dialoge: Abholung bestellen, Verhandeln, Platz ausbauen ---
          Ein gemeinsamer Stil für alle drei. Sie waren zuvor ohne jede Regel
          im Dokument und wurden dadurch unsichtbar hinter dem Bild gerendert:
@@ -1289,6 +1338,8 @@
         <button id="pause-music">Musik an/aus</button>
         <button id="pause-radio">Radio</button>
         <button id="pause-ton">Lautstärke</button>
+        <!-- E-195: ui/bestenliste.ts haengt den Klick an -->
+        <button id="pause-bestenliste">Bestenliste</button>
         <button id="pause-save">Speichern</button>
         <button id="pause-load">Stand laden</button>
         <button id="pause-new">Neues Spiel</button>
@@ -1421,8 +1472,15 @@
         <h1></h1>
         <p class="sub">Bagger-Simulator</p>
         <button id="hm-sandkasten">SANDKASTEN<small>Der Platz voller Schrott und Wracks. Ohne Ziel, ohne Uhr — zum Üben und Kaputtmachen.</small></button>
+        <!-- E-195: beschriftet von ui/hauptmenue.ts, oeffnet ui/bestenliste.ts -->
+        <button id="hm-bestenliste" translate="no">BESTENLISTE</button>
         <div id="hm-challenges"></div>
       </div>
+    </div>
+    <!-- E-195: Bestenliste — ganze Flaeche, alle Texte setzt ui/bestenliste.ts -->
+    <div id="bestenliste" translate="no">
+      <div class="kopf"><button id="bl-zurueck"></button><h2 id="bl-titel"></h2></div>
+      <div id="bl-inhalt"></div>
     </div>
     <div id="loading">Lade Physik …</div>
     <script type="module" src="/src/main.ts"></script>

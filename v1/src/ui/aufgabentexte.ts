@@ -54,6 +54,22 @@ export const WORTE = {
     en: "The yard full of scrap and wrecks. No goal, no clock — for practice and smashing things.",
   },
   geschafftOhneSchwelle: { de: "geschafft", en: "completed" },
+  // --- Bestenliste (E-195)
+  bestenliste: { de: "BESTENLISTE", en: "LEADERBOARD" },
+  zurueck: { de: "Zurück", en: "Back" },
+  rang: { de: "Bestenliste", en: "Leaderboard" },
+  neuerRekord: { de: "Neuer Rekord!", en: "New record!" },
+  platzVon: { de: "Platz {n} von 5", en: "Rank {n} of 5" },
+  nichtPlatziert: { de: "nicht unter den besten 5", en: "not in the top 5" },
+  keinLauf: { de: "noch kein Lauf", en: "no run yet" },
+  bestzeit: { de: "Bestzeit", en: "Best time" },
+  spaltePlatz: { de: "Platz", en: "Rank" },
+  spalteSterne: { de: "Sterne", en: "Stars" },
+  spalteDatum: { de: "Datum", en: "Date" },
+  sandkastenRekorde: { de: "SANDKASTEN-REKORDE", en: "SANDBOX RECORDS" },
+  rekordSortiert: { de: "Sortiert in einer Sitzung", en: "Sorted in one session" },
+  rekordQuote: { de: "Sortierquote ab {t} t", en: "Sorting accuracy from {t} t" },
+  rekordWrack: { de: "Schnellstes Wrack ausgeweidet", en: "Fastest wreck stripped" },
 } satisfies Record<string, Zweisprachig>;
 
 export type Wort = keyof typeof WORTE;
@@ -69,6 +85,12 @@ export function uhr(s: number): string {
   return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`;
 }
 
+/** Stoppuhr mit Hundertsteln: „1:23,45" (Englisch „1:23.45") — fuer die Bestenliste (E-195). */
+export function uhrGenau(hs: number, s: Sprache): string {
+  const r = Math.max(0, Math.round(hs));
+  return `${uhr(r / 100)}${s === "de" ? "," : "."}${String(r % 100).padStart(2, "0")}`;
+}
+
 /** Die Messgroessen in fester Reihenfolge: so stehen sie auf Karte und Tafel. */
 export const MESSGROESSEN = [
   "zeitS",
@@ -79,6 +101,27 @@ export const MESSGROESSEN = [
   "fremdteile",
 ] as const satisfies ReadonlyArray<keyof ChallengeMessung>;
 export type Messgroesse = (typeof MESSGROESSEN)[number];
+
+/**
+ * Je Messgroesse ein Name und eine Schreibweise (E-125, neue Groessen mit
+ * E-162) — Tafel und Bestenliste (E-195). `wort` steht nur hinter dem eigenen
+ * Wert, nicht hinter der Schwelle — sonst wird die Zeile zu breit fuers iPhone mini.
+ */
+export const KRITERIEN: Record<
+  Messgroesse,
+  { name: Zweisprachig; zahl: (v: number) => string; wort?: Zweisprachig }
+> = {
+  zeitS: { name: { de: "Zeit", en: "Time" }, zahl: (v) => `${uhr(v)} min` },
+  fehlwuerfe: { name: { de: "Fehlwürfe", en: "Misses" }, zahl: (v) => String(Math.round(v)) },
+  praezisionCm: {
+    name: { de: "Präzision", en: "Precision" },
+    zahl: (v) => `${Math.round(v)} cm`,
+    wort: { de: " daneben", en: " off" },
+  },
+  harteAufschlaege: { name: { de: "Harte Aufschläge", en: "Hard drops" }, zahl: (v) => String(Math.round(v)) },
+  ueberlasten: { name: { de: "Überlast", en: "Overloads" }, zahl: (v) => String(Math.round(v)) },
+  fremdteile: { name: { de: "Fremdteile", en: "Wrong parts" }, zahl: (v) => String(Math.round(v)) },
+};
 
 /** Zaehlwort mit Einzahl/Mehrzahl in beiden Sprachen. */
 const ZAEHL: Record<Exclude<Messgroesse, "zeitS" | "praezisionCm">, { null: Zweisprachig; eins: Zweisprachig; viele: Zweisprachig }> = {

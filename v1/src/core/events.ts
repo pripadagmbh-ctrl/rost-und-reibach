@@ -23,7 +23,14 @@ export interface GameEvents {
    */
   "bagger:hupe": Record<string, never>;
   /** Ein Item ist in einen Container gefallen (per Zonen-Zählung erkannt) */
-  itemEntered: { itemId: string; materialId: string; containerId: string; correct: boolean };
+  itemEntered: {
+    itemId: string;
+    materialId: string;
+    containerId: string;
+    correct: boolean;
+    /** E-195: Masse des Teils (kg) — fuer die Sandkasten-Rekorde (sortierte Tonnen); optional, weil Wächter-Tests es ohne senden */
+    massKg?: number;
+  };
   /** Ein Item wurde aus einem Container entfernt (Nachsortieren) */
   itemLeft: { itemId: string; containerId: string };
   /** Greifer hat zugepackt */
@@ -52,6 +59,8 @@ export interface GameEvents {
     teil: string;
     name: string;
     massKg: number;
+    /** E-195: bei "ab" — wie viele Teile danach noch dran sind (0 = ausgeweidet, Sandkasten-Rekord) */
+    rest?: number;
     x: number;
     y: number;
     z: number;

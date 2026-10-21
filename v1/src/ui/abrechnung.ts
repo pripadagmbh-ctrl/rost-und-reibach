@@ -32,7 +32,8 @@ import { CHALLENGES } from "../challenges/katalog";
 import { sprache, waehle, type Sprache } from "../challenges/texte";
 import { leseChallenges } from "../core/save";
 import { naechsteFreieAufgabe, nochmal, zumMenue } from "./hauptmenue";
-import { MESSGROESSEN, sterneText, uhr as stoppuhr, wort, type Messgroesse } from "./aufgabentexte";
+import { KRITERIEN, MESSGROESSEN, sterneText, wort } from "./aufgabentexte";
+import { laufAus, merkeLauf } from "../core/bestenliste";
 
 /** Eine Zeile der Abrechnung: links das Wort, rechts die Zahl. */
 export interface Abrechnungszeile {
@@ -91,27 +92,6 @@ export function abrechnungszeilen(b: Tagesbilanz): Abrechnungszeile[] {
 }
 
 /**
- * Je Messgroesse ein Name und eine Schreibweise (E-125, neue Groessen mit
- * E-162). `wort` steht nur hinter dem eigenen Wert, nicht hinter der
- * Schwelle — sonst wird die Zeile zu breit fuers iPhone mini.
- */
-const KRITERIEN: Record<
-  Messgroesse,
-  { name: { de: string; en: string }; zahl: (v: number) => string; wort?: { de: string; en: string } }
-> = {
-  zeitS: { name: { de: "Zeit", en: "Time" }, zahl: (v) => `${stoppuhr(v)} min` },
-  fehlwuerfe: { name: { de: "Fehlwürfe", en: "Misses" }, zahl: (v) => String(Math.round(v)) },
-  praezisionCm: {
-    name: { de: "Präzision", en: "Precision" },
-    zahl: (v) => `${Math.round(v)} cm`,
-    wort: { de: " daneben", en: " off" },
-  },
-  harteAufschlaege: { name: { de: "Harte Aufschläge", en: "Hard drops" }, zahl: (v) => String(Math.round(v)) },
-  ueberlasten: { name: { de: "Überlast", en: "Overloads" }, zahl: (v) => String(Math.round(v)) },
-  fremdteile: { name: { de: "Fremdteile", en: "Wrong parts" }, zahl: (v) => String(Math.round(v)) },
-};
-
-/**
  * Die Zahlen einer Aufgabe als Zeilen — ohne DOM, damit sie prüfbar bleiben.
  * Eine Zeile je Messgroesse, nach der die Aufgabe wertet; dahinter, was es
  * für drei Sterne braucht. Ob eine Schwelle erfuellt ist, entscheidet
@@ -133,6 +113,13 @@ export function challengeZeilen(e: GameEvents["challenge:geschafft"], s: Sprache
     if (zwei[k] !== undefined && !erfuellt(nur(zwei), e.messung)) return { name, wert: `✗ ${wert}`, farbe: "#e08a5a" };
     return { name, wert };
   });
+}
+
+/** E-195: Wo der Lauf in der Bestenliste steht — `platz` aus `eintragen` (null = nicht unter den besten 5). */
+export function rangZeile(platz: number | null, s: Sprache = sprache()): Abrechnungszeile {
+  const wert =
+    platz === 1 ? `★ ${wort("neuerRekord", s)}` : platz ? wort("platzVon", s).replace("{n}", String(platz)) : wort("nichtPlatziert", s);
+  return { name: wort("rang", s), wert, farbe: platz === 1 ? "#f0b429" : undefined };
 }
 
 /** Was das Feld von außen braucht — mehr nicht. */
@@ -225,7 +212,9 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
       CHALLENGES.map((c) => c.id),
       stand
     );
-    if (!fuelle(`${wort("geschafft", s)} · ${waehle(e.name, s)}`, e.sterne, challengeZeilen(e, s), s)) {
+    // E-195: Hier wird der Lauf gespeichert — so kennt die Tafel seinen Platz, ohne Reihenfolge zwischen Zuhoerern
+    const rang = rangZeile(merkeLauf(e.id, laufAus(e)), s);
+    if (!fuelle(`${wort("geschafft", s)} · ${waehle(e.name, s)}`, e.sterne, [rang, ...challengeZeilen(e, s)], s)) {
       m.hud.toast(`${wort("geschafft", s)} · ${sterneZeile(e.sterne, s)}`);
       return;
     }

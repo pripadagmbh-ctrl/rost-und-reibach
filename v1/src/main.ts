@@ -72,6 +72,7 @@ import { installChallengeKarte } from "./ui/challengekarte";
 import { installGeisterdaumen } from "./ui/geisterdaumen";
 import { installZielmarke } from "./ui/zielmarke";
 import { onSprache, sprache, t } from "./ui/sprache";
+import { installSandkastenRekorde } from "./core/rekorde";
 import { Fahrkunst } from "./skills/fahrkunst";
 import { NACHSCHUB_FOLGE, nachschubMeldung, profilFuer } from "./delivery/nachschub";
 
@@ -155,6 +156,12 @@ async function main(): Promise<void> {
 
   // --- Spielobjekte ---
   const bus = new EventBus();
+  /*
+   * E-195: Sandkasten-Rekorde (core/rekorde.ts), nur am Bus. Vor dem Laden des
+   * Spielstands installiert, damit ein Wrack, das beim Laden Teile verliert,
+   * fuer die Sitzung gesperrt ist; in einer Aufgabe zaehlt nichts.
+   */
+  const rekorde = wahl.art === "sandkasten" ? installSandkastenRekorde(bus) : null;
   const physics = new PhysicsWorld();
   const input = new Input(renderer.domElement);
   /*
@@ -1901,6 +1908,7 @@ async function main(): Promise<void> {
       // Challenge (E-125): keine Anlieferer, die Uhr der Aufgabe laeuft
       challenge.takt(frameDt);
     } else {
+      rekorde?.takt(frameDt); // E-195: Spielzeit der Sandkasten-Rekorde, steht in der Pause
       /*
        * SANDKASTEN: DIE ANLIEFERER KOMMEN WIEDER VON SELBST (E-122, Patrick
        * 06.10.2026: "LKWs kommen automatisch"). Derselbe Takt wie im Betrieb:
