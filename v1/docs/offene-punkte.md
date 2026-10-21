@@ -579,6 +579,13 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 38f | Kasse ja, Handelskonzept nein |
       | 38g | Platzgestaltung dazu überarbeiten, weitere Vorschläge |
 
+      Antworten 21.10. (nach Vorschlag): Lehrgang mit 10–12 Lektionen, Vorführung
+      im Spiel (Bagger macht es vor, Geisterdaumen) statt Videos; die 6 Aufgaben
+      werden Prüfungen danach. Schichtbetrieb: Verlade-LKW (Misch-Abroller) steht
+      fast immer bereit, für Sortiertes kommt er bei voller Mulde, Hupe schickt
+      früher weg; Kasse mit festen Preisen je Sorte, Abzug für Standgeld,
+      Fehlwürfe, Schäden; kein Verhandeln. Store-Start **Ende November** mit allem.
+
 - [ ] **Ansage 21.10.2026** — Patrick, wörtlich: „High Score Board Konzept und pay
       to win Konzept vorschlagen". Antworten nach Vorschlag: Bestenliste in 1.0
       „eigene auf dem Gerät" (Top 5 je Aufgabe + Sandkasten-Rekorde), Game Center
