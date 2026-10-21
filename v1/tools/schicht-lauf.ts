@@ -6,7 +6,8 @@
  * mit dem Test-Fahrer aus `test/schichtlauf.ts`: ein Teil je `GRIFF` Sekunden
  * von der Annahme dorthin, wo es hingehört. `GRIFF=0` heißt „niemand räumt".
  *
- * Druckt je Minute: Körper gesamt, dynamisch, wach; Physik-ms je Schritt
+ * Druckt je Minute: Körper gesamt, dynamisch, wach (Höchststand der Minute,
+ * alle 0,1 s gezählt — S5); Physik-ms je Schritt
  * (Mittel, p95, Spitze); Laster auf dem Hof; wartende Fuhren; Abfahrten der
  * Verlader; Standzeit-Summe (roh) und Standgeld-Sekunden (über 60 s je Laster).
  * Am Ende: Teile je Fuhre, Gewicht je Fuhre, Lücke Abfahrt → Nachrücker am Halt.
@@ -43,13 +44,15 @@ async function main(): Promise<void> {
   let abfahrtenVorher = 0;
 
   console.log(
-    "Min | Körper | dyn | wach | ms Mittel | ms p95 | ms max | >8 ms | Takt ms | Takt p95 | Laster | wartend | Verlader ab | Standzeit s | Standgeld s"
+    "Min | Körper max | dyn max | wach max | ms Mittel | ms p95 | ms max | >8 ms | Takt ms | Takt p95 | Laster | wartend | Verlader ab | Standzeit s | Standgeld s"
   );
   let ms: number[] = [];
+  /** Höchststände der laufenden Minute und der ganzen Schicht (S5). */
+  let kMax = 0, dMax = 0, wMax = 0;
+  let kGes = 0, dGes = 0, wGes = 0;
   /** Der ganze Takt (Physik + Fuhrpark + Boxen + Betrieb), ohne Test-Fahrer — das, was das Spiel je Bild zusätzlich rechnet. */
   let taktMs: number[] = [];
   const zeile = (min: number): void => {
-    const c = p.phys.counts();
     ms.sort((a, b) => a - b);
     const mittel = ms.reduce((a, b) => a + b, 0) / Math.max(1, ms.length);
     const p95 = ms[Math.floor(ms.length * 0.95)] ?? 0;
@@ -61,13 +64,14 @@ async function main(): Promise<void> {
     const roh = p.protokoll.standzeiten.reduce((s, e) => s + e.standzeitS, 0);
     const geld = p.protokoll.standzeiten.reduce((s, e) => s + standgeldSekunden(e.standzeitS), 0);
     console.log(
-      `${String(min).padStart(3)} | ${String(c.bodies).padStart(6)} | ${String(c.dynamic).padStart(3)} | ${String(c.dynAwake).padStart(4)} | ` +
+      `${String(min).padStart(3)} | ${String(kMax).padStart(10)} | ${String(dMax).padStart(7)} | ${String(wMax).padStart(8)} | ` +
         `${mittel.toFixed(2).padStart(9)} | ${p95.toFixed(2).padStart(6)} | ${max.toFixed(1).padStart(6)} | ${String(ueber).padStart(5)} | ${tm.toFixed(2).padStart(7)} | ${tp.toFixed(2).padStart(8)} | ` +
         `${String(p.vehicles.lasterAufDemHof).padStart(6)} | ${String(p.betrieb.wartend).padStart(7)} | ` +
         `${String(p.vehicles.verladerAbfahrten).padStart(11)} | ${roh.toFixed(0).padStart(11)} | ${geld.toFixed(0).padStart(11)}`
     );
     ms = [];
     taktMs = [];
+    kMax = dMax = wMax = 0;
   };
   const schritte = Math.round(sekunden / DT);
   for (let i = 0; i < schritte; i++) {
@@ -77,6 +81,15 @@ async function main(): Promise<void> {
     fahrer.schritt(DT);
     if (i > 60) taktMs.push(dauer);
     if (i > 60) ms.push(p.letzteMs); // die erste Sekunde ist WASM-Aufwärmen (`platzlast.ts`)
+    if (i % 6 === 0) {
+      const c = p.phys.counts();
+      kMax = Math.max(kMax, c.bodies);
+      dMax = Math.max(dMax, c.dynamic);
+      wMax = Math.max(wMax, c.dynAwake);
+      kGes = Math.max(kGes, c.bodies);
+      dGes = Math.max(dGes, c.dynamic);
+      wGes = Math.max(wGes, c.dynAwake);
+    }
     const a = p.vehicles.schichtAnlieferer;
     if (a && a !== letzterAnlieferer && a.phaseName === "in") {
       letzterAnlieferer = a;
@@ -107,6 +120,7 @@ async function main(): Promise<void> {
   console.log("Standzeiten je Anlieferer:");
   for (const s of p.protokoll.standzeiten)
     console.log(`  ${s.t.toFixed(0).padStart(4)} s  ${s.fahrzeug.padEnd(9)} ${s.standzeitS.toFixed(0).padStart(4)} s (Standgeld ${standgeldSekunden(s.standzeitS).toFixed(0)} s)`);
+  console.log(`Höchststand der Schicht: Körper ${kGes}, dynamisch ${dGes}, wach ${wGes}`);
   console.log(`Griffe: ${fahrer.griffe} · lose am Ende ${(p.loseKg / 1000).toFixed(1)} t · Meldungen ${p.protokoll.meldungen.length}`);
   if (process.env.MELDUNGEN === "1") console.log(p.protokoll.meldungen.join("\n"));
 }

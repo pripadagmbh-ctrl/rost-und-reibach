@@ -40,6 +40,7 @@ import { BAGGER_STAND } from "../src/world/baggerstand";
 import { ABKIPP_ZONE, ABLADE_SPUR_X, ABLADE_HALT_Z } from "../src/delivery/routes";
 import { ABSETZMULDE } from "../src/delivery/fuellgrad";
 import type { Schichtstufe } from "../src/economy/kasse";
+import { SCHICHT_FEIERABEND_S } from "../src/world/schichtzeit";
 
 export const DT = 1 / 60;
 
@@ -379,6 +380,198 @@ export class TestFahrer {
     const box = this.boxFuer(it);
     lege(this.p, it, box ? boxAblage(this.boxen[box]) : wagenAblage(misch!));
     this.griffe++;
+  }
+}
+
+/* ------------------------------------------------- Leistungslauf (S5) */
+
+/**
+ * Phasen, in denen ein Laster stehen DARF (gewolltes Warten: Abladen, Beladen,
+ * Kippen, Mulde, Waage, Parken). Dieselbe Liste wie im Freitag-Wächter von
+ * `schichtbetrieb.test.ts`.
+ */
+export const RUHIGE_PHASEN: ReadonlySet<string> = new Set([
+  "waitUnload", "waitLoad", "parked", "tipping", "tipHold", "tipBack", "tipCreep", "pauseBeforeUnload",
+  "settleCargo", "weighIn", "shiftPause", "muldeHeben", "muldeRuhe", "muldeKippen", "muldeLeeren",
+  "muldeSenken", "muldeLoesen", "armeEin", "muldeHolen", "muldeAufnehmen",
+]);
+
+export interface LeistungsOptionen {
+  stufe: Schichtstufe;
+  saat: number;
+  /** Sekunden je Griff des Test-Fahrers; 0 = niemand räumt. */
+  griffS: number;
+  /** Gegenprobe: jede Fuhre des Fahrplans kommt zweimal. */
+  doppelt?: boolean;
+  /** Schicht-Sekunden; Vorgabe bis 1 s nach Feierabend. */
+  sekunden?: number;
+  /** Danach so lange weiter ohne Greifen und ohne neue Fuhre (Ruheprobe). SW: 20 s (Auftrag S5). */
+  ruheS?: number;
+}
+
+export interface LeistungsBefund {
+  koerperMax: number;
+  dynMax: number;
+  wachMax: number;
+  /** Wann der Körper-Höchststand war (Schicht-s). */
+  koerperMaxT: number;
+  /** Körper zu Beginn (leerer Platz mit Verlader und Nachrücker). */
+  koerperStart: number;
+  /** Physik-ms je Schritt (ohne erste Sekunde, WASM-Aufwärmen). */
+  physMittel: number;
+  physP95: number;
+  /** Ganzer Takt (Physik + Fuhrpark + Boxen + Betrieb) ms je Schritt. */
+  taktMittel: number;
+  taktP95: number;
+  /** Längster Stillstand eines Lasters außerhalb gewollten Wartens (s) und wer. */
+  laengsterStand: number;
+  wer: string;
+  feierabend: boolean;
+  /** Abfahrten der Verlader VOR Feierabend (voll oder angehupt — nicht der Feierabend-Abschub). */
+  abfahrtenVorFeierabend: number;
+  abfahrten: number;
+  /** Ruheprobe: wache bewegliche Körper auf dem Platz bzw. auf einem Laster. */
+  wachPlatz: number;
+  wachLaster: number;
+  /** Wo die wachen Platz-Körper liegen (für die Fehlermeldung). */
+  wachWo: string[];
+  griffe: number;
+  /** Fuhren, die auf den Hof gekommen sind (Anlieferer + Silo-Pritschen). */
+  fuhren: number;
+}
+
+/**
+ * Eine ganze Schicht mit Messung — für den Leistungs-Wächter
+ * (`test/schichtleistung.test.ts`). Gemessen wird alle 6 Takte (0,1 s):
+ * Körper gesamt / beweglich / wach als Höchststand, Stillstand je Laster.
+ */
+export function leistungsLauf(o: LeistungsOptionen): LeistungsBefund {
+  const p = baueSchichtPlatz({ stufe: o.stufe, saat: o.saat });
+  if (o.doppelt) {
+    const einmal = p.vehicles.schichtFaellig.bind(p.vehicles);
+    p.vehicles.schichtFaellig = (f) => {
+      einmal(f);
+      einmal({ ...f });
+    };
+  }
+  const fahrer = new TestFahrer(p, { griffS: o.griffS, lagerFahrtS: 20 });
+  const sekunden = o.sekunden ?? SCHICHT_FEIERABEND_S + 1;
+  const b: LeistungsBefund = {
+    koerperMax: 0, dynMax: 0, wachMax: 0, koerperMaxT: 0, koerperStart: p.phys.counts().bodies,
+    physMittel: 0, physP95: 0, taktMittel: 0, taktP95: 0, laengsterStand: 0, wer: "",
+    feierabend: false, abfahrtenVorFeierabend: 0, abfahrten: 0, wachPlatz: 0, wachLaster: 0, wachWo: [],
+    griffe: 0, fuhren: 0,
+  };
+  type F = (typeof p.vehicles.fahrzeuge)[number];
+  const stand = new Map<F, { x: number; z: number; s: number; ph: string }>();
+  const gesehen = new Set<F>();
+  const phys: number[] = [];
+  const takt: number[] = [];
+  const schritte = Math.round(sekunden / DT);
+  for (let i = 0; i < schritte; i++) {
+    const t0 = performance.now();
+    p.takt();
+    const dauer = performance.now() - t0;
+    fahrer.schritt(DT);
+    if (i > 60) {
+      phys.push(p.letzteMs);
+      takt.push(dauer);
+    }
+    if (!b.feierabend && p.betrieb.vorbei) {
+      b.feierabend = true;
+      b.abfahrtenVorFeierabend = p.protokoll.abfahrten.filter((a) => a.t < SCHICHT_FEIERABEND_S).length;
+    }
+    if (i % 6) continue;
+    const c = p.phys.counts();
+    if (c.bodies > b.koerperMax) {
+      b.koerperMax = c.bodies;
+      b.koerperMaxT = p.schichtS;
+    }
+    b.dynMax = Math.max(b.dynMax, c.dynamic);
+    b.wachMax = Math.max(b.wachMax, c.dynAwake);
+    for (const w of [p.vehicles.schichtAnlieferer, p.vehicles.schichtSiloWagen]) if (w) gesehen.add(w);
+    for (const v of p.vehicles.fahrzeuge) {
+      const st = stand.get(v) ?? { x: v.group.position.x, z: v.group.position.z, s: 0, ph: v.phaseName };
+      if (Math.hypot(v.group.position.x - st.x, v.group.position.z - st.z) > 0.3 || st.ph !== v.phaseName) {
+        st.x = v.group.position.x;
+        st.z = v.group.position.z;
+        st.s = 0;
+        st.ph = v.phaseName;
+      } else if (!RUHIGE_PHASEN.has(v.phaseName)) st.s += 6 * DT;
+      stand.set(v, st);
+      if (st.s > b.laengsterStand) {
+        b.laengsterStand = st.s;
+        b.wer = `${v.kind} ${v.phaseName} (${v.group.position.x.toFixed(1)} | ${v.group.position.z.toFixed(1)}) bei ${p.schichtS.toFixed(0)} s`;
+      }
+    }
+  }
+  // Ruheprobe: keiner greift, keine Fuhre kommt (nach Feierabend ohnehin nicht)
+  for (let i = 0; i < Math.round((o.ruheS ?? 20) / DT); i++) p.takt();
+  p.world.bodies.forEach((rb) => {
+    if (!rb.isDynamic() || rb.isSleeping()) return;
+    if (p.vehicles.liegtAufLaster(rb)) b.wachLaster++;
+    else {
+      b.wachPlatz++;
+      const t = rb.translation();
+      b.wachWo.push(`(${t.x.toFixed(1)} | ${t.y.toFixed(1)} | ${t.z.toFixed(1)})`);
+    }
+  });
+  const mittel = (a: number[]): number => a.reduce((s, x) => s + x, 0) / Math.max(1, a.length);
+  const p95 = (a: number[]): number => [...a].sort((x, y) => x - y)[Math.floor(a.length * 0.95)] ?? 0;
+  b.physMittel = mittel(phys);
+  b.physP95 = p95(phys);
+  b.taktMittel = mittel(takt);
+  b.taktP95 = p95(takt);
+  b.abfahrten = p.protokoll.abfahrten.length;
+  b.griffe = fahrer.griffe;
+  b.fuhren = gesehen.size;
+  return b;
+}
+
+/**
+ * Die Schranken des Leistungs-Wächters (S5). Gemessen 21.10.2026, Freitag,
+ * Test-Fahrer 1 Teil/4 s, Saaten 1–5 (`docs/messungen/2026-10-21_schicht-leistung.md`):
+ * Körper 103–124, beweglich 62–87, wach nach 20 s Ruhe auf dem Platz 0–3.
+ * Doppelter Fahrplan (Gegenprobe): Körper 139–162, beweglich 106–125.
+ */
+export const LEISTUNGS_SCHRANKEN = {
+  /** E-202/S5: höchstens 124 gemessen; 160 = +29 % Rand, so viel wie ein doppelter Fahrplan bringt. */
+  koerper: 160,
+  /** S5: höchstens 87 gemessen; 110 = +26 % Rand. */
+  beweglich: 110,
+  /** S5: 0–3 gemessen (Teile, die an einem stehenden Laster lehnen, E-177); SW: doppelt. */
+  wachNachRuhe: 6,
+  /** Auftrag S5: kein Laster steckt länger fest (außer gewolltem Warten, `RUHIGE_PHASEN`). */
+  stillstandS: 60,
+} as const;
+
+/** Was am Befund gegen die Schranken verstößt — leer heißt: bestanden. */
+export function leistungsVerstoesse(b: LeistungsBefund): string[] {
+  const s = LEISTUNGS_SCHRANKEN;
+  const v: string[] = [];
+  if (b.koerperMax > s.koerper) v.push(`Körper ${b.koerperMax} > ${s.koerper} (bei ${b.koerperMaxT.toFixed(0)} s)`);
+  if (b.dynMax > s.beweglich) v.push(`beweglich ${b.dynMax} > ${s.beweglich}`);
+  if (b.wachPlatz > s.wachNachRuhe) v.push(`nach Ruhe wach auf dem Platz ${b.wachPlatz} > ${s.wachNachRuhe}: ${b.wachWo.slice(0, 5).join(" ")}`);
+  if (b.laengsterStand >= s.stillstandS) v.push(`Laster steckt ${b.laengsterStand.toFixed(0)} s fest: ${b.wer}`);
+  if (!b.feierabend) v.push("Feierabend nicht erreicht");
+  if (b.abfahrtenVorFeierabend < 1) v.push("kein Verlader ist vor Feierabend gefahren");
+  return v;
+}
+
+/** Ein Freitag für die Leistungs-Wächter, so wie `tools/schicht-lauf.ts` ihn mit `SAAT=n` fährt (gleicher Zufall); druckt den Befund. */
+export function freitagLauf(saat: number, griffS = 4, doppelt = false): LeistungsBefund {
+  const zurueck = festerZufall(saat * 7919 + 13);
+  try {
+    const b = leistungsLauf({ stufe: "freitag", saat, griffS, doppelt });
+    console.log(
+      `Freitag Saat ${saat}${doppelt ? " DOPPELT" : ""}, 1 Teil/${griffS} s: Körper ${b.koerperStart} → max ${b.koerperMax} (bei ${b.koerperMaxT.toFixed(0)} s), ` +
+        `beweglich max ${b.dynMax}, wach max ${b.wachMax}; nach 20 s Ruhe wach Platz ${b.wachPlatz} / auf Laster ${b.wachLaster}; ` +
+        `Physik ${b.physMittel.toFixed(2)} ms (p95 ${b.physP95.toFixed(2)}), Takt ${b.taktMittel.toFixed(2)} ms (p95 ${b.taktP95.toFixed(2)}); ` +
+        `Stillstand max ${b.laengsterStand.toFixed(1)} s (${b.wer}); Fuhren ${b.fuhren}, Verlader ab ${b.abfahrtenVorFeierabend} vor / ${b.abfahrten} gesamt, Griffe ${b.griffe}`
+    );
+    return b;
+  } finally {
+    zurueck();
   }
 }
 
