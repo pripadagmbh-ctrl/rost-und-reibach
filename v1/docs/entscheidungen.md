@@ -10,9 +10,9 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-203 | 21.10.2026 | Schicht-Kasse mit festen Preisen, Bilanz, Sterne und Schicht-Uhr | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-202 | 21.10.2026 | Schicht-Fahrplan, Verlader mit Nachrücker, Box-Abholer, Silo-Pritsche, Standzeit | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-201 | 21.10.2026 | Schicht-Platz: Verlader quer vorn, rechte Halde wird MÜLL | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
-| E-203 | 21.10.2026 | Schicht-Kasse mit festen Preisen, Bilanz, Sterne und Schicht-Uhr | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-196 | 21.10.2026 | Lehrgang Etappe 1: Vorführung im Spiel, dann nachmachen; Lektionen 1–3 | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-195 | 21.10.2026 | Bestenliste auf dem Gerät: beste 5 je Aufgabe, drei Sandkasten-Rekorde | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-194 | 21.10.2026 | Privatperson statt Firma: Pripada/GmbH raus, Repo rost-und-reibach, neue Bundle-ID | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |

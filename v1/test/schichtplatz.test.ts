@@ -215,9 +215,11 @@ describe("Schicht-Platz: die rechte Halde ist der MÜLL", () => {
  */
 const main = readFileSync(resolve(__dirname, "../src/main.ts"), "utf8");
 describe("Schicht-Platz: Startplatz leer (Verdrahtung in main.ts)", () => {
-  it.skipIf(!main.includes("istSchichtPlatz"))("Starthaufen, Ansteher und Müll-Abroller hängen am Schalter", () => {
-    expect(main).toMatch(/else if \(istSchichtPlatz\(\)\)/);
-    expect(main).toMatch(/!istSchichtPlatz\(\)[^\n]*stelleAnstehendeAuf|stelleAnstehendeAuf[^\n]*!istSchichtPlatz/);
-    expect(main).toMatch(/!istSchichtPlatz\(\)[^\n]*\)\s*\{\s*\n\s*containers\.raeumeMuell/);
+  // main.ts liest die Stufe aus der Wahl (`schichtStufe`) und schaltet damit den Platz um
+  it("Starthaufen, Ansteher und Müll-Abroller hängen am Schalter", () => {
+    expect(main).toMatch(/if \(schichtStufe\) aktiviereSchichtPlatz\(\)/);
+    expect(main).toMatch(/\} else if \(schichtStufe\) \{/);
+    expect(main).toMatch(/!schichtStufe\) vehicles\.stelleAnstehendeAuf/);
+    expect(main).toMatch(/!schichtStufe\) \{\s*\n[^\n]*\n?\s*containers\.raeumeMuell/);
   });
 });
