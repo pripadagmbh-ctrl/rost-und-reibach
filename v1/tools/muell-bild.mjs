@@ -5,7 +5,7 @@
  * (wie `tools/aufgaben-smoke.mjs`), geht in den Sandkasten, bestellt „Müll"
  * und hält die Physik an, wenn der Abroller den vollen Container halb
  * hochgezogen hat. Dann je ein Bild in drei Ansichten (Orbit, Kabine, Seite)
- * und eines beim Abstellen des leeren.
+ * und eines beim Abstellen des leeren (seit E-192 zuerst: zum Start steht keiner).
  *
  * Aufruf (in v1/):  node tools/muell-bild.mjs <Ausgabeordner>
  */
@@ -180,8 +180,11 @@ try {
     await pause(300);
   };
   await ziehe(Number(process.env.BILD_DX ?? 260), Number(process.env.BILD_DY ?? 60));
+  // E-192: Zum Start steht keiner — die erste Bestellung bringt den leeren
   await bisPhase(`t.phaseName === "hakenAb" && t.hakenAlpha > 1.0`);
   await bild("1_leer_abstellen_orbit");
+  await bisPhase(`t.phaseName === "out"`);
+  await werte(`(() => { const g = window.__game; for (let k = 0; k < 400 && g.vehicles.activeKind; k++) g.step(30); return g.vehicles.requestPickup("rubble"); })()`);
   await bisPhase(`t.phaseName === "hakenAuf" && t.hakenAlpha < 1.4`);
   await bild("2_hochziehen_orbit");
   await taste("KeyC", "c"); // Draufsicht

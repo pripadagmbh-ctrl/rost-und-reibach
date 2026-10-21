@@ -767,6 +767,17 @@ export const EN: Record<string, string> = {
   "Abroller fährt mit dem vollen Müll-Container los.": "Hook-lift truck is leaving with the full waste container.",
   "Büro an Bagger: Stell den Müll-Container an seinen Platz.":
     "Office to loader: Put the waste container back in its place.",
+  // Müll in zwei Fahrten, Fahrspuren, Platz dicht (Lieferung, E-192)
+  "Abroller holt den vollen Müll-Container.": "Hook-lift truck is collecting the full waste container.",
+  "Abroller stellt den Müll-Container ab.": "Hook-lift truck is setting down the waste container.",
+  "Büro an Bagger: Der Abroller bringt den leeren Müll-Container.":
+    "Office to loader: The hook-lift truck is bringing the empty waste container.",
+  "Büro an Bagger: Der Laster kommt nicht vorbei — Bagger aus der Fahrspur, bitte.":
+    "Office to loader: The truck can't get past — please move the loader out of the lane.",
+  "Büro an Bagger: Der Platz ist voll — neue Fuhren warten am Tor, bis aufgeräumt ist.":
+    "Office to loader: The yard is full — new loads wait at the gate until it's cleared.",
+  "Büro an Bagger: Platz wieder frei — die nächste Fuhre kommt.":
+    "Office to loader: Yard clear again — the next load is coming.",
 };
 
 /**
@@ -805,6 +816,8 @@ export const MUSTER: Array<[RegExp, string]> = [
   [/^Büro an Bagger: (.+) holt seine Mulde\.$/, "Office to loader: $1 is collecting its skip."],
   [/^(.+) steht bereit — laden, dann ABHOLEN drücken \(V\)\.$/, "$1 is ready — load it, then press PICKUP (V)."],
   [/^(.+) (\d+) m³ · ([\d,]+) m³ da$/, "$1 $2 m³ · $3 m³ ready"],
+  [/^Büro an Bagger: Der Laster kommt nicht weiter — (.+) steht im Weg\.$/, "Office to loader: The truck is stuck — $1 is in the way."],
+  [/^Büro an Bagger: Kipper mit (.+) wartet am Tor — der Bagger steht in der Silogasse\.$/, "Office to loader: Tipper truck with $1 is waiting at the gate — the loader is in the silo lane."],
   [/^(.+) fährt dir nach\.$/, "$1 is following you."],
   [/^(.+) ist voll und fährt los\.$/, "$1 is full and leaving."],
   [/^(.+) fährt los\.$/, "$1 is leaving."],

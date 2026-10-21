@@ -159,7 +159,7 @@ describe("E-190 — der Hakenarm", () => {
   });
 });
 
-describe("E-190 — der Müllplatz", () => {
+describe("E-190/E-192 — der Müllplatz vor dem Bagger", () => {
   const muell = CONFIGS.find((c) => c.id === "r_rubble")!;
 
   it("ist ein 10-m³-Abrollcontainer an der Schwelle der BUNT + VA", () => {
@@ -170,52 +170,52 @@ describe("E-190 — der Müllplatz", () => {
     expect(muell.x - w / 2, "Westkante wie in E-183").toBeCloseTo(-4.8, 6);
   });
 
-  it("beide Stellplätze liegen im Schwenkband und frei von Bauwerken; A ist nicht in der Fahrlinie", () => {
-    for (const s of MUELL_PLAETZE) {
-      const d = Math.hypot(s.x - BAGGER_STAND.x, s.z - BAGGER_STAND.z);
-      expect(d).toBeGreaterThanOrEqual(SCHWENK_INNEN);
-      expect(d).toBeLessThanOrEqual(SCHWENK_AUSSEN);
-      expect(tiefsteDurchdringung([{ ...wannenRechteck(s, 0.05), rot: 0 }], fahrHindernisse().filter((o) => !o.label.startsWith("MUELL")))).toBe(0);
-    }
+  it("EIN Platz: im Schwenkband, frei von Bauwerken, nicht in der Fahrlinie (E-192)", () => {
+    expect(MUELL_PLAETZE.length).toBe(1);
     const a = MUELL_PLAETZE[0]!;
+    const d = Math.hypot(a.x - BAGGER_STAND.x, a.z - BAGGER_STAND.z);
+    expect(d).toBeGreaterThanOrEqual(SCHWENK_INNEN);
+    expect(d).toBeLessThanOrEqual(SCHWENK_AUSSEN);
+    expect(
+      tiefsteDurchdringung(
+        [{ ...wannenRechteck(a, 0.05), rot: 0 }],
+        fahrHindernisse().filter((o) => !o.label.startsWith("MUELL"))
+      )
+    ).toBe(0);
     expect(Math.abs(a.x - BAGGER_STAND.x) - (MUELL_WANNE.breite / 2 + UNTERWAGEN_HALB_B)).toBeGreaterThan(0);
   });
 
-  it("von beiden Stellplätzen aus ist der Wechsel planbar — der leere kommt auf den anderen", () => {
-    const vonA = planeMuellwechsel(MUELL_PLAETZE[0]!);
-    const vonB = planeMuellwechsel(MUELL_PLAETZE[1]!);
-    expect(vonA?.leer).toBe(MUELL_PLAETZE[1]);
-    expect(vonB?.leer).toBe(MUELL_PLAETZE[0]);
-    for (const pl of [vonA!, vonB!]) {
-      expect(pl.hin.wahl).not.toMatch(/^NICHT FREI/);
-      expect(pl.zumVollen.wahl).not.toMatch(/^NICHT FREI/);
-    }
+  it("holen und bringen sind beide planbar, ohne Bauwerk", () => {
+    const holen = planeMuellwechsel(MUELL_PLAETZE[0]!);
+    const bringen = planeMuellwechsel(null);
+    expect(holen?.voll).toBe(MUELL_PLAETZE[0]);
+    expect(holen?.leer).toBeNull();
+    expect(bringen?.leer).toBe(MUELL_PLAETZE[0]);
+    expect(bringen?.voll).toBeNull();
+    for (const pl of [holen!, bringen!]) expect(pl.hin.wahl).not.toMatch(/^NICHT FREI/);
   });
 });
 
-describe("E-190 — voll weg, leer zurück", () => {
-  function wechsel(p: Platz): {
-    wander: number;
-    spitze: number;
-    tief: number;
-    sekunden: number;
-  } {
-    const drin = p.items.items.filter((it) => p.c.muell()!.containsPoint(it.body.translation()));
-    expect(p.m.requestPickup("rubble")).toBe("gerufen");
-    expect(p.m.activeKind).toBe("abholer");
+describe("E-192 — voll weg, dann leer zurück", () => {
+  /** Bis kein Abroller mehr fährt und keiner mehr vorgemerkt ist. */
+  function fahreAus(
+    p: Platz,
+    drin: ScrapItem[] = []
+  ): { wander: number; spitze: number; tief: number; sekunden: number } {
     let wander = 0;
     let spitze = 0;
     let tief = 0;
     const start = new Map<number, THREE.Vector3>();
     const boxen: Box[] = [];
+    const fest = fahrHindernisse().filter((o) => !o.label.startsWith("MUELL"));
     let i = 0;
-    for (; i < 60 * 600 && p.m.activeKind !== null; i++) {
+    for (; i < 60 * 900 && (p.m.activeKind !== null || p.m.abholungVorgemerkt); i++) {
       takt(p);
       const t = p.m.pickupTruck;
-      if (!t) break;
+      if (!t) continue;
       boxen.length = 0;
       t.boxen(boxen);
-      tief = Math.max(tief, tiefsteDurchdringung(boxen, fahrHindernisse()));
+      tief = Math.max(tief, tiefsteDurchdringung(boxen, fest));
       // Sobald der volle am Haken hängt: Inhalt bleibt, wo er im Container liegt
       const w = (t as unknown as { tragWanne: { group: THREE.Group } | null }).tragWanne;
       if (w && t.holtVollen) {
@@ -232,46 +232,54 @@ describe("E-190 — voll weg, leer zurück", () => {
       }
     }
     expect(p.m.activeKind, "der Abroller ist nicht vom Hof gekommen").toBeNull();
-    for (const it of drin) expect(p.items.items.includes(it), "Müll ist auf dem Platz geblieben").toBe(false);
     return { wander, spitze, tief, sekunden: i * DT };
   }
 
-  it("der leere steht danach auf B, der volle ist samt Inhalt weg, keine Körper übrig", () => {
+  it("zum Start steht keiner — Müll bestellt: der Abroller bringt einen leeren auf den Platz vor dem Bagger", () => {
+    const p = bauePlatz();
+    p.c.raeumeMuell();
+    expect(p.c.muell()!.aufgestellt).toBe(false);
+    expect(p.m.abholAngebot("rubble").fahrzeug, "Müll bestellbar, auch ohne Container").toBe("Abroller 10 m³");
+    const koerper = p.world.bodies.len();
+    expect(p.m.requestPickup("rubble")).toBe("gerufen");
+    fahreAus(p);
+    for (let i = 0; i < 120; i++) takt(p);
+    const m = p.c.muell()!;
+    const a = MUELL_PLAETZE[0]!;
+    expect(m.aufgestellt).toBe(true);
+    expect(Math.hypot(m.ort.x - a.x, m.ort.z - a.z), "er steht nicht auf dem Müllplatz").toBeLessThan(0.7);
+    expect(m.wanne!.body.isDynamic()).toBe(true);
+    expect(m.wanne!.body.translation().y).toBeLessThan(0.05);
+    expect(p.world.bodies.len(), "genau ein Körper mehr: der Container").toBe(koerper + 1);
+    expect(p.meldungen).toContain("Abroller stellt den Müll-Container ab.");
+  });
+
+  it("steht einer (voll): Fahrt eins holt ihn samt Inhalt, Fahrt zwei bringt einen leeren auf denselben Platz", () => {
     const p = bauePlatz();
     const drin = fuelle(p, 6);
     for (let i = 0; i < 30; i++) takt(p);
     expect(p.c.muell()!.contentKg, "der Müll liegt nicht im Container").toBeGreaterThan(300);
     const koerper = p.world.bodies.len();
-    const r = wechsel(p);
+    expect(p.m.requestPickup("rubble")).toBe("gerufen");
+    const r = fahreAus(p, drin);
     expect(r.wander, "Inhalt hat sich im Container bewegt").toBeLessThan(0.02);
     expect(r.spitze, "Katapult").toBeLessThan(8);
     expect(r.tief, "durch ein Bauwerk gefahren").toBeLessThanOrEqual(UMRISS_TOLERANZ);
-    // Der leere ist jetzt der Müll-Container des Platzes
+    for (const it of drin) expect(p.items.items.includes(it), "Müll ist auf dem Platz geblieben").toBe(false);
     for (let i = 0; i < 120; i++) takt(p);
-    const neu = p.c.muell()!;
-    const b = MUELL_PLAETZE[1]!;
-    expect(Math.hypot(neu.ort.x - b.x, neu.ort.z - b.z), "der leere steht nicht auf B").toBeLessThan(0.7);
-    expect(neu.wanne!.body.isDynamic()).toBe(true);
-    expect(neu.wanne!.body.translation().y).toBeLessThan(0.05);
-    expect(neu.contentKg).toBe(0);
-    expect(p.world.bodies.len(), "Körperzahl").toBe(koerper - drin.length);
-    expect(p.meldungen[0]).toBe("Büro an Bagger: Abroller 10 m³ für Müll ist unterwegs.");
-    expect(p.meldungen).toContain("Abroller tauscht den Müll-Container.");
-    expect(p.meldungen).toContain("Abroller fährt mit dem vollen Müll-Container los.");
-    expect(p.hupen).toBeGreaterThanOrEqual(1);
-    console.log(`Wechsel A→B: ${r.sekunden.toFixed(0)} s bis vom Hof`);
-  });
-
-  it("beim nächsten Wechsel kommt der leere wieder auf A — genau an den Platz", () => {
-    const p = bauePlatz();
-    wechsel(p);
-    for (let i = 0; i < 120; i++) takt(p);
-    fuelle(p, 4);
-    wechsel(p);
-    for (let i = 0; i < 120; i++) takt(p);
+    const m = p.c.muell()!;
     const a = MUELL_PLAETZE[0]!;
-    const neu = p.c.muell()!;
-    expect(Math.hypot(neu.ort.x - a.x, neu.ort.z - a.z)).toBeLessThan(0.7);
+    expect(Math.hypot(m.ort.x - a.x, m.ort.z - a.z), "der leere steht nicht auf dem Platz").toBeLessThan(0.7);
+    expect(m.wanne!.body.isDynamic()).toBe(true);
+    expect(m.contentKg).toBe(0);
+    expect(p.world.bodies.len(), "Körperzahl: vorher minus Inhalt").toBe(koerper - drin.length);
+    expect(p.meldungen[0]).toBe("Büro an Bagger: Abroller 10 m³ für Müll ist unterwegs.");
+    expect(p.meldungen).toContain("Abroller holt den vollen Müll-Container.");
+    expect(p.meldungen).toContain("Abroller fährt mit dem vollen Müll-Container los.");
+    expect(p.meldungen).toContain("Büro an Bagger: Der Abroller bringt den leeren Müll-Container.");
+    expect(p.meldungen).toContain("Abroller stellt den Müll-Container ab.");
+    expect(p.hupen).toBeGreaterThanOrEqual(1);
+    console.log(`voll weg, leer zurück: ${r.sekunden.toFixed(0)} s`);
   });
 
   it("steht der Container so, dass keiner hinkommt, funkt das Büro und es kommt niemand", () => {
@@ -287,19 +295,18 @@ describe("E-190 — voll weg, leer zurück", () => {
   });
 });
 
-describe("E-190 — die Meldungen gibt es auch auf Englisch", () => {
-  it("Tausch, Abfahrt, Büro", async () => {
+describe("E-190/E-192 — die Meldungen gibt es auch auf Englisch", () => {
+  it("Holen, Bringen, Abfahrt, Büro", async () => {
     const { nachEnglisch } = await import("../src/ui/sprache");
-    expect(nachEnglisch("Büro an Bagger: Abroller 10 m³ für Müll ist unterwegs.")).toBe(
-      "Office to loader: Hook-lift truck 10 m³ for Waste is on its way."
-    );
-    expect(nachEnglisch("Abroller tauscht den Müll-Container.")).toBe("Hook-lift truck is swapping the waste container.");
-    expect(nachEnglisch("Abroller fährt mit dem vollen Müll-Container los.")).toBe(
-      "Hook-lift truck is leaving with the full waste container."
-    );
-    expect(nachEnglisch("Büro an Bagger: Stell den Müll-Container an seinen Platz.")).toBe(
-      "Office to loader: Put the waste container back in its place."
-    );
+    const paare: Array<[string, string]> = [
+      ["Büro an Bagger: Abroller 10 m³ für Müll ist unterwegs.", "Office to loader: Hook-lift truck 10 m³ for Waste is on its way."],
+      ["Abroller holt den vollen Müll-Container.", "Hook-lift truck is collecting the full waste container."],
+      ["Abroller stellt den Müll-Container ab.", "Hook-lift truck is setting down the waste container."],
+      ["Abroller fährt mit dem vollen Müll-Container los.", "Hook-lift truck is leaving with the full waste container."],
+      ["Büro an Bagger: Der Abroller bringt den leeren Müll-Container.", "Office to loader: The hook-lift truck is bringing the empty waste container."],
+      ["Büro an Bagger: Stell den Müll-Container an seinen Platz.", "Office to loader: Put the waste container back in its place."],
+    ];
+    for (const [de, en] of paare) expect(nachEnglisch(de)).toBe(en);
   });
 });
 

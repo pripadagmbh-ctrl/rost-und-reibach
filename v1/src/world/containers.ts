@@ -253,6 +253,26 @@ export function bayDrehung(cfg: ContainerConfig): number {
 export const MUELL_START = { x: -3.55, z: -16.0 } as const;
 
 /**
+ * DER MÜLLPLATZ VOR DEM BAGGER (E-192). Patrick, 21.10.2026: „der neue wird
+ * vor den Bagger abgestellt. Fahrspuren müssen frei bleiben … muss Platz für
+ * Bagger bleiben und gute Erreichbarkeit."
+ *
+ * EIN Platz, gerechnet und nicht gewählt: rechts vor dem Bagger an der
+ * Schwelle der BUNT + VA (E-183/E-190), Mitte 7,17 m vom Sitz, 0,30 m neben
+ * der Fahrlinie. Links vor dem Bagger ist für einen zweiten kein Platz, der
+ * keine Spur berührt: Dort schwenkt die Ausfahrt vom Abladeplatz ein
+ * (gemessen mit allen 100+ Fahrplänen, `tools/platz-fahrspuren.ts`; frei
+ * wäre erst (2,25 | −17,2), und dort steht er halb unter dem Bagger und an
+ * den Pratzen). Darum tauscht der Abroller seit E-192 in zwei Fahrten:
+ * voll weg, dann leer zurück (`delivery/muellwechsel.ts`).
+ *
+ * Als Liste, damit ein zweiter Platz eine Zeile ist, falls Patrick ihn will.
+ */
+export const MUELL_PLAETZE: ReadonlyArray<{ x: number; z: number; gier: number }> = [
+  { x: MUELL_START.x, z: MUELL_START.z, gier: 0 },
+];
+
+/**
  * Eine Wanne: Netz und Körper eines Absetz- bzw. Abrollcontainers. Der
  * Müll-Abroller (E-190) tauscht sie aus — der Platz behält seinen
  * Müll-Container (Schild, Zählzone, Platzinventar), nur die Wanne wechselt.
@@ -1033,6 +1053,7 @@ class GameContainer {
 
   /** Schild nach Entfernung zur Kamera ein- oder ausblenden. */
   updateLabelDistance(camPos: THREE.Vector3): void {
+    if (!this.aufgestellt) return; // ohne Wanne kein Schild (E-192)
     this.label.updateDistance(camPos);
   }
 
@@ -1745,11 +1766,47 @@ class GameContainer {
    */
   tauscheWanne(neu: Wanne): Wanne | null {
     const alt = this.wanne;
+    if (!alt) this.group.removeFromParent(); // vorher stand keine (E-192)
     this.group = neu.group;
     this.koerper = neu.body;
     this.clearAfterSale();
     this.syncBeweglich();
     this.wiegeLadung();
+    return alt;
+  }
+
+  /** Steht seine Wanne auf dem Platz? Nur ein Absetzcontainer kann ohne sein (E-192). */
+  get aufgestellt(): boolean {
+    return this.koerper !== null || this.cfg.kind !== "rolloff";
+  }
+
+  /**
+   * E-192: Die Wanne vom Platz nehmen — im Sandkasten steht beim Start kein
+   * Müll-Container, ihn bringt erst der Abroller. Zone, Schild und Platz-
+   * inventar bleiben bei diesem Behälter; sie zählen nichts, bis eine Wanne kommt.
+   */
+  raeumeWanne(world: RAPIER.World): void {
+    if (!this.koerper) return;
+    this.group.removeFromParent();
+    world.removeRigidBody(this.koerper);
+    this.koerper = null;
+    this.group = new THREE.Group();
+    this.clearAfterSale();
+    this.label.sprite.visible = false;
+  }
+
+  /**
+   * E-192: Die Wanne an den Abroller abgeben (er nimmt sie mit). Danach steht
+   * kein Container mehr da, bis er einen leeren bringt; die Wanne lebt am
+   * Haken weiter und wird erst am Ende der Ausfahrt entfernt.
+   */
+  gibWanneAb(): Wanne | null {
+    const alt = this.wanne;
+    if (!alt) return null;
+    this.koerper = null;
+    this.group = new THREE.Group();
+    this.clearAfterSale();
+    this.label.sprite.visible = false;
     return alt;
   }
 
@@ -1833,6 +1890,7 @@ class GameContainer {
 
   /** Liegt der Punkt in der Zone (Haufen/Bay: bis Fanghöhe; Box: bis knapp überm Rand)? */
   containsPoint(p: { x: number; y: number; z: number }, marginXZ = 0, marginY = 0.4): boolean {
+    if (!this.aufgestellt) return false; // ohne Wanne zählt die Zone nichts (E-192)
     const [w, d, h] = this.cfg.size;
     // Offene Flaechen fangen bis Fanghoehe, umwandete bis Oberkante: In einer
     // 5-m-Halde liegt der Schrott sonst zur Haelfte ausserhalb der Zaehlung.
@@ -1855,6 +1913,7 @@ class GameContainer {
 
   /** Für die Abwurf-Ampel: großzügigere XZ-Zone, Höhe egal. */
   isOverhead(x: number, z: number): boolean {
+    if (!this.aufgestellt) return false;
     const [w, d] = this.cfg.size;
     const [lx, lz] = this.lokal(x, z);
     return Math.abs(lx) < w / 2 + 0.35 && Math.abs(lz) < d / 2 + 0.35;
@@ -1878,7 +1937,7 @@ class GameContainer {
   }
 
   setLabelVisible(v: boolean): void {
-    this.label.sprite.visible = v;
+    this.label.sprite.visible = v && this.aufgestellt;
   }
 
   /** Nach dem Verkauf: Aggregat leeren (Items wurden bereits entfernt). */
@@ -2109,6 +2168,20 @@ export class ContainerManager {
     return this.muell()?.tauscheWanne(neu) ?? null;
   }
 
+  /** E-192: Der Abroller nimmt den Müll-Container mit — er gehört ab jetzt ihm. */
+  gibMuellWanneAb(): Wanne | null {
+    return this.muell()?.gibWanneAb() ?? null;
+  }
+
+  /**
+   * E-192: Beim Start keinen Müll-Container aufstellen (Patrick, 21.10.2026:
+   * „Der blaue initiale Müllcontainer kommt weg"). Gerufen im Sandkasten aus
+   * `main.ts`; den ersten bringt der Abroller auf Bestellung „Müll".
+   */
+  raeumeMuell(): void {
+    this.muell()?.raeumeWanne(this.world);
+  }
+
   /**
    * Zonen-Zählung (alle ~10 Steps): Items den Containern zuordnen, Aggregate
    * neu berechnen, Enter/Leave-Events feuern. Gegriffene Items zählen nicht.
@@ -2330,7 +2403,7 @@ export class ContainerManager {
    */
   platzinventarIn(x: number, z: number, hw: number, hd: number): GameContainer | null {
     for (const c of this.containers) {
-      if (!istPlatzinventar(c.cfg)) continue;
+      if (!istPlatzinventar(c.cfg) || !c.aufgestellt) continue;
       const [w, d] = c.cfg.size;
       const gross = Math.max(w, d) / 2; // gedreht abgesetzt: Hüllkreis
       if (Math.abs(c.ort.x - x) < hw + gross && Math.abs(c.ort.z - z) < hd + gross) return c;
@@ -2341,7 +2414,8 @@ export class ContainerManager {
   /** Aktuelle Stellung eines Behälters, oder null wenn es ihn nicht gibt. */
   ortVon(id: string): { x: number; z: number } | null {
     const c = this.containers.find((k) => k.cfg.id === id);
-    return c ? c.ort : null;
+    // Ohne Wanne steht er nirgends (E-192)
+    return c && c.aufgestellt ? c.ort : null;
   }
 
   byId(id: string): GameContainer {

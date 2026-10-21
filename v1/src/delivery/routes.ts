@@ -15,6 +15,7 @@ import {
 import { BAGGER_STAND, VERLADE_STAND } from "../world/baggerstand";
 import {
   CONFIGS,
+  MUELL_PLAETZE,
   bayOeffnung,
   bayVorderkante,
   lagerMuldeFuer,
@@ -317,9 +318,21 @@ export function planHindernisse(ohneSlot: readonly [number, number] | null = nul
  */
 export function fahrHindernisse(): Array<Rechteck & { label: string }> {
   const out: Array<Rechteck & { label: string }> = [...STATIC_OBSTACLES];
+  /*
+   * Der Müllplatz vor dem Bagger (E-192, `MUELL_PLAETZE`): keine Fahrt darf
+   * durch ihn geplant sein — auch wenn dort gerade kein Container steht.
+   */
   const muell = CONFIGS.find((c) => c.id === "r_rubble");
   if (muell) {
-    out.push({ x: muell.x, z: muell.z, hw: muell.size[0] / 2, hd: muell.size[1] / 2, label: "MUELL Startplatz" });
+    MUELL_PLAETZE.forEach((p, i) =>
+      out.push({
+        x: p.x,
+        z: p.z,
+        hw: muell.size[0] / 2,
+        hd: muell.size[1] / 2,
+        label: i === 0 ? "MUELL Startplatz" : `MUELL Stellplatz ${i + 1}`,
+      })
+    );
   }
   // Wrack 6,00 x 2,50 m, laengs (`startplatz.ts`)
   out.push({ x: START_LKW.x, z: START_LKW.z, hw: 1.25, hd: 3.0, label: "LKW-Wrack Startplatz" });

@@ -232,6 +232,7 @@ import { alleHindernisse } from "../world/obstacles";
 import {
   fahrzeugUmriss,
   zugwagenUmriss,
+  umrissUeberlappung,
   anhaengerUmriss,
   poseAuf,
   tiefsteDurchdringung,
@@ -1563,15 +1564,17 @@ class DeliveryVehicle {
    */
   private planeMuell(): void {
     const v = this.vollOrt();
-    const plan = v ? planeMuellwechsel(v.ort) : null;
-    if (!v || !plan) {
+    // Steht noch keiner (Sandkasten, E-192), bringt er nur den leeren
+    const plan = v || this.platzinventar?.muellPlatz?.() ? planeMuellwechsel(v ? v.ort : null) : null;
+    if (!plan) {
       this.muellPlan = null;
       this.onMeldung?.("Büro an Bagger: Stell den Müll-Container an seinen Platz.");
       this.sendAway();
       return;
     }
     this.muellPlan = plan;
-    this.muellSchritt = "abstellen";
+    // Holen, wenn einer steht; sonst bringen (E-192: zwei Fahrten statt Tausch an Ort und Stelle)
+    this.muellSchritt = plan.voll ? "holen" : "abstellen";
     this.meineAnfahrt = plan.hin.anfahrt;
     this.meinRueckweg = plan.hin.rueckweg;
     this.meineAusfahrt = plan.ausfahrt;
@@ -1581,8 +1584,15 @@ class DeliveryVehicle {
      * Minute bis dahin weg, und der Haken griffe ins Leere — oder der
      * Container spränge an den Haken. Hineinwerfen geht weiter.
      */
-    v.wanne.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
-    this.vollWanne = v.wanne;
+    if (v) {
+      v.wanne.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
+      this.vollWanne = v.wanne;
+    }
+  }
+
+  /** Bringt er nur einen leeren (es stand noch keiner, E-192)? */
+  get bringtNur(): boolean {
+    return this.hakenlift && this.muellPlan !== null && this.muellPlan.voll === null;
   }
 
   /** Wo der Container am Haken steht (Welt), für Armwinkel und Schub jetzt. */
@@ -1693,7 +1703,7 @@ class DeliveryVehicle {
     if (!plan) return;
     // Steht der Bagger dort, wo der Container hin oder her soll, wartet er und hupt
     const ziel = this.phase === "hakenAb" ? plan.leer : plan.voll;
-    if ((this.phase === "hakenAb" || this.phase === "hakenAuf") && baggerImWeg(ziel, this.baggerPos?.() ?? null)) {
+    if (ziel && (this.phase === "hakenAb" || this.phase === "hakenAuf") && baggerImWeg(ziel, this.baggerPos?.() ?? null)) {
       if (!this.hakenGehupt) {
         this.hakenGehupt = true;
         this.onHonk?.();
@@ -1720,12 +1730,9 @@ class DeliveryVehicle {
         return;
       case "hakenEin":
         if (!rein()) return;
-        this.muellSchritt = "holen";
-        this.meineAnfahrt = plan.zumVollen.anfahrt;
-        this.meinRueckweg = plan.zumVollen.rueckweg;
-        this.phase = "approach";
-        this.phaseT = 0;
-        this.routeS = 0;
+        // Gebracht (E-192): Er fährt ohne Container wieder vom Hof
+        this.abholerFaehrtRaus();
+        this.starteAusfaedeln(this.routeOut, "out", 0);
         return;
       case "hakenAus":
         if (!raus()) return;
@@ -1736,6 +1743,12 @@ class DeliveryVehicle {
             return;
           }
           this.verriegeleWannenInhalt(w);
+          /*
+           * Ab jetzt gehört er dem Abroller (E-192): Der Platz hat keinen
+           * Müll-Container mehr, bis der leere kommt — sein Schild und seine
+           * Zählzone gehen nicht mit auf die Straße.
+           */
+          this.platzinventar?.gibMuellWanneAb?.();
           const t = w.body.translation();
           const r = w.body.rotation();
           this.einziehVon = {
@@ -1757,8 +1770,8 @@ class DeliveryVehicle {
 
   /** Umriss des Containers am Haken (für Bagger und Lambert), sonst null. */
   wannenBox(): Box | null {
-    // Vor dem Tausch ist der volle noch der Müll-Container des Platzes und steht in dessen Liste
-    const w = this.tragWanne ?? (this.muellSchritt === "holen" ? this.vollWanne : null);
+    // Der volle steht bis zum Ankoppeln in der Liste des Platzes; danach hängt er am Haken
+    const w = this.tragWanne;
     if (!w) return null;
     const g = w.group;
     const q = new THREE.Euler().setFromQuaternion(g.quaternion, "YXZ");
@@ -1767,11 +1780,11 @@ class DeliveryVehicle {
 
   /** Körper des Containers am Haken — der Baggerarm taucht da nicht ein. */
   wannenKoerper(): RAPIER.RigidBody | null {
-    const w = this.tragWanne ?? (this.muellSchritt === "holen" ? this.vollWanne : null);
+    const w = this.tragWanne;
     return w && w.body.isValid() ? w.body : null;
   }
 
-  /** Holt er schon den vollen (der leere steht)? */
+  /** Holt er den vollen (Fahrt eins von zwei, E-192)? */
   get holtVollen(): boolean {
     return this.hakenlift && this.muellSchritt === "holen";
   }
@@ -3451,6 +3464,38 @@ class DeliveryVehicle {
     return tiefeVoraus > UMRISS_TOLERANZ && tiefeVoraus > tiefeJetzt;
   }
 
+  /** Steht der Bagger auf den nächsten Metern der Strecke? Gleiche Tastpunkte wie `isBlocked`. */
+  private baggerVoraus(route: Array<[number, number]>, aheadS: number, reverse: boolean): boolean {
+    const nah = this.baggerNah;
+    if (!nah) return false;
+    const ax = this.group.position.x;
+    const az = this.group.position.z;
+    const probe = this.probePoint(route, aheadS, reverse);
+    for (let t = 0.3; t <= 1.001; t += 0.235) {
+      if (nah(ax + (probe.x - ax) * t, az + (probe.z - az) * t, BLOCK_RADIUS)) return true;
+    }
+    return false;
+  }
+
+  /** Ist an (x,z) im Umkreis r der Bagger? Gesetzt vom Fuhrpark (E-192). */
+  baggerNah: ((x: number, z: number, r: number) => boolean) | null = null;
+
+  /** Welches Bauwerk steckt in der Lage voraus (Name aus der Hindernisliste)? */
+  private wasStehtImWeg(): string | null {
+    let best: string | null = null;
+    let tief = UMRISS_TOLERANZ;
+    for (const u of this.umrissCache) {
+      for (const o of alleHindernisse()) {
+        const d = umrissUeberlappung(u, o);
+        if (d > tief) {
+          tief = d;
+          best = (o as { label?: string }).label ?? null;
+        }
+      }
+    }
+    return best;
+  }
+
   private isBlocked(route: Array<[number, number]>, aheadS: number, reverse: boolean): boolean {
     if (!this.getBlocker) return false;
     const ax = this.group.position.x;
@@ -3501,6 +3546,31 @@ class DeliveryVehicle {
       if (this.blockedT > HONK_AFTER_S && !this.honked) {
         this.honked = true;
         this.onHonk?.();
+        /*
+         * WAS IM WEG STEHT, SAGT DAS BÜRO (E-192). Ein Bauwerk lässt der
+         * Fahrer nie hinter sich — steht ein versetzter Container in der
+         * Spur, wartet er für immer. Ohne Ansage sah das aus wie „der
+         * Zulieferer bleibt stecken".
+         */
+        const was = this.wasStehtImWeg();
+        if (was) this.onMeldung?.(`Büro an Bagger: Der Laster kommt nicht weiter — ${was} steht im Weg.`);
+      }
+      return false;
+    }
+    /*
+     * DER BAGGER WIRD NIE DURCHFAHREN (E-192). Bis hierher galt die
+     * Aufgeben-Regel unten auch für ihn: Nach 35 s Warten fuhr der Laster
+     * „vorsichtig weiter" — mitten durch die Maschine — und danach für den
+     * Rest der Fahrt an jedem Hindernis vorbei (`gaveUpWaiting` bleibt
+     * stehen). Gemeint war sie für liegengebliebenen Schrott. Steht der
+     * Bagger in der Spur, wartet der Fahrer, hupt und das Büro sagt es.
+     */
+    if (this.baggerVoraus(route, this.routeS + 4, reverse)) {
+      this.blockedT += dt;
+      if (this.blockedT > HONK_AFTER_S && !this.honked) {
+        this.honked = true;
+        this.onHonk?.();
+        this.onMeldung?.("Büro an Bagger: Der Laster kommt nicht vorbei — Bagger aus der Fahrspur, bitte.");
       }
       return false;
     }
@@ -4346,6 +4416,27 @@ export class VehicleManager {
    * Dann kommt kein Anlieferer an den Abladeplatz, bis sie geholt ist.
    */
   private mulde: AbgesetzteMulde | null = null;
+  /** Eine Silo-Fuhre, die wartet, bis der Bagger aus der Silogasse ist (E-192). */
+  private nachSilo: { k: DeliveryKind; kunde: CustomerProfile; silo: ContainerConfig } | null = null;
+
+  /** Steht der Bagger im Tastbereich der Strecke zu diesem Silo (`BLOCK_RADIUS`)? */
+  private baggerInGasse(silo: ContainerConfig): boolean {
+    const ex = this.getExcavatorPos?.();
+    if (!ex) return false;
+    for (const r of [bayApproach(silo), bayInRev(silo)]) {
+      for (let i = 0; i < r.length - 1; i++) {
+        const [ax, az] = r[i]!;
+        const [bx, bz] = r[i + 1]!;
+        const dx = bx - ax;
+        const dz = bz - az;
+        const L = dx * dx + dz * dz || 1e-9;
+        const t = Math.max(0, Math.min(1, ((ex.x - ax) * dx + (ex.z - az) * dz) / L));
+        if (Math.hypot(ex.x - ax - dx * t, ex.z - az - dz * t) < BLOCK_RADIUS) return true;
+      }
+    }
+    return false;
+  }
+
   /** Eine Fuhre, die kommen sollte, waehrend die Mulde stand — sie faehrt danach. */
   private nachMulde: { k: DeliveryKind; kunde: CustomerProfile } | null = null;
   /** Fuer HUD und Waechter: steht eine Mulde, und wie lange schon? */
@@ -4400,6 +4491,8 @@ export class VehicleManager {
   onMeldung: ((text: string) => void) | null = null;
   /** Ein Fahrer ist an seinem Halt angekommen und hupt (E-178, hoechstens alle `HUPE_ABSTAND_S`). */
   onAnkunftHupe: (() => void) | null = null;
+  /** War die Einfahrt beim letzten Bild offen? Für die Ansage „Platz dicht" (E-192). */
+  private einfahrtWarOffen: boolean | null = null;
   /** Eigene Uhr fuer den Hupabstand — `t` wird bei jeder Fuhre zurueckgesetzt. */
   private uhr = 0;
   private letzteHupe = -Infinity;
@@ -4454,8 +4547,8 @@ export class VehicleManager {
   private blockedAt = (x: number, z: number, r: number, ignore: Set<number>): boolean => {
     // Feste Bauten pruefen NICHT mehr hier: Sie haengen an isBlockedByBuilding,
     // damit die Aufgeben-Regel nicht auf sie durchschlaegt.
-    const ex = this.getExcavatorPos?.();
-    if (ex && Math.hypot(ex.x - x, ex.z - z) < r) return true;
+    // Der Bagger steht seit E-192 nicht mehr hier: Für ihn gilt die
+    // Aufgeben-Regel nicht (`DeliveryVehicle.baggerVoraus`).
     // In den Arbeitszonen (Abkipp-/Verladeplatz) darf Schrott liegen — dorthin
     // muss das Fahrzeug ja gerade hin.
     for (const [zx, zz, zr] of WORK_ZONES) {
@@ -4505,6 +4598,23 @@ export class VehicleManager {
       this.nachMulde = { k, kunde: gezogen };
       return;
     }
+    /*
+     * STEHT DER BAGGER IN DER SILOGASSE (E-192), wartet eine sortenreine Fuhre
+     * fürs Silo am Tor. Der Verladeplatz vor einem Silo liegt 7,5 m vor dessen
+     * Öffnung, die Gasse 5 m davor — dort, wo der Kipper zurücksetzt. Vorher
+     * fuhr er hinein, hielt vor dem Bagger und fuhr nach 35 s durch ihn
+     * hindurch. Jetzt kommt er erst, wenn die Gasse frei ist; das Büro sagt es.
+     */
+    const silo = lagerMuldeFuer(gezogen.sortedMaterial ?? null);
+    if (faehrtInsSilo(k, silo) && silo && this.baggerInGasse(silo)) {
+      if (!this.nachSilo) {
+        this.onMeldung?.(
+          `Büro an Bagger: Kipper mit ${getMaterial(gezogen.sortedMaterial!).name} wartet am Tor — der Bagger steht in der Silogasse.`
+        );
+      }
+      this.nachSilo = { k, kunde: gezogen, silo };
+      return;
+    }
     const c = gezogen;
     this.active = this.baueWagen(k, c);
     if (k === "absetzer") {
@@ -4538,8 +4648,12 @@ export class VehicleManager {
     const aufbau = this.pickupAufbau;
     const wagen = this.baueWagen(aufbau === "absetzer" ? "absetzer" : "abholer", null, null, true, aufbau === "muell");
     this.active = wagen;
-    // Der Müll-Abroller bringt den leeren Container mit (E-190)
-    if (wagen.hakenlift) wagen.nimmLeereWanne();
+    /*
+     * Der Müll-Abroller (E-190/E-192): Steht kein Müll-Container auf dem
+     * Platz, bringt er einen leeren mit; steht einer, kommt er ohne und holt ihn.
+     */
+    const bringt = wagen.hakenlift && !this.platzinventar?.muellWanne?.();
+    if (bringt) wagen.nimmLeereWanne();
     // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
     wagen.bestellung = this.pickupOrder;
     /*
@@ -4564,10 +4678,16 @@ export class VehicleManager {
     wagen.abladeplatzZu = () => this.mulde !== null;
     wagen.onMeldung = (text) => this.onMeldung?.(text);
     this.onMeldung?.(
-      `Büro an Bagger: ${this.abholAngebot(this.pickupOrder, aufbau).fahrzeug} für ${abholWas(this.pickupOrder)} ist unterwegs.`
+      this.muellRueckfahrt && bringt
+        ? "Büro an Bagger: Der Abroller bringt den leeren Müll-Container."
+        : `Büro an Bagger: ${this.abholAngebot(this.pickupOrder, aufbau).fahrzeug} für ${abholWas(this.pickupOrder)} ist unterwegs.`
     );
+    this.muellRueckfahrt = false;
     wagen.loadCargo(this.items, this.composites);
   }
+
+  /** Der nächste Müll-Abroller ist die Rückfahrt mit dem leeren (E-192). */
+  private muellRueckfahrt = false;
 
   /** Wie der Abholer kommt, der als naechster faehrt (E-177). */
   pickupAufbau: AbholAufbau = "abroller";
@@ -4601,7 +4721,7 @@ export class VehicleManager {
      * leeren 10-m³-Container und nimmt den vollen mit — im Sandkasten, wenn
      * der Platz einen Müll-Container hat.
      */
-    const muell = this.sandkastenAbholer && order === "rubble" && !!this.platzinventar?.muellWanne?.();
+    const muell = this.sandkastenAbholer && order === "rubble" && !!this.platzinventar?.muellPlatz?.();
     const wahl: AbholAufbau =
       aufbau ?? (muell ? "muell" : this.sandkastenAbholer && bereit <= absetzRaumM3() ? "absetzer" : "abroller");
     const m3 = wahl === "absetzer" ? ABSETZMULDE_NENN_M3 : wahl === "muell" ? MUELL_NENN_M3 : abrollerNennM3();
@@ -4661,6 +4781,12 @@ export class VehicleManager {
     );
     v.itemQuelle = this.items;
     v.platzinventar = this.platzinventar;
+    // E-192: Bagger in der Spur → warten statt durchfahren; das Büro sagt, was im Weg steht
+    v.baggerNah = (x, z, r) => {
+      const ex = this.getExcavatorPos?.();
+      return !!ex && Math.hypot(ex.x - x, ex.z - z) < r;
+    };
+    v.onMeldung = (text) => this.onMeldung?.(text);
     // Der Anlieferer spricht (E-082) — hier, damit auch ein Ansteher spricht.
     if (!v.isPickup) {
       v.onAnliefererlage = (lage) => this.onPickupFunk?.(v.customer?.name ?? "Fahrer", anliefererfunk(lage));
@@ -4674,7 +4800,8 @@ export class VehicleManager {
         this.onAnkunftHupe?.();
       }
       if (v.hakenlift) {
-        if (!v.holtVollen) this.onMeldung?.("Abroller tauscht den Müll-Container.");
+        if (v.bringtNur) this.onMeldung?.("Abroller stellt den Müll-Container ab.");
+        else if (v.holtVollen) this.onMeldung?.("Abroller holt den vollen Müll-Container.");
       } else if (v.isPickup) this.onMeldung?.(`${v.fahrzeugName} steht bereit — laden, dann ABHOLEN drücken (V).`);
     };
     // Die abgesetzte Mulde geht an den Fuhrpark (E-141)
@@ -4756,7 +4883,8 @@ export class VehicleManager {
      */
     if (aufbau === "muell") {
       const m = this.platzinventar?.muellWanne?.() ?? null;
-      if (!m || !planeMuellwechsel({ x: m.x, z: m.z, gier: m.gier })) {
+      const platz = !!this.platzinventar?.muellPlatz?.();
+      if (!platz || !planeMuellwechsel(m ? { x: m.x, z: m.z, gier: m.gier } : null)) {
         this.onMeldung?.("Büro an Bagger: Stell den Müll-Container an seinen Platz.");
         return "unmoeglich";
       }
@@ -4801,6 +4929,7 @@ export class VehicleManager {
       this.mulde = null;
     }
     this.nachMulde = null;
+    this.nachSilo = null;
     this.t = 0;
     this.nextSpawnT = FIRST_DELAY_S;
   }
@@ -5039,6 +5168,22 @@ export class VehicleManager {
     this.t += dt;
     this.uhr += dt;
     this.pruefeMulde(dt);
+    /*
+     * PLATZ DICHT (E-192). Liegt zu viel lose herum (`shift.JAM_KG`), macht
+     * die Einfahrt zu — wer auf einem Warteplatz am Tor ansteht, bleibt dort
+     * stehen. Im Sandkasten stand das nirgends; man sah nur einen Laster an
+     * der Waage, der sich nicht rührt. Jetzt sagt es das Büro, einmal beim
+     * Zumachen und einmal beim Aufmachen.
+     */
+    if (this.einfahrtWarOffen === null) this.einfahrtWarOffen = this.acceptDeliveries;
+    if (this.sandkastenAbholer && this.acceptDeliveries !== this.einfahrtWarOffen) {
+      this.einfahrtWarOffen = this.acceptDeliveries;
+      this.onMeldung?.(
+        this.acceptDeliveries
+          ? "Büro an Bagger: Platz wieder frei — die nächste Fuhre kommt."
+          : "Büro an Bagger: Der Platz ist voll — neue Fuhren warten am Tor, bis aufgeräumt ist."
+      );
+    }
     // Wartende Fahrzeuge weiterlaufen lassen: Pause, dann Ausfahrt
     for (let i = this.parked.length - 1; i >= 0; i--) {
       const v = this.parked[i];
@@ -5078,6 +5223,14 @@ export class VehicleManager {
         this.spawnAbholer();
         return;
       }
+      // Wer auf die freie Silogasse wartet, kommt, sobald der Bagger draußen ist (E-192)
+      if (this.nachSilo) {
+        if (this.baggerInGasse(this.nachSilo.silo)) return;
+        const n = this.nachSilo;
+        this.nachSilo = null;
+        this.spawnNow(n.k, n.kunde);
+        return;
+      }
       // Was waehrend der Mulde warten musste, kommt jetzt (E-141)
       if (this.nachMulde) {
         const n = this.nachMulde;
@@ -5112,6 +5265,15 @@ export class VehicleManager {
       return;
     }
     if (this.active.done) {
+      /*
+       * VOLL WEG, LEER ZURÜCK (E-192): Hat der Abroller den vollen geholt,
+       * kommt er gleich mit einem leeren wieder — als vorgemerkte Abholung,
+       * also vor jedem Anlieferer und ohne Wartezeit.
+       */
+      if (this.active.holtVollen && !this.vorgemerkt) {
+        this.vorgemerkt = { order: "rubble", aufbau: "muell" };
+        this.muellRueckfahrt = true;
+      }
       this.active.despawn();
       this.active = null;
       this.t = 0;

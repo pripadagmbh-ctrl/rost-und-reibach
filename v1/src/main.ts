@@ -1357,6 +1357,8 @@ async function main(): Promise<void> {
     containers.nachtschichtAktiv = false;
     // E-131: Zum Start stehen schon Fuhren an, die erste rollt gleich los
     if (!challenge) vehicles.stelleAnstehendeAuf(ANSTEH_START_ANZAHL);
+    // E-192: Kein Müll-Container zum Start — den ersten bringt der Abroller (ABHOLEN → Müll)
+    if (!challenge) containers.raeumeMuell();
   }
   // Ein Abholer faehrt nie los, solange die Spinne etwas ueber ihm haelt (E-120)
   vehicles.gegriffen = () => grip.grippedBodies;

@@ -61,6 +61,10 @@ export interface PlatzinventarPort {
   muellWanne?(): { wanne: Wanne; x: number; z: number; gier: number } | null;
   /** Eine leere Müll-Wanne bauen (an dieser Stelle). */
   baueLeereMuellWanne?(x: number, z: number): Wanne | null;
+  /** Hat der Platz einen Müll-Container — aufgestellt oder nicht (E-192)? */
+  muellPlatz?(): boolean;
+  /** Der Abroller nimmt die Müll-Wanne mit (E-192). */
+  gibMuellWanneAb?(): Wanne | null;
   /** Die leere wird der Müll-Container des Platzes; zurück kommt die alte. */
   tauscheMuell?(neu: Wanne): Wanne | null;
 }
@@ -113,6 +117,15 @@ export class ContainerAbholung implements PlatzinventarPort {
     if (!m || !w) return null;
     const r = w.body.rotation();
     return { wanne: w, x: m.ort.x, z: m.ort.z, gier: Math.atan2(2 * (r.w * r.y), 1 - 2 * r.y * r.y) };
+  }
+
+  gibMuellWanneAb(): Wanne | null {
+    this.gemerkt.clear();
+    return this.containers.gibMuellWanneAb();
+  }
+
+  muellPlatz(): boolean {
+    return this.containers.muell() !== null;
   }
 
   baueLeereMuellWanne(x: number, z: number): Wanne | null {

@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-192 | 21.10.2026 | Müll vor dem Bagger in zwei Fahrten, Spuren frei, Bagger nie durchfahren | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-191 | 21.10.2026 | Bagger hupt: Abholer fährt los; Schere heißt Presse; Maschendraht raus | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-190 | 21.10.2026 | Müll-Container wird Abrollcontainer: voll weg, leer zurück | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-188 | 20.10.2026 | Überlast einmal je Versuch, LKW-Wrack sinkt beim Zudrücken nicht, Schleppen unter Überlast | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -197,6 +198,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-192 — Müll vor dem Bagger, Fahrspuren, Waage** (iPad)
+- Sandkasten neu: kein blauer Container vor dem Bagger? ABHOLEN → Müll: bringt der Abroller einen leeren rechts vor dich an die BUNT + VA?
+- Container füllen, wieder Müll: holt er den vollen und kommt gleich mit einem leeren zurück auf denselben Platz?
+- Bagger auf die Zufahrt stellen: wartet der Laster, meldet das Büro „Bagger aus der Fahrspur"?
+- Viel Schrott liegen lassen: kommt „Der Platz ist voll — neue Fuhren warten am Tor"?
 
 **E-190 — Müll-Abroller: voll weg, leer zurück** (iPad)
 - ABHOLEN → Müll: stellt der Abroller erst den leeren ab und zieht dann den vollen hoch — sieht das wie auf einem echten Hof aus?
