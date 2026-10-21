@@ -554,6 +554,22 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 21.10.2026, Müll und Fahrwege** — Patrick, wörtlich: „Die müllmulde
+      die vor dem Bagger steht kann raus" und auf Nachfrage: „Der blaue initiale
+      Müllcontainer kommt weg, der neue wird vor die, Bagger abgestellt.
+      Fahrspuren müssen frei bleiben, der Zulieferer bleibt stecken an der Waage.
+      Sortenreine lkws fahren zur entsprechenden Mulde, muss Platz für Bagger
+      bleiben und gute Erreichbarkeit. Gilt auch für alle abholplätze"
+
+      | # | Punkt |
+      |---|---|
+      | 36a | Der blaue Müllcontainer vom Start kommt weg |
+      | 36b | Der neue Müllcontainer (vom Abroller) wird vor dem Bagger abgestellt |
+      | 36c | Fahrspuren bleiben frei |
+      | 36d | Fehler: Zulieferer bleibt an der Waage stecken |
+      | 36e | Sortenreine LKW fahren zur passenden Mulde |
+      | 36f | Platz für den Bagger und gute Erreichbarkeit — auch an allen Abholplätzen |
+
 - [ ] **Ansage 21.10.2026** — Patrick, wörtlich: „Bagger bekommt auch Hupe für
       Abfahrt, Schere wird Presse heißen. Maschendraht verschwindet."
 
