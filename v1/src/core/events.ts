@@ -1,6 +1,7 @@
 import type { Tagesbilanz } from "../economy/shift";
 import type { ChallengeMessung, ChallengeWertung } from "../challenges/challenge";
 import type { Zweisprachig } from "../challenges/texte";
+import type { LehrgangSymbol } from "../challenges/lektion";
 import type { ControlFunction } from "./controlConfig";
 import type { Spur } from "./spur";
 
@@ -215,6 +216,9 @@ export interface GameEvents {
     phase: "zeigen" | "du";
     /** Bodenmarke dieses Schritts (z. B. Lektion 3 „Spinne über die Marke"), in beiden Phasen gleich; null/fehlend = keine */
     marke?: { x: number; y: number; z: number; radiusM: number } | null;
+    /** E-197: Bildzeichen der Funktion (Leiste am Rand statt Text) und hoechstens ein Wort */
+    symbol?: LehrgangSymbol | null;
+    wort?: Zweisprachig | null;
   };
   /** Lauf → Wiedergabe: diese Spur jetzt abspielen (über den Eingabeweg des Spielers). */
   "lehrgang:vorfuehren": { spur: Spur };

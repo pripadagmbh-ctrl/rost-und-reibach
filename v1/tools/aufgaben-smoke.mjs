@@ -13,10 +13,11 @@
  * Schalter (Umgebung): SMOKE_PORT (Vorgabe 5199), LAEUFE (3), SMOKE_NUR=durchlauf
  * (nur iPad-Bild + Durchlauf + Menue), SMOKE_NUR=aufgaben (Q2: je Aufgabe aus SMOKE_AUFGABE=id,id …,
  * Vorgabe 2-6, auf mini und iPad: Erstbild, Projektion der Marken, F3, ↻ Bus + Finger, Geisterdaumen-Probe; ~10 min), SMOKE_ANGLE (d3d11 | swiftshader), SMOKE_SPUR=1 (CDP-Aufrufe zeigen).
- * SMOKE_NUR=lehrgang (Q3, E-196): je Geraet (SMOKE_GERAET=mini,ipad) Erststart → Lektion 1–3 per Touch
- * (Vorfuehrung beobachten, je eine abbrechen, nachmachen, WEITER), danach Pruefung 1, Menue, Englisch.
- * Je Geraet einen eigenen Aufruf (SMOKE_GERAET=mini, dann =ipad): Im selben Browser bekam das zweite Geraet
- * keinen WebGL-Kontext mehr („context loss … blocked"). ~4 min (mini) bzw. ~6 min (iPad) je Aufruf.
+ * SMOKE_NUR=lehrgang (Q4, E-197): der EINE Lehrgang (9 Schritte) per Touch, SMOKE_GERAET=mini|ipad|mini1:
+ * Erststart ohne Menue, je Schritt Vorfuehrung beobachten (Startlage), sichtbaren Text gegen die Mittelzone
+ * pruefen, nachmachen (aus der Spur abgeleitet, NACHAHMUNG), Erfolgsbild; nach Schritt 5 neu laden
+ * (Wiedereinstieg), Tafel, ZUR PRUEFUNG 1; dann frischer Speicher: ⏭ → ✕, ⏭ → ✓, Menue.
+ * Je Geraet einen eigenen Aufruf: Im selben Browser bekam das zweite Geraet keinen WebGL-Kontext mehr.
  * Dauer: rund 12 min (Ladezeiten 12 Seiten, Durchlauf ~1 min).
  * Ergebnis: <Ausgabeordner>/aufgaben-smoke.json + PNGs. Liest nur, schreibt nichts im Spiel.
  */
@@ -315,15 +316,27 @@ const LEHRGANG_HAKEN = `(() => {
   // Bildrate: Abstand der letzten 60 Bilder (ms) — headless ist sie niedriger als auf dem Geraet
   S.bilder = []; const raf = (t) => { S.bilder.push(t); if (S.bilder.length > 61) S.bilder.shift(); requestAnimationFrame(raf); }; requestAnimationFrame(raf);
   S.fps = () => { const b = S.bilder; return b.length > 1 ? +((1000 * (b.length - 1)) / (b[b.length - 1] - b[0])).toFixed(1) : null; };
+  // Q4: Physikschritte zaehlen (1/60 s) — die Nachahmung haelt Zwischenabschnitte so lange wie die Spur, in Spielzeit
+  S.n = 0;
+  addEventListener("touchend", () => { S.ende = performance.now(); }, { capture: true, passive: true });
+  /** Warten in der Seite, je Bild geprueft — ohne CDP-Rundreisen (sonst ~0,7 s Verzug beim Loslassen) */
+  S.warte = (f, ms) => new Promise((ok) => { const t0 = performance.now(); const g = () => { const v = f(); if (v || performance.now() - t0 > ms) { S.aufgeloest = performance.now(); ok(!!v); } else requestAnimationFrame(g); }; g(); });
+  const zaehl = setInterval(() => { const g = window.__game; if (!g) return; clearInterval(zaehl); const x = g.excavator, u = x.update;
+    x.update = function (...a) { S.n++; return u.apply(this, a); }; }, 5);
   import("/src/excavator/orbitCamera.ts").then((m) => {
     const P = m.OrbitCamera.prototype, u = P.update, d = Object.getOwnPropertyDescriptor(P, "blick");
     P.update = function (...a) { window.__orbit = this; return u.apply(this, a); };
     if (d && d.get) Object.defineProperty(P, "blick", { configurable: true, get() { window.__orbit = this; return d.get.call(this); } });
   });
+  // Q4: Erfolgsbild — beim Haekchen (nur wenn angefordert) die Lehrgangsuhr anhalten und nach 200 ms die CSS-Animationen
+  // einfrieren; das Bild (PNG DPR 3 ~1,6 s) faellt sonst hinter das 0,8-s-Leuchten. Nur Testseite, kein Spielcode.
+  import("/src/challenges/lektion.ts").then((m) => { const P = m.LektionLauf.prototype, t = P.takt; P.takt = function (...a) { if (S.halt) return; return t.apply(this, a); }; });
+  S.taue = () => { (S.angehalten || []).forEach((x) => x.play()); S.angehalten = null; S.halt = false; S.haltBeiHaken = false; S.eingefroren = null; return true; };
   import("/src/core/events.ts").then((m) => {
     const P = m.EventBus.prototype, em = P.emit;
     S.hakenDa = true;
     P.emit = function (n, e) {
+      if (n === "lehrgang:haekchen" && S.haltBeiHaken) { S.halt = true; setTimeout(() => { S.angehalten = document.getAnimations().filter((x) => x.playState === "running"); S.angehalten.forEach((x) => x.pause()); S.eingefroren = performance.now(); }, 200); }
       if (n.startsWith("lehrgang:") || (n.startsWith("challenge:") && n !== "challenge:stand"))
         S.log.push({ n, t: performance.now(), id: e && e.id, nr: e && e.nr, phase: e && e.phase, abgebrochen: e && e.abgebrochen,
           marke: e && e.marke ? { ...e.marke } : undefined, zeitS: e && e.zeitS, zust: snap(),
@@ -355,12 +368,61 @@ const MENUE_LESEN = `(() => { const el = document.getElementById("hauptmenue");
   return { offen: el.classList.contains("open"), liste: !document.getElementById("hm-liste").hidden, titel: document.getElementById("hm-listentitel")?.textContent,
     knoepfe: kn, ueberlappen: ueber, rollbar: roll, seiteRollt: document.documentElement.scrollHeight > innerHeight + 1, fenster: [innerWidth, innerHeight] }; })()`;
 
-/** Lektion 1-3 je Geraet per Touch, dann Pruefung 1, Menue, Englisch. */
+/** Q4 (E-197): sichtbarer Text im Bild. Mittelzone wie `test/lehrgangsleiste.test.ts`: zwischen den Innenkanten der
+ *  Geisterdaumen-Ringe, 25–85 % der Hoehe von oben. Ringe aus dem DOM, sonst die Zahlen des Tests (mini 168..644, iPad 249..775). */
+const TEXT_SICHT = `(() => {
+  const W = innerWidth, H = innerHeight;
+  const ring = (s) => { const e = document.querySelector("#geisterdaumen .geist." + s); const b = e && e.getBoundingClientRect(); return b && b.width ? b : null; };
+  const L = ring("links"), Rr = ring("rechts"), fest = W > 1000 ? [249, 775] : [168, 644];
+  const zone = { x0: Math.round(L ? L.right : fest[0]), x1: Math.round(Rr ? Rr.left : fest[1]), y0: Math.round(0.25 * H), y1: Math.round(0.85 * H), quelle: L && Rr ? "dom" : "test" };
+  const texte = [];
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; (n = w.nextNode()); ) {
+    const t = n.textContent.replace(/\\s+/g, " ").trim(); if (!t) continue;
+    const el = n.parentElement; if (!el || ["SCRIPT", "STYLE", "TITLE"].includes(el.tagName)) continue;
+    if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+    const r = document.createRange(); r.selectNodeContents(n);
+    const b = [...r.getClientRects()].find((q) => q.width >= 1 && q.height >= 1 && q.right > 0 && q.left < W && q.bottom > 0 && q.top < H);
+    if (!b) continue;
+    let op = 1; for (let e = el; e; e = e.parentElement) op *= +getComputedStyle(e).opacity;
+    if (op < 0.05) continue;
+    texte.push({ text: t.slice(0, 80), el: el.id || (el.className && String(el.className).slice(0, 40)) || el.tagName, x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height), deckkraft: +op.toFixed(2),
+      inZone: b.left < zone.x1 && b.right > zone.x0 && b.top < zone.y1 && b.bottom > zone.y0, worte: t.split(" ").length });
+  }
+  return { zone, texte, inZone: texte.filter((t) => t.inZone), saetze: texte.filter((t) => t.worte > 2) };
+})()`;
+
+/** Q4: Wie der Spieler einen Schritt nachmacht — abgeleitet aus Ziel und Spur des Schritts (waechst mit `lehrgang.ts`).
+ *  „hin" = die aktiven Abschnitte bis zur ersten Pause; Stickausschlaege ueber `stickAusschlag` mit der echten Belegung. */
+const NACHAHMUNG = (nr) => `(async () => {
+  const { LEKTIONEN } = await import("/src/challenges/lehrgang.ts");
+  const { stickAusschlag } = await import("/src/ui/geisterdaumen.ts");
+  const s = LEKTIONEN[0].schritte[${nr} - 1], c = __game.touch.config, ACH = ["cab", "boom", "stick", "grapple", "rotator", "drive", "steer"];
+  const spur = s.vorfuehrung ?? [];
+  const aktiv = (a) => !!((a.tasten && a.tasten.length) || a.kamera || (a.achsen && Object.values(a.achsen).some((v) => Math.abs(v) > 0.02)));
+  const hin = []; for (const a of spur) { if (!aktiv(a)) { if (hin.length) break; continue; } hin.push(a); }
+  return { von: LEKTIONEN[0].schritte.length, symbol: s.symbol ?? null, ziel: s.ziel, fahrt: spur.some((a) => a.achsen && a.achsen.drive),
+    hin: hin.map((a) => ({ dauerS: a.dauerS, tasten: a.tasten ?? null, kamera: a.kamera ?? null,
+      sticks: a.achsen ? stickAusschlag(Object.fromEntries(ACH.map((k) => [k, (a.achsen && a.achsen[k]) || 0])), c) : null })) };
+})()`;
+
+const ERFOLG_LESEN = `(() => ({ t: performance.now(), leisteHaken: !!document.querySelector("#lehrgangsleiste.haken"),
+  erfolg: [...document.querySelectorAll(".erfolg")].map((e) => e.id || String(e.className)),
+  striche: [...document.querySelectorAll("#lehrgangsleiste .punkte i")].map((i) => i.className || "-").join(" ") }))()`;
+
+const LEISTE_LESEN = `(() => { const l = document.getElementById("lehrgangsleiste"); if (!l) return null; const r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) }; };
+  return { sichtbar: !l.hidden, klasse: l.className, phase: l.dataset.phase, aria: l.getAttribute("aria-label"), kasten: r(l), skip: r(document.getElementById("lg-skip")), ja: r(document.getElementById("lg-ja")), nein: r(document.getElementById("lg-nein")),
+    karteOffen: !!document.querySelector("#tutorial.open") }; })()`;
+
+/** Q4: der eine Lehrgang (9 Schritte, E-197) je Geraet per Touch — Erststart, Bilder, Erfolg, Wiedereinstieg nach Schritt 5, Tafel, Pruefung 1, Ueberspringen. */
 async function lehrgangSmoke(cdp, neueSeite) {
   ergebnis.lehrgang = {};
-  const geraete = (process.env.SMOKE_GERAET ?? "mini,ipad").split(",");
+  const geraete = (process.env.SMOKE_GERAET ?? "mini").split(",");
+  const BILDSCHRITTE = new Set([1, 5, 9]); // Auftrag: Kamera, Fahren, Marke
+  const F3_SCHRITT = 7;
+  const WIEDER_NACH = 5; // Auftrag: nach Schritt 5 neu laden
   for (const geraet of geraete) {
-    const R = (ergebnis.lehrgang[geraet] = { lektionen: {} });
+    const R = (ergebnis.lehrgang[geraet] = { schritte: [] });
     const p = await neueSeite(geraet);
     const konsole = [];
     const hoer = (d) => {
@@ -378,12 +440,11 @@ async function lehrgangSmoke(cdp, neueSeite) {
     await p.s("Emulation.setLocaleOverride", { locale: "de-DE" }).catch(() => null);
 
     const T = (type, pts) => p.s("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([x, y, id]) => ({ x, y, id, force: 0.5 })) });
-    const logLaenge = () => p.werte("__smoke.log.length");
     const warteEv = (ab, bed, ms = 20000) =>
       p.warte(`(() => { const L = __smoke.log; for (let k = ${ab}; k < L.length; k++) { const e = L[k]; if (${bed}) return { ...e, k }; } return null; })()`, ms);
     const hatEv = (ab, bed) => p.werte(`(() => { const L = __smoke.log; for (let k = ${ab}; k < L.length; k++) { const e = L[k]; if (${bed}) return true; } return false; })()`);
     /** Finger aufsetzen, ziehen (Versatz je Finger), halten bis `bis()` oder `maxMs`, loslassen. */
-    const zieh = async (finger, { haltMs = 0, bis = null, maxMs = 12000, schritte = 6 } = {}) => {
+    const zieh = async (finger, { haltMs = 0, bis = null, bisSeite = null, maxMs = 12000, schritte = 6 } = {}) => {
       const pts = [];
       const laeuft = [];
       for (const f of finger) {
@@ -395,22 +456,23 @@ async function lehrgangSmoke(cdp, neueSeite) {
         const z = T("touchMove", finger.map((f) => [f.x + (f.dx * k) / schritte, f.y + (f.dy * k) / schritte, f.id]));
         if (k === 1) await Promise.all(laeuft);
         await z;
-        await pause(30);
+        if (schritte > 1) await pause(30);
       }
       const t0 = Date.now();
       let erreicht = false;
-      if (bis) while (Date.now() - t0 < maxMs) { if (await bis()) { erreicht = true; break; } await pause(50); }
+      if (bisSeite) erreicht = await p.werte(bisSeite);
+      else if (bis) while (Date.now() - t0 < maxMs) { if (await bis()) { erreicht = true; break; } await pause(20); }
       else await pause(haltMs);
       await T("touchEnd", []);
-      return { erreicht, haltMs: Date.now() - t0 };
+      const verzugMs = bisSeite ? await p.werte("Math.round(__smoke.ende - __smoke.aufgeloest)") : null;
+      return { erreicht, haltMs: Date.now() - t0, verzugMs };
     };
     const tipp = async (x, y, ms = 60) => {
       await T("touchStart", [[x, y, 9]]);
       await pause(ms);
       await T("touchEnd", []);
     };
-    // Doppeltipp ohne auf die Quittung zu warten: Bei wenigen Bildern je Sekunde (headless) kaemen die Tipps
-    // sonst > 320 ms auseinander an (DOUBLE_TAP_MS, touch.ts) — auf dem Geraet liegen 60 Bilder/s dazwischen
+    // Doppeltipp ohne auf die Quittung zu warten (DOUBLE_TAP_MS 320, touch.ts) — headless kaemen die Tipps sonst zu spaet
     const doppel = async (x, y) => {
       const a = [T("touchStart", [[x, y, 9]])];
       await pause(50);
@@ -429,6 +491,10 @@ async function lehrgangSmoke(cdp, neueSeite) {
       }
       throw new Error(`kein freier Punkt in ${zone}`);
     };
+    const mitte = async () => {
+      const [x, y] = await freierPunkt("zone-mitte", [[0.5, 0.6], [0.5, 0.75], [0.5, 0.45]]);
+      return { x, y };
+    };
 
     const runde = (z) => z && { cabGrad: +((z.cab * 180) / Math.PI).toFixed(2), boomGrad: +((z.boom * 180) / Math.PI).toFixed(2), stickGrad: +((z.stick * 180) / Math.PI).toFixed(2),
       x: +z.x.toFixed(3), z: +z.z.toFixed(3), headingGrad: +((z.heading * 180) / Math.PI).toFixed(2),
@@ -444,236 +510,278 @@ async function lehrgangSmoke(cdp, neueSeite) {
     const inStartlage = (d) => !!d && Math.abs(d.cabGrad) < 0.5 && Math.abs(d.boomGrad) < 0.5 && Math.abs(d.stickGrad) < 0.5 && d.wegM < 0.02 && Math.abs(d.headingGrad) < 0.5 &&
       (d.gierGrad === undefined || (d.kamModusGleich && Math.abs(d.gierGrad) < 0.5 && Math.abs(d.nickGrad) < 0.5 && Math.abs(d.abstandRel) < 0.01));
 
-    /* --- Lektion fahren. `plan[nr]`: { abbruch: "mitte"|"links", bildZeigen, bildDu, f3, tu: async (ctx) => … } */
-    const fahreLektion = async (id, plan) => {
-      const L = (R.lektionen[id] = { schritte: [] });
-      const st = await warteEv(0, `e.n === "lehrgang:start" && e.id === ${JSON.stringify(id)}`, 90000);
-      const wandStart = Date.now();
-      L.start = { karte: st.karte, menueOffen: await p.werte(`document.getElementById("hauptmenue").classList.contains("open")`), adresse: await p.werte("location.hash"), sprache: await p.werte("navigator.language") };
-      let ab = st.k;
-      for (let nr = 1; ; nr++) {
-        const pl = plan[nr] ?? {};
+    /** Den Schritt nachmachen wie ein Spieler — aus der Spur abgeleitet (NACHAHMUNG). */
+    const nachmachen = async (nr, ab, marke = null) => {
+      const hakenBed = `__smoke.log.some((e, k) => k >= ${ab} && e.n === "lehrgang:haekchen" && e.nr === ${nr})`;
+      const haken = () => p.werte(hakenBed);
+      const hakenSeite = `__smoke.warte(() => ${hakenBed}, 8000)`;
+      const info = await p.werte(NACHAHMUNG(nr));
+      const z = info.ziel;
+      if (z.art === "ansicht") {
+        const [x, y] = await freierPunkt("zone-right", [[0.5, 0.4], [0.4, 0.3], [0.6, 0.5]]);
+        let n = 0;
+        for (; n < 8 && !(await haken()); n++) { await doppel(x, y); await pause(700); }
+        return { art: "doppeltipp rechts", doppeltipps: n };
+      }
+      const kam = info.hin.find((a) => a.kamera);
+      if (kam) {
+        const k = kam.kamera, m = await mitte();
+        if (k.zoomProS && Math.abs(k.zoomProS - 1) > 1e-3) {
+          const auf = k.zoomProS < 1 ? 1 : -1; // Faktor < 1 = naeher = Finger auseinander (geisterdaumen.ts kameraGeste)
+          const r = await zieh([{ x: m.x, y: m.y - 25, dx: 0, dy: -60 * auf, id: 33 }, { x: m.x, y: m.y + 25, dx: 0, dy: 60 * auf, id: 34 }], { bisSeite: hakenSeite });
+          return { art: auf > 0 ? "spreizen" : "kneifen", ...r };
+        }
+        const dx = Math.sign(k.gierProS ?? 0) * 120, dy = Math.sign(k.nickProS ?? 0) * 120;
+        return { art: "ein Finger ziehen", dx, dy, ...(await zieh([{ ...m, dx, dy, id: 31 }], { bisSeite: hakenSeite })) };
+      }
+      if (!info.hin.length) throw new Error(`Schritt ${nr}: keine Spur zum Nachmachen`);
+      // Fahrbetrieb wie die Spur: mit Fahr-Achse an, sonst aus (Pedal antippen)
+      const fahrenVor = await p.werte(`document.getElementById("touch").classList.contains("fahren")`);
+      let pedal = false, naiv = null;
+      const punkt0 = { links: await freierPunkt("zone-left", [[0.5, 0.55], [0.6, 0.45], [0.4, 0.4]]), rechts: await freierPunkt("zone-right", [[0.5, 0.55], [0.4, 0.45], [0.6, 0.4]]) };
+      if (fahrenVor && !info.fahrt && info.hin[0]?.sticks) {
+        // Wie ein Spieler, der nur dem Geist folgt: Fahren ist noch an, er drueckt trotzdem 1,5 s in Pfeilrichtung
+        const a = info.hin[0], vor = await p.werte("__smoke.snap()");
+        const fi = ["links", "rechts"].filter((sd) => a.sticks[sd]).map((sd, i) => ({ x: punkt0[sd][0], y: punkt0[sd][1], dx: a.sticks[sd].dx * 62, dy: a.sticks[sd].dy * 62, id: 51 + i }));
+        const r = await zieh(fi, { schritte: 1, bisSeite: `__smoke.warte(() => ${hakenBed}, 1500)` });
+        await pause(400);
+        const nach = await p.werte("__smoke.snap()");
+        naiv = { haekchen: r.erreicht, cabGrad: +(((nach.cab - vor.cab) * 180) / Math.PI).toFixed(1), headingGrad: +(((nach.heading - vor.heading) * 180) / Math.PI).toFixed(1), wegM: +Math.hypot(nach.x - vor.x, nach.z - vor.z).toFixed(2) };
+      }
+      if (!!info.fahrt !== fahrenVor && !(await haken())) { await p.tippe("#pedal-l"); await pause(300); pedal = true; }
+      const fahrenNach = await p.werte(`document.getElementById("touch").classList.contains("fahren")`);
+      const punkt = { links: await freierPunkt("zone-left", [[0.5, 0.55], [0.6, 0.45], [0.4, 0.4]]), rechts: await freierPunkt("zone-right", [[0.5, 0.55], [0.4, 0.45], [0.6, 0.4]]) };
+      const abschnitte = [];
+      if (z.art === "marke" && marke && info.hin.length >= 2) {
+        /*
+         * Wie ein Spieler mit Blick auf die Marke: erst schwenken (erster Abschnitt der Spur), dann heranholen
+         * (zweiter), jeweils mit Vorhalt loslassen und nachkorrigieren. Reines Nachzeitmessen traf headless nicht:
+         * Zwischen „genug" in der Seite und dem Loslassen per CDP liegen 0,1–1,3 s (Q4-Messung).
+         */
+        const lage = `(() => { const g = __game, x = g.excavator, sp = x.getSensorPosition(new g.THREE.Vector3()), p = x.position, m = ${JSON.stringify({ x: marke.x, z: marke.z })};
+          const b = (X, Z) => Math.atan2(X - p.x, Z - p.z); let e = ((b(m.x, m.z) - b(sp.x, sp.z)) * 180) / Math.PI; e = ((e + 540) % 360) - 180;
+          // Schwenkfehler ueber den Drehkranz, nicht ueber die pendelnde Spinne: Peilung bei Beginn minus bisher geschwenkt
+          if (window.__m0 === undefined) window.__m0 = { e, cab: x.cabYaw };
+          e = window.__m0.e - ((x.cabYaw - window.__m0.cab) * 180) / Math.PI;
+          return { e, r: Math.hypot(sp.x - p.x, sp.z - p.z) - Math.hypot(m.x - p.x, m.z - p.z), d: Math.hypot(sp.x - m.x, sp.z - m.z) }; })()`;
+        const [schwenk, heran] = info.hin;
+        await p.werte("delete window.__m0; true");
+        const l0 = await p.werte(lage);
+        const vz = { e: Math.sign(l0.e) || 1, r: Math.sign(l0.r) || 1 };
+        const finger = (a, sign, k) => ["links", "rechts"].filter((sd) => a.sticks?.[sd]).map((sd, i) => ({ x: punkt[sd][0], y: punkt[sd][1], dx: a.sticks[sd].dx * 62 * sign * k, dy: a.sticks[sd].dy * 62 * sign * k, id: 61 + i, seite: sd }));
+        for (let runde = 0; runde < 10 && !(await haken()); runde++) {
+          const l = await p.werte(lage);
+          let r;
+          if (Math.abs(l.e) > 3) { // SW: 3° bei ~6,5 m Ausladung = 0,34 m, Marke hat 0,5 m
+            const gross = Math.abs(l.e) > 8, sign = Math.sign(l.e) === vz.e ? 1 : -1, s0 = Math.sign(l.e);
+            const halt = gross ? 7 : 1.5; // SW: Vorhalt in Grad fuer Auslauf + Verzug (gemessen 0,1–0,6 s)
+            r = await zieh(finger(schwenk, sign, gross ? 1 : 0.3), { schritte: 1, bisSeite: `__smoke.warte(() => { const l = ${lage}; return Math.abs(l.e) < ${halt} || Math.sign(l.e) !== ${s0}; }, 6000)` });
+            abschnitte.push({ was: "schwenken", vorGrad: +l.e.toFixed(1), sign, gross, ...r });
+          } else {
+            const gross = Math.abs(l.r) > 0.8, sign = Math.sign(l.r) === vz.r ? 1 : -1, s0 = Math.sign(l.r);
+            const halt = gross ? 0.5 : 0.15; // SW: Vorhalt in m
+            r = await zieh(finger(heran, sign, gross ? 1 : 0.5), { schritte: 1, bisSeite: `__smoke.warte(() => { const l = ${lage}; return ${hakenBed} || Math.abs(l.r) < ${halt} || Math.sign(l.r) !== ${s0}; }, 6000)` });
+            abschnitte.push({ was: "heranholen", vorM: +l.r.toFixed(2), sign, gross, ...r });
+          }
+          await pause(500); // Auslauf abwarten, dann neu schauen
+        }
+        abschnitte.push({ ende: await p.werte(lage) });
+        return { art: "Marke (Schwenken, Heranholen, nachkorrigiert)", pedal, naiv, abschnitte };
+      }
+      for (let i = 0; i < info.hin.length; i++) {
+        const a = info.hin[i], letzter = i === info.hin.length - 1;
+        const finger = [];
+        let id = 41 + 2 * i;
+        for (const seite of ["links", "rechts"]) {
+          const s = a.sticks?.[seite];
+          if (s) finger.push({ x: punkt[seite][0], y: punkt[seite][1], dx: s.dx * 62, dy: s.dy * 62, id: id++, seite }); // 62 px = Vollausschlag (touch.ts RADIUS)
+        }
+        if (!finger.length) continue;
+        // Zwischenabschnitte so lange wie in der Spur, gemessen in Physikschritten (1/60 s, wie die Wiedergabe); der letzte bis zum Haekchen
+        const soll = Math.round(a.dauerS * 60);
+        await p.werte("window.__n0 = null; true");
+        // Zaehler startet, sobald der Finger liegt (erste Abfrage nach dem Ziehen)
+        const r = await zieh(finger, { schritte: 1, bisSeite: letzter ? `(window.__n0 = __smoke.n, ${hakenSeite})` : `(window.__n0 = __smoke.n, __smoke.warte(() => __smoke.n - window.__n0 >= ${soll}, 8000))` });
+        abschnitte.push({ finger: finger.map((f) => `${f.seite} ${f.dx.toFixed(0)},${f.dy.toFixed(0)}`).join(" + "), sollSchritte: letzter ? "bis Haekchen" : soll, physikSchritte: await p.werte("__smoke.n - window.__n0"), ...r });
+      }
+      return { art: "Sticks", pedal, naiv, fahrenVor, fahrenNach, abschnitte };
+    };
+
+    /** Schritte `von`..`bis` fahren; `ab` = Logstelle von `lehrgang:start`. */
+    const fahreSchritte = async (von, bis, ab, liste = R.schritte, bilder = true) => {
+      for (let nr = von; nr <= bis; nr++) {
+        const bildHier = bilder && BILDSCHRITTE.has(nr);
         const ev = await warteEv(ab, `(e.n === "lehrgang:schritt" && e.nr === ${nr}) || e.n === "lehrgang:geschafft"`, 30000);
-        if (ev.n === "lehrgang:geschafft") break;
-        const S = { nr, phase1: ev.phase, karteBeginn: ev.karte, marke: ev.marke ?? null };
-        L.schritte.push(S);
+        if (ev.n === "lehrgang:geschafft") throw new Error(`geschafft vor Schritt ${nr}`);
+        const S = { nr, phase1: ev.phase, von: null, marke: ev.marke ?? null };
+        liste.push(S);
         ab = ev.k;
         const tBeginn = Date.now();
-        const proben = [];
         if (ev.phase === "zeigen") {
           const vf = await warteEv(ab, `e.n === "lehrgang:vorfuehren"`, 5000);
           S.vorher = runde(vf.zust);
-          let abgebrochen = false;
-          let bildGemacht = false;
+          let gelesen = false;
+          const proben = [];
           for (;;) {
-            const g = await p.werte(GEIST_LESEN);
-            proben.push({ ms: Date.now() - tBeginn, ...g });
-            if (!bildGemacht && pl.bildZeigen && Date.now() - tBeginn > (pl.bildNachMs ?? 600)) {
-              S.geistVorBild = await p.werte(GEIST_LESEN);
-              S.fpsZeigen = await p.werte("__smoke.fps()");
-              S.bildZeigen = await p.bild(`${geraet}_${id}_s${nr}_zeigen`);
-              S.geistBeimBild = await p.werte(GEIST_LESEN);
-              bildGemacht = true;
-            }
-            if (pl.abbruch && !abgebrochen && Date.now() - tBeginn > (pl.bildNachMs ?? 600) + 200) {
-              const z = await p.werte(ZONEN);
-              const [ax, ay] = pl.abbruch === "mitte" ? await freierPunkt("zone-mitte", [[0.5, 0.65], [0.5, 0.8]]) : await freierPunkt("zone-left", [[0.5, 0.55], [0.6, 0.45], [0.4, 0.4]]);
-              S.abbruch = { wo: pl.abbruch, x: ax, y: ay, msNachBeginn: Date.now() - tBeginn, tSeite: await p.werte("performance.now()"), zonen: z };
-              await tipp(ax, ay, 400); // 400 ms: auch bei wenigen Bildern je Sekunde sieht die Wiedergabe den Finger
-              abgebrochen = true;
+            proben.push(await p.werte(GEIST_LESEN));
+            if (!gelesen && Date.now() - tBeginn > 600) {
+              S.textZeigen = await p.werte(TEXT_SICHT);
+              S.leisteZeigen = await p.werte(LEISTE_LESEN);
+              S.geistZeigen = await p.werte(GEIST_LESEN);
+              if (bildHier) S.bildZeigen = await p.bild(`${geraet}_s${nr}_1_zeigen`);
+              gelesen = true;
             }
             if (await hatEv(ab, `e.n === "lehrgang:vorfuehrungEnde"`)) break;
-            if (Date.now() - tBeginn > 30000) throw new Error(`Vorfuehrung ${id}/${nr} endet nicht`);
+            if (Date.now() - tBeginn > 30000) throw new Error(`Vorfuehrung ${nr} endet nicht`);
             await pause(80);
           }
           const ende = await warteEv(ab, `e.n === "lehrgang:vorfuehrungEnde"`, 1000);
-          S.vorfuehrungMs = Date.now() - tBeginn;
-          // Seitenuhr: wirkliche Dauer der Vorfuehrung (Spur 2,6-5 s) und wann der Abbruch-Finger kam
           S.vorfuehrungSeiteMs = Math.round(ende.t - vf.t);
-          S.erkanntNachMs = Math.round(proben[0] ? proben[0].t - vf.t : -1);
-          if (S.abbruch) S.abbruch.nachVorfuehrenMs = Math.round(S.abbruch.tSeite - vf.t);
+          S.zeigenProben = { n: proben.length, links: proben.some((q) => q.geister.some((g) => g.seite === "links")), rechts: proben.some((q) => q.geister.some((g) => g.seite === "rechts")),
+            pedale: proben.filter((q) => q.pedaleLeuchten).length, kamGesten: [...new Set(proben.map((q) => q.kamgeist).filter(Boolean))], schilder: [...new Set(proben.map((q) => q.schild).filter(Boolean))] };
           S.abgebrochen = ende.abgebrochen;
           S.nachher = runde(ende.zust);
           S.delta = diff(S.vorher, S.nachher);
           S.inStartlage = inStartlage(S.delta);
-          const du = await warteEv(ab, `e.n === "lehrgang:schritt" && e.nr === ${nr} && e.phase === "du"`, 5000);
-          ab = du.k;
-          S.karteDu = du.karte;
-          // Geist in der Vorfuehrung: Ausschlag je Seite, Kamera-Gesten, Schild
-          const max = { links: null, rechts: null };
-          // erster deutlicher Ausschlag = Hinweg (der Rueckweg kommt spaeter und zeigt entgegen)
-          // Nur Proben aus der ersten Sekunde — sonst kann es der Rueckweg sein (Schritt 1 beginnt beim Laden, bevor wir zusehen)
-          for (const q of proben) for (const g of q.geister) if (g.folgt && !max[g.seite] && Math.hypot(g.dx, g.dy) > 0.3 && q.t - vf.t < 1000) max[g.seite] = { ...g, nachMs: Math.round(q.t - vf.t) };
-          S.geistFolgt = max;
-          S.kamGesten = [...new Set(proben.map((q) => q.kamgeist).filter(Boolean))];
-          S.schilder = [...new Set(proben.map((q) => q.schild).filter(Boolean))];
-          S.pedaleLeuchteten = proben.some((q) => q.pedaleLeuchten);
-          S.proben = proben.length;
+          if (!gelesen) S.textZeigen = await p.werte(TEXT_SICHT);
         }
-        await pause(400); // Karte „Jetzt du" steht
+        const du = await warteEv(ab, `e.n === "lehrgang:schritt" && e.nr === ${nr} && e.phase === "du"`, 5000);
+        ab = du.k;
+        await pause(400); // Leiste „Jetzt du" steht
+        S.textDu = await p.werte(TEXT_SICHT);
+        S.leisteDu = await p.werte(LEISTE_LESEN);
         S.geistDu = await p.werte(GEIST_LESEN);
-        if (pl.bildDu) S.bildDu = await p.bild(`${geraet}_${id}_s${nr}_du`);
-        if (pl.f3) {
+        if (bildHier) S.bildDu = await p.bild(`${geraet}_s${nr}_2_du`);
+        if (bilder && nr === F3_SCHRITT) {
           S.f3 = await p.werte(F3_LESEN);
-          S.f3Zahl = await p.werte(`(() => { const c = __game.physics.counts(); return { koerper: c.bodies, wach: c.awake, kollider: __game.physics.world.colliders.len(), heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null }; })()`);
-          await p.bild(`${geraet}_${id}_f3`);
-          // F3 wieder aus, damit die folgenden Bilder ohne Overlay sind
+          S.f3Zahl = await p.werte(`(() => { const c = __game.physics.counts(); return { koerper: c.bodies, wach: c.awake, kollider: __game.physics.world.colliders.len(), heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, fps: __smoke.fps() }; })()`);
+          S.f3Bild = await p.bild(`${geraet}_s${nr}_f3`);
           await p.werte(`(() => { window.dispatchEvent(new KeyboardEvent("keydown", { code: "F3" })); window.dispatchEvent(new KeyboardEvent("keyup", { code: "F3" })); return true; })()`);
         }
-        const haken = () => hatEv(ab, `e.n === "lehrgang:haekchen" && e.nr === ${nr}`);
-        const tDu = Date.now();
-        S.aktion = await pl.tu({ haken, S });
+        S.fpsDu = await p.werte("__smoke.fps()");
+        if (bildHier) await p.werte("__smoke.haltBeiHaken = true");
+        S.aktion = await nachmachen(nr, ab, S.marke);
+        // Erfolgsbild sofort nach dem Loslassen — schnelles JPEG, das PNG (DPR 3) braucht ~1,6 s, das Leuchten steht 0,8 s
+        if (bildHier) {
+          S.eingefroren = await p.warte("__smoke.eingefroren", 15000).catch(() => null);
+          S.erfolg = await p.werte(ERFOLG_LESEN);
+          S.bildErfolg = await p.bild(`${geraet}_s${nr}_3_erfolg`);
+          S.erfolgNachBild = await p.werte(ERFOLG_LESEN);
+          S.textErfolg = await p.werte(TEXT_SICHT);
+          await p.werte("__smoke.taue()");
+        } else S.erfolg = await p.werte(ERFOLG_LESEN);
         const hk = await warteEv(ab, `e.n === "lehrgang:haekchen" && e.nr === ${nr}`, 15000).catch(() => null);
         S.haekchen = !!hk;
-        S.duMs = Date.now() - tDu;
-        if (hk) {
-          S.nachHaken = runde(hk.zust);
-          await pause(150);
-          S.karteHaken = await p.werte(`document.getElementById("tutorial").innerText.replace(/\\n+/g, " | ")`);
-          if (pl.bildHaken) S.bildHaken = await p.bild(`${geraet}_${id}_s${nr}_haken`);
-          ab = hk.k;
-        } else {
-          S.bildFehlt = await p.bild(`${geraet}_${id}_s${nr}_KEIN-HAKEN`);
+        if (!hk) {
+          S.bildFehlt = await p.bild(`${geraet}_s${nr}_KEIN-HAKEN`);
           S.stand = await p.werte(`__smoke.snap()`);
-          throw new Error(`kein Haekchen ${id}/${nr}`);
+          throw new Error(`kein Haekchen ${nr}`);
         }
-        log(geraet, id, nr, "zeigen:", S.vorfuehrungMs ?? "-", "ms abgebrochen:", S.abgebrochen ?? "-", "Startlage:", S.inStartlage ?? "-", "Haken:", S.haekchen, S.duMs, "ms");
+        S.duSeiteMs = Math.round(hk.t - du.t);
+        S.losgelassenNachHakenMs = bildHier ? null : Math.round(S.erfolg.t - hk.t); // obere Grenze: Lesen nach dem Loslassen
+        S.wandMs = Date.now() - tBeginn;
+        S.nachHaken = runde(hk.zust);
+        ab = hk.k;
+        log(geraet, "Schritt", nr, "zeigen:", S.vorfuehrungSeiteMs ?? "-", "ms Startlage:", S.inStartlage ?? "-", "Haken:", S.haekchen, S.duSeiteMs, "ms, Text in Zone:",
+          [S.textZeigen, S.textDu].map((t) => (t ? t.inZone.length : "-")).join("/"), JSON.stringify(S.aktion).slice(0, 160));
+        writeFileSync(join(AUS, "aufgaben-smoke.json"), JSON.stringify(ergebnis, null, 2));
       }
-      const gs = await warteEv(ab, `e.n === "lehrgang:geschafft"`, 5000);
-      L.geschafftSpielzeitS = +gs.zeitS.toFixed(1);
-      L.wandS = +((Date.now() - wandStart) / 1000).toFixed(1);
-      await p.warte("document.getElementById('abrechnung').classList.contains('open')", 10000);
-      await pause(1500);
-      L.tafel = await p.werte(`(() => { const t = (id) => { const e = document.getElementById(id); if (!e) return null; const b = e.getBoundingClientRect(); return { text: e.innerText, versteckt: e.hidden, drin: b.bottom <= innerHeight && b.top >= 0 }; };
-        return { kopf: t("abr-kopf"), sterne: t("abr-sterne"), zahlen: t("abr-zahlen"), weiter: t("abr-weiter"), naechste: t("abr-naechste"), menue: t("abr-menue"), lehrgang: localStorage.getItem("schrottplatz_lehrgang") }; })()`);
-      L.tafelBild = await p.bild(`${geraet}_${id}_tafel`);
-      log(geraet, id, "geschafft", L.geschafftSpielzeitS, "s Spielzeit,", L.wandS, "s Wand; Tafel:", JSON.stringify([L.tafel.kopf?.text, L.tafel.weiter?.text, L.tafel.naechste?.text, L.tafel.menue?.text]));
-      writeFileSync(join(AUS, "aufgaben-smoke.json"), JSON.stringify(ergebnis, null, 2));
+      return ab;
     };
 
-    /* Bausteine fuer „du" */
-    const mitte = async () => {
-      const [x, y] = await freierPunkt("zone-mitte", [[0.5, 0.6], [0.5, 0.75], [0.5, 0.45]]);
-      return { x, y };
-    };
-    const VEKTOR = { links: [-1, 0], rechts: [1, 0], hoch: [0, -1], runter: [0, 1], quer: [1, 0], laengs: [0, -1] };
-    /** Dem Geist folgen: Richtung aus der Vorfuehrung (gemessener Ausschlag), sonst aus dem Pfeil in „du". */
-    const folgeGeist = async ({ haken, S }) => {
-      const finger = [];
-      let id = 21;
-      for (const seite of ["links", "rechts"]) {
-        const f = S.geistFolgt?.[seite];
-        const du = S.geistDu.geister.find((g) => g.seite === seite);
-        let v = null;
-        // Wie ein Mensch: zuerst der Pfeil in „du", sonst die Richtung, die der Geist in der Vorfuehrung zeigte
-        if (du?.pfeil) v = VEKTOR[du.pfeil];
-        else if (f && Math.hypot(f.dx, f.dy) > 0.1) v = [Math.sign(Math.round(f.dx * 2) / 2) * Math.min(1, Math.abs(f.dx) * 2), Math.sign(Math.round(f.dy * 2) / 2) * Math.min(1, Math.abs(f.dy) * 2)];
-        if (!v || (v[0] === 0 && v[1] === 0)) continue;
-        const [x, y] = du ? [du.x, du.y] : await freierPunkt(seite === "links" ? "zone-left" : "zone-right", [[0.5, 0.55], [0.6, 0.45]]);
-        finger.push({ x, y, dx: v[0] * 84, dy: v[1] * 84, id: id++, seite });
-      }
-      if (!finger.length) throw new Error("kein Geist zum Folgen");
-      const r = await zieh(finger, { bis: haken });
-      return { finger: finger.map((f) => ({ seite: f.seite, x: f.x, y: f.y, dx: f.dx, dy: f.dy })), ...r };
-    };
-    const pedal = async () => {
-      await p.tippe("#pedal-l");
-      await pause(300);
-      return p.werte(`document.getElementById("touch").classList.contains("fahren")`);
-    };
-
-    const PLAN = {
-      kamera: {
-        1: { bildZeigen: true, bildNachMs: 0, bildDu: true, bildHaken: true, tu: async ({ haken }) => { const m = await mitte(); return zieh([{ ...m, dx: 120, dy: 0, id: 31 }], { haltMs: 300 }).then(async (r) => ({ ...r, haken: await haken() })); } },
-        2: { bildZeigen: true, tu: async () => { const m = await mitte(); return zieh([{ x: m.x, y: m.y - 30, dx: 0, dy: 70, id: 32 }], { haltMs: 300 }); } },
-        3: { bildZeigen: true, abbruch: "mitte", bildNachMs: 500, tu: async () => { const m = await mitte(); return zieh([{ x: m.x, y: m.y - 20, dx: 0, dy: -60, id: 33 }, { x: m.x, y: m.y + 20, dx: 0, dy: 60, id: 34 }], { haltMs: 300 }); } },
-        4: { bildZeigen: true, bildNachMs: 800, tu: async ({ haken }) => { const [x, y] = await freierPunkt("zone-right", [[0.5, 0.4], [0.4, 0.3], [0.6, 0.5]]); let n = 0; for (; n < 4 && !(await haken()); n++) { await doppel(x, y); await pause(900); } return { x, y, doppeltipps: n }; } },
-        5: { tu: async ({ haken }) => { const [x, y] = await freierPunkt("zone-right", [[0.5, 0.4], [0.4, 0.3], [0.6, 0.5]]); let n = 0; for (; n < 8 && !(await haken()); n++) { await doppel(x, y); await pause(700); } return { doppeltipps: n }; } },
-        6: { bildZeigen: true, bildNachMs: 400, tu: async ({ haken }) => { const m = await mitte(); await zieh([{ ...m, dx: -100, dy: 0, id: 35 }], { haltMs: 200 }); await pause(300); let n = 0; for (; n < 4 && !(await haken()); n++) { await doppel(m.x, m.y); await pause(900); } return { m, doppeltipps: n }; } },
-      },
-      "fahren-schwenken": {
-        1: { bildZeigen: true, bildNachMs: 0, bildDu: true, tu: folgeGeist },
-        2: { abbruch: "links", bildNachMs: 100, tu: folgeGeist },
-        3: { bildZeigen: true, bildNachMs: 800, tu: async (c) => ({ fahrenAn: await pedal(), ...(await folgeGeist(c)) }) },
-        4: { tu: folgeGeist },
-        5: { tu: async (c) => ({ fahrenAn: await pedal(), ...(await folgeGeist(c)) }) },
-      },
-      "ausleger-stiel": {
-        1: { bildZeigen: true, bildDu: true, f3: true, tu: folgeGeist },
-        2: { tu: folgeGeist },
-        3: { tu: folgeGeist },
-        4: { tu: folgeGeist },
-        5: { bildZeigen: true, bildNachMs: 500, bildDu: true, bildHaken: true, tu: folgeGeist },
-      },
-    };
-
-    // 1. Erststart, leerer Speicher
+    // 1.–3. Erststart, leerer Speicher: der ganze Lehrgang am Stueck (1..9), Tafel, ZUR PRUEFUNG 1
+    const t0 = Date.now();
     await p.s("Page.navigate", { url: BASIS });
     R.erststart = { hakenDa: await p.warte("window.__smoke && window.__smoke.hakenDa", 30000) };
-    await fahreLektion("kamera", PLAN.kamera);
+    const st = await warteEv(0, `e.n === "lehrgang:start"`, 90000);
+    R.erststart.menueOffen = await p.werte(`document.getElementById("hauptmenue").classList.contains("open")`);
+    R.erststart.adresse = await p.werte("location.hash");
+    R.erststart.ladeBisStartMs = Date.now() - t0;
+    const tLauf = Date.now();
+    const ab9 = await fahreSchritte(1, 9, st.k);
+    const gs = await warteEv(ab9, `e.n === "lehrgang:geschafft"`, 5000);
     R.erststart.menueNieOffen = await p.werte("!__smoke.menueMs");
-    for (const [id, weiter] of [["fahren-schwenken", true], ["ausleger-stiel", true]]) {
-      if (weiter) await p.tippe("#abr-weiter");
-      await fahreLektion(id, PLAN[id]);
-    }
-    R.konsoleNachLektionen = konsole.length;
-
-    // 7. WEITER nach Lektion 3 -> Pruefung 1 (erster-griff)
-    await p.tippe("#abr-weiter");
-    await warteEv(0, `e.n === "challenge:start"`, 90000);
-    await pause(2500);
-    R.pruefung = { adresse: await p.werte("location.hash"), lage: await p.werte(LAGE), geist: await p.werte(GEIST_LESEN) };
-    R.pruefung.bild = await p.bild(`${geraet}_pruefung1_nach-weiter`);
-    R.pruefung.neuSichtbar = R.pruefung.lage.neuKnopf?.sichtbar;
-    // ↻ per Finger: Neustart ohne Neuladen
-    await p.werte("window.__marke = 'gleiche Seite'; true");
-    const vorNeu = await logLaenge();
-    await p.tippe("#tut-neu");
-    R.pruefung.neustart = !!(await warteEv(vorNeu, `e.n === "challenge:start"`, 8000).catch(() => null));
-    R.pruefung.gleicheSeite = await p.werte("window.__marke === 'gleiche Seite'").catch(() => false);
+    R.durchlauf = { wandS: +((Date.now() - tLauf) / 1000).toFixed(1), spielzeitS: +gs.zeitS.toFixed(1), mehrSchritte: await hatEv(ab9, `e.n === "lehrgang:schritt"`) };
+    await p.warte("document.getElementById('abrechnung').classList.contains('open')", 10000);
     await pause(1500);
-    R.pruefung.bildNachNeu = await p.bild(`${geraet}_pruefung1_nach-neustart`);
-    R.pruefung.seitenfehler = await p.werte("__smoke.fehler");
+    R.tafel = await p.werte(`(() => { const t = (id) => { const e = document.getElementById(id); if (!e) return null; const b = e.getBoundingClientRect(); return { text: e.innerText, versteckt: e.hidden, drin: b.bottom <= innerHeight && b.top >= 0 }; };
+      return { kopf: t("abr-kopf"), sterne: t("abr-sterne"), zahlen: t("abr-zahlen"), weiter: t("abr-weiter"), naechste: t("abr-naechste"), menue: t("abr-menue"), lehrgang: localStorage.getItem("schrottplatz_lehrgang") }; })()`);
+    R.tafelBild = await p.bild(`${geraet}_5_tafel`);
+    log(geraet, "Tafel", JSON.stringify([R.tafel.kopf?.text, R.tafel.weiter?.text, R.tafel.menue?.text]), "Speicher", R.tafel.lehrgang, "Durchlauf", JSON.stringify(R.durchlauf));
+    await p.tippe("#abr-weiter");
+    const cs = await warteEv(0, `e.n === "challenge:start"`, 90000);
+    await pause(2500);
+    R.pruefung = { id: cs.id, adresse: await p.werte("location.hash"), bild: await p.bild(`${geraet}_6_pruefung1`) };
+    R.pruefung.f3 = await p.werte(F3_LESEN);
+    R.konsoleNachDurchlauf = konsole.length;
+    R.seitenfehlerDurchlauf = await p.werte("__smoke.fehler");
 
-    // 4. Menue nach dem ersten Start
+    // 4. Wiedereinstieg: frischer Speicher, Schritte 1..5 (ohne Bilder), neu laden, Menue, LEHRGANG
+    const W = (R.wiedereinstieg = { schritte: [] });
+    await p.s("Storage.clearDataForOrigin", { origin: BASIS.slice(0, -1), storageTypes: "local_storage" });
+    await p.s("Page.navigate", { url: BASIS });
+    const sw = await warteEv(0, `e.n === "lehrgang:start"`, 90000);
+    await fahreSchritte(1, WIEDER_NACH, sw.k, W.schritte, false);
+    await pause(300);
+    W.speicherVor = await p.werte(`localStorage.getItem("schrottplatz_lehrgang")`);
     await p.s("Page.navigate", { url: BASIS });
     await p.warte("document.getElementById('hauptmenue')?.classList.contains('open')", 60000);
     await pause(500);
-    R.menue = { haupt: await p.werte(MENUE_LESEN), hauptBild: await p.bild(`${geraet}_menue_1_haupt`) };
+    W.menue = await p.werte(MENUE_LESEN);
+    W.knopf = await p.werte(`document.getElementById("hm-lehrgang")?.innerText.replace(/\\n/g, " / ")`);
+    W.lehrgangStartOhneMenue = await hatEv(0, `e.n === "lehrgang:start"`);
+    W.bild = await p.bild(`${geraet}_4_wiedereinstieg_menue`);
     await p.tippe("#hm-lehrgang");
+    const st2 = await warteEv(0, `e.n === "lehrgang:start"`, 90000);
+    const erster = await warteEv(st2.k, `e.n === "lehrgang:schritt"`, 30000);
+    W.ersterSchrittNr = erster.nr;
+    W.ersterSchrittPhase = erster.phase;
+    await pause(800);
+    W.leiste = await p.werte(LEISTE_LESEN);
+    W.leisteStriche = (await p.werte(ERFOLG_LESEN)).striche;
+    W.bildSchritt = await p.bild(`${geraet}_4b_wiedereinstieg_schritt`);
+    log(geraet, "Wiedereinstieg", W.knopf, "-> Schritt", erster.nr, "Speicher", W.speicherVor, "Striche", W.leisteStriche);
+
+    // 5. Ueberspringen — frischer Speicher
+    const U = (R.ueberspringen = {});
+    await p.s("Storage.clearDataForOrigin", { origin: BASIS.slice(0, -1), storageTypes: "local_storage" });
+    await p.s("Page.navigate", { url: BASIS });
+    const su = await warteEv(0, `e.n === "lehrgang:start"`, 90000);
+    const z1 = await warteEv(su.k, `e.n === "lehrgang:schritt" && e.nr === 1 && e.phase === "zeigen"`, 10000);
+    await pause(600);
+    await p.tippe("#lg-skip");
     await pause(400);
-    R.menue.lektionen = await p.werte(MENUE_LESEN);
-    R.menue.lektionenBild = await p.bild(`${geraet}_menue_2_lektionen`);
-    await p.tippe("#hm-zurueck");
+    U.frage = { leiste: await p.werte(LEISTE_LESEN), text: await p.werte(TEXT_SICHT), bild: await p.bild(`${geraet}_7_rueckfrage`) };
+    U.vorfuehrungAbgebrochenDurchSkip = await hatEv(z1.k, `e.n === "lehrgang:vorfuehrungEnde" && e.abgebrochen`);
+    await p.tippe("#lg-nein");
     await pause(300);
+    U.nachNein = await p.werte(LEISTE_LESEN);
+    // laeuft weiter? Schritt 1 nachmachen und das Haekchen sehen
+    const du1 = await warteEv(z1.k, `e.n === "lehrgang:schritt" && e.nr === 1 && e.phase === "du"`, 10000);
+    await pause(300);
+    await nachmachen(1, du1.k);
+    U.haekchenNachNein = !!(await warteEv(du1.k, `e.n === "lehrgang:haekchen" && e.nr === 1`, 8000).catch(() => null));
+    await warteEv(du1.k, `e.n === "lehrgang:schritt" && e.nr === 2`, 8000);
+    await pause(300);
+    await p.werte("window.__marke = 'vor Skip'; true");
+    await p.tippe("#lg-skip");
+    await pause(300);
+    await p.tippe("#lg-ja");
+    await p.warte("window.__marke !== 'vor Skip' && document.getElementById('hauptmenue')?.classList.contains('open')", 60000);
+    await pause(500);
+    U.speicher = await p.werte(`localStorage.getItem("schrottplatz_lehrgang")`);
+    U.menue = await p.werte(MENUE_LESEN);
+    U.menueBild = await p.bild(`${geraet}_8_menue_nach_skip`);
     await p.tippe("#hm-pruefungen");
     await pause(400);
-    R.menue.pruefungen = await p.werte(MENUE_LESEN);
-    R.menue.pruefungenBild = await p.bild(`${geraet}_menue_3_pruefungen`);
-    log(geraet, "Menue", JSON.stringify(R.menue.haupt.knoepfe.map((k) => k.text)), JSON.stringify(R.menue.lektionen.knoepfe.map((k) => k.text)));
-
-    // 5. Englisch: Karte (Lektion 1, Vorfuehrung) und Menue
-    await p.werte(`localStorage.setItem("sprache", "en"); true`);
-    // Nur die Raute aendern laedt nicht neu (gleiche Seite) — darum wie `zurLektion` mit reload
-    await p.werte(`location.hash = "lektion=kamera"; location.reload(); true`).catch(() => null);
-    await pause(300);
-    const enStart = await warteEv(0, `e.n === "lehrgang:start"`, 90000);
-    await warteEv(enStart.k, `e.n === "lehrgang:schritt" && e.phase === "zeigen"`, 5000);
-    await pause(700);
-    R.englisch = { karte: await p.werte(GEIST_LESEN), karteBild: await p.bild(`${geraet}_en_karte-zeigen`) };
-    await warteEv(enStart.k, `e.n === "lehrgang:schritt" && e.phase === "du"`, 15000);
-    await pause(400);
-    R.englisch.karteDu = await p.werte(GEIST_LESEN);
-    R.englisch.karteDuBild = await p.bild(`${geraet}_en_karte-du`);
+    U.pruefungen = await p.werte(MENUE_LESEN);
+    U.pruefungenBild = await p.bild(`${geraet}_9_pruefungen_nach_skip`);
     await p.s("Page.navigate", { url: BASIS });
     await p.warte("document.getElementById('hauptmenue')?.classList.contains('open')", 60000);
-    await pause(500);
-    R.englisch.menue = await p.werte(MENUE_LESEN);
-    R.englisch.menueBild = await p.bild(`${geraet}_en_menue_haupt`);
-    await p.tippe("#hm-lehrgang");
-    await pause(400);
-    R.englisch.lektionen = await p.werte(MENUE_LESEN);
-    R.englisch.lektionenBild = await p.bild(`${geraet}_en_menue_lektionen`);
+    await pause(1500);
+    U.naechsterStart = { menueOffen: await p.werte(`document.getElementById("hauptmenue").classList.contains("open")`), lehrgangGestartet: await hatEv(0, `e.n === "lehrgang:start"`) };
+    log(geraet, "Ueberspringen", JSON.stringify({ abgebrochen: U.vorfuehrungAbgebrochenDurchSkip, haken: U.haekchenNachNein, speicher: U.speicher, naechster: U.naechsterStart }));
+
     R.seitenfehler = await p.werte("__smoke.fehler");
     cdp.hoerer.splice(cdp.hoerer.indexOf(hoer), 1);
     writeFileSync(join(AUS, "aufgaben-smoke.json"), JSON.stringify(ergebnis, null, 2));
@@ -755,9 +863,9 @@ try {
       }
       throw new Error(`Zeitueberschreitung: ${expr}`);
     };
-    const bild = async (name) => {
-      const { data } = await s("Page.captureScreenshot", { format: "png" });
-      const pfad = join(AUS, `${name}.png`);
+    const bild = async (name, schnell = false) => {
+      const { data } = await s("Page.captureScreenshot", schnell ? { format: "jpeg", quality: 85, optimizeForSpeed: true } : { format: "png" });
+      const pfad = join(AUS, `${name}.${schnell ? "jpg" : "png"}`);
       writeFileSync(pfad, Buffer.from(data, "base64"));
       return pfad;
     };

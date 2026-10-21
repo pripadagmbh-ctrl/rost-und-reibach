@@ -253,15 +253,17 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
       weiter: () => (naechsteLektion ? zurLektion(naechsteLektion) : ersteP ? nochmal(ersteP) : zumMenue()),
     };
     const zeit = { name: waehle(KRITERIEN.zeitS.name, s), wert: KRITERIEN.zeitS.zahl(e.zeitS) };
-    if (!fuelle(`${wort("lektionGeschafft", s)} · ${waehle(e.name, s)}`, 0, [zeit], s)) {
-      m.hud.toast(`${wort("lektionGeschafft", s)} · ${waehle(e.name, s)}`);
+    // L4: EIN Lehrgang heisst LEHRGANG — der Name hinter „LEHRGANG GESCHAFFT" waere doppelt
+    const kopf = ids.length > 1 ? `${wort("lektionGeschafft", s)} · ${waehle(e.name, s)}` : wort("lektionGeschafft", s);
+    if (!fuelle(kopf, 0, [zeit], s)) {
+      m.hud.toast(kopf);
       return;
     }
     feld?.setAttribute("translate", "no");
     if (sterneEl) {
-      sterneEl.textContent = wort("lektionVon", s)
-        .replace("{n}", String(e.nr))
-        .replace("{m}", String(ids.length || e.nr));
+      // L4: EIN Lehrgang — „Lektion 1 von 1" sagt nichts, das ✓ reicht (Kopf sagt „LEHRGANG GESCHAFFT")
+      sterneEl.textContent =
+        ids.length > 1 ? wort("lektionVon", s).replace("{n}", String(e.nr)).replace("{m}", String(ids.length)) : "✓";
     }
     if (weiter) weiter.textContent = naechsteLektion || !ersteP ? wort("weiterGross", s) : wort("zurPruefung", s);
     if (naechste) {

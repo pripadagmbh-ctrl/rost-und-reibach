@@ -57,23 +57,26 @@ export const WORTE = {
   geschafftOhneSchwelle: { de: "geschafft", en: "completed" },
   // --- Lehrgang (E-196): Menue, Karte, Tafel
   lehrgang: { de: "LEHRGANG", en: "TRAINING" },
-  lehrgangText: { de: "{n} Lektionen: zuschauen, nachmachen.", en: "{n} lessons: watch, then try." },
+  // L4: EIN Lehrgang — Kleingedrucktes am Menueknopf; n = der naechste Schritt
+  lehrgangSchritt: { de: "Schritt {n} von {m}", en: "Step {n} of {m}" },
+  lehrgangFertig: { de: "✓ geschafft", en: "✓ done" },
   pruefungen: { de: "PRÜFUNGEN", en: "TESTS" },
   pruefungenText: { de: "Aufgaben mit Uhr und Sternen.", en: "Tasks against the clock, for stars." },
-  lektion: { de: "Lektion", en: "Lesson" },
+  // Leiste (L4): nichts davon steht sichtbar im Bild — nur Vorlesetext (aria-label)
   schritt: { de: "Schritt", en: "Step" },
+  von: { de: "von", en: "of" },
   schauZu: { de: "Schau zu", en: "Watch" },
   jetztDu: { de: "Jetzt du", en: "Your turn" },
-  antippen: { de: "Antippen überspringt", en: "Tap to skip" },
-  klickenUeberspringt: { de: "Klicken überspringt", en: "Click to skip" },
-  lektionGeschafft: { de: "LEKTION GESCHAFFT", en: "LESSON COMPLETE" },
+  ueberspringen: { de: "Lehrgang überspringen", en: "Skip training" },
+  ueberspringenJa: { de: "Ja, überspringen", en: "Yes, skip" },
+  ueberspringenNein: { de: "Nein, weiter üben", en: "No, keep practising" },
+  // Tafel nach dem Lehrgang (eine Zeile Text: sie liegt nach dem Spiel)
+  lektionGeschafft: { de: "LEHRGANG GESCHAFFT", en: "TRAINING COMPLETE" },
   lektionVon: { de: "✓ Lektion {n} von {m}", en: "✓ Lesson {n} of {m}" },
-  lektionErledigt: { de: "geschafft", en: "done" },
   weiterGross: { de: "WEITER", en: "NEXT" },
   zurPruefung: { de: "ZUR PRÜFUNG 1", en: "TO TEST 1" },
-  // --- Geisterdaumen: was eine Taste auf Touch heisst
-  ansichtTipp: { de: "ANSICHT: 2× tippen", en: "VIEW: double-tap" },
-  kranzTipp: { de: "halten, ziehen", en: "hold, swipe" },
+  // --- Geisterdaumen: was eine Taste auf Touch heisst (L4: Zeichen plus hoechstens ein Wort)
+  ansichtTipp: { de: "2× ANSICHT", en: "2× VIEW" },
   // --- Bestenliste (E-195)
   bestenliste: { de: "BESTENLISTE", en: "LEADERBOARD" },
   zurueck: { de: "Zurück", en: "Back" },

@@ -3,24 +3,27 @@
  * Fortschritt, Menü-Logik, Geisterdaumen-Folgen.
  *
  * Ohne DOM: geprüft werden die reinen Teile (`spurWerte`, `kameraZwischen`,
- * `lektionsKartenText`, `lehrgangAus`, `startWahl`, `stickAusschlag` …) und
+ * `leistenBild`, `lehrgangAus`, `startWahl`, `stickAusschlag` …) und
  * die Wiedergabe-Klasse an einem echten Bus mit einem Schreibziel aus Zahlen.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventBus, type GameEvents } from "../src/core/events";
 import type { Spur } from "../src/core/spur";
 import { KAMERA_ZURUECK, SPUR_ACHSEN, Wiedergabe, kameraZwischen, spurWerte, type WiedergabeZiel } from "../src/core/wiedergabe";
-import { lektionsKartenText } from "../src/ui/lektionskarte";
+import { BILD, leistenBild, schrittSymbol } from "../src/ui/lektionskarte";
 import {
   LEHRGANG_KEY,
   lehrgangAus,
   leererLehrgang,
   leseLehrgang,
+  lehrgangEinstieg,
   merkeLehrgangBegonnen,
-  merkeLektion,
+  merkeLehrgangFertig,
+  merkeLehrgangSchritt,
+  merkeLehrgangUebersprungen,
 } from "../src/core/save";
-import { ersterStart, lektionKnopf, startWahl, wahlAusAdresse } from "../src/ui/hauptmenue";
-import { daumenAusSpur, daumenBild, kameraAusSpur, kameraGeste, stickAusschlag, tastenText } from "../src/ui/geisterdaumen";
+import { ersterStart, lehrgangKlein, startWahl, wahlAusAdresse } from "../src/ui/hauptmenue";
+import { daumenAusSpur, daumenBild, kameraAusSpur, kameraGeste, pedaleLeuchten, stickAusschlag, tastenText } from "../src/ui/geisterdaumen";
 import { LEKTIONEN } from "../src/challenges/lehrgang";
 import type { SpurAchse } from "../src/core/spur";
 import { defaultConfig } from "../src/core/controlConfig";
@@ -290,9 +293,10 @@ describe("Wiedergabe in Physikzeit (L2b)", () => {
 // --- Geisterdaumen in „du" aus der Spur (qa-Befunde 4, 5)
 describe("Geisterdaumen in „du“: aus der Spur des Schritts", () => {
   const c = defaultConfig();
-  const lektion = (id: string) => LEKTIONEN.find((l) => l.id === id)!;
-  it("Lektion 3 Schritt 5: beide Sticks, je Richtung des ersten Ausschlags", () => {
-    const st = lektion("ausleger-stiel").schritte[4]!;
+  // L3: ein Lehrgang — Schritte ueber ihr Symbol finden
+  const schritt = (sym: string) => LEKTIONEN[0]!.schritte.find((st) => st.symbol === sym)!;
+  it("Schritt „Auf die Marke“: beide Sticks, je Richtung des ersten Ausschlags", () => {
+    const st = schritt("marke");
     const b = daumenAusSpur(st.vorfuehrung, st.zeige, c);
     expect(b.map((x) => x.seite).sort()).toEqual(["links", "rechts"]);
     // Werk: Hauptarm links längs umgekehrt → heben = hoch (nicht das Vorab-Schwenken links quer); Stiel aus zeige
@@ -300,66 +304,106 @@ describe("Geisterdaumen in „du“: aus der Spur des Schritts", () => {
     expect(b.find((x) => x.seite === "rechts")).toEqual(daumenBild(st.zeige, c));
   });
   it("zeige behält seine Seite (Doppelpfeil bei „beide“), ohne Spur nur zeige", () => {
-    const st = lektion("fahren-schwenken").schritte[4]!;
+    const st = schritt("schwenken");
     expect(daumenAusSpur(st.vorfuehrung, st.zeige, c)).toEqual([daumenBild(st.zeige, c)]);
     expect(daumenAusSpur(null, { fn: "boom", richtung: "plus" }, c)).toEqual([daumenBild({ fn: "boom", richtung: "plus" }, c)]);
     expect(daumenAusSpur(null, null, c)).toEqual([]);
   });
   it("Fahren ohne zeige: linker Stick nach oben bzw. unten", () => {
-    const l = lektion("fahren-schwenken");
-    expect(daumenAusSpur(l.schritte[2]!.vorfuehrung, null, c)).toEqual([{ seite: "links", pfeil: "hoch" }]);
-    expect(daumenAusSpur(l.schritte[3]!.vorfuehrung, null, c)).toEqual([{ seite: "links", pfeil: "runter" }]);
+    expect(daumenAusSpur(schritt("fahren").vorfuehrung, null, c)).toEqual([{ seite: "links", pfeil: "hoch" }]);
+    // Rueckwaerts zuerst (seit L3 kein eigener Schritt mehr): runter
+    expect(daumenAusSpur([{ dauerS: 1.2, achsen: { drive: -0.5 } }], null, c)).toEqual([{ seite: "links", pfeil: "runter" }]);
   });
   it("Kamera-Schritte: Geste aus der Spur, Doppeltipp hat Vorrang", () => {
-    const s = lektion("kamera").schritte;
-    expect(s.map((st) => kameraAusSpur(st.vorfuehrung))).toEqual(["rechts", "runter", "auf", "", "", "doppeltipp"]);
+    const s = LEKTIONEN[0]!.schritte.filter((st) => st.symbol === "kamera" || st.symbol === "ansicht");
+    expect(s.map((st) => kameraAusSpur(st.vorfuehrung))).toEqual(["rechts", "auf", "", ""]);
+    // Neigen und Zuruecksetzen sind seit L3 keine Schritte mehr — die Ableitung gilt weiter
+    expect(kameraAusSpur([{ dauerS: 1, kamera: { nickProS: 80 } }])).toBe("runter");
+    expect(kameraAusSpur([{ dauerS: 0.8, kamera: { gierProS: 150 } }, { dauerS: 0.8, kamera: { zuruecksetzen: true } }])).toBe("doppeltipp");
   });
 });
 
-// --- Karte
-const START: GameEvents["lehrgang:start"] = {
-  id: "hauptarm",
-  nr: 2,
-  von: 12,
-  name: { de: "Hauptarm", en: "Boom" },
-  ziel: { de: "Den Hauptarm heben und senken.", en: "Raise and lower the boom." },
-};
-const schritt = (phase: "zeigen" | "du"): GameEvents["lehrgang:schritt"] => ({
-  id: "hauptarm",
-  nr: 1,
-  von: 4,
+// --- L4b: Pedale in „du" (qa Q4 Befund 1) — Spur × Fahrbetrieb
+describe("Pedale leuchten in „du“, wenn der Fahrbetrieb nicht zum Schritt passt", () => {
+  const c = defaultConfig();
+  const st = (sym: string) => LEKTIONEN[0]!.schritte.find((x) => x.symbol === sym)!.vorfuehrung ?? null;
+  it("Tabelle über die echten Lehrgangsschritte", () => {
+    const tabelle = (["fahren", "schwenken", "arm", "stiel", "marke", "kamera"] as const).map((sym) => [
+      sym,
+      pedaleLeuchten(st(sym), false, c),
+      pedaleLeuchten(st(sym), true, c),
+    ]);
+    expect(tabelle).toEqual([
+      ["fahren", true, false], // fährt, Fahren aus → antippen
+      ["schwenken", false, true], // Drehkranz links, Fahren noch an (aus Schritt 5) → antippen
+      ["arm", false, true],
+      ["stiel", false, false], // Stiel liegt rechts: der Fahrbetrieb stört nicht
+      ["marke", false, true],
+      ["kamera", false, false], // nur Kamera: egal
+    ]);
+  });
+  it("Gegenprobe: ohne Spur nie; liegt der Stiel links, leuchtet auch der Stiel-Schritt", () => {
+    expect(pedaleLeuchten(null, true, c)).toBe(false);
+    expect(pedaleLeuchten(null, false, c)).toBe(false);
+    const getauscht = defaultConfig();
+    getauscht.leftY = { fn: "stick", invert: true };
+    getauscht.rightY = { fn: "boom", invert: true };
+    expect(pedaleLeuchten(st("stiel"), true, getauscht)).toBe(true);
+    expect(pedaleLeuchten(st("arm"), true, getauscht)).toBe(false);
+  });
+  it("Fährt die Spur und arbeitet links, gewinnt das Fahren; Rauschen unter der Ruhe zählt nicht", () => {
+    expect(pedaleLeuchten([{ dauerS: 1, achsen: { drive: 0.5, cab: 1 } }], false, c)).toBe(true);
+    expect(pedaleLeuchten([{ dauerS: 1, achsen: { drive: 0.5, cab: 1 } }], true, c)).toBe(false);
+    expect(pedaleLeuchten([{ dauerS: 1, achsen: { boom: 0.01 } }], true, c)).toBe(false);
+  });
+});
+
+// --- Leiste (L4): Zeichen statt Text
+const schritt = (phase: "zeigen" | "du", nr = 1): GameEvents["lehrgang:schritt"] => ({
+  id: "fremd",
+  nr,
+  von: 9,
   titel: { de: "Hauptarm heben", en: "Raise the boom" },
   text: { de: "{boom-}", en: "{boom-}" },
   zeige: { fn: "boom", richtung: "minus" },
   phase,
 });
 
-describe("Lektionskarte: Phasen", () => {
+describe("Lehrgangsleiste: Phase, Zeichen, Vorlesetext", () => {
   const c = defaultConfig();
-  it("Kopf Lektion n · Schritt k/m, Ziel", () => {
-    const x = lektionsKartenText(START, schritt("zeigen"), false, c, "de", true);
-    expect(x.kopf).toBe("Lektion 2 · Schritt 1/4");
-    expect(x.ziel).toBe("Ziel: Den Hauptarm heben und senken.");
-    expect(lektionsKartenText(START, schritt("zeigen"), false, c, "en", true).kopf).toBe("Lesson 2 · Step 1/4");
+  it("Phase und Häkchen kommen durch, Nummer n von m", () => {
+    expect(leistenBild(schritt("zeigen"), false, c, "de")).toMatchObject({ phase: "zeigen", haken: false, nr: 1, von: 9 });
+    expect(leistenBild(schritt("du", 4), true, c, "de")).toMatchObject({ phase: "du", haken: true, nr: 4 });
   });
-  it("zeigen: Schau zu, Hinweis Antippen (Touch) bzw. Klicken (Rechner)", () => {
-    const x = lektionsKartenText(START, schritt("zeigen"), false, c, "de", true);
-    expect(x.titel).toBe("Schau zu: Hauptarm heben");
-    expect(x.hinweis).toBe("Antippen überspringt");
-    expect(lektionsKartenText(START, schritt("zeigen"), false, c, "de", false).hinweis).toBe("Klicken überspringt");
-    expect(lektionsKartenText(START, schritt("zeigen"), false, c, "en", true).hinweis).toBe("Tap to skip");
+  it("aria-label trägt den vollen Schritt — sichtbar ist davon nichts", () => {
+    expect(leistenBild(schritt("zeigen"), false, c, "de").aria).toMatch(/^Schritt 1 von 9 · Schau zu: Hauptarm heben\. Linker Stick nach (oben|unten)$/);
+    expect(leistenBild(schritt("du"), false, c, "en").aria).toMatch(/^Step 1 of 9 · Your turn: Raise the boom\. /);
+    expect(leistenBild(schritt("du"), true, c, "de").aria).toContain("✓ Hauptarm heben");
+    expect(leistenBild(schritt("du"), false, c, "de").wort).toBe("");
   });
-  it("du: Jetzt du und die Bedienzeile aus SEINER Belegung, kein Hinweis", () => {
-    const x = lektionsKartenText(START, schritt("du"), false, c, "de", true);
-    expect(x.titel).toBe("Jetzt du: Hauptarm heben");
-    // Werkseinstellung: Hauptarm links längs, umgekehrt — „minus" = senken? Hier zählt nur, dass bedientext greift
-    expect(x.text).toMatch(/^Linker Stick nach (oben|unten)$/);
-    expect(x.hinweis).toBe("");
+  it("jeder Schritt des Lehrgangs hat ein Zeichen, für das es eine Zeichnung gibt", () => {
+    for (const l of LEKTIONEN) {
+      l.schritte.forEach((st, i) => {
+        const e = { ...schritt("du", i + 1), id: l.id, zeige: st.zeige, titel: st.titel, text: st.text };
+        const sym = schrittSymbol(e);
+        expect(sym, `${l.id} ${i + 1}`).not.toBeNull();
+        expect(BILD[sym!], `${l.id} ${i + 1}: ${sym}`).toMatch(/^<svg /);
+      });
+    }
   });
-  it("Häkchen: ✓ vor dem Titel, kein Hinweis", () => {
-    const x = lektionsKartenText(START, schritt("du"), true, c, "de", true);
-    expect(x.titel).toBe("✓ Hauptarm heben");
-    expect(x.hinweis).toBe("");
+  it("Ersatz ohne Datenfeld: aus dem, was der Schritt übt", () => {
+    const ohne = (zeige: GameEvents["lehrgang:schritt"]["zeige"], marke = false) =>
+      schrittSymbol({ ...schritt("du"), zeige, marke: marke ? { x: 0, y: 0, z: 0, radiusM: 1 } : null }, null);
+    expect(ohne({ fn: "cab", richtung: "plus" })).toBe("schwenken");
+    expect(ohne({ fn: "boom", richtung: "plus" })).toBe("arm");
+    expect(ohne({ fn: "stick", richtung: "minus" })).toBe("stiel");
+    expect(ohne({ fn: "stick", richtung: "minus" }, true)).toBe("marke");
+    expect(ohne(null)).toBeNull();
+  });
+  it("höchstens EIN Wort neben dem Zeichen (Daten, beide Sprachen)", () => {
+    for (const st of LEKTIONEN.flatMap((l) => l.schritte)) {
+      for (const s of ["de", "en"] as const) if (st.wort) expect(st.wort[s], st.wort[s]).toMatch(/^\S+$/);
+    }
   });
 });
 
@@ -378,61 +422,101 @@ function speicher(wirft = false): Map<string, string> {
 }
 afterEach(() => vi.unstubAllGlobals());
 
-describe("Fortschritt im Lehrgang", () => {
+describe("Fortschritt im Lehrgang (Schema 2)", () => {
   it("kaputt, fremde Schemanummer oder falsche Form ergibt leer", () => {
-    for (const t of [null, "", "{", "null", "[]", '{"v":2,"begonnen":true,"geschafft":[]}', '{"v":1,"geschafft":"a"}']) {
+    for (const t of [
+      null,
+      "",
+      "{",
+      "null",
+      "[]",
+      '{"v":3,"schritt":2,"fertig":false,"uebersprungen":false,"begonnen":true}',
+      '{"v":2,"schritt":-1,"fertig":false,"uebersprungen":false,"begonnen":true}',
+      '{"v":2,"schritt":1.5,"fertig":false,"uebersprungen":false,"begonnen":true}',
+      '{"v":2,"schritt":"3","fertig":false,"uebersprungen":false,"begonnen":true}',
+      '{"v":2,"schritt":3,"fertig":"ja","uebersprungen":false,"begonnen":true}',
+      '{"v":1,"geschafft":"a"}',
+    ]) {
       expect(lehrgangAus(t), String(t)).toEqual(leererLehrgang());
     }
-    expect(lehrgangAus('{"v":1,"begonnen":true,"geschafft":["a",3,"b"]}').geschafft).toEqual(["a", "b"]);
   });
-  it("begonnen, geschafft (einmal je Lektion), Roundtrip über den Speicher", () => {
+  it("Schema 1 → 2: begonnen bleibt, fertig nur mit allen drei alten Lektionen", () => {
+    expect(lehrgangAus('{"v":1,"begonnen":true,"geschafft":["kamera"]}')).toEqual({ ...leererLehrgang(), begonnen: true });
+    expect(lehrgangAus('{"v":1,"begonnen":true,"geschafft":["kamera","ausleger-stiel","fahren-schwenken"]}')).toEqual({
+      ...leererLehrgang(),
+      begonnen: true,
+      fertig: true,
+    });
+    expect(lehrgangAus('{"v":1,"begonnen":false,"geschafft":[]}')).toEqual(leererLehrgang());
+  });
+  it("Roundtrip: begonnen, je Häkchen der Schritt, geschafft = fertig; Einstieg danach von vorn", () => {
     const m = speicher();
     expect(leseLehrgang()).toEqual(leererLehrgang());
+    expect(lehrgangEinstieg()).toBe(0);
     merkeLehrgangBegonnen();
-    expect(leseLehrgang().begonnen).toBe(true);
-    merkeLektion("sticks");
-    merkeLektion("sticks");
-    merkeLektion("kamera");
-    expect(leseLehrgang().geschafft).toEqual(["sticks", "kamera"]);
+    merkeLehrgangSchritt(1);
+    merkeLehrgangSchritt(2);
+    expect(leseLehrgang()).toEqual({ ...leererLehrgang(), begonnen: true, schritt: 2 });
+    expect(lehrgangEinstieg(9)).toBe(2); // Index 2 = dritter Schritt, genau der naechste
+    expect(lehrgangEinstieg(2)).toBe(0); // Lehrgang kuerzer geworden: von vorn
+    merkeLehrgangFertig();
+    expect(leseLehrgang().fertig).toBe(true);
+    expect(lehrgangEinstieg(9)).toBe(0);
+    expect(JSON.parse(m.get(LEHRGANG_KEY)!)).toMatchObject({ v: 2 });
     m.set(LEHRGANG_KEY, "kaputt{");
     expect(leseLehrgang()).toEqual(leererLehrgang());
+  });
+  it("Überspringen merkt sich und behält die Stelle", () => {
+    speicher();
+    merkeLehrgangSchritt(3);
+    merkeLehrgangUebersprungen();
+    expect(leseLehrgang()).toEqual({ ...leererLehrgang(), begonnen: true, schritt: 3, uebersprungen: true });
+    expect(lehrgangEinstieg(9)).toBe(3);
   });
   it("gesperrter Speicher (Safari privat): leer lesen, nichts wirft", () => {
     speicher(true);
     expect(leseLehrgang()).toEqual(leererLehrgang());
-    expect(() => merkeLektion("sticks")).not.toThrow();
+    expect(() => merkeLehrgangSchritt(2)).not.toThrow();
+    expect(() => merkeLehrgangUebersprungen()).not.toThrow();
+    expect(lehrgangEinstieg()).toBe(0);
   });
 });
 
 // --- Menü
-describe("Menü: erster Start, Adresse, Lektionsliste", () => {
-  const L = ["sticks", "kamera", "stuetzen"];
+describe("Menü: erster Start, Adresse, LEHRGANG-Knopf", () => {
+  const L = ["lehrgang"];
   const P = ["erster-griff", "verladen"];
-  it("erster Start → Lektion 1; danach Menü", () => {
+  it("erster Start → Lehrgang; begonnen, übersprungen oder fertig → Menü", () => {
     const leer = leererLehrgang();
-    expect(startWahl(null, {}, leer, L, P)).toEqual({ art: "lektion", id: "sticks" });
+    expect(startWahl(null, {}, leer, L, P)).toEqual({ art: "lektion", id: "lehrgang" });
     expect(startWahl(null, {}, { ...leer, begonnen: true }, L, P)).toBeNull();
+    expect(startWahl(null, {}, { ...leer, uebersprungen: true }, L, P)).toBeNull();
+    expect(startWahl(null, {}, { ...leer, fertig: true }, L, P)).toBeNull();
     // Wer schon Prüfungen gespielt hat (vor E-196), kommt nicht in den Lehrgang gezwungen
     expect(startWahl(null, { "erster-griff": { sterne: 0 } }, leer, L, P)).toBeNull();
-    expect(ersterStart({}, { ...leer, geschafft: ["sticks"] })).toBe(false);
+    expect(ersterStart({}, { ...leer, schritt: 2 })).toBe(false);
   });
   it("ohne Lektionen wie bisher Prüfung 1", () => {
     expect(startWahl(null, {}, leererLehrgang(), [], P)).toEqual({ art: "challenge", id: "erster-griff" });
   });
-  it("Adresse #lektion= und #challenge= vor allem anderen, Unbekanntes zählt nicht", () => {
-    expect(wahlAusAdresse("#lektion=kamera", L, P)).toEqual({ art: "lektion", id: "kamera" });
+  it("Adresse #lektion=lehrgang und #challenge= vor allem anderen, Unbekanntes zählt nicht", () => {
+    expect(wahlAusAdresse("#lektion=lehrgang", L, P)).toEqual({ art: "lektion", id: "lehrgang" });
     expect(wahlAusAdresse("#challenge=verladen", L, P)).toEqual({ art: "challenge", id: "verladen" });
     expect(wahlAusAdresse("#lektion=gibtsnicht", L, P)).toBeNull();
     expect(wahlAusAdresse("#lektion=verladen", L, P)).toBeNull();
     expect(wahlAusAdresse("", L, P)).toBeNull();
-    const a = wahlAusAdresse("#lektion=stuetzen", L, P);
-    expect(startWahl(a, { x: { sterne: 3 } }, { ...leererLehrgang(), begonnen: true }, L, P)).toEqual(a);
+    const a = wahlAusAdresse("#lektion=lehrgang", L, P);
+    expect(startWahl(a, { x: { sterne: 3 } }, { ...leererLehrgang(), fertig: true }, L, P)).toEqual(a);
+    // die echte Lektion heisst so, wie die Adresse sie nennt
+    expect(LEKTIONEN.map((l) => l.id)).toContain("lehrgang");
   });
-  it("Lektionsknopf: ✓ UND Wort für geschafft, Nummer und Name", () => {
-    const l = { id: "kamera", name: { de: "Kamera", en: "Camera" } };
-    expect(lektionKnopf(2, l, true, "de")).toEqual({ kopf: "✓ 2 · Kamera", aria: "Lektion 2 · Kamera · geschafft" });
-    expect(lektionKnopf(2, l, false, "en").kopf).toBe("   2 · Camera");
-    expect(lektionKnopf(2, l, false, "en").aria).toBe("Lesson 2 · Camera");
+  it("Kleingedrucktes: „Schritt n von m“ (n = der nächste) bzw. „✓ geschafft“", () => {
+    const leer = leererLehrgang();
+    expect(lehrgangKlein(leer, 9, "de")).toBe("Schritt 1 von 9");
+    expect(lehrgangKlein({ ...leer, schritt: 4 }, 9, "en")).toBe("Step 5 of 9");
+    expect(lehrgangKlein({ ...leer, schritt: 9 }, 9, "de")).toBe("Schritt 9 von 9");
+    expect(lehrgangKlein({ ...leer, fertig: true }, 9, "de")).toBe("✓ geschafft");
+    expect(lehrgangKlein({ ...leer, fertig: true }, 9, "en")).toBe("✓ done");
   });
   it("Prüfungen heißen PRÜFUNG / TEST", () => {
     expect(WORTE.aufgabe).toEqual({ de: "PRÜFUNG", en: "TEST" });
@@ -469,9 +553,10 @@ describe("Geisterdaumen folgt der Vorführung", () => {
   });
   it("Tasten-Schild: Ansicht = 2× tippen, Kranz-Funktionen mit ihrem Namen", () => {
     const kranz = (code: string) => ({ KeyO: "STÜTZEN" })[code] ?? null;
-    expect(tastenText("KeyC", kranz, "de")).toBe("ANSICHT: 2× tippen");
-    expect(tastenText("KeyO", kranz, "de")).toBe("STÜTZEN: halten, ziehen");
-    expect(tastenText("KeyO", kranz, "en")).toBe("STÜTZEN: hold, swipe"); // der Kranzname kommt übersetzt aus der Seite
+    // L4: Zeichen plus hoechstens ein Wort
+    expect(tastenText("KeyC", kranz, "de")).toBe("2× ANSICHT");
+    expect(tastenText("KeyC", kranz, "en")).toBe("2× VIEW");
+    expect(tastenText("KeyO", kranz, "de")).toBe("STÜTZEN"); // der Kranzname kommt übersetzt aus der Seite
     expect(tastenText(KAMERA_ZURUECK, kranz, "de")).toBeNull();
     expect(tastenText("KeyQ", kranz, "de")).toBeNull();
   });

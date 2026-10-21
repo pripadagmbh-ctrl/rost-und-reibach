@@ -741,6 +741,15 @@ export class TouchControls {
     return this.left?.id != null || this.right?.id != null || this.camZeiger.size > 0;
   }
 
+  /**
+   * L4b: Ist der Fahrbetrieb an (Pedale getreten)? Nur lesen — der
+   * Geisterdaumen laesst im Lehrgang die Pedale leuchten, wenn der Schritt
+   * den anderen Betrieb braucht.
+   */
+  get fahrenAktiv(): boolean {
+    return this.fahrenAn;
+  }
+
   consumePress(code: string): boolean {
     if (!this.pressed.has(code)) return false;
     this.pressed.delete(code);

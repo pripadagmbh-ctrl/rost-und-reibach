@@ -223,35 +223,58 @@ export function merkeChallenge(id: string, sterne: number): void {
 }
 
 /**
- * DER FORTSCHRITT IM LEHRGANG (E-196) — welche Lektionen geschafft sind, und
- * ob der Lehrgang je begonnen wurde (dann zeigt der naechste Start das Menue
- * statt Lektion 1). Eigener Schluessel wie `CHALLENGE_KEY`, eigene
- * Schemanummer: Ein Stand mit fremder Nummer oder kaputtem Inhalt gilt als
- * leer — schlimmstenfalls faengt der Lehrgang wieder bei Lektion 1 an, nie
- * ein Schwarzbild. Kommt Schema 2, wird hier von 1 migriert.
+ * DER FORTSCHRITT IM LEHRGANG — eigener Schluessel wie `CHALLENGE_KEY`,
+ * eigene Schemanummer. Kaputt oder fremd = leer: schlimmstenfalls beginnt der
+ * Lehrgang wieder bei Schritt 1, nie ein Schwarzbild.
+ *
+ * Schema 2 (L4, 21.10.2026, Patrick: „Alles in einem Durchgang", „sollte auch
+ * geskippt werden koennen"): EIN Lehrgang am Stueck, Fortschritt je Schritt.
+ *   schritt        geschaffte Schritte (= Index, bei dem es weitergeht)
+ *   fertig         einmal ganz durch
+ *   uebersprungen  per ⏭ ✓ verlassen — der naechste Start zeigt das Menue
+ *   begonnen       je gestartet
+ *
+ * Schema 1 (E-196) kannte drei Lektionen einzeln. Uebernommen wird `begonnen`;
+ * `fertig` nur, wenn alle drei damaligen Lektionen geschafft waren — dann war
+ * der ganze heutige Lehrgang durch. Einzelne geschaffte Lektionen zaehlen
+ * nicht als Schritte: Wo sie im fortlaufenden Lehrgang liegen, entscheidet
+ * dessen Reihenfolge (welt), nicht dieser Speicher.
  */
 export const LEHRGANG_KEY = "schrottplatz_lehrgang";
-export const LEHRGANG_SCHEMA = 1;
+export const LEHRGANG_SCHEMA = 2;
 export interface LehrgangStand {
   v: typeof LEHRGANG_SCHEMA;
+  schritt: number;
+  fertig: boolean;
+  uebersprungen: boolean;
   begonnen: boolean;
-  /** IDs der geschafften Lektionen, in der Reihenfolge des Schaffens */
-  geschafft: string[];
 }
+/** Die Lektionen von Schema 1 (E-196, `challenges/lehrgang.ts` bis L4). */
+const V1_LEKTIONEN = ["kamera", "fahren-schwenken", "ausleger-stiel"];
 
 export function leererLehrgang(): LehrgangStand {
-  return { v: LEHRGANG_SCHEMA, begonnen: false, geschafft: [] };
+  return { v: LEHRGANG_SCHEMA, schritt: 0, fertig: false, uebersprungen: false, begonnen: false };
 }
 
-/** Rein: gelesener Text → Stand. Alles, was nicht genau passt, ergibt leer. */
+/** Rein: gelesener Text → Stand (v1 wird uebernommen). Alles, was nicht genau passt, ergibt leer. */
 export function lehrgangAus(text: string | null): LehrgangStand {
   if (!text) return leererLehrgang();
   try {
-    const d = JSON.parse(text) as Partial<LehrgangStand> | null;
-    if (!d || d.v !== LEHRGANG_SCHEMA || typeof d.begonnen !== "boolean" || !Array.isArray(d.geschafft)) {
+    const d = JSON.parse(text) as Record<string, unknown> | null;
+    if (!d || typeof d !== "object") return leererLehrgang();
+    if (d.v === 1 && typeof d.begonnen === "boolean" && Array.isArray(d.geschafft)) {
+      const g = d.geschafft as unknown[];
+      return { ...leererLehrgang(), begonnen: d.begonnen, fertig: V1_LEKTIONEN.every((id) => g.includes(id)) };
+    }
+    const s = d.schritt;
+    if (
+      d.v !== LEHRGANG_SCHEMA ||
+      typeof s !== "number" || !Number.isInteger(s) || s < 0 ||
+      typeof d.fertig !== "boolean" || typeof d.uebersprungen !== "boolean" || typeof d.begonnen !== "boolean"
+    ) {
       return leererLehrgang();
     }
-    return { v: LEHRGANG_SCHEMA, begonnen: d.begonnen, geschafft: d.geschafft.filter((x): x is string => typeof x === "string") };
+    return { v: LEHRGANG_SCHEMA, schritt: s, fertig: d.fertig, uebersprungen: d.uebersprungen, begonnen: d.begonnen };
   } catch {
     return leererLehrgang();
   }
@@ -265,26 +288,40 @@ export function leseLehrgang(): LehrgangStand {
   }
 }
 
-function schreibeLehrgang(d: LehrgangStand): void {
+function aendereLehrgang(f: (d: LehrgangStand) => Partial<LehrgangStand>): void {
+  const d = leseLehrgang();
   try {
-    localStorage.setItem(LEHRGANG_KEY, JSON.stringify(d));
+    localStorage.setItem(LEHRGANG_KEY, JSON.stringify({ ...d, ...f(d), begonnen: true }));
   } catch {
     /* privates Fenster: gilt nur fuer diese Sitzung */
   }
 }
 
-/** Beim Start einer Lektion: begonnen ist begonnen (naechster Start = Menue). */
+/** `lehrgang:start` */
 export function merkeLehrgangBegonnen(): void {
-  const d = leseLehrgang();
-  if (d.begonnen) return;
-  schreibeLehrgang({ ...d, begonnen: true });
+  aendereLehrgang(() => ({}));
+}
+/** `lehrgang:haekchen` — `nr` ist der geschaffte Schritt (ab 1), also geht es danach bei Index `nr` weiter. */
+export function merkeLehrgangSchritt(nr: number): void {
+  aendereLehrgang(() => ({ schritt: Math.max(0, Math.floor(nr)) }));
+}
+/** `lehrgang:geschafft` */
+export function merkeLehrgangFertig(): void {
+  aendereLehrgang(() => ({ fertig: true }));
+}
+/** ⏭ ✓ — die Pruefungen sind ohnehin frei, Pruefung 1 ist offen. */
+export function merkeLehrgangUebersprungen(): void {
+  aendereLehrgang(() => ({ uebersprungen: true }));
 }
 
-/** Beim Ereignis `lehrgang:geschafft`. */
-export function merkeLektion(id: string): void {
-  const d = leseLehrgang();
-  if (!d.geschafft.includes(id)) d.geschafft.push(id);
-  schreibeLehrgang({ ...d, begonnen: true });
+/**
+ * Wo `LektionLauf.start(ab)` weitermacht: Index des naechsten Schritts, bei
+ * `fertig` 0 = von vorn. `schritte` (Anzahl im Lehrgang) faengt einen Stand
+ * ab, der hinter dem Ende steht (Lehrgang inzwischen kuerzer) — dann von vorn.
+ */
+export function lehrgangEinstieg(schritte = Infinity, d: LehrgangStand = leseLehrgang()): number {
+  if (d.fertig || d.schritt >= schritte) return 0;
+  return d.schritt;
 }
 
 export function clearSave(): void {

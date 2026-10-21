@@ -71,6 +71,7 @@ import { lektionQuellen, weltQuellen } from "./challenges/quellen";
 import { LEKTIONEN, lektionNr } from "./challenges/lehrgang";
 import { LektionLauf } from "./challenges/lektion";
 import { Wiedergabe } from "./core/wiedergabe";
+import { lehrgangEinstieg } from "./core/save";
 import { installLektionsKarte } from "./ui/lektionskarte";
 import { installChallengeKarte } from "./ui/challengekarte";
 import { installGeisterdaumen } from "./ui/geisterdaumen";
@@ -489,7 +490,7 @@ async function main(): Promise<void> {
     const karte = installLektionsKarte({ bus, steuerung: () => touch.config, audio });
     lektionsKarte = karte;
     onSprache(() => karte.neuBeschriften());
-    lektionsGeist = installGeisterdaumen({ bus, steuerung: () => touch.config, vorfuehrung: wiedergabe });
+    lektionsGeist = installGeisterdaumen({ bus, steuerung: () => touch.config, vorfuehrung: wiedergabe, fahrenAn: () => touch.fahrenAktiv }); // E-197: Pedale leuchten, wenn der Fahrbetrieb nicht zum Schritt passt
     installZielmarke(scene, bus);
     vehicles.acceptDeliveries = false;
     lektion = new LektionLauf(lektionDaten, lektionNr(lektionDaten.id), LEKTIONEN.length, lektionQuellen({ bagger: excavator, kamera: orbit }), bus);
@@ -2086,7 +2087,8 @@ async function main(): Promise<void> {
     input.endFrame();
     requestAnimationFrame(frame);
   }
-  lektion?.start(); // E-196: erst jetzt — alle Zuhoerer (Karte, Geist, Wiedergabe, Tafel) haengen
+  // E-197: Wiedereinstieg beim naechsten Schritt ohne Haekchen (core/save.ts)
+  lektion?.start(lehrgangEinstieg(lektionDaten?.schritte.length)); // E-196: erst jetzt — alle Zuhoerer (Karte, Geist, Wiedergabe, Tafel) haengen
   if (!BETRIEB && !aufgabenPlatz) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
   requestAnimationFrame(frame);
 }

@@ -64,7 +64,7 @@ function raster(hoehen: number[], spalten: number, luecke: number): number {
 }
 
 const HAUPT_TEXTE = (s: Sprache): string[] => [
-  wort("lehrgangText", s).replace("{n}", "12"),
+  wort("lehrgangSchritt", s).replace("{n}", "60").replace("{m}", "60"), // L4: SW-Obergrenze, 12 Themen x 5 Schritte
   wort("pruefungenText", s),
   "Ein Arbeitstag auf dem Platz, Schicht für Schicht.", // SCHICHT: Platzhalter in typischer Länge
   wort("sandkastenText", s),

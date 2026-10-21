@@ -16,6 +16,7 @@
  */
 import * as THREE from "three";
 import type { EventBus } from "../core/events";
+import { HAEKCHEN_PAUSE_S } from "../challenges/lektion";
 
 /** Hoehe der Kegelspitze ueber dem Punkt (m). SW: ueber einem Auto (1,5 m) noch frei sichtbar. */
 const SCHWEBE_M = 2.2;
@@ -25,7 +26,11 @@ const WIPP_HZ = 0.9;
 /** Ring knapp ueber dem Punkt (m), damit er nicht im Boden flimmert. SW */
 const RING_UEBER_M = 0.08;
 
-const FARBE = { teil: 0xf0c020, ziel: 0x4fd06a } as const; // SW: Gelb wie die Karte, Gruen wie ✓
+const FARBE = { teil: 0xf0c020, ziel: 0x4fd06a, erfolg: 0xc8ffd4 } as const; // SW: Gelb wie die Karte, Gruen wie ✓, Erfolg fast weiss-gruen
+/** L4: so lange pulst die Marke beim Haekchen — die Pause, bis der naechste Schritt sie wegraeumt */
+const ERFOLG_S = HAEKCHEN_PAUSE_S;
+/** SW: Ring schwillt um die Haelfte an — aus 11 m Abstand deutlich, ohne Nachbarn zu verdecken */
+const ERFOLG_WUCHS = 0.5;
 
 export interface Zielmarke {
   /** Alle Marken weg (auch von aussen, z. B. vor einem Neuaufbau). */
@@ -48,7 +53,8 @@ export function installZielmarke(scene: THREE.Scene, bus: EventBus): Zielmarke {
       depthWrite: false,
       fog: false,
     });
-  const mat = { teil: material(FARBE.teil), ziel: material(FARBE.ziel) };
+  const mat = { teil: material(FARBE.teil), ziel: material(FARBE.ziel), erfolg: material(FARBE.erfolg) };
+  mat.erfolg.opacity = 1;
 
   const vorrat: Array<{ kegel: THREE.Mesh; ring: THREE.Mesh }> = [];
   const neueMarke = (): { kegel: THREE.Mesh; ring: THREE.Mesh } => {
@@ -128,6 +134,33 @@ export function installZielmarke(scene: THREE.Scene, bus: EventBus): Zielmarke {
     sichtbar = 1;
   });
   bus.on("lehrgang:geschafft", leeren);
+
+  /*
+   * L4 (Patrick: „sollte irgendwie gehighlighten sein, wenn eine aktion
+   * erfolgreich war"): Beim Haekchen leuchtet die Marke hell auf und der Ring
+   * schwillt einmal an und ab — `ERFOLG_S` lang, so lang wie die
+   * Haekchen-Pause des Laufs, danach raeumt der naechste Schritt sie weg.
+   */
+  let puls = 0;
+  bus.on("lehrgang:haekchen", () => {
+    const mk = vorrat[0];
+    if (sichtbar !== 1 || !mk || mk.ring.material !== mat.ziel) return;
+    mk.kegel.material = mat.erfolg;
+    mk.ring.material = mat.erfolg;
+    const basis = mk.ring.scale.x;
+    const t0 = performance.now();
+    const lauf = ++puls;
+    const schritt = (): void => {
+      const k = (performance.now() - t0) / 1000 / ERFOLG_S;
+      if (lauf !== puls || !mk.ring.visible) return;
+      mk.ring.scale.setScalar(basis * (1 + ERFOLG_WUCHS * Math.sin(Math.PI * Math.min(1, k))));
+      if (k < 1) requestAnimationFrame(schritt);
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(schritt);
+  });
+  bus.on("lehrgang:schritt", () => {
+    puls++; // ein laufender Puls hoert auf
+  });
 
   return { leeren };
 }

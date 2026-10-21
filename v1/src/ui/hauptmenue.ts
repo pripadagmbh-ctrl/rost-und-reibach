@@ -2,11 +2,15 @@
  * DAS HAUPTMENÜ (E-118) — seit E-196 zweistufig:
  *
  *   Stufe 1 (`#hm-haupt`): LEHRGANG · PRÜFUNGEN · (SCHICHT) · SANDKASTEN · BESTENLISTE
- *   Stufe 2 (`#hm-liste`):  die Lektionen mit ✓ bzw. die Prüfungen mit Sternen
+ *   Stufe 2 (`#hm-liste`):  die Prüfungen mit Sternen
  *
- * Zweistufig, weil fünf Hauptknöpfe plus zwölf Lektionen plus sechs
- * Prüfungen auf dem iPhone mini quer (354 px nutzbare Höhe) nur mit Scrollen
- * in eine Liste passten. Rechnung bei `#hauptmenue` in index.html und in
+ * LEHRGANG ist seit L4 (Patrick 21.10.2026: „Alles in einem Durchgang") EIN
+ * Knopf ohne Untermenü: Er startet den einen Lehrgang dort, wo der Spieler
+ * aufgehört hat (`lehrgangEinstieg` in core/save.ts, main.ts reicht es an
+ * `LektionLauf.start`), Kleingedrucktes „Schritt n von m" bzw. „✓ geschafft".
+ *
+ * Zweistufig, weil fünf Hauptknöpfe plus sechs Prüfungen auf dem iPhone mini
+ * quer (354 px nutzbare Höhe) nur mit Scrollen in eine Liste passten. Rechnung bei `#hauptmenue` in index.html und in
  * `test/hauptmenue-platz.test.ts`.
  *
  * Es steht VOR dem Aufbau der Welt: `main.ts` wartet auf die Wahl und baut
@@ -18,8 +22,8 @@
  * angeschlossen) wie bisher in Prüfung 1.
  *
  * Prüfungen werden NACHEINANDER freigeschaltet (E-162): n+1 ist offen, sobald
- * n mindestens einen Stern hat. Lektionen sind alle offen und einzeln
- * wiederholbar. Gesperrte Knöpfe sind `disabled`, tragen ein Schloss UND
+ * n mindestens einen Stern hat. Der Lehrgang ist jederzeit wiederholbar und
+ * sperrt nichts (auch übersprungen nicht). Gesperrte Knöpfe sind `disabled`, tragen ein Schloss UND
  * sagen, was fehlt (Kap. 20: nie nur Farbe). Alle Texte zweisprachig.
  *
  * EIN WEITERER HAUPTKNOPF (z. B. SCHICHT): ein `<button id="hm-…">` an seiner
@@ -46,6 +50,8 @@ export type Spielwahl =
 export interface LektionEintrag {
   id: string;
   name: Zweisprachig;
+  /** nur gezählt: „Schritt n von m" */
+  schritte?: readonly unknown[];
 }
 
 /**
@@ -86,9 +92,15 @@ export function wahlAusAdresse(
   return challengeIds.includes(id) ? { art: "challenge", id } : null;
 }
 
-/** Erster Start = weder eine Prüfung noch der Lehrgang je begonnen. */
+/** Erster Start = weder eine Prüfung noch der Lehrgang je begonnen (auch nicht übersprungen). */
 export function ersterStart(challenges: ChallengeStand, lehrgang: LehrgangStand): boolean {
-  return Object.keys(challenges).length === 0 && !lehrgang.begonnen && lehrgang.geschafft.length === 0;
+  return (
+    Object.keys(challenges).length === 0 &&
+    !lehrgang.begonnen &&
+    !lehrgang.fertig &&
+    !lehrgang.uebersprungen &&
+    lehrgang.schritt === 0
+  );
 }
 
 /** Rein: Wohin es ohne Menü geht — Adresse vor erstem Start; null = Menü zeigen. */
@@ -105,18 +117,11 @@ export function startWahl(
   return challengeIds[0] ? { art: "challenge", id: challengeIds[0] } : null;
 }
 
-/** Rein: Beschriftung eines Lektionsknopfs — ✓ UND Wort (Kap. 20), das Wort für die Sprachausgabe. */
-export function lektionKnopf(
-  nr: number,
-  l: LektionEintrag,
-  geschafft: boolean,
-  s: Sprache
-): { kopf: string; aria: string } {
-  const name = waehle(l.name, s);
-  return {
-    kopf: `${geschafft ? "✓" : "  "} ${nr} · ${name}`,
-    aria: `${wort("lektion", s)} ${nr} · ${name}${geschafft ? ` · ${wort("lektionErledigt", s)}` : ""}`,
-  };
+/** Rein: Kleingedrucktes am LEHRGANG-Knopf — „Schritt n von m" (n = der nächste) bzw. „✓ geschafft" (Zeichen UND Wort, Kap. 20). */
+export function lehrgangKlein(stand: LehrgangStand, schritte: number, s: Sprache): string {
+  if (stand.fertig) return wort("lehrgangFertig", s);
+  const n = Math.min(stand.schritt + 1, Math.max(1, schritte));
+  return wort("lehrgangSchritt", s).replace("{n}", String(n)).replace("{m}", String(schritte));
 }
 
 function adresseLoeschen(): void {
@@ -204,7 +209,7 @@ export function waehleSpielart(lektionen: readonly LektionEintrag[] = []): Promi
     };
 
     /** Stufe 2 zeigen: Titel, Knöpfe, Zurück. */
-    const zeigeListe = (titel: string, art: "lektionen" | "pruefungen", knoepfe: HTMLButtonElement[]): void => {
+    const zeigeListe = (titel: string, art: "pruefungen", knoepfe: HTMLButtonElement[]): void => {
       listenTitel.textContent = titel;
       eintraege.className = art;
       eintraege.replaceChildren(...knoepfe);
@@ -221,18 +226,6 @@ export function waehleSpielart(lektionen: readonly LektionEintrag[] = []): Promi
     window.addEventListener("keydown", (e) => {
       if (e.code === "Escape" && !listeEl.hidden && el.classList.contains("open")) zurueck();
     });
-
-    const lektionsKnoepfe = (): HTMLButtonElement[] => {
-      const lg = leseLehrgang();
-      return lektionen.map((l, i) => {
-        const b = document.createElement("button");
-        const t = lektionKnopf(i + 1, l, lg.geschafft.includes(l.id), s);
-        b.textContent = t.kopf;
-        b.setAttribute("aria-label", t.aria);
-        b.addEventListener("click", () => waehle_({ art: "lektion", id: l.id }));
-        return b;
-      });
-    };
 
     const pruefungsKnoepfe = (): HTMLButtonElement[] =>
       CHALLENGES.map((c, i) => {
@@ -261,11 +254,15 @@ export function waehleSpielart(lektionen: readonly LektionEintrag[] = []): Promi
       });
 
     // --- Stufe 1, in der Reihenfolge von #hm-haupt (index.html)
+    // L4: EIN Lehrgang — die erste (einzige) Lektion; wo er weitermacht, sagt main.ts dem Lauf (`lehrgangEinstieg`)
+    const lg = lektionen[0];
     const lehrgangKnopf = document.getElementById("hm-lehrgang");
-    if (lehrgangKnopf) lehrgangKnopf.hidden = lektionen.length === 0;
-    haupt("hm-lehrgang", wort("lehrgang", s), wort("lehrgangText", s).replace("{n}", String(lektionen.length)), () =>
-      zeigeListe(wort("lehrgang", s), "lektionen", lektionsKnoepfe())
-    );
+    if (lehrgangKnopf) lehrgangKnopf.hidden = !lg;
+    if (lg) {
+      haupt("hm-lehrgang", wort("lehrgang", s), lehrgangKlein(lehrgang, lg.schritte?.length ?? 0, s), () =>
+        waehle_({ art: "lektion", id: lg.id })
+      );
+    }
     haupt("hm-pruefungen", wort("pruefungen", s), wort("pruefungenText", s), () =>
       zeigeListe(wort("pruefungen", s), "pruefungen", pruefungsKnoepfe())
     );

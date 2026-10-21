@@ -1,10 +1,12 @@
 /**
- * LEKTION 3, SCHRITT 5 — DIE BODENMARKE IST AUS DER STARTKAMERA ZU SEHEN
+ * LEHRGANG, SCHRITT „AUF DIE MARKE" — DIE BODENMARKE IST AUS DER STARTKAMERA ZU SEHEN
  * (L1b, Geraetebefund 21.10.2026: Die Marke 1,2 m vor dem Bagger lag hinter
  * dem Oberwagen und erschien als Ring auf dem Kabinendach).
  *
  * Echter Bagger in Startlage, echte `OrbitCamera` auf ihrem Startpunkt, die
- * Marke so, wie `LektionLauf` sie beim Beginn des Schritts legt. Geprueft:
+ * Marke so, wie `LektionLauf` sie beim Beginn des Schritts legt — der Lauf
+ * steigt dazu direkt bei diesem Schritt ein (L3 Wiedereinstieg aus der
+ * Startpose). Geprueft:
  *   - jeder Ringpunkt liegt im Bild (iPad quer, iPhone mini quer);
  *   - kein Strahl von der Kamera zu einem Ringpunkt trifft ein Netz des
  *     Baggers (`bildwurzeln()`: Unter-, Oberwagen, Ausleger, Spinne).
@@ -21,8 +23,8 @@ import { OrbitCamera } from "../src/excavator/orbitCamera";
 import { FASSUNGEN } from "./cssmass";
 import { DT, platzLeinwand, werkbank } from "./aufgabenwerkbank";
 
-const L3 = LEKTIONEN.find((l) => l.id === "ausleger-stiel")!;
-const S5 = L3.schritte[4]!;
+const L = LEKTIONEN[0]!;
+const S5 = L.schritte.find((s) => s.ziel.art === "marke")!;
 
 /** Ringpunkte (Halbmesser wie gezeichnet, `ui/zielmarke.ts` RING_UEBER_M) und ihre Sichtbarkeit */
 function blick(ziel: LektionZiel): { verdeckt: number; raus: Record<string, number>; n: number } {
@@ -34,8 +36,10 @@ function blick(ziel: LektionZiel): { verdeckt: number; raus: Record<string, numb
   // Ziel wie main.ts (`getCameraTarget`); die Kamera zieht weich nach — 5 s reichen
   for (let i = 0; i < 300; i++) orbit.update(DT, kam as never, (o) => b.getCameraTarget(o), (o) => (o.copy(b.position).setY(3), b.cabinBaseYaw));
 
-  const lauf = new LektionLauf({ ...L3, schritte: [{ ...S5, ziel }] }, 3, 12, lektionQuellen({ bagger: b, kamera: orbit }), new EventBus());
-  lauf.start();
+  const schritte = L.schritte.map((s) => (s === S5 ? { ...s, ziel } : s));
+  const lauf = new LektionLauf({ ...L, schritte }, 1, 1, lektionQuellen({ bagger: b, kamera: orbit }), new EventBus());
+  lauf.start(L.schritte.indexOf(S5)); // Wiedereinstieg genau hier
+  expect(lauf.schritt).toBe(L.schritte.indexOf(S5));
   const m = lauf.marke!;
 
   const netze: THREE.Object3D[] = [];
@@ -69,7 +73,7 @@ function blick(ziel: LektionZiel): { verdeckt: number; raus: Record<string, numb
   return { verdeckt, raus, n: N };
 }
 
-describe("Lektion 3, Schritt 5: Bodenmarke aus der Startkamera", () => {
+describe("Lehrgang, „Auf die Marke“: Bodenmarke aus der Startkamera", () => {
   beforeAll(async () => {
     platzLeinwand();
     await RAPIER.init();

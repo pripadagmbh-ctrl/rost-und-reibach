@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-197 | 22.10.2026 | Lehrgang am Stück ohne Text: Zeichenleiste, Erfolg grün, überspringbar | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-196 | 21.10.2026 | Lehrgang Etappe 1: Vorführung im Spiel, dann nachmachen; Lektionen 1–3 | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-195 | 21.10.2026 | Bestenliste auf dem Gerät: beste 5 je Aufgabe, drei Sandkasten-Rekorde | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-194 | 21.10.2026 | Privatperson statt Firma: Pripada/GmbH raus, Repo rost-und-reibach, neue Bundle-ID | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -202,6 +203,14 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-197 — Lehrgang ohne Text** (iPhone mini quer, dann iPad)
+- Website-Daten löschen: oben nur die Leiste (Auge/Hand), sonst kein Satz im Bild? Vorführung von Schritt 1 sichtbar?
+- Schritt 5/6: Pedale pulsieren, bis man sie antippt bzw. wieder ausschaltet?
+- Häkchen: grün leuchtet Leiste, Stick, Marke — bleibt grün beim Loslassen? Auf dem iPad deutlich genug?
+- ⏭ → ✕ weiter, ⏭ → ✓ Menü mit Prüfung 1 offen; Neuladen mitten drin: „Schritt n von 9“?
+- Arm vor Schritt 7 ganz hoch: Geist zeigt „runter“, Häkchen kommt; Bagger nach jeder Vorführung wie vorher?
+- Schwenken rechts zählt auch — ohne Text verständlich? Fahr-Zeichen als Bagger auf Rädern erkennbar?
 
 **E-196 — Lehrgang Etappe 1** (iPad, dann iPhone mini quer)
 - Erststart nach Website-Daten löschen: Lektion 1 ohne Menü?

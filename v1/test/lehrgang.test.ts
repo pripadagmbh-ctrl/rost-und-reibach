@@ -1,12 +1,13 @@
 /**
- * DER LEHRGANG (E-196): Lektions-Kern und die Lektionen 1–3.
+ * DER LEHRGANG (E-196, L3): Lektions-Kern und der Lehrgang am Stueck.
  *
  *  1. der Ablauf mit Attrappen — zeigen → Vorfuehrung → du; Haekchen nur fuer
  *     die eigene Aenderung, die Vorfuehrung zaehlt nie; Abbruch geht gleich zu
- *     „du"; die Pause zaehlt nicht; beendet = stumm;
- *  2. jede Lektion kopflos mit echtem Bagger und echter Kamera: Die Spur jedes
+ *     „du"; die Pause zaehlt nicht; beendet = stumm; Wiedereinstieg bei Schritt n;
+ *  2. der Lehrgang kopflos mit echtem Bagger und echter Kamera: Die Spur jedes
  *     Schritts laeuft als Vorfuehrung (und muss in der Startlage enden) und
- *     dann noch einmal als „Spieler" — die Lektion muss geschafft werden;
+ *     dann noch einmal als „Spieler" — der Lehrgang muss geschafft werden,
+ *     im Zeitbudget, auch beim Wiedereinstieg mitten drin und am letzten Schritt;
  *  3. die Texte: zweisprachig, dieselben Platzhalter, iPhone mini quer.
  */
 import { describe, it, expect, beforeAll } from "vitest";
@@ -15,9 +16,8 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { EventBus, type GameEvents } from "../src/core/events";
 import { spurDauer, type Spur, type SpurAbschnitt } from "../src/core/spur";
 import { HAEKCHEN_PAUSE_S, LektionLauf, ORBIT_START, type LektionDaten, type LektionZustand } from "../src/challenges/lektion";
-import { LEKTIONEN, LEKTIONS_PLAN, PRUEFUNG_NACH, lektionNr } from "../src/challenges/lehrgang";
+import { LEKTIONEN, lektionNr } from "../src/challenges/lehrgang";
 import { lektionQuellen } from "../src/challenges/quellen";
-import { CHALLENGES } from "../src/challenges/katalog";
 import { OrbitCamera } from "../src/excavator/orbitCamera";
 import { SPUR_ACHSEN, Wiedergabe } from "../src/core/wiedergabe";
 import type { TouchAxes } from "../src/core/touch";
@@ -93,10 +93,11 @@ describe("LektionLauf (Attrappen)", () => {
     z.cabYaw = 0.0;
     lauf.takt(0.1);
     expect(log).not.toContain("haekchen 1");
-    z.cabYaw = 0.79; // 0,29 ueber dem Ausgang
+    // L3b: gemessen ab dem Wendepunkt (0,0), nicht ab dem Ausgang — sonst kaeme ein Arm am Anschlag nie zum Haekchen
+    z.cabYaw = 0.29;
     lauf.takt(0.1);
     expect(log).not.toContain("haekchen 1");
-    z.cabYaw = 0.81;
+    z.cabYaw = 0.31;
     lauf.takt(0.1);
     expect(log.at(-1)).toBe("haekchen 1");
   });
@@ -159,11 +160,68 @@ describe("LektionLauf (Attrappen)", () => {
     expect(lauf.beendet).toBe(true);
   });
 
+  it("Wiedereinstieg: start(1) beginnt bei Schritt 2, die Uhr ab dort; jenseits des Endes = geschafft", () => {
+    const { lauf, z, log } = probe();
+    lauf.start(1);
+    expect(log).toEqual(["start probe 2/12", "schritt 2 du"]);
+    z.z = -1.01;
+    lauf.takt(DT);
+    lauf.takt(HAEKCHEN_PAUSE_S + 0.01);
+    expect(log.slice(2)).toEqual(["haekchen 2", "geschafft 2"]);
+    expect(lauf.zeitS).toBeCloseTo(DT + HAEKCHEN_PAUSE_S + 0.01, 9);
+    for (const ab of [2, 99]) {
+      const p = probe();
+      p.lauf.start(ab);
+      expect(p.log).toEqual(["start probe 2/12", "geschafft 2"]);
+      expect(p.lauf.geschafft).toBe(true);
+    }
+    // Kaputter Speicherstand: von vorn
+    for (const ab of [-3, Number.NaN]) {
+      const p = probe();
+      p.lauf.start(ab);
+      expect(p.log.slice(0, 2)).toEqual(["start probe 2/12", "schritt 1 zeigen"]);
+    }
+  });
+
   it("eine Wiedergabe, die sofort fertig meldet, landet trotzdem in „du“", () => {
     const { lauf, bus, log } = probe();
     bus.on("lehrgang:vorfuehren", () => bus.emit("lehrgang:vorfuehrungEnde", { abgebrochen: false }));
     lauf.start();
     expect(log.at(-1)).toBe("schritt 1 du");
+  });
+
+  it("L3b: Hauptarm am Anschlag — Spur und Geist erst senken, Haekchen fuer Senken-dann-Heben", () => {
+    const d = LEKTIONEN[0]!;
+    const i = d.schritte.findIndex((s) => s.symbol === "arm");
+    const bus = new EventBus();
+    const z = { ...zustand(), boom: 69 / GRAD };
+    const spuren: Spur[] = [];
+    const zeige: GameEvents["lehrgang:schritt"]["zeige"][] = [];
+    const hak: number[] = [];
+    bus.on("lehrgang:vorfuehren", (e) => spuren.push(e.spur));
+    bus.on("lehrgang:schritt", (e) => zeige.push(e.zeige));
+    bus.on("lehrgang:haekchen", (e) => hak.push(e.nr));
+    const lauf = new LektionLauf(d, 1, 1, { zustand: () => ({ ...z, kamera: { ...z.kamera }, spinne: { ...z.spinne } }) }, bus);
+    lauf.start(i);
+    expect(spuren[0]![0]!.achsen?.boom).toBe(-1);
+    expect(zeige[0]).toEqual({ fn: "boom", richtung: "minus" });
+    bus.emit("lehrgang:vorfuehrungEnde", { abgebrochen: false });
+    z.boom = 70 / GRAD; // an den Anschlag: nur 1°
+    lauf.takt(DT);
+    z.boom = 55 / GRAD;
+    lauf.takt(DT);
+    z.boom = 64.9 / GRAD;
+    lauf.takt(DT);
+    expect(hak).toEqual([]);
+    z.boom = 65.1 / GRAD; // 10,1° ueber dem Wendepunkt
+    lauf.takt(DT);
+    expect(hak).toEqual([i + 1]);
+    // Aus der Startlage bleibt alles, wie es geschrieben ist
+    const bus2 = new EventBus();
+    const s2: Spur[] = [];
+    bus2.on("lehrgang:vorfuehren", (e) => s2.push(e.spur));
+    new LektionLauf(d, 1, 1, { zustand: () => ({ ...zustand(), boom: 35 / GRAD }) }, bus2).start(i);
+    expect(s2[0]).toBe(d.schritte[i]!.vorfuehrung);
   });
 
   it("Kamera-Startpunkt: erst verstellt, dann zurueck", () => {
@@ -202,7 +260,7 @@ function bilder(spur: Spur): Array<{ a: SpurAbschnitt; erstes: boolean }> {
 /** Loesung fuer Schritte ohne Vorfuehrung — was ein Spieler tut */
 const LOESUNG: Record<string, Spur> = {
   // Weiter doppelt rechts tippen, alle halbe Sekunde, bis die Aussenansicht kommt
-  "kamera/5": [{ dauerS: 0.5, tasten: ["KeyC"] }, { dauerS: 0.5, tasten: ["KeyC"] }, { dauerS: 0.5, tasten: ["KeyC"] }, { dauerS: 0.5, tasten: ["KeyC"] }],
+  "lehrgang/4": [{ dauerS: 0.5, tasten: ["KeyC"] }, { dauerS: 0.5, tasten: ["KeyC"] }, { dauerS: 0.5, tasten: ["KeyC"] }, { dauerS: 0.5, tasten: ["KeyC"] }],
 };
 
 /**
@@ -220,12 +278,15 @@ interface Durchlauf {
   geschafft: boolean;
   zeitS: number;
   haekchen: number[];
+  /** Lehrgangszeit bei jedem Haekchen (s) */
+  bei: number[];
   /** je Vorfuehrung: Abweichung Ende − Anfang */
   abweichung: Array<{ schritt: number; was: string; wert: number; tol: number }>;
   marken: Array<{ schritt: number; abstand: number }>;
 }
 
-function durchlauf(d: LektionDaten): Durchlauf {
+/** `ab`: Wiedereinstieg bei diesem Schritt (0-basiert), aus der Startpose */
+function durchlauf(d: LektionDaten, ab = 0): Durchlauf {
   const k = werkbank();
   const b = k.b;
   const achsen: TouchAxes = { cab: 0, stick: 0, boom: 0, rotator: 0, drive: 0, steer: 0, grab: false, grapple: 0 };
@@ -233,10 +294,10 @@ function durchlauf(d: LektionDaten): Durchlauf {
   const orbit = new OrbitCamera(16 / 9);
   const kam = { orbitDX: 0, orbitDY: 0, zoomFactor: 1, camReset: false, shiftHeld: false, wheelDelta: 0, wasPressed: () => false };
   const q = lektionQuellen({ bagger: b, kamera: orbit });
-  const lauf = new LektionLauf(d, lektionNr(d.id), LEKTIONS_PLAN.length, q, k.bus);
+  const lauf = new LektionLauf(d, lektionNr(d.id), LEKTIONEN.length, q, k.bus);
   const aug = new THREE.Vector3();
 
-  const erg: Durchlauf = { geschafft: false, zeitS: 0, haekchen: [], abweichung: [], marken: [] };
+  const erg: Durchlauf = { geschafft: false, zeitS: 0, haekchen: [], bei: [], abweichung: [], marken: [] };
   /** Wer gerade die Sticks fuehrt: die Wiedergabe (Vorfuehrung) oder der Spieler */
   const fuehrt: {
     vorfuehrung: { anfang: LektionZustand; ansicht: boolean } | null;
@@ -249,7 +310,10 @@ function durchlauf(d: LektionDaten): Durchlauf {
     else throw new Error(`Taste ${t} kennt der Test nicht`);
   };
   const wiedergabe = new Wiedergabe(k.bus, { achsen, kamera: kam, druecke, eingriff: () => false });
+  // L3b: Der Lauf richtet die Spur nach der Lage — der Spieler macht genau die nach, die er sah
+  let gesehen: Spur | null = null;
   k.bus.on("lehrgang:vorfuehren", (e) => {
+    gesehen = e.spur;
     fuehrt.vorfuehrung = { anfang: q.zustand(), ansicht: e.spur.some((a) => a.tasten?.includes("KeyC")) };
   });
   k.bus.on("lehrgang:vorfuehrungEnde", () => {
@@ -276,12 +340,13 @@ function durchlauf(d: LektionDaten): Durchlauf {
   k.bus.on("lehrgang:schritt", (e) => {
     if (e.phase !== "du") return;
     const s = d.schritte[e.nr - 1]!;
-    const spur = s.vorfuehrung ?? LOESUNG[`${d.id}/${e.nr}`];
+    const spur = (s.vorfuehrung ? gesehen : null) ?? LOESUNG[`${d.id}/${e.nr}`];
     if (!spur) throw new Error(`${d.id}/${e.nr}: keine Loesung`);
     fuehrt.spieler = { bilder: bilder(spur), i: 0 };
   });
   k.bus.on("lehrgang:haekchen", (e) => {
     erg.haekchen.push(e.nr);
+    erg.bei.push(lauf.zeitS);
     if (lauf.marke) erg.marken.push({ schritt: e.nr, abstand: Math.hypot(b.getSensorPosition(aug).x - lauf.marke.x, aug.z - lauf.marke.z) });
     fuehrt.spieler = null; // geschafft — Daumen weg
   });
@@ -290,8 +355,8 @@ function durchlauf(d: LektionDaten): Durchlauf {
     erg.zeitS = e.zeitS;
   });
 
-  lauf.start();
-  for (let n = 0; n < 60 * 120 && !erg.geschafft; n++) {
+  lauf.start(ab);
+  for (let n = 0; n < 60 * 600 && !erg.geschafft; n++) {
     kam.orbitDX = 0;
     kam.orbitDY = 0;
     kam.zoomFactor = 1;
@@ -318,22 +383,36 @@ function durchlauf(d: LektionDaten): Durchlauf {
   return erg;
 }
 
-describe("Jede Lektion ist vom Wiedergabe-Fahrer schaffbar (echter Bagger, echte Kamera)", () => {
+/**
+ * Zeitbudget der Grundsteuerung (Patrick 21.10.2026: Lehrgang gesamt 8–12 min,
+ * davon dieser Teil rund 3 min). Der Wiedergabe-Fahrer reagiert sofort und
+ * trifft jede Bewegung beim ersten Mal; ein Mensch braucht je Schritt etwa
+ * doppelt so lange (hinschauen, Daumen finden). // SW: Faktor 2 — darum
+ * darf der Fahrer hoechstens 90 s brauchen.
+ */
+const FAHRER_BUDGET_S = 180 / 2;
+
+describe("Der Lehrgang ist vom Wiedergabe-Fahrer schaffbar (echter Bagger, echte Kamera)", () => {
   beforeAll(async () => {
     platzLeinwand();
     await RAPIER.init();
   });
 
-  for (const d of LEKTIONEN) {
-    it(d.id, () => {
-      const e = durchlauf(d);
-      expect(e.haekchen).toEqual(d.schritte.map((_, i) => i + 1));
+  const d = LEKTIONEN[0]!;
+  const n = d.schritte.length;
+  // Von vorn, mitten drin (ab „Fahren") und am letzten Schritt — jeweils aus der Startpose
+  for (const ab of [0, d.schritte.findIndex((s) => s.symbol === "fahren"), n - 1]) {
+    it(`${d.id} ab Schritt ${ab + 1} von ${n}`, () => {
+      expect(ab).toBeGreaterThanOrEqual(0);
+      const e = durchlauf(d, ab);
+      const je = e.bei.map((t, i) => `${e.haekchen[i]}:${(t - (e.bei[i - 1] ?? 0)).toFixed(1)}`).join(" ");
+      console.log(`Lehrgang ab Schritt ${ab + 1}: ${e.zeitS.toFixed(1)} s (Fahrer) · je Schritt bis Haekchen ${je}`);
+      expect(e.haekchen).toEqual(d.schritte.map((_, i) => i + 1).slice(ab));
       expect(e.geschafft).toBe(true);
       for (const a of e.abweichung) expect(Math.abs(a.wert), `Schritt ${a.schritt}: ${a.was} endet nicht in der Startlage`).toBeLessThanOrEqual(a.tol);
       for (const m of e.marken) expect(m.abstand).toBeLessThanOrEqual(0.5);
-      // 1–2 min gelten fuer einen Menschen; der Wiedergabe-Fahrer ist schneller
-      expect(e.zeitS).toBeLessThan(120);
-    }, 60_000);
+      expect(e.zeitS).toBeLessThanOrEqual(FAHRER_BUDGET_S);
+    }, 120_000);
   }
 });
 
@@ -360,25 +439,17 @@ function platzhalter(t: string): string[] {
 const BEKANNT = ["boom", "stick", "cab", "grapple", "rotator"].flatMap((f) => [`{${f}}`, `{${f}+}`, `{${f}-}`]);
 
 describe("Lehrgang: Daten und Texte", () => {
-  it("Lektionen 1–3 in der Reihenfolge des Plans, je 3–6 Schritte, Spuren 2–5 s", () => {
-    expect(LEKTIONEN.map((l) => l.id)).toEqual(LEKTIONS_PLAN.slice(0, 3));
-    expect(LEKTIONS_PLAN.length).toBe(12);
-    for (const l of LEKTIONEN) {
-      expect(l.schritte.length).toBeGreaterThanOrEqual(3);
-      expect(l.schritte.length).toBeLessThanOrEqual(6);
-      for (const s of l.schritte) {
-        if (!s.vorfuehrung) continue;
-        expect(spurDauer(s.vorfuehrung), `${l.id} ${s.titel.de}`).toBeGreaterThanOrEqual(2);
-        expect(spurDauer(s.vorfuehrung), `${l.id} ${s.titel.de}`).toBeLessThanOrEqual(5);
-      }
-    }
-  });
-
-  it("Pruefungen: jede Aufgabe genau einmal, nur Lektionen aus dem Plan", () => {
-    expect(Object.keys(PRUEFUNG_NACH).sort()).toEqual(CHALLENGES.map((c) => c.id).sort());
-    for (const ids of Object.values(PRUEFUNG_NACH)) {
-      expect(ids.length).toBeGreaterThan(0);
-      for (const id of ids) expect(LEKTIONS_PLAN).toContain(id);
+  it("ein Lehrgang am Stueck (L3): jeder Schritt mit Symbol, hoechstens ein Wort, Spuren 2–5 s", () => {
+    expect(LEKTIONEN.map((l) => l.id)).toEqual(["lehrgang"]);
+    expect(lektionNr("lehrgang")).toBe(1);
+    const l = LEKTIONEN[0]!;
+    // Reihenfolge laut Patrick: Kamera, Fahren, Schwenken, Arm/Stiel
+    expect(l.schritte.map((s) => s.symbol)).toEqual(["kamera", "kamera", "ansicht", "ansicht", "fahren", "schwenken", "arm", "stiel", "marke"]);
+    for (const s of l.schritte) {
+      if (s.wort) for (const t of [s.wort.de, s.wort.en]) expect(t.trim(), s.titel.de).toMatch(/^\S+$/);
+      if (!s.vorfuehrung) continue;
+      expect(spurDauer(s.vorfuehrung), s.titel.de).toBeGreaterThanOrEqual(2);
+      expect(spurDauer(s.vorfuehrung), s.titel.de).toBeLessThanOrEqual(5);
     }
   });
 

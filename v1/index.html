@@ -983,20 +983,91 @@
       #touch #pedals.geist-zeigt .pedal, #touch .btn.geist-zeigt {
         box-shadow: 0 0 0 3px rgba(240,180,41,0.9); border-color: #f0b429;
       }
+      /* L4b: Pedale pulsen (Vorfuehrung und „du", wenn der Fahrbetrieb nicht
+         zum Schritt passt) — Bewegung als zweiter Kanal neben der Farbe.
+         SW: 1,2 s je Puls, 3 → 9 px Rand. */
+      #touch #pedals.geist-zeigt .pedal { animation: pedal-puls 1.2s ease-in-out infinite; }
+      @keyframes pedal-puls { 0%, 100% { box-shadow: 0 0 0 3px rgba(240,180,41,0.9); } 50% { box-shadow: 0 0 0 9px rgba(240,180,41,0.15); } }
       @media (max-height: 430px) {
         #geisterdaumen .geist { --weg: 24px; }
-        #geisterdaumen .tastengeist { right: calc(var(--sa-r) + 20px); bottom: calc(var(--sa-b) + 172px); }
+        /* L4: 8 statt 20 px vom Rand — so steht auch der laengste Kranzname (9 Zeichen) neben dem Arbeitsfeld (test/lehrgangsleiste.test.ts) */
+        #geisterdaumen .tastengeist { right: calc(var(--sa-r) + 8px); bottom: calc(var(--sa-b) + 172px); }
       }
       @media (max-width: 500px) and (min-height: 431px) {
         #geisterdaumen .geist { --weg: 24px; }
         #geisterdaumen .tastengeist { right: calc(var(--sa-r) + 12px); bottom: calc(var(--sa-b) + 354px); }
       }
-      /* Lektionskarte (E-196): dieselbe Karte, eine Hinweiszeile mehr. Am
-         Rechner ist sie waehrend der Vorfuehrung anklickbar (Klick = weiter);
-         auf Touch bleibt sie durchlaessig — dort bricht jeder Daumen ab,
-         der auf einem Stick oder im Mittelstreifen aufsetzt. */
-      #tutorial.aufgabe .hinweis { color: #9aa2a8; }
-      body:not(.touch) #tutorial.lektion.zeigt .karte { pointer-events: auto; cursor: pointer; }
+      /* --- Lehrgangsleiste (L4, ersetzt die Lektionskarte) ---
+         Patrick 21.10.2026: „kaum oder keinen text, weil der text die ganze
+         sicht verdeckt". Im Lehrgang bleibt #tutorial zu; oben in der Mitte
+         steht nur diese Leiste (ui/lektionskarte.ts):
+           Zeile 44 px: [Auge|Hand 30] [Bildzeichen 30] [ein Wort] … [⏭ 44]
+           darunter je Schritt ein Strich (fertig gefuellt, jetzt umrandet + hoeher).
+         Rueckfrage an derselben Stelle: [⏭? ] [✓ 44] 14 px [✕ 44] — ✕ liegt
+         genau unter ⏭: ein versehentlicher Doppeltipp bricht ab.
+         Masse: 228 breit, 1 + 4 + 44 + 3 + 8 + 5 + 1 = 66 hoch, oben 8.
+         iPhone mini quer (812 x 375): x 292..520 im Kamera-Mittelstreifen
+         284,2..527,8 (7,8 px Luft je Seite), ⏭/✕ 469..513, ✓ 411..455;
+         Unterkante 74, das Arbeitsfeld (25 % = 94) bleibt frei.
+         iPad quer: x 398..626 im Streifen 358,4..665,6, Unterkante 74.
+         Nimmt ausser den Knoepfen keine Beruehrung an — ein Finger daneben
+         dreht wie immer die Kamera. Gerechnet in test/lehrgangsleiste.test.ts.
+         Telefon hoch: Der Streifen ist nur 75 px breit — die Leiste steht
+         oben ueber den Zonen (offen, siehe Lieferung L4). */
+      #lehrgangsleiste {
+        position: fixed; z-index: 12;
+        left: 50%; width: 228px; margin-left: -114px;
+        top: max(8px, calc(var(--sa-t) + 8px));
+        box-sizing: border-box; padding: 4px 6px 5px;
+        border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+        background: rgba(20,23,26,0.62); color: #e8e8e4;
+        font: 700 14px "Consolas", monospace; pointer-events: none;
+      }
+      #lehrgangsleiste[hidden] { display: none; }
+      #lehrgangsleiste .zeile, #lehrgangsleiste .frage { display: flex; align-items: center; gap: 6px; height: 44px; }
+      #lehrgangsleiste .frage, #lehrgangsleiste.fragt .zeile { display: none; }
+      #lehrgangsleiste.fragt .frage { display: flex; }
+      #lehrgangsleiste .phase, #lehrgangsleiste .fn { flex: none; width: 30px; height: 30px; }
+      #lehrgangsleiste .fn[hidden] { display: none; }
+      #lehrgangsleiste svg { display: block; width: 100%; height: 100%; }
+      #lehrgangsleiste .phase { color: #f0d060; }
+      #lehrgangsleiste .wort { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; color: #f0d060; }
+      #lehrgangsleiste .fsym { flex: none; display: flex; align-items: center; gap: 2px; height: 26px; color: #f0d060; }
+      #lehrgangsleiste .fsym svg { width: 26px; }
+      #lehrgangsleiste .fsym b { font-size: 20px; }
+      #lehrgangsleiste button {
+        flex: none; box-sizing: border-box; width: 44px; height: 44px; padding: 9px; margin: 0;
+        border-radius: 8px; border: 2px solid rgba(255,255,255,0.3); background: rgba(46,52,57,0.92);
+        color: #e8e8e4; cursor: pointer; pointer-events: auto;
+        touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+      }
+      #lehrgangsleiste #lg-skip, #lehrgangsleiste #lg-ja { margin-left: auto; }
+      #lehrgangsleiste #lg-ja { margin-right: 8px; color: #4fd06a; border-color: rgba(79,208,106,0.7); }
+      #lehrgangsleiste .punkte { display: flex; align-items: center; gap: 3px; height: 8px; margin-top: 3px; }
+      #lehrgangsleiste .punkte i { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.25); }
+      #lehrgangsleiste .punkte i.ok { height: 6px; background: #f0b429; }
+      #lehrgangsleiste .punkte i.jetzt { height: 8px; background: transparent; box-shadow: inset 0 0 0 2px #f0d060; }
+      /* Erfolg (lehrgang:haekchen): Auge/Hand wird ein gruenes ✓, der Strich
+         fuellt sich gruen, die Leiste pulst einmal — 0,8 s wie HAEKCHEN_PAUSE_S
+         (challenges/lektion.ts). Gruen UND Haken UND Bewegung: nie nur Farbe. */
+      #lehrgangsleiste.haken { border-color: #4fd06a; background: rgba(24,60,34,0.8); animation: lg-haken 0.8s ease-out forwards; }
+      #lehrgangsleiste.haken .phase { color: #4fd06a; animation: lg-pop 0.8s ease-out; }
+      /* L4b (qa Q4: „✓ dünn" auf dem iPad): kraeftiger Haken */
+      #lehrgangsleiste.haken .phase svg { stroke-width: 3.5; }
+      #lehrgangsleiste .punkte i.neu { background: #4fd06a; animation: lg-pop 0.8s ease-out; }
+      /* L4b: Der Ring laeuft einmal nach aussen, der Schein (zweiter Schatten,
+         SW 16 px) bleibt bis zum naechsten Schritt stehen (forwards) — vorher
+         war er nach 0,8 s weg und auf dem iPad kaum zu sehen (qa Q4). */
+      @keyframes lg-haken { 0% { box-shadow: 0 0 0 0 rgba(79,208,106,0.9), 0 0 16px 2px rgba(79,208,106,0.75); } 100% { box-shadow: 0 0 0 14px rgba(79,208,106,0), 0 0 16px 2px rgba(79,208,106,0.75); } }
+      @keyframes lg-pop { 0% { transform: scale(0.6); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+      /* Geisterdaumen, Finger-Geist, Knopf-Schild und der echte Stickkreis
+         leuchten beim Haekchen gruen auf (ui/geisterdaumen.ts `.erfolg`). */
+      #geisterdaumen .geist.erfolg .ring { border: 4px solid #4fd06a; background: rgba(79,208,106,0.35); animation: lg-ring 0.8s ease-out forwards; }
+      #geisterdaumen .geist.erfolg .daumen, #geisterdaumen .kamgeist.erfolg .finger { background: rgba(79,208,106,0.75); box-shadow: 0 0 0 2px #4fd06a; }
+      #geisterdaumen .tastengeist.erfolg { border-color: #4fd06a; color: #4fd06a; }
+      #touch .pad.erfolg { border-color: #4fd06a; background: rgba(79,208,106,0.3); animation: lg-ring 0.8s ease-out forwards; }
+      /* Wie lg-haken: Ring einmal nach aussen, Schein (SW 18 px) bleibt stehen */
+      @keyframes lg-ring { 0% { box-shadow: 0 0 0 0 rgba(79,208,106,0.9), 0 0 18px 4px rgba(79,208,106,0.7); } 100% { box-shadow: 0 0 0 18px rgba(79,208,106,0), 0 0 18px 4px rgba(79,208,106,0.7); } }
       /* --- Hauptmenue (E-118) ---
          Steht VOR dem Aufbau der Welt, darum deckend statt durchscheinend:
          Dahinter ist noch nichts. Knoepfe wie im Pausenfeld, die Erklaerzeile
@@ -1523,6 +1594,12 @@
         <h3 id="tut-titel"></h3>
         <p id="tut-text"></p>
       </div>
+    </div>
+    <!-- L4: Lehrgangsleiste (ui/lektionskarte.ts) — Zeichen statt Text, aria-label traegt den Schritt -->
+    <div id="lehrgangsleiste" role="group" translate="no" hidden>
+      <div class="zeile"><span class="phase"></span><span class="fn"></span><span class="wort"></span><button id="lg-skip" type="button"></button></div>
+      <div class="frage"><span class="fsym" aria-hidden="true"></span><button id="lg-ja" type="button"></button><button id="lg-nein" type="button"></button></div>
+      <div class="punkte" aria-hidden="true"></div>
     </div>
     <div id="shop">
       <div class="panel">

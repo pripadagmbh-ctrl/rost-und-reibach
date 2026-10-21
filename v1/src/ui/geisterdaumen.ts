@@ -167,6 +167,31 @@ export function kameraAusSpur(spur: Spur | null): KameraGeste | "doppeltipp" | "
   return "";
 }
 
+/*
+ * --- L4b: Pedale in „du" (qa Q4 Befund 1) ---
+ * Fahren liegt auf dem linken Stick, solange der Fahrbetrieb an ist
+ * (`core/touch.ts`: dann zaehlen leftX/leftY nicht fuer die Arbeitsfunktionen).
+ * Ohne Text sieht der Spieler nicht, dass er erst die Pedale antippen muss —
+ * also leuchten sie, wenn der Betrieb nicht zum Schritt passt.
+ */
+const LINKS_ACHSEN: readonly AxisId[] = ["leftX", "leftY"];
+
+/**
+ * Rein: Muessen die Pedale in „du" leuchten?
+ *  - Die Spur faehrt (drive/steer), Fahren ist aus → ja.
+ *  - Die Spur bewegt eine Funktion, die auf dem LINKEN Stick liegt (bei der
+ *    Grundbelegung Drehkranz und Hauptarm), Fahren ist an → ja. Funktionen
+ *    auf dem rechten Stick (Grundbelegung: Stiel) stoert der Fahrbetrieb nicht.
+ *  - Sonst nein. Faehrt die Spur UND arbeitet links, gewinnt das Fahren.
+ */
+export function pedaleLeuchten(spur: Spur | null, fahrenAn: boolean, c: ControlConfig): boolean {
+  const s = spur ?? [];
+  const bewegt = (a: SpurAbschnitt, k: SpurAchse): boolean => Math.abs(a.achsen?.[k] ?? 0) >= RUHE;
+  if (s.some((a) => bewegt(a, "drive") || bewegt(a, "steer"))) return !fahrenAn;
+  const links = (["cab", "boom", "stick", "grapple", "rotator"] as const).filter((fn) => LINKS_ACHSEN.includes(achseVon(fn, c) as AxisId));
+  return fahrenAn && s.some((a) => links.some((fn) => bewegt(a, fn)));
+}
+
 /** SW: so lange leuchtet ein gedrueckter Knopf nach (s) */
 export const TASTE_LEUCHTET_S = 1.5;
 
@@ -174,8 +199,8 @@ export const TASTE_LEUCHTET_S = 1.5;
 export function tastenText(code: string, kranz: (code: string) => string | null, s: Sprache = sprache()): string | null {
   if (code === "KeyC") return wort("ansichtTipp", s);
   if (code === KAMERA_ZURUECK) return null; // zeigt der Doppeltipp im Mittelstreifen
-  const name = kranz(code);
-  return name ? `${name}: ${wort("kranzTipp", s)}` : null;
+  // L4 (Patrick: „kaum oder keinen Text"): Zeichen plus hoechstens EIN Wort — beim Kranz nur sein Name, wie er dort steht
+  return kranz(code);
 }
 
 export interface Geisterdaumen {
@@ -188,6 +213,8 @@ export function installGeisterdaumen(m: {
   steuerung: () => ControlConfig;
   /** E-196: die Wiedergabe des Lehrgangs — nur gelesen (`werte`, `gedrueckt`) */
   vorfuehrung?: Pick<Wiedergabe, "werte" | "gedrueckt">;
+  /** L4b: Fahrbetrieb an? (`TouchControls.fahrenAktiv`, nur gelesen) — fehlt am Rechner, dann leuchtet nichts */
+  fahrenAn?: () => boolean;
 }): Geisterdaumen {
   const halter = document.createElement("div");
   halter.id = "geisterdaumen";
@@ -229,6 +256,10 @@ export function installGeisterdaumen(m: {
   let aus = true; // nach `geschafft` bis zum naechsten Schritt
   let gezeigt = ""; // was gerade im DOM steht — geschrieben wird nur bei Aenderung
   let phase: "zeigen" | "du" = "du";
+  /* Lehrgang „du": die Spur des Schritts — fuer die Pedal-Regel */
+  let duSpur: Spur | null = null;
+  /* L4b: Haekchen-Pause bis zum naechsten Schritt — die Seiten, die gruen leuchten */
+  let gelungen: Set<"links" | "rechts"> | null = null;
 
   /** Liegt ein echter Daumen in dieser Zone? Der Stickkreis ist dann eingeblendet. */
   const daumenDrauf = (seite: "links" | "rechts"): boolean => {
@@ -262,11 +293,33 @@ export function installGeisterdaumen(m: {
     const R = folgt("rechts");
     const runde = (x: Ausschlag | null): string => (x ? `${x.dx.toFixed(2)},${x.dy.toFixed(2)}` : "-");
     const sichtbar = !aus && touch;
+    if (gelungen) {
+      /*
+       * L4b (qa Q4 Befund 2): In der Haekchen-Pause kein gelber Geist mit
+       * Pfeil — der hiesse „nochmal". Laesst der Spieler los, steht an der
+       * Stelle seines Sticks der Geist gruen und still; Finger-Geist, Schild
+       * und Pedale bleiben, wie sie beim Haekchen waren.
+       */
+      const soll = `p|${daumenDrauf("links")}|${daumenDrauf("rechts")}|${sichtbar}`;
+      if (soll === gezeigt) return;
+      gezeigt = soll;
+      for (const seite of ["links", "rechts"] as const) {
+        const { el, pfeil } = g[seite];
+        const an = sichtbar && gelungen.has(seite) && !daumenDrauf(seite);
+        el.classList.toggle("an", an);
+        el.classList.toggle("folgt", false);
+        el.classList.toggle("erfolg", an);
+        pfeil.textContent = "";
+        delete el.dataset["pfeil"];
+      }
+      return;
+    }
+    const pedal = !w && pedaleLeuchten(duSpur, m.fahrenAn?.() ?? false, m.steuerung());
     const soll = !sichtbar
       ? ""
       : w
         ? `v|${runde(L)}|${runde(R)}|${geste}|${schildText}|${fahren}|${rot}`
-        : `d|${steht("links")?.pfeil ?? "-"}|${steht("rechts")?.pfeil ?? "-"}|${geste}|${schildText}`;
+        : `d|${steht("links")?.pfeil ?? "-"}|${steht("rechts")?.pfeil ?? "-"}|${geste}|${schildText}|${pedal}`;
     if (soll === gezeigt) return;
     gezeigt = soll;
     for (const seite of ["links", "rechts"] as const) {
@@ -293,7 +346,7 @@ export function installGeisterdaumen(m: {
     kam.dataset["geste"] = geste;
     schild.classList.toggle("an", sichtbar && schildText !== "");
     schild.textContent = schildText;
-    document.getElementById("pedals")?.classList.toggle("geist-zeigt", sichtbar && fahren);
+    document.getElementById("pedals")?.classList.toggle("geist-zeigt", sichtbar && (fahren || pedal));
     document.getElementById("btn-rot-r")?.classList.toggle("geist-zeigt", sichtbar && rot > 0);
     document.getElementById("btn-rot-l")?.classList.toggle("geist-zeigt", sichtbar && rot < 0);
   };
@@ -304,6 +357,8 @@ export function installGeisterdaumen(m: {
     duTasten = [];
     zeigtGerade = null;
     spurDes = null;
+    duSpur = null;
+    gelungen = null;
     aus = false;
     phase = "du";
     auffrischen();
@@ -311,15 +366,36 @@ export function installGeisterdaumen(m: {
   /** `spur`: nur Lehrgang „du" — die Spur, die zu DIESEM Schritt vorgefuehrt wurde */
   const schritt = (zeige: GameEvents["challenge:schritt"]["zeige"], p: "zeigen" | "du", spur: Spur | null = null): void => {
     aus = false;
+    gelungen = null;
     phase = p;
+    duSpur = p === "du" ? spur : null;
     bilder = daumenAusSpur(p === "du" ? spur : null, zeige, m.steuerung());
     duGeste = p === "du" ? kameraAusSpur(spur) : "";
     duTasten = p === "du" ? [...new Set((spur ?? []).flatMap((a) => a.tasten ?? []))] : [];
     auffrischen();
   };
+  /*
+   * L4 (Patrick: „sollte irgendwie gehighlighten sein, wenn eine aktion
+   * erfolgreich war"): Beim Haekchen leuchtet gruen, was die Aktion war —
+   * der Geist (Ring, Finger, Schild) oder, wo der echte Daumen noch liegt,
+   * der echte Stickkreis. Die Dauer steht im CSS (0,8 s wie
+   * `HAEKCHEN_PAUSE_S`); weg ist es mit dem naechsten Schritt.
+   */
+  const erfolg = (an: boolean): void => {
+    const ziele = an
+      ? [
+          ...Array.from(halter.querySelectorAll<HTMLElement>(".geist.an, .kamgeist.an, .tastengeist.an")),
+          ...["touch-left", "touch-right"].map((id) => document.getElementById(id)).filter((el): el is HTMLElement => !!el && !el.hidden),
+        ]
+      : Array.from(document.querySelectorAll<HTMLElement>(".erfolg"));
+    for (const el of ziele) el.classList.toggle("erfolg", an);
+  };
   const ende = (): void => {
     aus = true;
     bilder = [];
+    duSpur = null;
+    gelungen = null;
+    erfolg(false);
     auffrischen();
   };
 
@@ -328,8 +404,18 @@ export function installGeisterdaumen(m: {
   // Einmal je Bild: reicht, um den echten Daumen zu bemerken (keine Layoutabfrage, nur `hidden`)
   m.bus.on("challenge:stand", () => auffrischen());
   m.bus.on("challenge:geschafft", ende);
-  m.bus.on("lehrgang:start", anfang);
+  m.bus.on("lehrgang:start", () => {
+    erfolg(false);
+    anfang();
+  });
+  m.bus.on("lehrgang:haekchen", () => {
+    erfolg(true);
+    // Gruen bleibt, was beim Haekchen zu sehen war: der Geist oder der echte Stick dieser Seite
+    gelungen = new Set((["links", "rechts"] as const).filter((s) => g[s].el.classList.contains("an") || daumenDrauf(s)));
+    auffrischen();
+  });
   m.bus.on("lehrgang:schritt", (e) => {
+    erfolg(false);
     if (e.phase === "zeigen") zeigtGerade = { id: e.id, nr: e.nr };
     const eigene = spurDes && spurDes.id === e.id && spurDes.nr === e.nr ? spurDes.spur : null;
     schritt(e.zeige, e.phase, e.phase === "du" ? eigene : null);
