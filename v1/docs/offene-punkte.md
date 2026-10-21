@@ -570,6 +570,13 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 36e | Sortenreine LKW fahren zur passenden Mulde |
       | 36f | Platz für den Bagger und gute Erreichbarkeit — auch an allen Abholplätzen |
 
+      Antworten nach E-192 (21.10.): Müll — „der alte müllcontainer weg. der lkw
+      bringt die neue mulde selbständig und wird abgeholt, sobald ich die abholung
+      beantrage" (also: beim Start bringt der Abroller den leeren von selbst, ohne
+      Bestellung). Silos: Kipper wartet am Tor. Waage — kein „Platz voll", sondern:
+      „er drehte direkt nach der waage und blieb bei einem anderen lkw stecken"
+      (Fahrzeug-gegen-Fahrzeug nach der Waage).
+
 - [ ] **Ansage 21.10.2026** — Patrick, wörtlich: „Bagger bekommt auch Hupe für
       Abfahrt, Schere wird Presse heißen. Maschendraht verschwindet."
 
