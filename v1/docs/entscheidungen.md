@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-191 | 21.10.2026 | Bagger hupt: Abholer fährt los; Schere heißt Presse; Maschendraht raus | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-188 | 20.10.2026 | Überlast einmal je Versuch, LKW-Wrack sinkt beim Zudrücken nicht, Schleppen unter Überlast | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-189 | 20.10.2026 | Bucht wie vorher, Ecken angeschrägt: kein Anschlag beim Schwenken | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-187 | 20.10.2026 | Hämmern mit der Spinne knautscht das Wrack, halb so stark wie ein Biss | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -195,6 +196,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-191 — Bagger-Hupe, Presse, Maschendraht** (iPad, dann iPhone mini)
+- Abholer beladen, HUPE im Kranz wählen: Hupt es, fährt der Laster los?
+- Leeren Abholer anhupen: Bleibt er stehen, kommt „Der Abholer ist noch leer."?
+- Kranz mit acht Einträgen auf dem iPhone mini quer: noch gut zu treffen?
+- Überall PRESSE statt SCHERE? Grüner Maschendraht-Besen nach „Neues Spiel" weg?
 
 **E-188 — Überlast einmal, Zudrücken, Schleppen**
 - Zu schweres Teil greifen, Heben gedrückt halten: Kommt „Zu schwer“ nur einmal?

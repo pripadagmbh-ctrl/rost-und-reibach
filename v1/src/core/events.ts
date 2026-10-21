@@ -16,6 +16,12 @@ export interface GameEvents {
   "fuhrpark:meldung": { text: string };
   /** Ein Fahrer ist an seinem Halt angekommen und hupt (hoechstens alle 30 s, E-178). */
   "fuhrpark:hupe": Record<string, never>;
+  /**
+   * E-191: Der Baggerfahrer hupt (Taste 2, Kranz HUPE) — Patrick 21.10.2026:
+   * „Hupen = Laster darf abfahren". Hoechstens alle `HUPE_ABSTAND_MS`
+   * (main.ts); der Ton haengt hier dran, die Abfahrt ebenso.
+   */
+  "bagger:hupe": Record<string, never>;
   /** Ein Item ist in einen Container gefallen (per Zonen-Zählung erkannt) */
   itemEntered: { itemId: string; materialId: string; containerId: string; correct: boolean };
   /** Ein Item wurde aus einem Container entfernt (Nachsortieren) */

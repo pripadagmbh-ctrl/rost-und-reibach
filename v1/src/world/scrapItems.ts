@@ -178,7 +178,7 @@ export interface Inventarstueck {
   hinlegen: (items: ItemManager) => ScrapItem | null;
 }
 
-/** Alles, was dauerhaft zum Platz gehoert. Heute genau ein Stueck. */
+/** Alles, was dauerhaft zum Platz gehoert. Seit E-191 (Besen raus) leer. */
 export const PLATZINVENTAR: Inventarstueck[] = [];
 
 /**
@@ -931,17 +931,18 @@ export const BESEN: PileSpec = {
   name: "Maschendraht-Besen",
 };
 
-/**
- * Der Besen als Platzinventar angemeldet.
+/*
+ * E-191: DER BESEN IST AUS DEM SPIEL. Patrick, 21.10.2026: „Maschendraht
+ * verschwindet." — gemeint ist der Maschendraht-Besen (die gruene Rolle vom
+ * 15.09.) samt Maschendraht-Ballen; die Zaunfelder bleiben. Bis hierhin stand
+ * er als Platzinventar in `PLATZINVENTAR` und lag damit beim Neuen Spiel und
+ * an jedem Tagesanfang auf `BESEN_PLATZ`. Ohne den Eintrag kommt er nie mehr.
  *
- * Erst hier, weil `ItemManager` weiter unten steht — der Eintrag zeigt auf
- * dessen Methode. Wer den Muellcontainer baut, haengt seinen Eintrag daneben.
+ * ponytail: `BESEN`, `besenForm` und `spawnBesen` bleiben stehen — sie sind
+ * der Pruefling, an dem `test/besen.test.ts` und `test/abfahrtswege.test.ts`
+ * die Gattung Platzinventar (wertlos, gedaempft, faehrt nicht mit) messen.
+ * Ganz loeschen, wenn ein anderes Inventarstueck diese Rolle uebernimmt.
  */
-PLATZINVENTAR.push({
-  id: "besen",
-  name: BESEN.name ?? "Besen",
-  hinlegen: (items) => items.spawnBesen(),
-});
 
 /** Die Form des Besens, so wie sie im Spielstand steht. */
 export function besenForm(): ScrapShape {
@@ -995,9 +996,8 @@ export const SPECS: PileSpec[] = [
   { materialId: "cable", massKg: 12, kind: "torus", dims: [0.2, 0.08], name: "Kabelrolle" },
   { materialId: "wood", massKg: 14, kind: "box", dims: [0.12, 0.12, 1.2], name: "Kantholz" },
   { materialId: "plastic", massKg: 8, kind: "box", dims: [0.5, 0.05, 0.9], name: "Kunststoffplatte" },
-  // Maschendraht-Bündel: sperrig + leicht — eignet sich als „Kehrbesen" zum
-  // Freischieben von Pritsche und Boden (Design-Wunsch 2026-08-27)
-  { materialId: "steel", massKg: 22, kind: "wire", dims: [0.55], name: "Maschendraht-Ballen" },
+  // E-191: Der Maschendraht-Ballen (Stahl, 22 kg, „Kehrbesen" vom 27.08.)
+  // ist raus — Patrick, 21.10.2026: „Maschendraht verschwindet."
 
   // Was auf einem Schrottplatz sonst noch liegt (Wunsch 10.09.2026). Vorher
   // war das Sortiment sehr nach Baustelle: Profile, Rohre, Bleche. Ein Platz

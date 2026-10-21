@@ -198,6 +198,8 @@ export class TouchControls {
     this.bindTap("btn-press", "KeyB");
     this.bindTap("btn-pickup", "KeyV");
     this.bindTap("btn-away", "KeyJ");
+    // E-191: Bagger-Hupe — Taste 2, weil jeder Buchstabe schon belegt ist
+    this.bindTap("btn-hupe", "Digit2");
     this.bindTap("btn-lambert", "KeyY");
     this.bindTap("btn-blade", "KeyI");
     // E-118: nur im Simulator auf der Seite; im Betrieb nimmt main.ts den Span heraus

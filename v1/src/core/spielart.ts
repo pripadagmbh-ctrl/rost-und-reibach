@@ -74,6 +74,7 @@ export const NUR_IM_SANDKASTEN: readonly string[] = [
   "btn-nachschub", // Kranz: keine Fuhre mitten in die Aufgabe
   "btn-pickup", // Kranz: kein Abholer
   "btn-away", // Kranz: ZUR WAAGE — es faehrt keiner
+  "btn-hupe", // Kranz: HUPE (E-191) — es wartet keiner auf das Signal
   "pause-save", // eine Challenge-Welt darf den Sandkasten-Stand nicht ueberschreiben
   "pause-new", // „Neues Spiel" loescht den Sandkasten-Stand
 ];

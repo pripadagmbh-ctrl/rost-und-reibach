@@ -102,7 +102,7 @@ describe("Ein Schalter fuer die Spielart", () => {
     }
   });
 
-  it("der Kranz hat in keiner Spielart mehr als sieben Eintraege", () => {
+  it("der Kranz hat in keiner Spielart mehr als acht Eintraege", () => {
     const von = seite.indexOf('<div class="hidden-actions">');
     const bis = seite.indexOf('<div class="hidden-actions" id="menu-actions">');
     const ids = [...seite.slice(von, bis).matchAll(/<span id="([\w-]+)"/g)].map((m) => m[1]);
@@ -113,8 +113,10 @@ describe("Ein Schalter fuer die Spielart", () => {
     expect(simulator).toContain("btn-pickup");
     expect(simulator).not.toContain("btn-lambert");
     expect(betrieb).not.toContain("btn-nachschub");
-    expect(simulator.length).toBeLessThanOrEqual(7);
-    expect(betrieb.length).toBe(7);
+    // E-191: HUPE kam in beide Spielarten — acht statt sieben (`funktionskranz.test.ts` traegt neun)
+    expect(simulator).toContain("btn-hupe");
+    expect(simulator.length).toBeLessThanOrEqual(8);
+    expect(betrieb.length).toBe(8);
   });
 });
 

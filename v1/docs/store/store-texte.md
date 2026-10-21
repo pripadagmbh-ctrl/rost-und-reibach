@@ -82,7 +82,7 @@ Der Fünfschalengreifer hängt frei am Ausleger und pendelt nach. Wer zu schnell
 
 DIE ARBEIT
 · Schrott nach Sorten in die Mulden legen: Stahl, Aluminium, Kupfer, Edelstahl, Kabel
-· Autowracks greifen, zerlegen und in der Schere zu Paketen pressen
+· Autowracks greifen, zerlegen und in der Presse zu Paketen pressen
 · Nachschub kommt per Kipper und Absetzkipper
 [· Aufgaben mit bis zu drei Sternen – vom ersten Griff bis zur sauberen Sortierung]
 · Sandkasten: der ganze Platz, ohne Ziel und ohne Uhr
@@ -133,7 +133,7 @@ The game comes from Pripada GmbH, a German scrap and metal trader. What goes int
 Länge (nachgezählt mit der Aufgaben-Zeile): Deutsch 1399, Englisch 1298 Zeichen. Weit unter 4000 — auf der Produktseite sieht man ohnehin nur den Anfang, bevor man „mehr“ tippt. Darum stehen Ort, Maschine und Gewicht ganz oben.
 
 **Prüfe bitte am Spiel**, ob jede Zeile stimmt:
-- „Schere zu Paketen pressen“ — im Spiel heißt der Knopf SCHERE; ist das für dich dasselbe wie die Presse?
+- ~~Knopfname der Presse~~ — beantwortet 21.10.2026: Der Knopf heißt jetzt PRESSE (E-191).
 - „Mulden“ und die fünf Sorten — stimmen die Namen mit den Schildern im Spiel?
 - „Ohne Stützen kippt die Rechnung früher“ — beruht auf E-154 (ohne Pratzen ein Drittel weniger Traglast).
 - „Kipper und Absetzkipper“ — kommen beide im Sandkasten über NACHSCHUB?

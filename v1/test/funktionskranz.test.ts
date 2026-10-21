@@ -143,7 +143,13 @@ describe("Funktionskranz: sieben Eintraege, und was der achte bis zehnte kosten"
      * im Simulator ABHOLEN und LAMBERT (also sechs), im Betrieb NACHSCHUB.
      * Gemessen wird unten trotzdem mit allen acht, also mit dem engsten Fall.
      */
-    expect(labels.length, `der Kranz hat ${labels.length} statt acht Eintraege`).toBe(8);
+    /*
+     * E-191 (21.10.2026): HUPE kam dazu — auf der Seite also neun, im Spiel
+     * hoechstens acht (Sandkasten ohne LAMBERT, Betrieb ohne NACHSCHUB; in
+     * einer Aufgabe vier). Gemessen wird weiter mit allen neun.
+     */
+    expect(labels.length, `der Kranz hat ${labels.length} statt neun Eintraege`).toBe(9);
+    expect(labels, "HUPE fehlt auf der Seite (E-191)").toContain("HUPE");
     expect(labels, "NACHSCHUB fehlt auf der Seite (E-118)").toContain("NACHSCHUB");
   });
 

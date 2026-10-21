@@ -73,3 +73,18 @@ describe("Migration v1 → v2: Radiosender", () => {
     }
   });
 });
+
+describe("E-191: Maschendraht verschwindet auch aus alten Ständen", () => {
+  it("Besen und Ballen fliegen beim Laden raus, alles andere bleibt", () => {
+    const d = JSON.parse(JSON.stringify(valid)) as SaveData;
+    const teil = d.items[0]!;
+    d.items.push(
+      { ...teil, materialId: "mixed", shape: { ...teil.shape, name: "Maschendraht-Besen", inventar: "besen" } },
+      { ...teil, shape: { ...teil.shape, inventar: "besen" } },
+      { ...teil, shape: { ...teil.shape, kind: "wire", name: "Maschendraht-Ballen" } }
+    );
+    const m = migrate(d);
+    expect(m).not.toBeNull();
+    expect(m!.items).toEqual(valid.items);
+  });
+});

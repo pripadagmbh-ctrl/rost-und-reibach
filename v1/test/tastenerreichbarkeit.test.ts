@@ -135,12 +135,14 @@ const TASTEN: Record<string, Zeile> = {
   KeyX: { wirkung: "Fahrerkabine heben/senken", touch: "Kranz: KABINE" },
   KeyO: { wirkung: "Pratzen aus/ein", touch: "Kranz: STUETZEN" },
   KeyI: { wirkung: "Schild heben/senken", touch: "Kranz: SCHILD" },
-  KeyB: { wirkung: "Schere/Presse starten", touch: "Kranz: SCHERE" },
+  KeyB: { wirkung: "Presse starten", touch: "Kranz: PRESSE" },
   KeyV: { wirkung: "Abholung rufen/abfahren", touch: "Kranz: ABHOLEN" },
   KeyJ: { wirkung: "zur Waage schicken", touch: "Kranz: ZUR WAAGE" },
   KeyY: { wirkung: "Lambert rufen", touch: "Kranz: LAMBERT" },
   // E-118: nur im Simulator; ABHOLEN und LAMBERT gibt es dort nicht
   Digit1: { wirkung: "Nachschub holen", touch: "Kranz: NACHSCHUB" },
+  // E-191: Hupen = Laster darf abfahren; 2, weil jeder Buchstabe belegt ist
+  Digit2: { wirkung: "Hupen (Abholer darf abfahren)", touch: "Kranz: HUPE" },
   /*
    * E-093: SCHILDER zog aus dem Kranz ins Pausenmenue (`pause-markierungen`).
    * Der Waechter wurde dafuer NICHT gelockert — er verlangt fuer „Menue: …"

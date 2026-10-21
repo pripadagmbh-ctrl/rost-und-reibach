@@ -84,7 +84,7 @@ HOW TO PLAY (about 2 minutes)
 4. Lower the open grapple onto a pile of scrap, close it, lift, slew to a skip and open it to drop the load.
 5. The buttons ↺ / ↻ rotate the grapple. One finger in the middle strip between the sticks orbits the camera, pinch zooms. Double-tap on the right switches between cab view and outside view.
 6. The menu button (☰) opens the pause menu (controls, volume, save/load, privacy policy).
-7. Further functions are on the button ring: e.g. SCHERE operates the baling press, NACHSCHUB brings a new truck load.
+7. Further functions are on the button ring: e.g. PRESSE (English: PRESS) operates the baling press, HUPE (HORN) lets a waiting truck leave, NACHSCHUB (NEW LOAD) brings a new truck load.
 [8. "Aufgaben"/"Tasks": short tasks with up to three stars; the first one teaches the controls.]
 
 The user interface is in [German only / German and English]. The grapple physics (load swinging, weight, reach) is intentional – it takes a few tries to place loads precisely.

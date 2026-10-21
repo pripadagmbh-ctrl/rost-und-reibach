@@ -325,7 +325,7 @@ export const KATALOG_SPECS: PileSpec[] = [
   // Anhaenger-Rad 155/80 R13: Aussen-Ø 0,578 m, Breite 0,155 m. Reifen 6 kg +
   // Stahlfelge 4,5Jx13 5 kg = 11 kg (SW).
   { materialId: "tires", massKg: 11, kind: "torus", dims: [0.21, 0.078], name: "Anhänger-Rad (Stahlfelge)", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.55 }, { materialId: "steel", anteil: 0.45 }] },
-  { materialId: "steel", massKg: 205, kind: "box", dims: [0.55, 0.55, 1.3], bau: "stapel", name: "Schrottschere-Abschnitte" },
+  { materialId: "steel", massKg: 205, kind: "box", dims: [0.55, 0.55, 1.3], bau: "stapel", name: "Stahlabschnitte" }, // E-191: hiess „Schrottschere-Abschnitte“ — kein „Schere“ mehr im Bild
   /* --- Massives Kleinzeug (E-042, 15.09.2026) ---------------------------
    *
    * Patrick nannte als Premium-Beispiele "Bahnschwellen, Bremsscheiben,

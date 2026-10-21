@@ -81,6 +81,12 @@ export interface SaveData {
 }
 
 export const SAVE_KEY = "schrottplatz_save";
+
+/** E-191: der Maschendraht-Besen (Platzinventar) und der Maschendraht-Ballen. */
+function istMaschendraht(it: SavedItem): boolean {
+  const s = it?.shape as Partial<ScrapShape> | undefined;
+  return s?.inventar === "besen" || s?.name === "Maschendraht-Besen" || s?.name === "Maschendraht-Ballen";
+}
 export const CURRENT_SCHEMA = 2;
 
 /**
@@ -101,6 +107,12 @@ export function migrate(raw: unknown): SaveData | null {
   ) {
     return null;
   }
+  /*
+   * E-191 (21.10.2026, Patrick: „Maschendraht verschwindet."): Besen und
+   * Ballen aus alten Ständen fliegen beim Laden raus. Kein neues Schema — das
+   * Format bleibt, nur zwei Teile gibt es nicht mehr.
+   */
+  d.items = (d.items as SavedItem[]).filter((it) => !istMaschendraht(it));
   // Fraktionen aus älteren Ständen umschlüsseln (Guss → Stahlschrott usw.)
   for (const it of d.items as SavedItem[]) {
     it.materialId = normalizeMaterialId(it.materialId);

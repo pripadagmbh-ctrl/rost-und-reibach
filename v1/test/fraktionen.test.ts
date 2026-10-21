@@ -111,7 +111,7 @@ describe("Was der Katalog daraus macht", () => {
    * Zahlen halten den Stand fest. Wandern sie, hat jemand den Katalog
    * umgebaut, und dann gehört die Bestandsaufnahme nachgezogen.
    */
-  it("339 erreichbare Einträge, davon 64 mit Stückliste", () => {
+  it("338 erreichbare Einträge, davon 72 mit Stückliste", () => {
     // 271 waren es bis E-042; neun massive Kleinteile sind dazugekommen
     // (Bremsscheibe, Bahnschwelle, Schienenabschnitt, Kurbelwelle …), weil
     // Patricks eigene Premium-Beispiele im Katalog fehlten.
@@ -149,7 +149,10 @@ describe("Was der Katalog daraus macht", () => {
     // Patrick: „nur einzel reifen" und „Reifen haben immer felge" — acht
     // Reifen ohne Stueckliste (zwei Stapel, Haufen, Bund, Vollgummi-Stapel,
     // LKW-, Erd- und Traktorreifen) sind acht Raeder mit Reifen + Felge.
-    expect(ALLE.length).toBe(339);
+    //
+    // 338 seit E-191 (21.10.2026): Der Maschendraht-Ballen ist raus
+    // („Maschendraht verschwindet."), ohne Stueckliste.
+    expect(ALLE.length).toBe(338);
     expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(72);
   });
 
@@ -533,7 +536,7 @@ describe("Die Farbe trägt die Fraktion nicht", () => {
     expect(d, "über 10 wäre eine klar andere Farbe").toBeLessThan(10);
   });
 
-  it("28 Teile ohne Bau (23 bis E-181; die Raeder zeigen Reifen und Felge)", () => {
+  it("27 Teile ohne Bau (23 bis E-181, 28 bis E-191; die Raeder zeigen Reifen und Felge)", () => {
     /*
      * Alles mit `bau` wird nach Zweck gefärbt (objektbau.ts:22-30).
      * 16 waren es bis E-042; Bremsscheibe und Großzahnrad sind absichtlich
@@ -554,8 +557,10 @@ describe("Die Farbe trägt die Fraktion nicht", () => {
      * 28 seit E-181 (20.10.2026): Die drei nackten Reifen sind Raeder, dazu
      * fuenf Raeder statt Stapel, Haufen und Bund — alle ohne `bau`, das Rad
      * zeichnet `scrapItems.radGeometrie` (Reifen und Felge in einem Netz).
+     *
+     * 27 seit E-191 (21.10.2026): Der Maschendraht-Ballen ist raus.
      */
-    expect(ALLE.filter((s) => !s.bau).length).toBe(28);
+    expect(ALLE.filter((s) => !s.bau).length).toBe(27);
   });
 
   it("Aluminium ist nicht mehr mit Edelstahl zu verwechseln (E-042)", () => {

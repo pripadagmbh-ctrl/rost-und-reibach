@@ -71,9 +71,9 @@ export const STEPS: TutorialStep[] = [
   },
   {
     id: "pressen",
-    title: "Mischschrott in die Schere",
+    title: "Mischschrott in die Presse",
     text:
-      "Was sich nicht lohnt zu trennen, kommt in die Schere hinter dir. " +
+      "Was sich nicht lohnt zu trennen, kommt in die Presse hinter dir. " +
       "Mit B schließt du die Klappen: Aus losem Schrott wird ein Paket, " +
       "das viel weniger Platz braucht.",
     done: (c) => c.gepresst,

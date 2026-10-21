@@ -968,7 +968,7 @@ async function main(): Promise<void> {
     // Was eben losgelassen wurde, liegt jetzt — gleich schiebt der Stempel (E-125)
     fahrkunst.jetztLiegtSie();
     audio.playGrab(); // Hydraulik läuft an
-    hud.toast("Schere: Klappen schließen …");
+    hud.toast("Presse: Klappen schließen …"); // E-191: hiess Schere
   };
   press.onLidsClosed = () => audio.playCrash(0.6); // Eisenplatten schlagen auf
   press.onStamp = (count, pos) => {
@@ -978,7 +978,7 @@ async function main(): Promise<void> {
     audio.playTear();
     particles.spawn(pos, 16, 0x9a8b74, 2.5, 1.8, 0.7);
     particles.spawn(pos, 8, 0xffc060, 4, 2, 0.4);
-    hud.toast(count > 0 ? `Schere: ${count} Teil${count > 1 ? "e" : ""} zum Paket gepresst` : "Schere: Mulde war leer");
+    hud.toast(count > 0 ? `Presse: ${count} Teil${count > 1 ? "e" : ""} zum Paket gepresst` : "Presse: Mulde war leer");
   };
   // Fahrer fahren weder durch den Bagger noch über liegenden Schrott (Kap. 13)
   vehicles.getExcavatorPos = () => excavator.position;
@@ -991,6 +991,24 @@ async function main(): Promise<void> {
   vehicles.onAnkunftHupe = () => bus.emit("fuhrpark:hupe", {});
   bus.on("fuhrpark:meldung", (e) => hud.toast(t(e.text)));
   bus.on("fuhrpark:hupe", () => audio.playHupe());
+  /*
+   * E-191 — BAGGER-HUPE (Patrick 21.10.2026: „Bagger bekommt auch Hupe für
+   * Abfahrt", Auswahl: „Hupen = Laster darf abfahren"). Taste 2 / Kranz HUPE
+   * senden `bagger:hupe`; der Ton haengt am Bus, die Abfahrt auch. Ein
+   * beladener Abholer am Verladeplatz (oder beim Umsetzen) faehrt los wie mit
+   * ABHOLEN; leer bleibt er stehen und das HUD sagt warum. Sonst nur Ton.
+   */
+  bus.on("bagger:hupe", () => audio.playHupe());
+  bus.on("bagger:hupe", () => {
+    const wagen = vehicles.pickupTruck;
+    if (challenge || !(wagen?.waitingForLoad || wagen?.setztUm)) return;
+    // 1 kg wie in `abholerFaehrtRaus`: jedes Teil wiegt mehr, Null waere Fliesskomma
+    if (wagen.ladeflaecheKg() < 1) hud.toast("Der Abholer ist noch leer.");
+    else vehicles.requestPickup(); // „… fährt los." kommt über den Bus (E-177)
+  });
+  /** SW: Mindestabstand zweier Hupen — die Aufnahme klingt zweimal kurz, gut 1 s. */
+  const HUPE_ABSTAND_MS = 1500;
+  let hupeFreiAb = 0;
   // Brückenwaage: voll rein, leer raus → Kunde bekommt sein Geld
   // --- Platz ausbauen: verdientes Geld bekommt eine Verwendung ---
   const ausbau = new UpgradeState();
@@ -1590,6 +1608,11 @@ async function main(): Promise<void> {
             : "Lambert winkt ab — in den Boxen liegt nichts für ihn."
       );
     }
+    // E-191: Hupe. Taste 2 — alle Buchstaben sind belegt, 2 liegt neben 1 (NACHSCHUB)
+    if ((input.wasPressed("Digit2") || touch.consumePress("Digit2")) && now >= hupeFreiAb) {
+      hupeFreiAb = now + HUPE_ABSTAND_MS;
+      bus.emit("bagger:hupe", {});
+    }
     // Zur Waage schicken: Reste auf der Flaeche zaehlen dort als Tara
     if (input.wasPressed("KeyJ") || touch.consumePress("KeyJ")) {
       const r = vehicles.zurWaage();
@@ -1606,7 +1629,7 @@ async function main(): Promise<void> {
     if (input.wasPressed("KeyB") || touch.consumePress("KeyB")) {
       // Challenge: erst pressen, wenn das Wrack losgelassen in der Kammer ist (E-125)
       if (challenge && !challenge.pressenErlaubt()) {
-        hud.toast("Erst das Wrack in die Kammer legen und loslassen — dann SCHERE.");
+        hud.toast("Erst das Wrack in die Kammer legen und loslassen — dann PRESSE.");
       } else if (!press.start()) hud.toast(press.sperrgrund ?? "Presse läuft bereits …");
     }
     if (input.wasPressed("KeyL")) {

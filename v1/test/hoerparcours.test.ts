@@ -55,7 +55,7 @@ describe("Hoerparcours (E-159)", () => {
   it("Stationen sind durchnummeriert und decken den Auftrag ab", () => {
     expect(STATIONEN.map((s) => s.nr)).toEqual(STATIONEN.map((_s, i) => i + 1));
     const namen = STATIONEN.map((s) => s.name).join(" | ");
-    for (const muss of ["Auto auf Beton", "Auto auf Stahl", "Träger auf Beton", "Träger auf Stahl", "Alu", "Kupfer", "Edelstahl", "Blech", "Kleinteil Eisen", "Schere", "schleift über Beton", "schleift über Stahl", "Wand", "Laster", "Hämmern", "Magnet", "Hupe", "Feierabend"]) {
+    for (const muss of ["Auto auf Beton", "Auto auf Stahl", "Träger auf Beton", "Träger auf Stahl", "Alu", "Kupfer", "Edelstahl", "Blech", "Kleinteil Eisen", "Presse", "schleift über Beton", "schleift über Stahl", "Wand", "Laster", "Hämmern", "Magnet", "Hupe", "Feierabend"]) {
       expect(namen, muss).toContain(muss);
     }
     expect(WIEDERHOLUNGEN).toBe(3);

@@ -60,7 +60,7 @@ export const STATIONEN: readonly Station[] = [
   st("Edelstahl auf Beton", 1.6, (_t, bus) => aufprall(bus, "va", 30, "beton")),
   st("Blech auf Beton", 1, (_t, bus) => aufprall(bus, "steel", 25, "beton", true)),
   st("Kleinteil Eisen auf Beton", 1.2, (_t, bus) => aufprall(bus, "steel", 8, "beton")),
-  st("Schere pressen (5 s)", 5.5, (ton, bus, nachher) => {
+  st("Presse (5 s)", 5.5, (ton, bus, nachher) => {
     ton.playGrab(); // Hydraulik laeuft an
     nachher(0.8, () => ton.playCrash(0.6)); // Klappen schlagen zu
     for (let i = 0; i < 4; i++) {

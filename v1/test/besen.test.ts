@@ -1135,10 +1135,16 @@ function tagesuhr(): Daylight {
 }
 
 describe("Besen: Platzinventar, kein Handelsgut", () => {
-  it("wird beim Neuen Spiel genau einmal gesetzt", () => {
+  it("E-191: wird beim Neuen Spiel NICHT mehr gesetzt („Maschendraht verschwindet.“)", () => {
     const { items } = platz();
-    expect(items.inventarNachtragen(), "der erste Aufruf legt ihn hin").toEqual([BESEN.name]);
-    expect(items.inventarNachtragen(), "der zweite legt keinen zweiten an").toEqual([]);
+    expect(items.inventarNachtragen(), "der Besen kommt wieder").toEqual([]);
+    expect(items.items.filter((it) => istPlatzinventar(it.shape)).length).toBe(0);
+  });
+
+  it("spawnBesen legt den Pruefling genau einmal hin", () => {
+    const { items } = platz();
+    expect(items.spawnBesen(), "der erste Aufruf legt ihn hin").not.toBeNull();
+    expect(items.spawnBesen(), "der zweite legt keinen zweiten an").toBeNull();
     const inventar = items.items.filter((it) => istPlatzinventar(it.shape));
     expect(inventar.length, "es liegt nicht genau einer auf dem Platz").toBe(1);
     expect(inventar[0].shape?.inventar).toBe("besen");
@@ -1241,11 +1247,11 @@ describe("Besen: Platzinventar, kein Handelsgut", () => {
     expect(besen.body.translation().y, "sie ist eingesunken").toBeGreaterThan(HOEHE / 2 - 0.06);
   });
 
-  it("steht als Gattung in der Inventarliste, nicht als Sonderfall", () => {
+  it("E-191: steht nicht mehr in der Inventarliste — die Gattung bleibt", () => {
     expect(
       PLATZINVENTAR.some((st) => st.id === "besen"),
-      "der Besen fehlt in der Liste"
-    ).toBe(true);
+      "der Besen steht wieder in der Liste"
+    ).toBe(false);
     for (const st of PLATZINVENTAR) {
       expect(st.id.length, "ein Inventarstueck ohne Kennung").toBeGreaterThan(0);
       expect(st.name.length, `${st.id} hat keinen Namen`).toBeGreaterThan(0);
@@ -1383,29 +1389,36 @@ describe("Besen: Platzinventar, kein Handelsgut", () => {
     expect(sale.eur, "Aufbau: normaler Schrott bringt Geld").toBeGreaterThan(0);
   });
 
-  it("ist am naechsten Tag wieder da", () => {
-    const { items } = platz();
-    items.remove(items.spawnBesen()!);
-    expect(
-      items.items.some((it) => istPlatzinventar(it.shape)),
-      "weg ist weg"
-    ).toBe(false);
+  it("ist am naechsten Tag wieder da — wenn er angemeldet ist (Gattung, E-191)", () => {
+    // Seit E-191 steht der Besen nicht mehr in der Liste; die Gattung wird
+    // an ihm trotzdem geprueft, dafuer meldet ihn der Test kurz an.
+    PLATZINVENTAR.push({ id: "besen", name: BESEN.name!, hinlegen: (it) => it.spawnBesen() });
+    try {
+      const { items } = platz();
+      items.remove(items.spawnBesen()!);
+      expect(
+        items.items.some((it) => istPlatzinventar(it.shape)),
+        "weg ist weg"
+      ).toBe(false);
 
-    const uhr = tagesuhr();
-    let wechsel = 0;
-    for (let i = 0; i < DAY_LENGTH_S * 60; i++) {
-      uhr.update(1 / 60);
-      if (uhr.neuerTag) {
-        uhr.neuerTag = false;
-        wechsel++;
-        items.inventarNachtragen();
+      const uhr = tagesuhr();
+      let wechsel = 0;
+      for (let i = 0; i < DAY_LENGTH_S * 60; i++) {
+        uhr.update(1 / 60);
+        if (uhr.neuerTag) {
+          uhr.neuerTag = false;
+          wechsel++;
+          items.inventarNachtragen();
+        }
       }
+      expect(wechsel, "die Uhr ist in einem Tag nicht genau einmal umgelaufen").toBe(1);
+      expect(
+        items.items.filter((it) => istPlatzinventar(it.shape)).length,
+        "der Besen ist am naechsten Tag nicht wieder da"
+      ).toBe(1);
+    } finally {
+      PLATZINVENTAR.splice(PLATZINVENTAR.findIndex((st) => st.id === "besen"), 1);
     }
-    expect(wechsel, "die Uhr ist in einem Tag nicht genau einmal umgelaufen").toBe(1);
-    expect(
-      items.items.filter((it) => istPlatzinventar(it.shape)).length,
-      "der Besen ist am naechsten Tag nicht wieder da"
-    ).toBe(1);
   });
 
   it("Gegenprobe: ohne Tageswechsel bleibt er weg", () => {

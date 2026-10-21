@@ -36,7 +36,7 @@ Reihenfolge = Reihenfolge im Store. Die ersten drei tragen die Last.
 |---|---|---|---|
 | 1 | Kabinensicht: Greifer schwebt voll beladen über dem Haufen, Hände an den Joysticks, Spinne leicht ausgependelt | **Du sitzt am Hebel.** | **You're at the controls.** |
 | 2 | Außensicht, Greifer schließt sich um ein Autowrack, Glas splittert | **Greifen, was Gewicht hat.** | **Grab anything with weight.** |
-| 3 | Wrack wird in die Schere/Presse gelegt, daneben fertige Pakete | **Pressen, bis es passt.** | **Crush it into bales.** |
+| 3 | Wrack wird in die Presse gelegt, daneben fertige Pakete | **Pressen, bis es passt.** | **Crush it into bales.** |
 | 4 | Sortierte Mulden mit Schildern (Stahl, Alu, Kupfer, Edelstahl, Kabel), Greifer lässt Kupfer fallen | **Jede Sorte in ihre Mulde.** | **Every metal in its skip.** |
 | 5 | Lasthebemagnet hebt Eisenteile, Nichteisen bleibt liegen | **Der Magnet nimmt nur Eisen.** | **The magnet takes only iron.** |
 | 6 | Kipper kippt Nachschub ab, Bagger wartet | **Nachschub kommt per Kipper.** | **Fresh loads by tipper truck.** |
@@ -74,7 +74,7 @@ Inhaltlich:
 | 0–3 s | Kabinensicht, Motor läuft an, Blick auf den vollen Platz | *Schrottplatz. Umschlagbagger. Du.* / *Scrapyard. Material handler. You.* | Diesel im Stand |
 | 3–8 s | Greifer senkt sich offen auf den Haufen, schließt, hebt — die Last pendelt nach | *Alles hat Gewicht.* / *Everything has weight.* | Hydraulik, Zupacken, Rasseln |
 | 8–12 s | Außensicht: Greifer packt ein Autowrack, Scheibe birst | — | Glas, Blech |
-| 12–16 s | Wrack in die Schere, Deckel drückt, Paket fällt heraus | *Pressen.* / *Crush.* | Knautschen |
+| 12–16 s | Wrack in die Presse, Deckel drückt, Paket fällt heraus | *Pressen.* / *Crush.* | Knautschen |
 | 16–20 s | Schnelle Folge: Kupfer in die Kupfermulde, Magnet hebt Eisen, Alu in die Alumulde | *Sortieren.* / *Sort.* | Kupfer-, Stahl-, Alu-Aufschläge |
 | 20–23 s | Kipper fährt rückwärts heran und kippt ab | *Nachschub kommt.* / *More is coming.* | LKW-Hupe, Abkippen |
 | 23–25 s | Weiter Blick über den Platz, Name eingeblendet | *Rost & Reibach — offline, ohne Werbung.* / *Rost & Reibach — offline, no ads.* | ausklingen |
