@@ -147,8 +147,7 @@ export const EN: Record<string, string> = {
   "Der Abholer ist noch leer.": "The pickup truck is still empty.",
   // E-202: Schicht (Zwischenstand, Start über #schicht=…)
   "Der nächste Verlader kommt von selbst.": "The next loading truck comes by itself.",
-  "Schicht: Misch auf den Verlader vor dir, Stahl links hinten, Bunt rechts, Müll rechts hinten. Laster nicht warten lassen!":
-    "Shift: mixed scrap onto the loading truck in front of you, steel back left, non-ferrous right, waste back right. Don't keep the trucks waiting!",
+  "Misch auf den Verlader, Sortiertes in die Boxen.": "Mixed scrap onto the loading truck, sorted scrap into the bays.",
   "Der Fahrer hupt — Fahrspur ist blockiert!": "The driver is honking — the lane is blocked!",
   "Musik an.": "Music on.",
   "Musik aus.": "Music off.",

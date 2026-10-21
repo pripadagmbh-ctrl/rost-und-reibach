@@ -44,9 +44,13 @@ import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
 import { START_HAUFEN, START_AUTOS, START_STREU, START_LKW } from "./world/startplatz";
 import { aktiviereSchichtPlatz } from "./world/schichtplatz";
-import { SchichtBetrieb } from "./delivery/schichtbetrieb";
-import { boxFuer, kassenTeilAus } from "./delivery/schichtfuhrpark";
+import { SchichtBetrieb, baueSchichtStand, abfahrtBuchungen, standgeldBuchung, SCHADEN_BUCHUNG } from "./delivery/schichtbetrieb";
+import { SchadenMelder } from "./delivery/schichtschaden";
+import { boxFuer, kassenTeilAus, BOX_ORDERS } from "./delivery/schichtfuhrpark";
 import { Kasse, sortenregelAus, standgeldSekunden, type Schichtstufe } from "./economy/kasse";
+import { SCHICHT_FEIERABEND_S } from "./world/schichtzeit";
+import { installSchichtAnzeige } from "./ui/schichtanzeige";
+import { installSchichtTafel } from "./ui/schichttafel";
 import { lastAufschlagWucht } from "./audio/klangregeln";
 import { anschlagUntergrund, SPINNE_WUCHT_VOLL_MS } from "./excavator/aufschlag";
 import { findeBox } from "./world/boxen";
@@ -66,7 +70,7 @@ import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
 import { setBaggerOrt, ANSTEH_START_ANZAHL } from "./delivery/routes";
 import { clearSave, merkeChallenge, readSave, speichereGreifer, storeSave, type SaveData } from "./core/save";
 import { Zwischenbild } from "./core/zwischenbild";
-import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SANDKASTEN, NUR_IM_SIMULATOR } from "./core/spielart";
+import { BETRIEB, NUR_AUSSER_SCHICHT, NUR_IM_BETRIEB, NUR_IM_SANDKASTEN, NUR_IM_SIMULATOR } from "./core/spielart";
 import { nochmal, waehleSpielart, type Spielwahl } from "./ui/hauptmenue";
 import { challengeNach, challengeNr } from "./challenges/katalog";
 import { ChallengeLauf, type ChallengeDaten } from "./challenges/challenge";
@@ -112,17 +116,14 @@ async function main(): Promise<void> {
    * faellt sie ohne Menue auf die erste. Eine Challenge ist keine dritte
    * Spielart, sondern eine Wahl im Simulator (Begruendung in core/spielart.ts).
    */
+  const wahl: Spielwahl = BETRIEB ? { art: "sandkasten" } : await waehleSpielart(LEKTIONEN);
   /*
-   * SCHICHT (E-201/E-202): Bis SCHICHT im Hauptmenue steht (S4), startet sie
-   * ueber die Adresse `#schicht=montag|mittwoch|freitag` — wie `#challenge=`.
-   * Der Schalter fuer den Platz faellt VOR dem Bau der Welt.
+   * SCHICHT (E-201/E-205): eine Wahl im Hauptmenue; `#schicht=<stufe>` fuehrt
+   * ueber `waehleSpielart` direkt hinein (vor jedem Lehrgang-Erststart). Der
+   * Schalter fuer den Platz faellt VOR dem Bau der Welt.
    */
-  const schichtStufe = ((): Schichtstufe | null => {
-    const m = /^#schicht=(montag|mittwoch|freitag)$/.exec(location.hash);
-    return m ? (m[1] as Schichtstufe) : null;
-  })();
+  const schichtStufe: Schichtstufe | null = wahl.art === "schicht" ? wahl.stufe : null;
   if (schichtStufe) aktiviereSchichtPlatz();
-  const wahl: Spielwahl = BETRIEB || schichtStufe ? { art: "sandkasten" } : await waehleSpielart(LEKTIONEN);
   const challengeDaten = wahl.art === "challenge" ? challengeNach(wahl.id) : null;
   // E-196: Lektion des Lehrgangs — wie eine Pruefung auf dem aufgeraeumten Platz
   const lektionId = wahl.art === "lektion" ? wahl.id : null;
@@ -202,8 +203,7 @@ async function main(): Promise<void> {
   const ausblenden = BETRIEB
     ? NUR_IM_SIMULATOR
     : schichtStufe
-      ? // Schicht: Uhr und Ladeanzeige des Verladers sichtbar, kein NACHSCHUB, kein Speichern (ein Lauf)
-        [...NUR_IM_BETRIEB.filter((id) => id !== "shift" && id !== "load"), "btn-nachschub", "pause-save", "pause-new"]
+      ? [...NUR_IM_BETRIEB, ...NUR_AUSSER_SCHICHT] // E-205: eigene Anzeige statt Konto/Uhr/Ladeanzeige, kein NACHSCHUB, kein Speichern
       : aufgabenPlatz
       ? [...NUR_IM_BETRIEB.filter((id) => id !== "tutorial"), ...NUR_IM_SANDKASTEN]
       : NUR_IM_BETRIEB;
@@ -629,7 +629,7 @@ async function main(): Promise<void> {
     setPaused(false);
   });
   // In der Challenge fuehrt derselbe Knopf ins Menue — neu geladen wird ohnehin
-  if (aufgabenPlatz) document.getElementById("pause-load")!.textContent = "Zum Hauptmenü";
+  if (aufgabenPlatz || schichtStufe) document.getElementById("pause-load")!.textContent = "Zum Hauptmenü";
   document.getElementById("pause-load")!.addEventListener("click", () => location.reload());
   document.getElementById("pause-new")!.addEventListener("click", () => {
     clearSave();
@@ -1437,9 +1437,15 @@ async function main(): Promise<void> {
   let schicht: SchichtBetrieb | null = null;
   let kasse: Kasse | null = null;
   let schichtLoseKg = 0;
-  /** Die Bilanz als Zeile, sobald Feierabend ist — bleibt bis zur Tafel (S4) stehen. */
-  let schichtErgebnis: string | null = null;
+  let schichtEnde = false;
+  let schadenMelder: SchadenMelder | null = null;
+  // E-205: Anzeige und Tafel hängen nur an schicht:* — installiert, bevor schicht:start gesendet wird
+  const schichtTafel = schichtStufe ? installSchichtTafel({ bus, audio }) : null;
   if (schichtStufe) {
+    installSchichtAnzeige(bus);
+    bus.on("schicht:buchung", (b) => {
+      if (b.art === "abfahrt" && b.eur > 0) audio.playSale(); // Ton am Ereignis (Regel 10)
+    });
     daylight.schichtTag();
     kasse = new Kasse(schichtStufe, sortenregelAus(CONFIGS.filter((c) => !c.lager), gehoertHierhin));
     schicht = new SchichtBetrieb(schichtStufe, vehicles, {
@@ -1448,12 +1454,19 @@ async function main(): Promise<void> {
     });
     schicht.onVerladerAbfahrt = (e) => {
       const b = kasse!.bucheAbfahrt(e.order, e.teile);
-      if (b.kg > 0) {
-        audio.playSale();
-        hud.toast(`Verlader fährt: ${(b.kg / 1000).toFixed(1).replace(".", ",")} t · +${Math.round(b.erloesEur).toLocaleString("de-DE")} €`);
-      }
+      for (const z of abfahrtBuchungen(e.order, b)) bus.emit("schicht:buchung", z);
     };
-    schicht.onStandzeit = (e) => kasse!.bucheStandgeld(standgeldSekunden(e.standzeitS));
+    schicht.onStandzeit = (e) => {
+      kasse!.bucheStandgeld(standgeldSekunden(e.standzeitS));
+      const z = standgeldBuchung(e.standzeitS);
+      if (z) bus.emit("schicht:buchung", z);
+    };
+    // E-204: harte Aufschläge auf Laster beim Laden kosten
+    schadenMelder = new SchadenMelder(bus, { boxen: () => vehicles.ladeBoxen(), jetztS: () => daylight.schichtSekunden });
+    schadenMelder.onSchaden = () => {
+      kasse!.bucheSchaden();
+      bus.emit("schicht:buchung", SCHADEN_BUCHUNG);
+    };
   }
   /** Loser Schrott für die Annahme-Sperre — was auf dem Verlader liegt, ist verladen (E-202). */
   const measureLooseSchicht = (): number => {
@@ -1664,7 +1677,7 @@ async function main(): Promise<void> {
     if (input.wasPressed("Escape") || input.wasPressed("KeyP") || touch.consumePress("Escape")) {
       setPaused(!paused);
     }
-    if (paused || abrechnung.offen) {
+    if (paused || abrechnung.offen || schichtTafel?.offen) {
       // In der Pause ruht die Simulation; nur Rendern und Eingaben laufen weiter
       renderer.render(scene, orbit.camera);
       input.endFrame();
@@ -1908,6 +1921,19 @@ async function main(): Promise<void> {
     if (looseTimer > 0.25) {
       looseKg = measureLoose();
       if (schicht) schichtLoseKg = measureLooseSchicht();
+      if (schicht && kasse) {
+        bus.emit(
+          "schicht:stand",
+          baueSchichtStand({
+            uhr: daylight.clock,
+            schichtS: daylight.schichtSekunden,
+            kasseEur: kasse.bilanz(false).verdienstEur,
+            betrieb: schicht,
+            verlader: vehicles.pickupTruck,
+            boxKg: (o) => containers.byId(boxFuer(o).id).contentKg,
+          })
+        );
+      }
       looseTimer = 0;
     }
     daylight.update(frameDt);
@@ -2013,29 +2039,15 @@ async function main(): Promise<void> {
     } else if (lektion) {
       lektion.takt(frameDt); // E-196: Lektion, Uhr steht in der Pause
     } else if (schicht && kasse) {
-      /*
-       * SCHICHT (E-202/E-203): Der Fahrplan steuert die Anlieferer, nicht
-       * `shift`. Bis zur Tafel (S4) steht alles in der Uhrzeile; zum
-       * Feierabend kommt die Bilanz als Meldung.
-       */
-      const stand = kasse.bilanz(false);
-      const warten = schicht.wartend > 0 ? ` · ${schicht.wartend} ${schicht.wartend === 1 ? "Fuhre wartet" : "Fuhren warten"}` : "";
-      hud.updateSchicht(
-        schichtErgebnis ??
-          `Schicht ${schichtStufe} · ${daylight.clock} · Kasse ${Math.round(stand.verdienstEur).toLocaleString("de-DE")} €${warten}`,
-        schicht.annahmeVoll && !schichtErgebnis
-      );
-      if (schicht.vorbei && !schichtErgebnis) {
-        const boxen = (["steel", "copper", "rubble"] as const).map((o) => ({
+      // SCHICHT (E-202 … E-205): Anzeige, Tafel und Ton hängen an schicht:stand/buchung/ende
+      if (schicht.vorbei && !schichtEnde) {
+        schichtEnde = true;
+        if (schadenMelder) schadenMelder.aktiv = false;
+        const boxen = BOX_ORDERS.map((o) => ({
           order: o,
           teile: items.items.filter((it) => it.containerId === boxFuer(o).id).map(kassenTeilAus),
         }));
-        const b = kasse.bilanz(true, boxen);
-        audio.playFeierabend();
-        schichtErgebnis =
-          `Feierabend: ${Math.round(b.verdienstEur).toLocaleString("de-DE")} € · ${b.tonnenUmgeschlagen.toFixed(1).replace(".", ",")} t · ` +
-          `Quote ${Math.round(b.sortierquote * 100)} % · Wartezeit ${Math.round(b.warteS)} s · ${"★".repeat(b.sterne)}`;
-        hud.toast(schichtErgebnis);
+        bus.emit("schicht:ende", { bilanz: kasse.bilanz(true, boxen) });
       }
     } else {
       rekorde?.takt(frameDt); // E-195: Spielzeit der Sandkasten-Rekorde, steht in der Pause
@@ -2060,7 +2072,7 @@ async function main(): Promise<void> {
     // Wartet ein Abholer, zählt nur eins: wie sortenrein ist die Ladung?
     // Daran hängt der Erlös, also gehört es laufend ins Bild.
     const abholer = vehicles.pickupTruck;
-    if (abholer?.waitingForLoad) {
+    if (!schicht && abholer?.waitingForLoad) {
       ladungTakt -= frameDt;
       if (ladungTakt <= 0) {
         ladungTakt = LADUNG_TAKT_S;
@@ -2176,7 +2188,10 @@ async function main(): Promise<void> {
   }
   // E-197: Wiedereinstieg beim naechsten Schritt ohne Haekchen (core/save.ts)
   lektion?.start(lehrgangEinstieg(lektionDaten?.schritte.length)); // E-196: erst jetzt — alle Zuhoerer (Karte, Geist, Wiedergabe, Tafel) haengen
-  if (schicht) hud.toast("Schicht: Misch auf den Verlader vor dir, Stahl links hinten, Bunt rechts, Müll rechts hinten. Laster nicht warten lassen!");
+  if (schicht && schichtStufe) {
+    bus.emit("schicht:start", { stufe: schichtStufe, dauerS: SCHICHT_FEIERABEND_S });
+    hud.toast("Misch auf den Verlader, Sortiertes in die Boxen.");
+  }
   else if (!BETRIEB && !aufgabenPlatz) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
   requestAnimationFrame(frame);
 }
