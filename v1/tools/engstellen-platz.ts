@@ -179,7 +179,14 @@ export function zielePlatz(): Platzmessung {
             k.max.z < cfg.z - d / 2 - 0.2 || k.min.z > cfg.z + d / 2 + 0.2
         ),
         zweck: "Muell hineinwerfen und wieder ausraeumen",
-        sollPassen: true,
+        /*
+         * SEIT E-190 NICHT MEHR: Der MUELL ist ein 10-m³-Abrollcontainer, so
+         * breit wie die Strasse erlaubt (2,50 m aussen, 2,32 m innen). Die ganz
+         * offene Spinne (rund 3,3 m) passt nicht hinein — geworfen wird von
+         * oben wie in die Ladeflaeche des Abholers, ausgeraeumt halb offen.
+         * Patrick hat die Groesse gewaehlt (21.10.2026).
+         */
+        sollPassen: false,
       });
     }
   }

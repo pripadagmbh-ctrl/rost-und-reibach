@@ -261,13 +261,15 @@ describe("Die Hindernisliste", () => {
     const cfg = CONFIGS.find((c) => c.id === "r_rubble")!;
     const huelle = huelleDesBehaelters(p, h.x, h.z);
 
-    expect(huelle.max.y, "gebaute Oberkante").toBeCloseTo(1.175, 3);
+    // Seit E-190 ist der MUELL ein 10-m³-Abrollcontainer mit 1,00 m Wand:
+    // 0,22 + 0,09 + 1,00 + 0,065 = 1,375 m (vorher 0,80 m Wand, 1,175 m).
+    expect(huelle.max.y, "gebaute Oberkante").toBeCloseTo(1.375, 3);
     expect(h.top, "gemeldete Oberkante").toBeCloseTo(huelle.max.y, 3);
-    expect(rolloffOberkante(cfg.size[2]), "die gemeinsame Quelle").toBeCloseTo(1.175, 3);
+    expect(rolloffOberkante(cfg.size[2]), "die gemeinsame Quelle").toBeCloseTo(1.375, 3);
 
-    // GEGENPROBE: die alte Rechnung meldet weiter 1,00 m und liegt 17,5 cm
+    // GEGENPROBE: die alte Rechnung meldet Wand + 0,20 m und liegt 17,5 cm
     // unter dem Riegel. Ohne sie pruefte der Fall eine Zahl gegen sich selbst.
-    expect(cfg.size[2] + 0.2, "die Rechnung von vorher").toBeCloseTo(1.0, 3);
+    expect(cfg.size[2] + 0.2, "die Rechnung von vorher").toBeCloseTo(1.2, 3);
     expect(huelle.max.y - (cfg.size[2] + 0.2), "was die alte Rechnung verschenkte").toBeCloseTo(
       0.175,
       3
@@ -299,8 +301,13 @@ describe("Die Hindernisliste", () => {
     expect(h.hw).toBeCloseTo(cfg.size[0] / 2, 3);
     expect(h.hd).toBeCloseTo(cfg.size[1] / 2, 3);
     expect(huelle.max.x - h.x - h.hw, "Riegelueberstand in x").toBeCloseTo(0.07, 3);
-    expect(h.z - huelle.min.z - h.hd, "OEsenueberstand in z").toBeCloseTo(0.365, 3);
-    expect(huelle.max.z - h.z - h.hd, "Rungenueberstand in z").toBeCloseTo(0.105, 3);
+    /*
+     * Seit E-190 hat er statt der Öse vorn (+z) den Hakenbügel (Stange Ø 0,10 m
+     * auf d/2 + 0,12) und hinten die Rollen innerhalb des Umrisses: hinten
+     * stehen nur noch die Rungen über, vorn der Bügel.
+     */
+    expect(h.z - huelle.min.z - h.hd, "Rungenueberstand hinten").toBeCloseTo(0.105, 3);
+    expect(huelle.max.z - h.z - h.hd, "Buegelueberstand vorn").toBeCloseTo(0.17, 3);
   });
 });
 
@@ -419,10 +426,12 @@ describe("Der Weg zum Warteplatz", () => {
      * Gierlage.
      */
     const tief = luftlinienTiefe(WARTEPLATZ_WEST, muellRechteck());
+    // Seit E-190 ist der Container 2,50 m breit — „ganz hindurch" heisst jetzt
+    // seine volle Breite (bis E-190 war die Schranke 2,5 m bei 3,60 m Breite).
     expect(
       tief,
       "die alte Luftlinie trifft den Container nicht mehr — dann prueft der Fall darueber nichts"
-    ).toBeGreaterThan(2.5);
+    ).toBeGreaterThan(2.4);
 
     // Und der Weg, der heute gefahren wird, ist frei. Beides mit demselben
     // Umriss und derselben Rechnung — der Unterschied ist die STRECKE.

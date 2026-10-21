@@ -26,7 +26,7 @@
  * Kopflos prüfbar wird es damit obendrein.
  */
 import RAPIER from "@dimforge/rapier3d-compat";
-import { CONFIGS, type ContainerManager } from "../world/containers";
+import { CONFIGS, type ContainerManager, type Wanne } from "../world/containers";
 import { istPlatzinventar } from "../world/platzinventar";
 import type { ItemManager } from "../world/scrapItems";
 
@@ -53,6 +53,16 @@ export interface PlatzinventarPort {
   leeren(id: string): LeerBericht;
   /** Die leere Hülle an dieser Stelle auf den Boden setzen. */
   absetzen(id: string, x: number, z: number): void;
+  /*
+   * DER MÜLL-ABROLLER (E-190) — optional, damit Prüfstände ohne Platz weiter
+   * mit drei Methoden auskommen.
+   */
+  /** Der Müll-Container: seine Wanne, Mitte der Grundfläche, Gier (Richtung des Hakenbügels). */
+  muellWanne?(): { wanne: Wanne; x: number; z: number; gier: number } | null;
+  /** Eine leere Müll-Wanne bauen (an dieser Stelle). */
+  baueLeereMuellWanne?(x: number, z: number): Wanne | null;
+  /** Die leere wird der Müll-Container des Platzes; zurück kommt die alte. */
+  tauscheMuell?(neu: Wanne): Wanne | null;
 }
 
 /**
@@ -97,6 +107,23 @@ export class ContainerAbholung implements PlatzinventarPort {
     return out;
   }
 
+  muellWanne(): { wanne: Wanne; x: number; z: number; gier: number } | null {
+    const m = this.containers.muell();
+    const w = m?.wanne;
+    if (!m || !w) return null;
+    const r = w.body.rotation();
+    return { wanne: w, x: m.ort.x, z: m.ort.z, gier: Math.atan2(2 * (r.w * r.y), 1 - 2 * r.y * r.y) };
+  }
+
+  baueLeereMuellWanne(x: number, z: number): Wanne | null {
+    return this.containers.baueLeereMuellWanne(x, z);
+  }
+
+  tauscheMuell(neu: Wanne): Wanne | null {
+    this.gemerkt.clear(); // die gemerkte Wanne ist ab jetzt die des Abrollers
+    return this.containers.tauscheMuell(neu);
+  }
+
   leeren(id: string): LeerBericht {
     return this.containers.leereBehaelter(id, this.items);
   }
@@ -124,7 +151,7 @@ export class ContainerAbholung implements PlatzinventarPort {
 
   private koerperVon(id: string): RAPIER.RigidBody | null {
     const schon = this.gemerkt.get(id);
-    if (schon && schon.isValid()) return schon;
+    if (schon && schon.isValid() && schon.isDynamic()) return schon;
     const ort = this.containers.ortVon(id);
     if (!ort) return null;
     const eigene = new Set<number>();

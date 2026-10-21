@@ -13,6 +13,7 @@ import {
 import type { ItemManager, ScrapItem } from "./scrapItems";
 import type { EventBus } from "../core/events";
 import { t } from "../ui/sprache"; // E-170: Schilder in der Spielsprache
+import { MUELL_WANNE } from "../delivery/hakenlift"; // E-190: eine Quelle für Container und Haken
 
 /**
  * Sortierziele (Design-Pivot 2026-08-27): offene **Haufen-Zonen** für die großen
@@ -249,7 +250,17 @@ export function bayDrehung(cfg: ContainerConfig): number {
  * Schwelle der BUNT + VA. Herleitung beim Eintrag `r_rubble` unten. Für
  * Aufgaben-Aufbauten und Wächter benannt, damit niemand die Zahl abschreibt.
  */
-export const MUELL_START = { x: -3.0, z: -16.0 } as const;
+export const MUELL_START = { x: -3.55, z: -16.0 } as const;
+
+/**
+ * Eine Wanne: Netz und Körper eines Absetz- bzw. Abrollcontainers. Der
+ * Müll-Abroller (E-190) tauscht sie aus — der Platz behält seinen
+ * Müll-Container (Schild, Zählzone, Platzinventar), nur die Wanne wechselt.
+ */
+export interface Wanne {
+  group: THREE.Group;
+  body: RAPIER.RigidBody;
+}
 
 export const CONFIGS: ContainerConfig[] = [
   /*
@@ -618,8 +629,23 @@ export const CONFIGS: ContainerConfig[] = [
    * Ostkante; nach vorn geht es mit etwas Linkseinschlag vorbei. Die
    * Rückfahrspur (Schranke 4) bleibt frei (x + 1,80 = 0,6 ≤ 3,35).
    */
+  /*
+   * SEIT E-190 (21.10.2026) EIN ABROLLCONTAINER, 10 m³. Patrick: „Der
+   * Müllcontainer soll ein abholcontainer werden der raufgezogen wird", Größe
+   * „kleiner Abroller, ca. 10 m³". Maße aus `delivery/hakenlift.ts`
+   * (`MUELL_WANNE`, eine Quelle für Bau und Haken): 2,50 breit (Straßenmaß),
+   * 4,50 lang, Wand 1,00 m — innen 2,32 × 4,32 × 1,00 = 10,0 m³. Hakenbügel
+   * vorn (+z, nach Norden, dort setzt der Abroller an), Rollen hinten.
+   *
+   * Platz wie in E-183, an der Schwelle der BUNT + VA: Westkante wieder auf
+   * x −4,80 (0,15 m vor der Schwelle), Mitte (−3,55 | −16,0), 7,17 m vom Sitz.
+   * Schmaler als vorher, darum steht er nicht mehr in der Fahrlinie: zwischen
+   * Mitte und Bagger 3,05 m, nötig 1,25 + 1,50 = 2,75 m — 0,30 m frei (vorher
+   * 0,80 m darin). Länger nach Norden: Nordkante z −13,75 (vorher −13,85).
+   */
   { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
-    label: "MUELL", kind: "rolloff", x: MUELL_START.x, z: MUELL_START.z, size: [3.6, 4.3, 0.8],
+    label: "MUELL", kind: "rolloff", x: MUELL_START.x, z: MUELL_START.z,
+    size: [MUELL_WANNE.breite, MUELL_WANNE.laenge, MUELL_WANNE.wand],
     platzinventar: true,
     /*
      * E-138: Enzianblau (RAL 5010) mit weisser Schrift. Blau, weil der Platz
@@ -1568,11 +1594,27 @@ class GameContainer {
         group.add(kante);
       }
       if (cfg.bemalung) group.add(muldenSchrift(t(cfg.bemalung.schrift), w, d, KUFE + T + h / 2, h));
-      // Haken-Öse an der Stirnseite: ohne sie ist es eine Kiste, keine Mulde
-      const oese = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.045, 6, 12), rahmen);
-      oese.rotation.y = Math.PI / 2;
-      oese.position.set(0, KUFE + T + h * 0.75, -(d / 2 + 0.16));
-      group.add(oese);
+      /*
+       * HAKENBÜGEL UND ROLLEN (E-190): Ein Abrollcontainer hat vorn (+z) einen
+       * Bügel, in den der Haken greift, und hinten zwei Rollen, auf denen er
+       * über den Boden läuft. Lage aus `MUELL_WANNE` — dieselben Zahlen, mit
+       * denen der Haken rechnet (`delivery/hakenlift.ts`).
+       */
+      const buegelY = MUELL_WANNE.bügelHoehe;
+      const saeule = new THREE.Mesh(new THREE.BoxGeometry(0.2, buegelY - KUFE, 0.16), rahmen);
+      saeule.position.set(0, KUFE + (buegelY - KUFE) / 2, d / 2 + 0.06);
+      group.add(saeule);
+      const buegel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.56, 8), rahmen);
+      buegel.rotation.z = Math.PI / 2;
+      buegel.position.set(0, buegelY, d / 2 + MUELL_WANNE.bügelVor);
+      group.add(buegel);
+      const rolleGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.2, 10);
+      for (const sx of [-1, 1]) {
+        const rolle = new THREE.Mesh(rolleGeo, rahmen);
+        rolle.rotation.z = Math.PI / 2;
+        rolle.position.set((sx * (w - 0.3)) / 2, 0.13, -d / 2 + 0.12);
+        group.add(rolle);
+      }
 
       /*
        * Auch der grosse Stahlcontainer ist beweglich (Ansage 12.09.2026: „ich
@@ -1691,6 +1733,31 @@ class GameContainer {
    * schlittern. Die Drehung ist enger gefasst als beim Schrott: Ein Container
    * steht auf einer Fläche und dreht sich schwerfällig, er trudelt nicht.
    */
+  /** E-190: Netz und Körper dieses Containers — nur bewegliche haben eine Wanne. */
+  get wanne(): Wanne | null {
+    return this.koerper ? { group: this.group, body: this.koerper } : null;
+  }
+
+  /**
+   * E-190: Eine andere Wanne übernehmen (der Müll-Abroller hat eine leere
+   * abgesetzt). Schild, Zählzone und Platzinventar bleiben bei diesem Behälter;
+   * der Inhalt der alten Wanne zählt ab jetzt nicht mehr hierher.
+   */
+  tauscheWanne(neu: Wanne): Wanne | null {
+    const alt = this.wanne;
+    this.group = neu.group;
+    this.koerper = neu.body;
+    this.clearAfterSale();
+    this.syncBeweglich();
+    this.wiegeLadung();
+    return alt;
+  }
+
+  /** Das Schild aus der Szene nehmen — für eine Wanne, die keinen eigenen Behälter bekommt. */
+  entferneSchild(): void {
+    this.label.sprite.removeFromParent();
+  }
+
   bremseTraegheit(): void {
     const b = this.koerper;
     if (!b || !b.isDynamic()) return;
@@ -2003,10 +2070,43 @@ export class ContainerManager {
    */
   nachtschichtAktiv = true;
 
-  constructor(scene: THREE.Scene, world: RAPIER.World, private bus: EventBus) {
+  constructor(
+    private scene: THREE.Scene,
+    private world: RAPIER.World,
+    private bus: EventBus
+  ) {
     for (const cfg of CONFIGS) {
       this.containers.push(new GameContainer(cfg, scene, world));
     }
+  }
+
+  /* --------------------------------------- Müll-Abroller (E-190) ------- */
+
+  /** Der Müll-Container des Platzes (das bewegliche Platzinventar), oder null. */
+  muell(): GameContainer | null {
+    return this.containers.find((c) => istPlatzinventar(c.cfg) && c.cfg.kind === "rolloff") ?? null;
+  }
+
+  /**
+   * Eine leere Müll-Wanne bauen, wie sie der Abroller mitbringt — gleiche
+   * Bauart, gleicher Lack, ohne eigenes Schild. Der Körper entsteht dort, wo
+   * er stehen soll (`x`, `z`, Lehre v2 E-058); der Aufrufer macht ihn vor dem
+   * ersten Schritt kinematisch und setzt seine Lage.
+   */
+  baueLeereMuellWanne(x: number, z: number): Wanne | null {
+    const m = this.muell();
+    if (!m) return null;
+    const c = new GameContainer({ ...m.cfg, x, z }, this.scene, this.world);
+    c.entferneSchild();
+    return c.wanne;
+  }
+
+  /**
+   * Der Platz bekommt die leere Wanne als Müll-Container; zurück kommt die
+   * alte (volle), die der Abroller mitnimmt. Danach neu zählen lassen.
+   */
+  tauscheMuell(neu: Wanne): Wanne | null {
+    return this.muell()?.tauscheWanne(neu) ?? null;
   }
 
   /**

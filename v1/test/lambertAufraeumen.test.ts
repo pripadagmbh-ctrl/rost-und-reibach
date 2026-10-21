@@ -93,15 +93,16 @@ describe("Füllstand einer Mulde", () => {
      * anderen rechnen mit `VOLL_AB` und wären auch bei 99 noch grün. Hier
      * steht die Rechenkette ausgeschrieben.
      *
-     * MUELL-Container: 3,60 × 4,30 × 0,80 m außen, 0,09 m Wand
-     *   → lichte 3,42 × 4,12 m, Nutzvolumen 11,27 m³
-     *   → voll ab 11,27 × 0,90 × 197,5 kg/m³ = 2.004 kg gemischter Abfall
+     * MUELL-Container (seit E-190 ein 10-m³-Abrollcontainer):
+     *   2,50 × 4,50 × 1,00 m außen, 0,09 m Wand
+     *   → lichte 2,32 × 4,32 m, Nutzvolumen 10,02 m³
+     *   → voll ab 10,02 × 0,90 × 197,5 kg/m³ = 1.782 kg gemischter Abfall
      * ABFALL-Silo: 6,00 × 4,20 × 3,00 m, 0,55 m Betonlego, zwei Wände
      *   → lichte 5,45 × 3,65 m, Nutzvolumen 59,68 m³ → 10.608 kg
      */
-    expect(nutzVolumen(MUELL)).toBeCloseTo(11.27, 2);
-    expect(nutzVolumen(MUELL) * VOLL_AB * abfallDichte()).toBeGreaterThan(1950);
-    expect(nutzVolumen(MUELL) * VOLL_AB * abfallDichte()).toBeLessThan(2060);
+    expect(nutzVolumen(MUELL)).toBeCloseTo(10.02, 2);
+    expect(nutzVolumen(MUELL) * VOLL_AB * abfallDichte()).toBeGreaterThan(1750);
+    expect(nutzVolumen(MUELL) * VOLL_AB * abfallDichte()).toBeLessThan(1820);
     expect(nutzVolumen(ABFALLSILO)).toBeCloseTo(59.68, 2);
     expect(nutzVolumen(ABFALLSILO) * VOLL_AB * abfallDichte()).toBeGreaterThan(10400);
     // Der Mittelwert der vier Abfall-Schüttdichten (250 · 300 · 150 · 90)

@@ -1000,6 +1000,11 @@ async function main(): Promise<void> {
    */
   bus.on("bagger:hupe", () => audio.playHupe());
   bus.on("bagger:hupe", () => {
+    // E-190: Ein Anlieferer, der abgeladen hat und wartet, fährt auf die Hupe zur Waage
+    if (!challenge && vehicles.anliefererWartet) {
+      vehicles.zurWaage();
+      return;
+    }
     const wagen = vehicles.pickupTruck;
     if (challenge || !(wagen?.waitingForLoad || wagen?.setztUm)) return;
     // 1 kg wie in `abholerFaehrtRaus`: jedes Teil wiegt mehr, Null waere Fliesskomma

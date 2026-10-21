@@ -67,7 +67,8 @@ describe("Der Müllcontainer ist ein Container, kein Bauwerk", () => {
     const waende = 2 * (w * h * WAND_T) + 2 * (WAND_T * h * d);
     const leerKg = (boden + waende) * DICHTE;
     expect(MUELL.kind, "der MUELL ist kein Absetzcontainer").toBe("rolloff");
-    expect(leerKg, `${leerKg.toFixed(0)} kg leer`).toBeCloseTo(1781, 0);
+    // Seit E-190 (2,50 × 4,50 × 1,00 m statt 3,60 × 4,30 × 0,80): 1424 statt 1781 kg
+    expect(leerKg, `${leerKg.toFixed(0)} kg leer`).toBeCloseTo(1424, 0);
     expect(leerKg, "leer schon zu schwer für den Greifer, auch nah").toBeLessThan(NAH_KG);
     // E-156: Leer hebt ihn die grosse Schrottmaschine ueberall, auch weit
     // draussen ohne Pratzen (zwei Drittel). Voll wird er von selbst schwerer:
@@ -129,10 +130,19 @@ describe("Der Müllcontainer ist ein Container, kein Bauwerk", () => {
     expect(Math.hypot(p.x - MUELL.x, p.z - MUELL.z), "er ist weggerutscht").toBeLessThan(0.05);
   });
 
-  it("die offene Spinne kommt hinein — sonst bekommt man nichts wieder heraus", () => {
-    // Sichelkralle offen 3,38 m (`spinnenmass`), Wandstärke 0,09 m je Seite.
+  it("seit E-190 ist er so schmal wie ein echter Abrollcontainer — hinein geht es von oben", () => {
+    /*
+     * BIS E-190 STAND HIER „die offene Spinne kommt hinein". Patrick hat am
+     * 21.10.2026 einen kleinen Abroller mit 10 m³ gewählt; ein Abrollcontainer
+     * ist höchstens so breit wie die Straße erlaubt (2,50 m), innen 2,32 m.
+     * Die ganz offene Spinne (Fünfschalengreifer rund 3,3 m) setzt damit auf
+     * den Bordwänden auf: Hineinwerfen geht von oben wie beim Abholer,
+     * Herausholen nur halb geöffnet. Festgehalten, damit es niemand für einen
+     * Fehler hält — und damit ein breiterer Container hier auffällt.
+     */
     const [w, d] = MUELL.size;
-    expect(Math.min(w, d) - 2 * WAND_T, "lichte Weite quer").toBeGreaterThan(3.38);
+    expect(Math.min(w, d) - 2 * WAND_T, "lichte Weite quer").toBeCloseTo(2.32, 3);
+    expect(w, "breiter als die Straße").toBeLessThanOrEqual(2.55);
   });
 
   it("sein Startplatz ist frei gewählt, aber begründet", () => {

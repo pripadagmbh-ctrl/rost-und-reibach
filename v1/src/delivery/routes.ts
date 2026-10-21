@@ -44,7 +44,7 @@ export const VERTEILER: [number, number] = [-27.0, 16.0];
  * Rangierzug. Den Verteiler allein (Fahrtrichtung Sued) zu nehmen, ginge
  * nicht — geradeaus laege der Wagen auf dem dritten Warteplatz.
  */
-const ANFAHRT_KOPF: Array<[number, number]> = [WAAGE_HALT, VERTEILER, [-21, 10]];
+export const ANFAHRT_KOPF: Array<[number, number]> = [WAAGE_HALT, VERTEILER, [-21, 10]];
 
 /**
  * Das Streckennetz des Platzes.
@@ -402,7 +402,7 @@ export function routeOut(): Array<[number, number]> {
  * kuerzeste Weg in einem Bauwerk, wird er ueber einen der alten Wegpunkte
  * gefuehrt (`TOR_ANKER`).
  */
-function zumTor(
+export function zumTor(
   vorher: Array<[number, number]>,
   ohneSlot: readonly [number, number] | null = null
 ): Array<[number, number]> {

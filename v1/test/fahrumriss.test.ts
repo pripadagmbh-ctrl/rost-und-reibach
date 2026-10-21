@@ -266,10 +266,11 @@ describe("Der versetzte Muellcontainer haelt einen Fahrer auf", () => {
      * DIE STELLE IST GERECHNET, NICHT GEGRIFFEN.
      *
      * Der Wagen setzt von (6,3 | −17,5) nach (6,3 | −23,0) zurueck, das Heck
-     * voran; seine Flanken liegen auf x 4,75 und 7,85. Der Container misst
-     * 3,60 x 4,30 m (`CONFIGS`, `r_rubble`), hat also 1,80 m halbe Breite.
+     * voran; seine Flanken liegen auf x 4,75 und 7,85. Die halbe Breite des
+     * Containers kommt aus `CONFIGS` (`r_rubble`; seit E-190 1,25 m, vorher
+     * 1,80), die Mitte wird daraus gerechnet:
      *
-     *   Mitte x 3,05  →  Container reicht bis x 4,85, das sind 10 cm
+     *   Mitte x 4,85 − halbe Breite  →  Container reicht bis x 4,85, das sind 10 cm
      *                    INNERHALB der westlichen Flanke des Wagens.
      *   Mittellinie   →  3,25 m entfernt. Der alte Korridor tastete mit
      *                    1,40 m um den Punkt, zusammen mit der halben
@@ -281,7 +282,7 @@ describe("Der versetzte Muellcontainer haelt einen Fahrer auf", () => {
      */
     const muell = CONFIGS.find((c) => c.id === "r_rubble")!;
     const versetzt = {
-      x: 3.05,
+      x: 4.85 - muell.size[0] / 2,
       z: -20.0,
       hw: muell.size[0] / 2,
       hd: muell.size[1] / 2,

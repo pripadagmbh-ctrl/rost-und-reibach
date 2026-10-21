@@ -762,6 +762,11 @@ export const EN: Record<string, string> = {
   "gemischter Ladung": "a mixed load",
   "einem Altauto": "a scrap car",
   "einem Wohnwagen": "a caravan",
+  // Müll-Abroller (Lieferung, E-190)
+  "Abroller tauscht den Müll-Container.": "Hook-lift truck is swapping the waste container.",
+  "Abroller fährt mit dem vollen Müll-Container los.": "Hook-lift truck is leaving with the full waste container.",
+  "Büro an Bagger: Stell den Müll-Container an seinen Platz.":
+    "Office to loader: Put the waste container back in its place.",
 };
 
 /**

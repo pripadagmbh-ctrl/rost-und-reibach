@@ -11,6 +11,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
 | E-191 | 21.10.2026 | Bagger hupt: Abholer fährt los; Schere heißt Presse; Maschendraht raus | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
+| E-190 | 21.10.2026 | Müll-Container wird Abrollcontainer: voll weg, leer zurück | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-188 | 20.10.2026 | Überlast einmal je Versuch, LKW-Wrack sinkt beim Zudrücken nicht, Schleppen unter Überlast | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-189 | 20.10.2026 | Bucht wie vorher, Ecken angeschrägt: kein Anschlag beim Schwenken | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-187 | 20.10.2026 | Hämmern mit der Spinne knautscht das Wrack, halb so stark wie ein Biss | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -196,6 +197,14 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-190 — Müll-Abroller: voll weg, leer zurück** (iPad)
+- ABHOLEN → Müll: stellt der Abroller erst den leeren ab und zieht dann den vollen hoch — sieht das wie auf einem echten Hof aus?
+- Fällt beim Hochziehen und Wegfahren etwas heraus oder fliegt weg?
+- Neuer, schmalerer Container (2,50 m): Hineinwerfen von oben und Herausholen mit halb offener Spinne gut?
+- Der leere steht beim ersten Mal auf B vor dem Bagger: stört er dort?
+- Container quer in eine Ecke stellen, Müll bestellen: kommt „Stell den Müll-Container an seinen Platz"?
+- Pritsche halb abladen und hupen (Taste 2 / HUPE): fährt sie zur Waage und vom Hof?
 
 **E-191 — Bagger-Hupe, Presse, Maschendraht** (iPad, dann iPhone mini)
 - Abholer beladen, HUPE im Kranz wählen: Hupt es, fährt der Laster los?

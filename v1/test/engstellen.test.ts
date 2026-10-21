@@ -151,7 +151,12 @@ function anstoesse(stellen: Engstelle[], name: string, durchmesser: number): str
  * Was daraus wird, entscheidet Patrick — Container breiter, Greifer schmaler,
  * oder so lassen. Dieser Wächter entscheidet nichts, er hält die Zahl fest.
  */
-const BEKANNTE_ANSTOESSE = ["Sichelkralle × Absetzcontainer MUELL"];
+/*
+ * SEIT E-190 LEER: Der MUELL ist ein 10-m³-Abrollcontainer (2,32 m innen) und
+ * soll die offene Spinne nicht mehr aufnehmen (`engstellen-platz.ts`,
+ * `sollPassen: false`) — der Befund oben hat sich damit erledigt.
+ */
+const BEKANNTE_ANSTOESSE: string[] = [];
 
 describe("Engstellen: passt der offene Greifer hinein?", () => {
   let ziele: Ziel[];
@@ -274,16 +279,27 @@ describe("Engstellen: passt der offene Greifer hinein?", () => {
         m.dick - m.huell,
         `${m.form.name}: der Prüfgreifer ist gar nicht breiter geworden`
       ).toBeCloseTo(AUFBLASEN, 6);
+      /*
+       * Seit E-190 lag die einzige Stelle, die 40 cm Zugabe meldeten, im
+       * MUELL-Container — der soll die offene Spinne nicht mehr aufnehmen.
+       * Aufgeblasen wird deshalb mindestens bis über die ENGSTE Stelle, in
+       * die der Greifer hinein soll (gemessen, plus 1 cm), so wie es die
+       * Presskammer-Gegenprobe unten macht.
+       */
+      const knapp = Math.min(
+        ...stellen.filter((e) => e.sollPassen && e.frei > m.huell).map((e) => e.frei - m.huell)
+      );
+      const zugabe = Math.max(AUFBLASEN, knapp + 0.01);
       const heute = anstoesse(stellen, m.form.name, m.huell);
-      const jetzt = anstoesse(stellen, m.form.name, m.dick);
+      const jetzt = anstoesse(stellen, m.form.name, m.huell + zugabe);
       // eslint-disable-next-line no-console
       console.log(
-        `Gegenprobe ${m.form.name}: ${m.huell.toFixed(4)} m → ${m.dick.toFixed(4)} m, ` +
+        `Gegenprobe ${m.form.name}: ${m.huell.toFixed(4)} m → ${(m.huell + zugabe).toFixed(4)} m, ` +
           `Anstöße ${heute.length} → ${jetzt.length}: ${jetzt.join(" | ")}`
       );
       expect(
         jetzt.length,
-        `${m.form.name} um ${AUFBLASEN * 100} cm breiter wird nirgends gemeldet — der Wächter wäre blind`
+        `${m.form.name} um ${(zugabe * 100).toFixed(0)} cm breiter wird nirgends gemeldet — der Wächter wäre blind`
       ).toBeGreaterThan(heute.length);
       for (const a of heute) expect(jetzt, "ein alter Anstoß ist verschwunden").toContain(a);
     }
@@ -353,6 +369,7 @@ describe("Engstellen: passt der offene Greifer hinein?", () => {
     expect(namen).toContain("Silo-Gasse, Wagen in der Mulde");
     // Sechs Lagersilos (E-028) plus die Sortierbox BUNT + VA.
     expect(namen.filter((n) => n.startsWith("Mulde ")).length, "Zahl der Mulden").toBe(7);
-    expect(ziele.filter((z) => z.sollPassen).length, "Zahl der Ziele, in die er hinein SOLL").toBe(12);
+    // Seit E-190 elf: der MUELL-Abrollcontainer nimmt die offene Spinne nicht mehr auf (von oben)
+    expect(ziele.filter((z) => z.sollPassen).length, "Zahl der Ziele, in die er hinein SOLL").toBe(11);
   });
 });

@@ -6,6 +6,7 @@ import { ladeHoeheGrenze } from "./fuellgrad";
 import { werbeAtlas, atlasFeld, PRIPADA_GRUEN } from "../world/werbung";
 import type { Fahrwerk } from "./lenkung";
 import { baueAbsetzmulde, zapfenLage, type MuldenBau } from "./absetzmulde";
+import { hakenGeometrie, type HakenGeometrie } from "./hakenlift";
 
 /**
  * WO DIE ACHSEN DES DREIACHSERS SITZEN (E-140) — eine Quelle fuer Bau und Fahrt.
@@ -296,6 +297,8 @@ export interface VehicleModelContext {
   tailGate: { hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody } | null;
   /** Absetzkipper ohne eigene Mulde — er kommt, um eine abgesetzte zu holen (E-141). */
   ohneMulde?: boolean;
+  /** Abroller mit Hakenarm statt Ladefläche — er holt den Müll-Container (E-190). */
+  hakenlift?: boolean;
 }
 
 /**
@@ -386,6 +389,11 @@ export interface VehicleModelParts {
     ketten: THREE.Mesh[];
     mulde: MuldenBau | null;
   } | null;
+  /**
+   * Der Hakenarm (E-190): `arm` dreht um das Gelenk (`rotation.x = −alpha`),
+   * `teleskop` fährt darin nach hinten (`position.z = −schub`).
+   */
+  haken: { arm: THREE.Group; teleskop: THREE.Group; geo: HakenGeometrie } | null;
   /** Wo die Achsen sitzen — daraus faehrt das Einspurmodell (E-140). */
   fahrwerk: Fahrwerk;
   /** Die Teile der Vorderraeder, die beim Lenken einschlagen. */
@@ -1196,6 +1204,49 @@ function logoWand(wallH: number, bedLen: number, dir: -1 | 1): THREE.BoxGeometry
   return geo;
 }
 
+/**
+ * DER HAKENARM DES MÜLL-ABROLLERS (E-190): Gelenk am Rahmenende, ein Balken im
+ * Rahmen, darin das Teleskop mit der Hakensäule; dazu die Heckrolle. Maße aus
+ * `hakenlift.hakenGeometrie` — dieselben, mit denen der Container bewegt wird.
+ * Sechs Netze; eine Ladefläche hat er nicht (`bedGroup` bleibt leer).
+ */
+function baueHakenarm(
+  v: VehicleModelContext,
+  paint: THREE.MeshStandardMaterial,
+  dark: THREE.MeshStandardMaterial
+): NonNullable<VehicleModelParts["haken"]> {
+  const geo = hakenGeometrie(v.bedLen);
+  const [a, b] = geo.arm;
+  v.bedGroup.position.set(0, geo.rahmenOben, -v.bedLen / 2);
+  v.group.add(v.bedGroup);
+  const arm = new THREE.Group();
+  arm.name = "Hakenarm";
+  arm.position.set(0, geo.gelenk[1], geo.gelenk[0]);
+  v.group.add(arm);
+  const aussen = 2.9;
+  const balken = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.26, aussen), paint);
+  balken.position.z = aussen / 2;
+  balken.castShadow = true;
+  arm.add(balken);
+  const teleskop = new THREE.Group();
+  arm.add(teleskop);
+  const innen = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.2, a - 1.2), dark);
+  innen.position.z = 1.2 + (a - 1.2) / 2;
+  teleskop.add(innen);
+  const saeule = new THREE.Mesh(new THREE.BoxGeometry(0.3, b + 0.15, 0.3), paint);
+  saeule.position.set(0, b / 2, a + 0.05);
+  saeule.castShadow = true;
+  teleskop.add(saeule);
+  const haken = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.34), dark);
+  haken.position.set(0, b, a - 0.1);
+  teleskop.add(haken);
+  const rolle = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 1.9, 12), dark);
+  rolle.rotation.z = Math.PI / 2;
+  rolle.position.set(0, geo.rolle[1] - 0.13, geo.rolle[0] + 0.05);
+  v.group.add(rolle);
+  return { arm, teleskop, geo };
+}
+
 export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const paint = new THREE.MeshStandardMaterial({ color: lackFuer(v.halter), roughness: 0.62 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8 });
@@ -1204,6 +1255,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   // Was der Ablauf danach ansteuert, wird hier gesammelt und zurückgegeben
   const teile: VehicleModelParts = {
     absetz: null,
+    haken: null,
     fahrwerk: lkwFahrwerk(v.bedLen),
     lenkRaeder: [],
     tailGate: null,
@@ -1310,6 +1362,10 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   }
   baueFahrerhaus(v, paint, dark, windowMat);
   baueFahrgestell(v, dark, bedMat);
+  if (v.hakenlift) {
+    teile.haken = baueHakenarm(v, paint, dark);
+    return teile;
+  }
   if (v.kind === "absetzer") {
     teile.absetz = baueAbsetzanlage(v, paint.color.getHex(), dark);
     return teile;

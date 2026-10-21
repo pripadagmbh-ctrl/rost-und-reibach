@@ -76,7 +76,7 @@ const ABHOLER_CONTAINER_KG = 1800;
  * grossen Container (`kind` „abholer") oder ein Absetzkipper, der seine Mulde
  * auf dem Rahmen behaelt und dort beladen wird.
  */
-export type AbholAufbau = "abroller" | "absetzer";
+export type AbholAufbau = "abroller" | "absetzer" | "muell";
 /**
  * Leergewicht der 7-m³-Absetzmulde (kg) — die Tara des Absetzkippers als
  * Abholer, wie `ABHOLER_CONTAINER_KG` beim Abroller. SW: Hersteller nennen fuer
@@ -114,6 +114,30 @@ const HUPE_ABSTAND_S = 30;
  * (SW — ein plattes Auto ist etwa ein Drittel so hoch wie ein heiles).
  */
 const WRACK_FLACH_REST = 0.3;
+/*
+ * DER MÜLL-ABROLLER (E-190) — Tempi des Hakenarms, SW. Ein echter Abroller
+ * braucht für Ab- oder Aufnehmen gut eine Minute; im Spiel sind es rund 14 s,
+ * damit man zusieht und nicht wartet. Ohne Container geht der Arm doppelt so
+ * schnell (nichts hängt daran).
+ */
+/** Kipptempo des Arms (rad/s): 148° in gut 10 s. */
+const HAKEN_DREH = 0.25;
+/** Tempo des Teleskops (m/s): 1,6 m in 4 s. */
+const HAKEN_SCHIEB = 0.4;
+/** Leer geht es so viel schneller. */
+const HAKEN_LEER_FAKTOR = 2;
+/**
+ * Beim Ankoppeln steht der Wagen nie auf den Zentimeter (bis 0,4 m daneben,
+ * E-140). Der Container wird deshalb nicht an den Haken versetzt, sondern
+ * während des ersten Viertels der Hubbewegung von seiner Standlage in die
+ * Hakenlage übergeblendet — er wird herangezogen, wie beim Absetzkipper die
+ * Mulde an den Ketten (E-141). SW.
+ */
+const HAKEN_EINZIEH_ANTEIL = 0.25;
+/** Nennvolumen des Müll-Containers (m³), innen 2,32 × 4,32 × 1,00 (`MUELL_WANNE`). */
+export const MUELL_NENN_M3 = Math.round(
+  (MUELL_WANNE.breite - 0.18) * (MUELL_WANNE.laenge - 0.18) * MUELL_WANNE.wand
+);
 /*
  * DER ABSETZKIPPER (E-141) — Tempi und Winkel, alle SW.
  *
@@ -245,6 +269,19 @@ import {
 import { muldenPose, absetzSchwenk, imTrog, MULDE_BODEN } from "./absetzmulde";
 import { Federung, federungsDatenFuer } from "./federung";
 import {
+  wannenLage,
+  alphaAmBoden,
+  HAKEN_SCHUB_M,
+  MUELL_WANNE,
+} from "./hakenlift";
+import {
+  planeMuellwechsel,
+  baggerImWeg,
+  type MuellPlan,
+  type WannenOrt,
+} from "./muellwechsel";
+import type { Wanne } from "../world/containers";
+import {
   ANHAENGER_HALB_BREITE,
   ANHAENGER_WAND,
   WRACK_KG,
@@ -361,7 +398,12 @@ type Phase =
   | "muldeLoesen"
   | "armeEin"
   | "muldeHolen"
-  | "muldeAufnehmen";
+  | "muldeAufnehmen"
+  // Müll-Abroller (E-190)
+  | "hakenAb"
+  | "hakenEin"
+  | "hakenAus"
+  | "hakenAuf";
 
 interface Cargo {
   items: ScrapItem[];
@@ -374,6 +416,20 @@ interface RidingBody {
   body: RAPIER.RigidBody;
   localPos: THREE.Vector3;
   localQuat: THREE.Quaternion;
+}
+
+/**
+ * Die Kollider eines Körpers neu in die Grobsuche eintragen, nachdem er die
+ * Art gewechselt hat (kinematisch → beweglich). Die Lehre aus E-071: Paare,
+ * die entstanden, während beide kinematisch waren, tragen sonst nicht.
+ */
+function meldeNeuAn(b: RAPIER.RigidBody): void {
+  for (let i = 0; i < b.numColliders(); i++) {
+    const c = b.collider(i);
+    if (!c.isEnabled()) continue;
+    c.setEnabled(false);
+    c.setEnabled(true);
+  }
 }
 
 /** Laderaum, den ein Wrack belegt (m³) — siehe `WRACK_FLACH_REST`. */
@@ -476,6 +532,25 @@ class DeliveryVehicle {
 
   /** Ein Absetzkipper, der als Abholer kommt (E-177) — gesetzt im Konstruktor. */
   readonly abholt: boolean;
+
+  /* ------------------------------------------ Müll-Abroller (E-190) --- */
+  /** Abroller mit Hakenarm, der den Müll-Container tauscht. */
+  readonly hakenlift: boolean;
+  private haken: VehicleModelParts["haken"] = null;
+  private hakenAlpha = 0;
+  private hakenSchub = 0;
+  /** Der Container am Haken (der leere bei der Ankunft, später der volle). */
+  private tragWanne: Wanne | null = null;
+  /** Der volle, eingeplant und bis zum Ankoppeln festgehalten. */
+  private vollWanne: Wanne | null = null;
+  /** Was im vollen liegt — verriegelt an ihm, fährt mit und ist am Ende weg. */
+  private wannenLadung: RidingBody[] = [];
+  private muellPlan: MuellPlan | null = null;
+  private muellSchritt: "abstellen" | "holen" = "abstellen";
+  /** Standlage des vollen beim Ankoppeln (Welt) — von dort wird er herangezogen. */
+  private einziehVon: { pos: THREE.Vector3; quat: THREE.Quaternion } | null = null;
+  /** Hat er gemeldet, dass der Bagger im Weg steht? (einmal je Halt) */
+  private hakenGehupt = false;
 
   /** Ein Absetzkipper, der nur eine Mulde holt: kein Ankauf, keine Verhandlung. */
   get holtNur(): boolean {
@@ -1010,7 +1085,8 @@ class DeliveryVehicle {
    */
   private gibPlatzinventarZurueck(): void {
     const port = this.platzinventar;
-    if (!port) return;
+    // Der Müll-Abroller trägt keinen Container auf einer Fläche, er tauscht ihn (E-190)
+    if (!port || this.hakenlift) return;
     this.bedGroup.updateWorldMatrix(true, false);
     this.bedInv.copy(this.bedGroup.matrixWorld).invert();
     for (const st of port.stellungen()) {
@@ -1256,7 +1332,13 @@ class DeliveryVehicle {
     this.onFahrerlage?.(aufDerFlaeche > 1 ? "abfahrtVoll" : "abfahrtLeer");
     // Und dem Spieler (E-177): voll von selbst oder auf ABHOLEN
     this.onMeldung?.(
-      this.vollLos ? `${this.fahrzeugName} ist voll und fährt los.` : `${this.fahrzeugName} fährt los.`
+      this.hakenlift
+        ? this.tragWanne && this.muellPlan
+          ? "Abroller fährt mit dem vollen Müll-Container los."
+          : `${this.fahrzeugName} fährt los.`
+        : this.vollLos
+          ? `${this.fahrzeugName} ist voll und fährt los.`
+          : `${this.fahrzeugName} fährt los.`
     );
   }
 
@@ -1450,6 +1532,248 @@ class DeliveryVehicle {
   /** Leergewicht dessen, worin er laedt: Abrollcontainer oder Absetzmulde (E-064, E-177). */
   private get containerTaraKg(): number {
     return this.absetz ? ABSETZMULDE_LEER_KG : ABHOLER_CONTAINER_KG;
+  }
+
+  /* ------------------------------------------ Müll-Abroller (E-190) --- */
+
+  /**
+   * Den leeren Container auf den Haken nehmen, bevor er losfährt — gleich nach
+   * dem Bau, vor dem ersten Physikschritt (Lehre v2 E-058: kinematische Körper
+   * an ihrer Startpose). Vom Fuhrpark gerufen.
+   */
+  nimmLeereWanne(): void {
+    const p = this.group.position;
+    const w = this.platzinventar?.baueLeereMuellWanne?.(p.x, p.z) ?? null;
+    if (!w) return;
+    w.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, false);
+    this.tragWanne = w;
+    this.fuehreHakenNach(true);
+  }
+
+  /** Wo der Müll-Container gerade steht, als Ort mit Bügelrichtung. */
+  private vollOrt(): { ort: WannenOrt; wanne: Wanne } | null {
+    const m = this.platzinventar?.muellWanne?.() ?? null;
+    if (!m) return null;
+    return { ort: { x: m.x, z: m.z, gier: m.gier }, wanne: m.wanne };
+  }
+
+  /**
+   * Den Wechsel planen (an der Waage). Geht es nicht, funkt das Büro und der
+   * Wagen fährt mit dem leeren wieder vom Hof.
+   */
+  private planeMuell(): void {
+    const v = this.vollOrt();
+    const plan = v ? planeMuellwechsel(v.ort) : null;
+    if (!v || !plan) {
+      this.muellPlan = null;
+      this.onMeldung?.("Büro an Bagger: Stell den Müll-Container an seinen Platz.");
+      this.sendAway();
+      return;
+    }
+    this.muellPlan = plan;
+    this.muellSchritt = "abstellen";
+    this.meineAnfahrt = plan.hin.anfahrt;
+    this.meinRueckweg = plan.hin.rueckweg;
+    this.meineAusfahrt = plan.ausfahrt;
+    /*
+     * Der volle ist eingeplant: Er wird festgehalten (kinematisch, steht
+     * still), bis der Haken ihn nimmt. Sonst schöbe ihn die Spinne in der
+     * Minute bis dahin weg, und der Haken griffe ins Leere — oder der
+     * Container spränge an den Haken. Hineinwerfen geht weiter.
+     */
+    v.wanne.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
+    this.vollWanne = v.wanne;
+  }
+
+  /** Wo der Container am Haken steht (Welt), für Armwinkel und Schub jetzt. */
+  private hakenWelt(): { pos: THREE.Vector3; quat: THREE.Quaternion } {
+    const geo = this.haken!.geo;
+    const l = wannenLage(geo, this.hakenAlpha, this.hakenSchub);
+    const pos = new THREE.Vector3(0, l.y, l.z);
+    this.group.localToWorld(pos);
+    const quat = new THREE.Quaternion();
+    this.group.getWorldQuaternion(quat);
+    quat.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -l.neigung));
+    return { pos, quat };
+  }
+
+  /** Arm zeichnen, Container und Inhalt nachführen — jedes Bild. */
+  private fuehreHakenNach(sofort = false): void {
+    const h = this.haken!;
+    h.arm.rotation.x = -this.hakenAlpha;
+    h.teleskop.position.z = -this.hakenSchub;
+    const w = this.tragWanne;
+    if (!w || !w.body.isValid()) return;
+    this.group.updateWorldMatrix(true, true);
+    let { pos, quat } = this.hakenWelt();
+    const von = this.einziehVon;
+    if (von) {
+      // Herangezogen statt versetzt: im ersten Viertel des Hubs übergeblendet
+      const voll = alphaAmBoden(h.geo);
+      const t = Math.min(1, (voll - this.hakenAlpha) / (voll * HAKEN_EINZIEH_ANTEIL));
+      pos = von.pos.clone().lerp(pos, t);
+      quat = von.quat.clone().slerp(quat, t);
+      if (t >= 1) this.einziehVon = null;
+    }
+    w.group.position.copy(pos);
+    w.group.quaternion.copy(quat);
+    if (sofort) {
+      w.body.setTranslation(pos, false);
+      w.body.setRotation(quat, false);
+    } else {
+      w.body.setNextKinematicTranslation(pos);
+      w.body.setNextKinematicRotation(quat);
+    }
+    if (this.wannenLadung.length > 0) {
+      const wp = new THREE.Vector3();
+      const m = new THREE.Matrix4().compose(pos, quat, new THREE.Vector3(1, 1, 1));
+      for (const r of this.wannenLadung) {
+        if (!r.body.isValid()) continue;
+        wp.copy(r.localPos).applyMatrix4(m);
+        const wq = quat.clone().multiply(r.localQuat);
+        r.body.setNextKinematicTranslation(wp);
+        r.body.setNextKinematicRotation(wq);
+      }
+    }
+  }
+
+  /** Was im Container liegt, an ihn koppeln (kinematisch) — es fährt mit vom Hof. */
+  private verriegeleWannenInhalt(w: Wanne): void {
+    const quelle = this.itemQuelle;
+    if (!quelle) return;
+    w.group.updateWorldMatrix(true, false);
+    const inv = new THREE.Matrix4().copy(w.group.matrixWorld).invert();
+    const wq = new THREE.Quaternion();
+    w.group.getWorldQuaternion(wq);
+    const wqInv = wq.clone().invert();
+    const gegriffen = new Set((this.gegriffen?.() ?? []).map((b) => b.handle));
+    const p = new THREE.Vector3();
+    for (const it of quelle.items) {
+      const b = it.body;
+      if (!b.isValid() || !b.isDynamic() || gegriffen.has(b.handle)) continue;
+      const t = b.translation();
+      p.set(t.x, t.y, t.z).applyMatrix4(inv);
+      // Im Trog (mit einer Handbreit Rand) und bis 1,5 m über die Wand gehäuft
+      if (Math.abs(p.x) > MUELL_WANNE.breite / 2 + 0.1) continue;
+      if (Math.abs(p.z) > MUELL_WANNE.laenge / 2 + 0.1) continue;
+      if (p.y < 0 || p.y > MUELL_WANNE.wand + 1.8) continue;
+      const r = b.rotation();
+      b.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, false);
+      this.wannenLadung.push({
+        body: b,
+        localPos: p.clone(),
+        localQuat: wqInv.clone().multiply(new THREE.Quaternion(r.x, r.y, r.z, r.w)),
+      });
+    }
+  }
+
+  /** Ein Bild der Hakenarbeit: abstellen, Arm ein, Arm aus, aufnehmen. */
+  private hakenSchritt(dt: number): void {
+    const geo = this.haken!.geo;
+    const voll = alphaAmBoden(geo);
+    const leer = this.tragWanne === null ? HAKEN_LEER_FAKTOR : 1;
+    const raus = (): boolean => {
+      // Erst schieben, dann kippen
+      if (this.hakenSchub < HAKEN_SCHUB_M) {
+        this.hakenSchub = Math.min(HAKEN_SCHUB_M, this.hakenSchub + HAKEN_SCHIEB * leer * dt);
+        return false;
+      }
+      this.hakenAlpha = Math.min(voll, this.hakenAlpha + HAKEN_DREH * leer * dt);
+      return this.hakenAlpha >= voll;
+    };
+    const rein = (): boolean => {
+      if (this.hakenAlpha > 0) {
+        this.hakenAlpha = Math.max(0, this.hakenAlpha - HAKEN_DREH * leer * dt);
+        return false;
+      }
+      this.hakenSchub = Math.max(0, this.hakenSchub - HAKEN_SCHIEB * leer * dt);
+      return this.hakenSchub <= 0;
+    };
+    const plan = this.muellPlan;
+    if (!plan) return;
+    // Steht der Bagger dort, wo der Container hin oder her soll, wartet er und hupt
+    const ziel = this.phase === "hakenAb" ? plan.leer : plan.voll;
+    if ((this.phase === "hakenAb" || this.phase === "hakenAuf") && baggerImWeg(ziel, this.baggerPos?.() ?? null)) {
+      if (!this.hakenGehupt) {
+        this.hakenGehupt = true;
+        this.onHonk?.();
+      }
+      return;
+    }
+    switch (this.phase) {
+      case "hakenAb":
+        if (!raus()) return;
+        {
+          /*
+           * Der leere steht. Er wird der Müll-Container des Platzes (Schild,
+           * Zählzone, Platzinventar), und der volle wird die Ladung des
+           * Abrollers — keine Wanne wird dafür versetzt, sie tauschen nur,
+           * wem sie gehören.
+           */
+          const leerW = this.tragWanne!;
+          leerW.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
+          meldeNeuAn(leerW.body);
+          this.platzinventar?.tauscheMuell?.(leerW);
+          this.tragWanne = null;
+          this.phase = "hakenEin";
+        }
+        return;
+      case "hakenEin":
+        if (!rein()) return;
+        this.muellSchritt = "holen";
+        this.meineAnfahrt = plan.zumVollen.anfahrt;
+        this.meinRueckweg = plan.zumVollen.rueckweg;
+        this.phase = "approach";
+        this.phaseT = 0;
+        this.routeS = 0;
+        return;
+      case "hakenAus":
+        if (!raus()) return;
+        {
+          const w = this.vollWanne;
+          if (!w || !w.body.isValid()) {
+            this.phase = "hakenAuf";
+            return;
+          }
+          this.verriegeleWannenInhalt(w);
+          const t = w.body.translation();
+          const r = w.body.rotation();
+          this.einziehVon = {
+            pos: new THREE.Vector3(t.x, t.y, t.z),
+            quat: new THREE.Quaternion(r.x, r.y, r.z, r.w),
+          };
+          this.tragWanne = w;
+          this.vollWanne = null;
+          this.phase = "hakenAuf";
+        }
+        return;
+      case "hakenAuf":
+        if (!rein()) return;
+        this.abholerFaehrtRaus();
+        this.starteAusfaedeln(this.routeOut, "out", 0);
+        return;
+    }
+  }
+
+  /** Umriss des Containers am Haken (für Bagger und Lambert), sonst null. */
+  wannenBox(): Box | null {
+    // Vor dem Tausch ist der volle noch der Müll-Container des Platzes und steht in dessen Liste
+    const w = this.tragWanne ?? (this.muellSchritt === "holen" ? this.vollWanne : null);
+    if (!w) return null;
+    const g = w.group;
+    const q = new THREE.Euler().setFromQuaternion(g.quaternion, "YXZ");
+    return { x: g.position.x, z: g.position.z, hw: MUELL_WANNE.breite / 2, hd: MUELL_WANNE.laenge / 2, rot: q.y };
+  }
+
+  /** Körper des Containers am Haken — der Baggerarm taucht da nicht ein. */
+  wannenKoerper(): RAPIER.RigidBody | null {
+    const w = this.tragWanne ?? (this.muellSchritt === "holen" ? this.vollWanne : null);
+    return w && w.body.isValid() ? w.body : null;
+  }
+
+  /** Holt er schon den vollen (der leere steht)? */
+  get holtVollen(): boolean {
+    return this.hakenlift && this.muellSchritt === "holen";
   }
 
   /** Wie der Wagen im Funk heisst. */
@@ -1695,6 +2019,11 @@ class DeliveryVehicle {
        * wo die Bestellung ihn hinschickte. Ist der Abladeplatz zu (abgesetzte
        * Mulde, E-141), kommt er dort nicht hin.
        */
+      if (this.hakenlift) {
+        this.planeMuell();
+        this.onZielFest?.();
+        return;
+      }
       const bagger = this.zumBagger ? this.baggerPos?.() : undefined;
       if (bagger) {
         this.platz = abholPlatzNahe(bagger.x, bagger.z, (p) => !(p.ziel === null && this.abladeplatzZu()));
@@ -1791,9 +2120,12 @@ class DeliveryVehicle {
     /** Absetzkipper: Diese abgesetzte Mulde holt er ab (E-141). */
     holeMulde: AbgesetzteMulde | null = null,
     /** Absetzkipper als Abholer (E-177): kommt leer, wird auf dem Rahmen beladen. */
-    alsAbholer = false
+    alsAbholer = false,
+    /** Abroller mit Hakenarm für den Müll-Container (E-190). */
+    hakenlift = false
   ) {
     this.abholt = alsAbholer;
+    this.hakenlift = hakenlift;
     this.customer = this.isPickup ? null : (customer ?? rollCustomer());
     // Die Tabelle steht in routes.ts — dieselbe, gegen die die Waechter rechnen
     this.bedLen = bedLenFor(kind);
@@ -1839,7 +2171,9 @@ class DeliveryVehicle {
       sideWalls: this.sideWalls,
       tailGate: null,
       ohneMulde: holeMulde !== null,
+      hakenlift,
     });
+    this.haken = teile.haken;
     this.tailGate = teile.tailGate;
     this.crane = teile.crane;
     this.trailer = teile.trailer;
@@ -1962,9 +2296,11 @@ class DeliveryVehicle {
     if (teile.absetz) {
       for (const k of teile.absetz.mulde?.kollider ?? []) world.createCollider(k, this.bedBody);
     }
-    const keil = teile.absetz ? null : RAPIER.ColliderDesc.convexHull(brueckenKeilEcken(halfW, this.bedLen));
+    // Der Müll-Abroller (E-190) hat keine Ladefläche: Er trägt den Container am Haken
+    const keil =
+      teile.absetz || teile.haken ? null : RAPIER.ColliderDesc.convexHull(brueckenKeilEcken(halfW, this.bedLen));
     if (keil) world.createCollider(keil, this.bedBody);
-    else if (!teile.absetz) throw new Error("Kippbruecke: konvexe Huelle nicht baubar");
+    else if (!teile.absetz && !teile.haken) throw new Error("Kippbruecke: konvexe Huelle nicht baubar");
     // Abhol-LKW trägt einen hohen Container, damit geladenes Material hält
     const wh = kind === "abholer" ? 1.25 : 0.32;
     // Seitenwände sind eigene bewegliche Körper (siehe buildMeshes) — hier nur
@@ -1973,7 +2309,7 @@ class DeliveryVehicle {
       [0, wh, this.bedLen, halfW, 0.05], // vordere Wand (zur Kabine)
     ];
     if (kind !== "kipper") walls.push([0, wh, 0, halfW, 0.05]); // Heckklappe nur bei Pritschen
-    for (const [wx, wy, wz, hx, hz] of teile.absetz ? [] : walls) {
+    for (const [wx, wy, wz, hx, hz] of teile.absetz || teile.haken ? [] : walls) {
       world.createCollider(
         RAPIER.ColliderDesc.cuboid(hx, wh, hz).setTranslation(wx, wy, wz),
         this.bedBody
@@ -2700,6 +3036,8 @@ class DeliveryVehicle {
     if (!body.isValid()) return false;
     const p = body.translation();
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return false;
+    // Der Müll-Abroller hat keine Fläche; was er trägt, hängt am Container (E-190)
+    if (this.hakenlift) return false;
     this.flaechePos.set(p.x, p.y, p.z);
     this.bedGroup.worldToLocal(this.flaechePos);
     const l = this.flaechePos;
@@ -3284,9 +3622,12 @@ class DeliveryVehicle {
           // und damit, wo dieser Wagen abkippt.
           // Seit E-029 auch fuer den Kipper: Er haelt am selben Abladeplatz.
           this.legeAbladestelleFest();
-          this.phase = "approach";
-          this.phaseT = 0;
-          this.routeS = 0;
+          // Der Müll-Abroller kann abgebrochen haben (E-190) — dann fährt er schon raus
+          if (this.phase === "weighIn") {
+            this.phase = "approach";
+            this.phaseT = 0;
+            this.routeS = 0;
+          }
         }
         break;
       case "approach": {
@@ -3325,6 +3666,13 @@ class DeliveryVehicle {
         if (this.umsetzen) {
           this.releaseCargo();
           this.umsetzen = false;
+        }
+        // Der Müll-Abroller setzt ab bzw. holt (E-190)
+        if (this.phaseT > 1.2 && this.hakenlift) {
+          this.phase = this.muellSchritt === "abstellen" ? "hakenAb" : "hakenAus";
+          this.phaseT = 0;
+          this.hakenGehupt = false;
+          break;
         }
         // Gekippt wird erst, wenn der Ladekran aus dem Weg ist (`kranSteht`)
         if (this.phaseT > 1.2 && this.absetz && !this.isPickup) {
@@ -3420,6 +3768,12 @@ class DeliveryVehicle {
             }
           }
         }
+        break;
+      case "hakenAb":
+      case "hakenEin":
+      case "hakenAus":
+      case "hakenAuf":
+        this.hakenSchritt(dt);
         break;
       case "muldeHeben": {
         /*
@@ -3793,6 +4147,9 @@ class DeliveryVehicle {
       w.body.setNextKinematicRotation({ x: bq.x, y: bq.y, z: bq.z, w: bq.w });
     }
 
+    // Hakenarm und der Container daran (E-190)
+    if (this.haken) this.fuehreHakenNach();
+
     // mitfahrende Ladung nachführen
     if (this.riding.length > 0) {
       const wp = new THREE.Vector3();
@@ -3810,6 +4167,24 @@ class DeliveryVehicle {
   despawn(): void {
     for (const w of this.sideWalls) this.world.removeRigidBody(w.body);
     this.sideWalls = [];
+    /*
+     * DER VOLLE MÜLL-CONTAINER FÄHRT MIT VOM HOF (E-190) — samt Inhalt, erst
+     * hier am Ende der Ausfahrt, außer Sicht (wie beim Abholer, E-120).
+     * Wurde abgebrochen, ist es der leere, der wieder mitfährt.
+     */
+    for (const r of this.wannenLadung) {
+      if (!r.body.isValid()) continue;
+      const it = this.itemQuelle?.itemByBody(r.body);
+      if (this.composites?.despawnByBody(r.body)) {
+        if (it) this.itemQuelle!.remove(it, false);
+      } else if (it) this.itemQuelle!.remove(it, true);
+    }
+    this.wannenLadung = [];
+    if (this.tragWanne) {
+      this.tragWanne.group.removeFromParent();
+      if (this.tragWanne.body.isValid()) this.world.removeRigidBody(this.tragWanne.body);
+      this.tragWanne = null;
+    }
     /*
      * Die Heckklappe ist ein eigener Koerper wie die Bordwaende — und blieb bis
      * E-177 am Ende der Ausfahrt stehen: je Pritsche, Abroller und
@@ -4161,8 +4536,10 @@ export class VehicleManager {
    */
   private spawnAbholer(): void {
     const aufbau = this.pickupAufbau;
-    const wagen = this.baueWagen(aufbau === "absetzer" ? "absetzer" : "abholer", null, null, true);
+    const wagen = this.baueWagen(aufbau === "absetzer" ? "absetzer" : "abholer", null, null, true, aufbau === "muell");
     this.active = wagen;
+    // Der Müll-Abroller bringt den leeren Container mit (E-190)
+    if (wagen.hakenlift) wagen.nimmLeereWanne();
     // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
     wagen.bestellung = this.pickupOrder;
     /*
@@ -4219,8 +4596,15 @@ export class VehicleManager {
       if (it.shape) bereit += deckelVolumen(it.shape.kind, it.shape.dims);
       else bereit += wrackVolumenVon(this.composites.cars.find((c) => c.body.handle === it.body.handle) ?? null);
     }
-    const wahl = aufbau ?? (this.sandkastenAbholer && bereit <= absetzRaumM3() ? "absetzer" : "abroller");
-    const m3 = wahl === "absetzer" ? ABSETZMULDE_NENN_M3 : abrollerNennM3();
+    /*
+     * MÜLL HOLT DER ABROLLER MIT DEM MÜLL-CONTAINER (E-190): Er bringt einen
+     * leeren 10-m³-Container und nimmt den vollen mit — im Sandkasten, wenn
+     * der Platz einen Müll-Container hat.
+     */
+    const muell = this.sandkastenAbholer && order === "rubble" && !!this.platzinventar?.muellWanne?.();
+    const wahl: AbholAufbau =
+      aufbau ?? (muell ? "muell" : this.sandkastenAbholer && bereit <= absetzRaumM3() ? "absetzer" : "abroller");
+    const m3 = wahl === "absetzer" ? ABSETZMULDE_NENN_M3 : wahl === "muell" ? MUELL_NENN_M3 : abrollerNennM3();
     return {
       aufbau: wahl,
       m3,
@@ -4259,7 +4643,8 @@ export class VehicleManager {
     k: DeliveryKind,
     c: CustomerProfile | null,
     holeMulde: AbgesetzteMulde | null = null,
-    alsAbholer = false
+    alsAbholer = false,
+    hakenlift = false
   ): DeliveryVehicle {
     const v = new DeliveryVehicle(
       k,
@@ -4271,7 +4656,8 @@ export class VehicleManager {
       (kg) => this.onWeighOut?.(kg),
       c,
       holeMulde,
-      alsAbholer
+      alsAbholer,
+      hakenlift
     );
     v.itemQuelle = this.items;
     v.platzinventar = this.platzinventar;
@@ -4287,7 +4673,9 @@ export class VehicleManager {
         this.letzteHupe = this.uhr;
         this.onAnkunftHupe?.();
       }
-      if (v.isPickup) this.onMeldung?.(`${v.fahrzeugName} steht bereit — laden, dann ABHOLEN drücken (V).`);
+      if (v.hakenlift) {
+        if (!v.holtVollen) this.onMeldung?.("Abroller tauscht den Müll-Container.");
+      } else if (v.isPickup) this.onMeldung?.(`${v.fahrzeugName} steht bereit — laden, dann ABHOLEN drücken (V).`);
     };
     // Die abgesetzte Mulde geht an den Fuhrpark (E-141)
     v.onMuldeAbgesetzt = (m) => (this.mulde = m);
@@ -4353,7 +4741,7 @@ export class VehicleManager {
     order?: string | null,
     /** Welcher Wagen kommen soll — so, wie ihn die Bestellliste angezeigt hat (E-177). */
     aufbauGewuenscht?: AbholAufbau
-  ): "gerufen" | "abgefahren" | "vorgemerkt" {
+  ): "gerufen" | "abgefahren" | "vorgemerkt" | "unmoeglich" {
     // Wartet er schon (oder setzt er gerade um), heisst ABHOLEN: fertig, losfahren
     if (this.active?.isPickup && (this.active.waitingForLoad || this.active.setztUm)) {
       this.active.requestRelease();
@@ -4361,6 +4749,18 @@ export class VehicleManager {
     }
     // Das Fahrzeug steht mit der Bestellung fest (E-177) — nach dem, was jetzt bereitliegt
     const aufbau = aufbauGewuenscht ?? this.abholAngebot(order ?? null).aufbau;
+    /*
+     * Müll (E-190): Kommt der Abroller überhaupt an den Container heran? Steht
+     * er so, dass kein Rangierzug frei hinführt (oder kein Stellplatz für den
+     * leeren frei ist), kommt er nicht, und das Büro sagt, was zu tun ist.
+     */
+    if (aufbau === "muell") {
+      const m = this.platzinventar?.muellWanne?.() ?? null;
+      if (!m || !planeMuellwechsel({ x: m.x, z: m.z, gier: m.gier })) {
+        this.onMeldung?.("Büro an Bagger: Stell den Müll-Container an seinen Platz.");
+        return "unmoeglich";
+      }
+    }
     // An den Abladeplatz kann er nicht, solange dort eine Mulde steht (E-141)
     if (!this.active && this.mulde && !this.abholZielFuer(order ?? null).ziel) {
       this.vorgemerkt = { order: order ?? null, aufbau };
@@ -4446,6 +4846,9 @@ export class VehicleManager {
     this.boxCache.length = 0;
     if (this.active) this.active.boxen(this.boxCache);
     for (const v of this.parked) v.boxen(this.boxCache);
+    // Der Container am Haken des Müll-Abrollers steht ebenso im Weg (E-190)
+    const wb = this.active?.wannenBox();
+    if (wb) this.boxCache.push(wb);
     // Die abgesetzte Mulde steht wie ein Fahrzeug im Weg (E-141)
     if (this.mulde) {
       const g = this.mulde.group;
@@ -4459,6 +4862,16 @@ export class VehicleManager {
     return this.boxCache;
   }
   private boxCache: Box[] = [];
+
+  /**
+   * Steht ein Anlieferer am Abladeplatz und wartet aufs Abladen (E-190, zur
+   * Bagger-Hupe E-191)? Dann schickt die Hupe ihn zur Waage — Reste auf der
+   * Fläche zählen dort als Tara, wie bei ZUR WAAGE.
+   */
+  get anliefererWartet(): boolean {
+    const a = this.active;
+    return !!a && !a.isPickup && a.phaseName === "waitUnload";
+  }
 
   /** Der wartende Abhol-LKW (für Beladung/Verkauf), sonst null. */
   get pickupTruck(): DeliveryVehicle | null {
@@ -4497,6 +4910,8 @@ export class VehicleManager {
   obstacleHandles(out: Set<number>): Set<number> {
     out.clear();
     if (this.active) this.active.collectBodyHandles(out);
+    const wk = this.active?.wannenKoerper();
+    if (wk) out.add(wk.handle);
     // Auch die Wartenden stehen im Weg — der Arm darf nicht hindurchfahren
     for (const v of this.parked) v.collectBodyHandles(out);
     if (this.mulde?.body.isValid()) out.add(this.mulde.body.handle);
