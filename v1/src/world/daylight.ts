@@ -159,7 +159,10 @@ export class Daylight {
     if (this.time < vorher) platzwache.neuerTag();
 
     // Sonnenhöhe: sin über den Tagbogen, negativ heißt unter dem Horizont
-    const angle = (this.time - 0.25) * Math.PI * 2;
+    // SCHICHT (E-202, Orchestrator 21.10.2026): Die Uhr zeigt 06:00–16:00, das LICHT laeuft halb so
+    // schnell um Mittag (09:30–14:30) — sonst begaenne jede Schicht in der Daemmerung. Eine Uhr, nur die Sonne versetzt.
+    const lichtZeit = this.istSchicht ? 0.5 + (this.time - 11 / 24) / 2 : this.time;
+    const angle = (lichtZeit - 0.25) * Math.PI * 2;
     const height = Math.sin(angle);
     this.daylight = THREE.MathUtils.clamp(height * 1.35 + 0.3, 0, 1);
 

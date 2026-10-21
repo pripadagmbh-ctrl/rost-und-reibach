@@ -3,6 +3,7 @@ import type { ChallengeMessung, ChallengeWertung } from "../challenges/challenge
 import type { Zweisprachig } from "../challenges/texte";
 import type { ControlFunction } from "./controlConfig";
 import type { Spur } from "./spur";
+import type { Schichtbilanz, Schichtstufe } from "../economy/kasse";
 
 /**
  * Typisierter Event-Bus (Briefing Kap. 17): Module kommunizieren nur über Events,
@@ -335,6 +336,34 @@ export interface GameEvents {
    * Tabelle — ist es false, hilft Abstuetzen mit Taste O).
    */
   "greifer:ueberlast": { massKg: number; grenzeKg: number; ausladungM: number; abgestuetzt: boolean };
+
+  /* ---------------- SCHICHT (E-202 … E-205) — Logik meldet, HUD/Tafel/Ton hören zu -------- */
+
+  /** Eine Schicht beginnt (06:00). `dauerS` = Spielsekunden bis Feierabend (600). */
+  "schicht:start": { stufe: Schichtstufe; dauerS: number };
+  /**
+   * Lagebild, viermal je Sekunde (main.ts): alles, was die Schicht-Anzeige zeigt.
+   * `kasseEur` = laufender Verdienst ohne Lager; `verlader.anteil` 0..1 bis „voll"
+   * (E-120: 80 % Füllgrad oder 8,5 t); `boxen[].kg` gegen `schwelleKg` = eine
+   * Abholer-Fuhre (E-202). `restS` bis Feierabend, `torZu` ab Torschluss.
+   */
+  "schicht:stand": {
+    uhr: string;
+    restS: number;
+    torZu: boolean;
+    kasseEur: number;
+    wartend: number;
+    annahmeVoll: boolean;
+    verlader: { order: string | null; kg: number; anteil: number } | null;
+    boxen: Array<{ order: "steel" | "copper" | "rubble"; kg: number; schwelleKg: number }>;
+  };
+  /**
+   * Eine Buchung der Kasse (E-203): Abfahrt (Erlös, auch negativ), Standgeld,
+   * Fehlwurf, Schaden. `eur` mit Vorzeichen, wie es die Kasse verändert.
+   */
+  "schicht:buchung": { art: "abfahrt" | "standgeld" | "fehlwurf" | "schaden"; eur: number; kg?: number; order?: string | null };
+  /** Feierabend (16:00): die Bilanz. Die Tafel zeigt sie und legt den Lauf in die Bestenliste. */
+  "schicht:ende": { bilanz: Schichtbilanz };
 }
 
 type Handler<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;
