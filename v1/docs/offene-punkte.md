@@ -554,6 +554,12 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 21.10.2026** — Patrick, wörtlich: „High Score Board Konzept und pay
+      to win Konzept vorschlagen". Antworten nach Vorschlag: Bestenliste in 1.0
+      „eigene auf dem Gerät" (Top 5 je Aufgabe + Sandkasten-Rekorde), Game Center
+      mit 1.1; Geld nach dem Kaufpreis „Erweiterungen + Aussehen, kein Pay-to-Win"
+      (ab 1.1: Maschinen, Plätze, Aufgabenpakete, Lackierungen).
+
 - [ ] **Ansage 21.10.2026, Müll und Fahrwege** — Patrick, wörtlich: „Die müllmulde
       die vor dem Bagger steht kann raus" und auf Nachfrage: „Der blaue initiale
       Müllcontainer kommt weg, der neue wird vor die, Bagger abgestellt.
