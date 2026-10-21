@@ -5335,18 +5335,38 @@ export class VehicleManager {
     const wb = this.active?.wannenBox();
     if (wb) this.boxCache.push(wb);
     // Die abgesetzte Mulde steht wie ein Fahrzeug im Weg (E-141)
-    if (this.mulde) {
-      const g = this.mulde.group;
-      g.updateWorldMatrix(true, false);
-      const mitte = new THREE.Vector3(0, 0, ABSETZMULDE.laenge / 2).applyMatrix4(g.matrixWorld);
-      const q = new THREE.Quaternion();
-      g.getWorldQuaternion(q);
-      const rot = new THREE.Euler().setFromQuaternion(q, "YXZ").y;
-      this.boxCache.push({ x: mitte.x, z: mitte.z, hw: ABSETZMULDE.breite / 2, hd: ABSETZMULDE.laenge / 2, rot });
-    }
+    this.muldeBox(this.boxCache);
     return this.boxCache;
   }
   private boxCache: Box[] = [];
+
+  private muldeBox(out: Box[]): void {
+    if (!this.mulde) return;
+    const g = this.mulde.group;
+    g.updateWorldMatrix(true, false);
+    const mitte = new THREE.Vector3(0, 0, ABSETZMULDE.laenge / 2).applyMatrix4(g.matrixWorld);
+    const q = new THREE.Quaternion();
+    g.getWorldQuaternion(q);
+    const rot = new THREE.Euler().setFromQuaternion(q, "YXZ").y;
+    out.push({ x: mitte.x, z: mitte.z, hw: ABSETZMULDE.breite / 2, hd: ABSETZMULDE.laenge / 2, rot });
+  }
+
+  /**
+   * Die Standflächen der Laster, an denen der Spieler gerade lädt oder
+   * ablädt (`waitLoad`, `waitUnload`), dazu die abgesetzte Mulde — für den
+   * Schaden-Melder der Schicht (E-204). Ein Kipper, der selbst kippt, oder
+   * eine Fuhre, die sich beim Einfahren setzt, beschädigt sich nicht selbst:
+   * gemessen am Mittwoch, 197 s, 667 kg Stahl mit 6,0 m/s im kippenden Kipper.
+   */
+  ladeBoxen(): Box[] {
+    this.ladeBoxCache.length = 0;
+    for (const v of this.alle()) {
+      if (v.phaseName === "waitLoad" || v.phaseName === "waitUnload") v.boxen(this.ladeBoxCache);
+    }
+    this.muldeBox(this.ladeBoxCache);
+    return this.ladeBoxCache;
+  }
+  private ladeBoxCache: Box[] = [];
 
   /**
    * Steht ein Anlieferer am Abladeplatz und wartet aufs Abladen (E-190, zur

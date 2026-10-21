@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-204 | 21.10.2026 | Schäden an die Kasse, Lagebild und Buchungen für die Schicht-Anzeige | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-203 | 21.10.2026 | Schicht-Kasse mit festen Preisen, Bilanz, Sterne und Schicht-Uhr | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-202 | 21.10.2026 | Schicht-Fahrplan, Verlader mit Nachrücker, Box-Abholer, Silo-Pritsche, Standzeit | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-201 | 21.10.2026 | Schicht-Platz: Verlader quer vorn, rechte Halde wird MÜLL | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
@@ -214,6 +215,10 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - ⏭ → ✕ weiter, ⏭ → ✓ Menü mit Prüfung 1 offen; Neuladen mitten drin: „Schritt n von 9“?
 - Arm vor Schritt 7 ganz hoch: Geist zeigt „runter“, Häkchen kommt; Bagger nach jeder Vorführung wie vorher?
 - Schwenken rechts zählt auch — ohne Text verständlich? Fahr-Zeichen als Bagger auf Rädern erkennbar?
+**E-204 — Schäden, Lagebild, Buchungen** (iPad; erst nach der Verdrahtung in `main.ts` und der Schicht-Anzeige S4)
+- Motorblock hoch über dem leeren Verlader loslassen: „Schaden −50 €“? Denselben Block in den Container absenken und knapp über dem Boden loslassen: kein Abzug?
+- Rad oder Blech aus derselben Höhe auf den Verlader: kein Abzug?
+- Leere Spinne voll auf die Ladefläche: −50 €, und nur einmal je Schlag?
 
 **E-196 — Lehrgang Etappe 1** (iPad, dann iPhone mini quer)
 - Erststart nach Website-Daten löschen: Lektion 1 ohne Menü?

@@ -16,12 +16,14 @@
  * beisammen, ist der nächste Verlader einer für diese Sorte. Selten wartet eine
  * sortenreine Pritsche am Lager. Wer Laster warten lässt, zahlt Standgeld.
  */
-import type { Schichtstufe } from "../economy/kasse";
-import { MISCH } from "../economy/kasse";
+import type { Buchung, Schichtstufe } from "../economy/kasse";
+import { MISCH, SCHADEN_EUR, STANDGELD_EUR_JE_S, standgeldSekunden } from "../economy/kasse";
 import { fahrplan, type Fahrt } from "../economy/schichtplan";
 import { SCHICHT_TORSCHLUSS_S, SCHICHT_FEIERABEND_S } from "../world/schichtzeit";
 import type { AbholAufbau, VehicleManager, VerladerAbfahrt } from "./vehicles";
 import { BOX_ORDERS, type BoxOrder } from "./schichtfuhrpark";
+import { FUELL_KLASSEN, NUTZLAST } from "./fuellgrad";
+import type { GameEvents } from "../core/events";
 
 /** Was der Betrieb vom Platz wissen muss — `main.ts` misst es ohnehin. */
 export interface SchichtPorts {
@@ -177,3 +179,81 @@ export class SchichtBetrieb {
     return this.order;
   }
 }
+
+/* ------------------------------------------------------------- Lagebild */
+
+/** Was das Lagebild braucht — `main.ts` reicht es viermal je Sekunde herein (E-204). */
+export interface StandPorts {
+  /** `daylight.clock` — keine eigene Uhr (E-203). */
+  uhr: string;
+  /** `daylight.schichtSekunden` */
+  schichtS: number;
+  /** `kasse.bilanz(false).verdienstEur` — laufender Verdienst ohne Lager. */
+  kasseEur: number;
+  betrieb: Pick<SchichtBetrieb, "wartend" | "torZu" | "annahmeVoll">;
+  /** `vehicles.pickupTruck` — in der Schicht der Verlader vorn. */
+  verlader: Pick<NonNullable<VehicleManager["pickupTruck"]>, "bestellung" | "waitingForLoad" | "ladeflaecheKg" | "ladeflaecheFuellgrad"> | null;
+  /** Inhalt der Box (kg) — derselbe Port wie `SchichtPorts.boxKg`. */
+  boxKg(o: BoxOrder): number;
+}
+
+/**
+ * Das Lagebild der Schicht (`schicht:stand`). Reine Rechnung.
+ *
+ * `verlader` ist null, solange keiner am Halt zum Laden steht (Lücke zwischen
+ * zwei Verladern, E-202) — die Anzeige sagt dann „Verlader kommt". Sein
+ * `anteil` misst bis „voll" wie der Wagen selbst (`abholerVoll`, E-120):
+ * Füllgrad gegen `FUELL_KLASSEN.randvoll.von` (0,8) oder Last gegen
+ * `NUTZLAST.pritsche` (8 500 kg), das Größere zählt, höchstens 1.
+ */
+export function baueSchichtStand(p: StandPorts): GameEvents["schicht:stand"] {
+  const v = p.verlader && p.verlader.waitingForLoad ? p.verlader : null;
+  let verlader: GameEvents["schicht:stand"]["verlader"] = null;
+  if (v) {
+    const kg = v.ladeflaecheKg();
+    const anteil = Math.max(v.ladeflaecheFuellgrad() / FUELL_KLASSEN.randvoll.von, kg / NUTZLAST.pritsche);
+    verlader = { order: v.bestellung, kg, anteil: Math.min(1, Math.max(0, anteil)) };
+  }
+  return {
+    uhr: p.uhr,
+    restS: Math.max(0, SCHICHT_FEIERABEND_S - p.schichtS),
+    torZu: p.betrieb.torZu,
+    kasseEur: p.kasseEur,
+    wartend: p.betrieb.wartend,
+    annahmeVoll: p.betrieb.annahmeVoll,
+    verlader,
+    boxen: BOX_ORDERS.map((order) => ({ order, kg: p.boxKg(order), schwelleKg: BOX_SCHWELLE_KG[order] })),
+  };
+}
+
+/* ------------------------------------------------- Buchungen für den Bus */
+
+/** Eine Zeile für `schicht:buchung` (E-204) — `eur` mit Vorzeichen, wie es die Kasse verändert. */
+export type SchichtBuchung = GameEvents["schicht:buchung"];
+
+/**
+ * Was eine Abfahrt meldet: der Erlös (auch negativ, auch 0 €, mit kg und
+ * Sorte), dazu — wenn welche dabei waren — die Fehlwürfe als EINE Zeile mit
+ * `−25 € × Stück`. Die Stückzahl ist `−eur / FEHLWURF_EUR`.
+ *
+ * @param b was `kasse.bucheAbfahrt` zurückgab
+ */
+export function abfahrtBuchungen(order: string | null, b: Buchung): SchichtBuchung[] {
+  const out: SchichtBuchung[] = [{ art: "abfahrt", eur: b.erloesEur, kg: b.kg, order }];
+  if (b.fehlwuerfe > 0) out.push({ art: "fehlwurf", eur: -b.fehlwurfEur, order });
+  return out;
+}
+
+/**
+ * Standgeld eines Lasters, sobald er seine Standzeit meldet; null, solange er
+ * in der freien Zeit blieb. Auf den Cent — die Bilanz rundet die Summe der
+ * Sekunden, die Zeilen hier je Laster; beide liegen höchstens einen Cent je
+ * Laster auseinander.
+ */
+export function standgeldBuchung(standzeitS: number): SchichtBuchung | null {
+  const s = standgeldSekunden(standzeitS);
+  return s > 0 ? { art: "standgeld", eur: -Math.round(s * STANDGELD_EUR_JE_S * 100) / 100 } : null;
+}
+
+/** Ein Schaden (`SchadenMelder`, E-204). */
+export const SCHADEN_BUCHUNG: SchichtBuchung = { art: "schaden", eur: -SCHADEN_EUR };
