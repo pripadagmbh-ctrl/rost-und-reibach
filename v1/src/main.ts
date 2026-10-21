@@ -19,7 +19,7 @@ import { ferroAnteilVon } from "./excavator/magnet";
 import { OrbitCamera } from "./excavator/orbitCamera";
 import { Yard } from "./world/yard";
 import { ItemManager, type ScrapItem } from "./world/scrapItems";
-import { ContainerManager, type AmpelState } from "./world/containers";
+import { CONFIGS, ContainerManager, gehoertHierhin, type AmpelState } from "./world/containers";
 import { ContainerAbholung } from "./delivery/platzinventarAbholung";
 import { AudioManager } from "./audio/audioManager";
 import { Hud, type Zahlungslage } from "./ui/hud";
@@ -43,6 +43,10 @@ import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
 import { START_HAUFEN, START_AUTOS, START_STREU, START_LKW } from "./world/startplatz";
+import { aktiviereSchichtPlatz } from "./world/schichtplatz";
+import { SchichtBetrieb } from "./delivery/schichtbetrieb";
+import { boxFuer, kassenTeilAus } from "./delivery/schichtfuhrpark";
+import { Kasse, sortenregelAus, standgeldSekunden, type Schichtstufe } from "./economy/kasse";
 import { lastAufschlagWucht } from "./audio/klangregeln";
 import { anschlagUntergrund, SPINNE_WUCHT_VOLL_MS } from "./excavator/aufschlag";
 import { findeBox } from "./world/boxen";
@@ -108,7 +112,17 @@ async function main(): Promise<void> {
    * faellt sie ohne Menue auf die erste. Eine Challenge ist keine dritte
    * Spielart, sondern eine Wahl im Simulator (Begruendung in core/spielart.ts).
    */
-  const wahl: Spielwahl = BETRIEB ? { art: "sandkasten" } : await waehleSpielart(LEKTIONEN);
+  /*
+   * SCHICHT (E-201/E-202): Bis SCHICHT im Hauptmenue steht (S4), startet sie
+   * ueber die Adresse `#schicht=montag|mittwoch|freitag` — wie `#challenge=`.
+   * Der Schalter fuer den Platz faellt VOR dem Bau der Welt.
+   */
+  const schichtStufe = ((): Schichtstufe | null => {
+    const m = /^#schicht=(montag|mittwoch|freitag)$/.exec(location.hash);
+    return m ? (m[1] as Schichtstufe) : null;
+  })();
+  if (schichtStufe) aktiviereSchichtPlatz();
+  const wahl: Spielwahl = BETRIEB || schichtStufe ? { art: "sandkasten" } : await waehleSpielart(LEKTIONEN);
   const challengeDaten = wahl.art === "challenge" ? challengeNach(wahl.id) : null;
   // E-196: Lektion des Lehrgangs — wie eine Pruefung auf dem aufgeraeumten Platz
   const lektionId = wahl.art === "lektion" ? wahl.id : null;
@@ -171,7 +185,7 @@ async function main(): Promise<void> {
    * Spielstands installiert, damit ein Wrack, das beim Laden Teile verliert,
    * fuer die Sitzung gesperrt ist; in einer Aufgabe zaehlt nichts.
    */
-  const rekorde = wahl.art === "sandkasten" ? installSandkastenRekorde(bus) : null;
+  const rekorde = wahl.art === "sandkasten" && !schichtStufe ? installSandkastenRekorde(bus) : null;
   const physics = new PhysicsWorld();
   const input = new Input(renderer.domElement);
   /*
@@ -187,7 +201,10 @@ async function main(): Promise<void> {
    */
   const ausblenden = BETRIEB
     ? NUR_IM_SIMULATOR
-    : aufgabenPlatz
+    : schichtStufe
+      ? // Schicht: Uhr und Ladeanzeige des Verladers sichtbar, kein NACHSCHUB, kein Speichern (ein Lauf)
+        [...NUR_IM_BETRIEB.filter((id) => id !== "shift" && id !== "load"), "btn-nachschub", "pause-save", "pause-new"]
+      : aufgabenPlatz
       ? [...NUR_IM_BETRIEB.filter((id) => id !== "tutorial"), ...NUR_IM_SANDKASTEN]
       : NUR_IM_BETRIEB;
   for (const id of new Set(ausblenden)) {
@@ -217,7 +234,7 @@ async function main(): Promise<void> {
   // Eine Challenge baut ihren eigenen Platz und liest keinen Stand (E-125) —
   // nur die Senderwahl kommt mit, sie gehoert dem Spieler, nicht dem Platz.
   const gespeichert = readSave();
-  const save = aufgabenPlatz ? null : gespeichert;
+  const save = aufgabenPlatz || schichtStufe ? null : gespeichert;
   let fence: FenceManager;
   if (save) {
     account.moneyEur = save.moneyEur;
@@ -239,6 +256,9 @@ async function main(): Promise<void> {
       car.body.setRotation({ x: c.rot[0], y: c.rot[1], z: c.rot[2], w: c.rot[3] }, true);
       car.restoreState(c);
     }
+  } else if (schichtStufe) {
+    // SCHICHT (E-201): leerer Platz — kein Haufen, keine Autos, kein Streuschrott; der Fahrplan bringt alles
+    fence = new FenceManager(scene, physics.world, items, bus);
   } else if (aufgabenPlatz) {
     /*
      * DER PLATZ EINER CHALLENGE (E-125): aufgeraeumt — kein Haufen, kein
@@ -1399,9 +1419,10 @@ async function main(): Promise<void> {
     vehicles.sandkastenAbholer = true;
     containers.nachtschichtAktiv = false;
     // E-131: Zum Start stehen schon Fuhren an, die erste rollt gleich los
-    if (!aufgabenPlatz) vehicles.stelleAnstehendeAuf(ANSTEH_START_ANZAHL);
+    if (!aufgabenPlatz && !schichtStufe) vehicles.stelleAnstehendeAuf(ANSTEH_START_ANZAHL);
     // E-192/E-193: Kein Müll-Container zum Start — der Abroller bringt ihn gleich von selbst
-    if (!aufgabenPlatz) {
+    // (in der Schicht gibt es keinen Müll-Container, E-201: MÜLL ist die rechte Halde)
+    if (!aufgabenPlatz && !schichtStufe) {
       containers.raeumeMuell();
       vehicles.bringeMuellcontainer();
     }
@@ -1409,13 +1430,50 @@ async function main(): Promise<void> {
   // Ein Abholer faehrt nie los, solange die Spinne etwas ueber ihm haelt (E-120)
   vehicles.gegriffen = () => grip.grippedBodies;
   /*
+   * SCHICHT (E-202 Fahrplan/Verlader, E-203 Kasse/Uhr). Eine Uhr: der
+   * Betrieb bekommt `daylight.schichtSekunden`. Die Kasse bucht Abfahrten
+   * und Standzeit; Tafel und Bestenliste folgen mit S4.
+   */
+  let schicht: SchichtBetrieb | null = null;
+  let kasse: Kasse | null = null;
+  let schichtLoseKg = 0;
+  /** Die Bilanz als Zeile, sobald Feierabend ist — bleibt bis zur Tafel (S4) stehen. */
+  let schichtErgebnis: string | null = null;
+  if (schichtStufe) {
+    daylight.schichtTag();
+    kasse = new Kasse(schichtStufe, sortenregelAus(CONFIGS.filter((c) => !c.lager), gehoertHierhin));
+    schicht = new SchichtBetrieb(schichtStufe, vehicles, {
+      looseKg: () => schichtLoseKg,
+      boxKg: (o) => containers.byId(boxFuer(o).id).contentKg,
+    });
+    schicht.onVerladerAbfahrt = (e) => {
+      const b = kasse!.bucheAbfahrt(e.order, e.teile);
+      if (b.kg > 0) {
+        audio.playSale();
+        hud.toast(`Verlader fährt: ${(b.kg / 1000).toFixed(1).replace(".", ",")} t · +${Math.round(b.erloesEur).toLocaleString("de-DE")} €`);
+      }
+    };
+    schicht.onStandzeit = (e) => kasse!.bucheStandgeld(standgeldSekunden(e.standzeitS));
+  }
+  /** Loser Schrott für die Annahme-Sperre — was auf dem Verlader liegt, ist verladen (E-202). */
+  const measureLooseSchicht = (): number => {
+    let kg = 0;
+    for (const it of items.items) {
+      if (it.containerId || !it.body.isValid() || !it.body.isDynamic()) continue;
+      if (it.body.translation().y > 2.5) continue;
+      if (vehicles.liegtAufLaster(it.body)) continue;
+      kg += it.massKg;
+    }
+    return kg;
+  };
+  /*
    * NACHSCHUB (E-118): Kipper, Pritsche, Wrack reihum, ohne Waage und ohne
    * Geld. Steht noch eine Fuhre auf dem Platz, wartet der Knopf — eine
    * zweite im Anflug haette keinen Abladeplatz.
    */
   let nachschubNr = 0;
   const holeNachschub = (): void => {
-    if (aufgabenPlatz) return; // keine Fuhre mitten in die Aufgabe (E-125) oder Lektion (E-196)
+    if (aufgabenPlatz || schicht) return; // keine Fuhre mitten in Aufgabe (E-125), Lektion (E-196) oder Schicht (E-202)
     if (vehicles.activeKind !== null) {
       hud.toast("Noch eine Fuhre auf dem Platz — Nachschub erst, wenn sie weg ist.");
       return;
@@ -1481,6 +1539,7 @@ async function main(): Promise<void> {
     composites.update();
     fence.update();
     vehicles.update(FIXED_DT);
+    schicht?.takt(FIXED_DT, daylight.schichtSekunden); // E-202: eine Uhr (E-203)
     press.update(FIXED_DT);
     // Belegschaft und Streifenwagen gibt es nur im Betrieb (E-118)
     if (BETRIEB) {
@@ -1641,6 +1700,8 @@ async function main(): Promise<void> {
       const wagen = vehicles.pickupTruck;
       if (wagen?.waitingForLoad || wagen?.setztUm) {
         vehicles.requestPickup(); // „… fährt los." kommt über den Bus (E-177)
+      } else if (schicht) {
+        hud.toast("Der nächste Verlader kommt von selbst."); // E-202: keine Bestellung in der Schicht
       } else if (vehicles.abholungVorgemerkt) {
         hud.toast("Die Abholung ist schon vorgemerkt und fährt als nächstes vor.");
       } else {
@@ -1846,6 +1907,7 @@ async function main(): Promise<void> {
     looseTimer += frameDt;
     if (looseTimer > 0.25) {
       looseKg = measureLoose();
+      if (schicht) schichtLoseKg = measureLooseSchicht();
       looseTimer = 0;
     }
     daylight.update(frameDt);
@@ -1950,6 +2012,31 @@ async function main(): Promise<void> {
       challenge.takt(frameDt);
     } else if (lektion) {
       lektion.takt(frameDt); // E-196: Lektion, Uhr steht in der Pause
+    } else if (schicht && kasse) {
+      /*
+       * SCHICHT (E-202/E-203): Der Fahrplan steuert die Anlieferer, nicht
+       * `shift`. Bis zur Tafel (S4) steht alles in der Uhrzeile; zum
+       * Feierabend kommt die Bilanz als Meldung.
+       */
+      const stand = kasse.bilanz(false);
+      const warten = schicht.wartend > 0 ? ` · ${schicht.wartend} ${schicht.wartend === 1 ? "Fuhre wartet" : "Fuhren warten"}` : "";
+      hud.updateSchicht(
+        schichtErgebnis ??
+          `Schicht ${schichtStufe} · ${daylight.clock} · Kasse ${Math.round(stand.verdienstEur).toLocaleString("de-DE")} €${warten}`,
+        schicht.annahmeVoll && !schichtErgebnis
+      );
+      if (schicht.vorbei && !schichtErgebnis) {
+        const boxen = (["steel", "copper", "rubble"] as const).map((o) => ({
+          order: o,
+          teile: items.items.filter((it) => it.containerId === boxFuer(o).id).map(kassenTeilAus),
+        }));
+        const b = kasse.bilanz(true, boxen);
+        audio.playFeierabend();
+        schichtErgebnis =
+          `Feierabend: ${Math.round(b.verdienstEur).toLocaleString("de-DE")} € · ${b.tonnenUmgeschlagen.toFixed(1).replace(".", ",")} t · ` +
+          `Quote ${Math.round(b.sortierquote * 100)} % · Wartezeit ${Math.round(b.warteS)} s · ${"★".repeat(b.sterne)}`;
+        hud.toast(schichtErgebnis);
+      }
     } else {
       rekorde?.takt(frameDt); // E-195: Spielzeit der Sandkasten-Rekorde, steht in der Pause
       /*
@@ -2089,7 +2176,8 @@ async function main(): Promise<void> {
   }
   // E-197: Wiedereinstieg beim naechsten Schritt ohne Haekchen (core/save.ts)
   lektion?.start(lehrgangEinstieg(lektionDaten?.schritte.length)); // E-196: erst jetzt — alle Zuhoerer (Karte, Geist, Wiedergabe, Tafel) haengen
-  if (!BETRIEB && !aufgabenPlatz) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
+  if (schicht) hud.toast("Schicht: Misch auf den Verlader vor dir, Stahl links hinten, Bunt rechts, Müll rechts hinten. Laster nicht warten lassen!");
+  else if (!BETRIEB && !aufgabenPlatz) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
   requestAnimationFrame(frame);
 }
 

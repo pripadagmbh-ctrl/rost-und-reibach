@@ -145,6 +145,10 @@ export const EN: Record<string, string> = {
   "Presse: 1 Teil zum Paket gepresst": "Press: 1 part pressed into a bale",
   "Presse: Mulde war leer": "Press: the chamber was empty",
   "Der Abholer ist noch leer.": "The pickup truck is still empty.",
+  // E-202: Schicht (Zwischenstand, Start über #schicht=…)
+  "Der nächste Verlader kommt von selbst.": "The next loading truck comes by itself.",
+  "Schicht: Misch auf den Verlader vor dir, Stahl links hinten, Bunt rechts, Müll rechts hinten. Laster nicht warten lassen!":
+    "Shift: mixed scrap onto the loading truck in front of you, steel back left, non-ferrous right, waste back right. Don't keep the trucks waiting!",
   "Der Fahrer hupt — Fahrspur ist blockiert!": "The driver is honking — the lane is blocked!",
   "Musik an.": "Music on.",
   "Musik aus.": "Music off.",

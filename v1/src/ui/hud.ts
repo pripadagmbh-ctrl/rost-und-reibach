@@ -514,6 +514,15 @@ export class Hud {
     schreib(el, k.text ? `${k.text} · ${text}` : text, k.farbe ?? (platzDicht ? PLATZ_DICHT : NORMAL));
   }
 
+  /**
+   * SCHICHT (E-202): Uhr, Kasse und Wartende in der Zeile des Tagesablaufs —
+   * dasselbe Feld wie im Betrieb, eigene Methode, damit die Schicht nicht am
+   * Betriebs-Aufruf haengt (`test/spielart.test.ts`). Die volle Anzeige kommt mit S4.
+   */
+  updateSchicht(text: string, annahmeVoll: boolean): void {
+    if (this.shiftEl) schreib(this.shiftEl, text, annahmeVoll ? PLATZ_DICHT : NORMAL);
+  }
+
   /** Kurze Einblendung (Verkauf, Speichern, Anlieferung). */
   toast(msg: string): void {
     const el = document.getElementById("toast")!;

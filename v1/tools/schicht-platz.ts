@@ -44,6 +44,7 @@ import {
   anfahrtVomPlatz,
   routeOut,
   zumTor,
+  VERLADER_VORN,
 } from "../src/delivery/routes";
 import { planeRangierzugOderNull, type Rangierzug } from "../src/delivery/rangierplan";
 import {
@@ -188,13 +189,8 @@ function vorher(): Variante {
  * Ladefläche 6,52 … 8,89 m vom Sitz, der Wagen 5,65 m vom Sitz, also außerhalb
  * des 5,5-m-Tastbereichs.
  */
-const A_WINKEL = (10 * Math.PI) / 180; // SW
-const A_ABSTAND = 7.2; // SW
-const A_VERLADER = {
-  x: S.x + A_ABSTAND * Math.sin(A_WINKEL),
-  z: S.z + A_ABSTAND * Math.cos(A_WINKEL),
-  gier: A_WINKEL - Math.PI / 2, // Kabine nach Westen, setzt nach Osten zurück
-};
+// Seit E-201 gebaut: die Lage steht in `routes.ts` (`VERLADER_VORN`), hier nur gelesen
+const A_VERLADER = VERLADER_VORN;
 function varianteA(): Variante {
   const kipperAmPlatz = box(ABLADE_SPUR_X, ABLADE_HALT_Z, 0, KIPPER);
   const verladerAmPlatz = box(A_VERLADER.x, A_VERLADER.z, A_VERLADER.gier, ABHOLER);

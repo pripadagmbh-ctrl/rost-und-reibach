@@ -624,6 +624,70 @@ export function rollSpaenefuhre(): CustomerProfile {
 }
 
 /**
+ * WER IN DER SCHICHT ANLIEFERT (E-202) — dieselbe Kundschaft wie im
+ * Sandkasten, nur mit dem Fahrzeug und der Ladung, die der Fahrplan verlangt.
+ *
+ * Gewürfelt wird wie immer (`rollCustomer`, Händler und Gewerbe — keine
+ * Privatleute: Die kommen mit dem Anhänger, und eine Schicht-Fuhre ist ein
+ * Lkw). Passt ein Wurf schon (Fahrzeug, gemischt bzw. die verlangte Sorte),
+ * kommt er unverändert. Sonst bleibt die Person — Name, Gruß, Aussehen,
+ * Härte —, und die Fuhre wird für das verlangte Fahrzeug neu gerechnet, mit
+ * derselben Rechnung wie jede Fuhre (`baueFuhre`: Füllgrad × Laderaum ×
+ * Schüttdichte, gedeckelt bei der Nutzlast). Eine sortenreine PRITSCHE gibt es
+ * im Sandkasten gar nicht (sortenrein kommt dort im Kipper, E-178) — in der
+ * Schicht ist sie gewollt (Patrick 21.10.2026: „du fährst hin").
+ *
+ * Ton-Leitplanke: Niemand wird neu erfunden; Milieu aus Beruf, Familie, Geschäft.
+ */
+export function rollSchichtKunde(
+  fahrzeug: "kipper" | "pritsche" | "absetzer",
+  sorte: string | null = null
+): CustomerProfile {
+  let c = rollCustomer();
+  // Höchstens 40 Würfe (SW): Danach wird umgerechnet statt weiter gewürfelt
+  for (let i = 0; i < 40; i++) {
+    const passt =
+      c.group !== "privat" &&
+      !c.spaene &&
+      !c.einzelstueck &&
+      c.vehicle === fahrzeug &&
+      (c.sortedMaterial ?? null) === sorte;
+    if (passt) return c;
+    const naechster = rollCustomer();
+    if (naechster.group !== "privat" || c.group === "privat") c = naechster;
+  }
+  /*
+   * Die Person bleibt, die Fuhre wird neu gerechnet. Füllgrad: der eigene,
+   * wenn das Fahrzeug schon stimmte; sonst wie beim Kunden dieser Gruppe
+   * (`rollFuellgrad`), der Absetzkipper wie in `fuhreFuer` drei Viertel bis
+   * randvoll (E-141: eine Mulde kommt, wenn sie voll ist).
+   */
+  const gruppe = c.group === "privat" ? "haendler" : c.group;
+  const fuellgrad =
+    c.vehicle === fahrzeug
+      ? c.fuellgrad
+      : fahrzeug === "absetzer"
+        ? FUELL_KLASSEN.dreiviertel.von +
+          Math.random() * (FUELL_KLASSEN.randvoll.bis - FUELL_KLASSEN.dreiviertel.von)
+        : rollFuellgrad(gruppe);
+  const aufbau: Aufbau = fahrzeug === "absetzer" ? "flach" : c.aufbau;
+  const stoer = sorte ? 0.02 : c.contaminantShare; // SW: sortenrein heißt fast ohne Beifang
+  const fuhre = baueFuhre({ kind: fahrzeug, aufbau, fuellgrad, hauptfraktion: sorte, stoerstoffAnteil: stoer });
+  const { spaene: _s, einzelstueck: _e, wrackArt: _w, ...person } = c;
+  return {
+    ...person,
+    group: gruppe,
+    vehicle: fahrzeug,
+    aufbau,
+    fuellgrad: fuhre.fuellgrad,
+    massKg: Math.max(MINDEST_FUHRE_KG, fuhre.massKg),
+    dichte: fuhre.dichte,
+    sortedMaterial: sorte,
+    contaminantShare: stoer,
+  };
+}
+
+/**
  * DIE GANZE KUNDSCHAFT AUF EINEN BLICK — 8 Händler, 7 Betriebe, 8 Privatleute.
  *
  * Kein zweiter Datenbestand, sondern eine Ansicht auf die drei Listen weiter
