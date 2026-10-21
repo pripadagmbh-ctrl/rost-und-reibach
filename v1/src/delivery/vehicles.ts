@@ -233,6 +233,7 @@ import {
   fahrzeugUmriss,
   zugwagenUmriss,
   umrissUeberlappung,
+  boxUeberlappung,
   anhaengerUmriss,
   poseAuf,
   tiefsteDurchdringung,
@@ -3461,6 +3462,8 @@ class DeliveryVehicle {
       if (r.fertig) break;
     }
     const tiefeVoraus = tiefsteDurchdringung(this.umrissCache, hind);
+    // Gemerkt für die Prüfung Laster gegen Laster (E-193)
+    this.vorausFiguren = this.umrissCache.map((b) => ({ ...b }));
     return tiefeVoraus > UMRISS_TOLERANZ && tiefeVoraus > tiefeJetzt;
   }
 
@@ -3476,6 +3479,14 @@ class DeliveryVehicle {
     }
     return false;
   }
+
+  /* ------------------------------------- Laster gegen Laster (E-193) --- */
+  /** Die Lagen 4 m voraus, wie sie die Bauwerksprüfung gerade gerechnet hat. */
+  vorausFiguren: Box[] = [];
+  /** Steht ein anderer Laster dort, wo dieser gleich hinfährt? Gesetzt vom Fuhrpark. */
+  fahrzeugImWeg: ((v: DeliveryVehicle) => boolean) | null = null;
+  /** Darf er vom Warteplatz los (Tor und Waage frei)? Gesetzt vom Fuhrpark. */
+  darfLosfahren: () => boolean = () => true;
 
   /** Ist an (x,z) im Umkreis r der Bagger? Gesetzt vom Fuhrpark (E-192). */
   baggerNah: ((x: number, z: number, r: number) => boolean) | null = null;
@@ -3571,6 +3582,21 @@ class DeliveryVehicle {
         this.honked = true;
         this.onHonk?.();
         this.onMeldung?.("Büro an Bagger: Der Laster kommt nicht vorbei — Bagger aus der Fahrspur, bitte.");
+      }
+      return false;
+    }
+    /*
+     * LASTER GEGEN LASTER (E-193). Patrick, 21.10.2026: „er drehte direkt
+     * nach der Waage und blieb bei einem anderen LKW stecken". Bis hierher
+     * kannte kein Laster den anderen: Sie fuhren durcheinander hindurch und
+     * standen Rumpf an Rumpf auf der Waage. Jetzt wartet, wer in einen anderen
+     * hineinfahren würde — der Fuhrpark entscheidet, wer Vorfahrt hat.
+     */
+    if (this.fahrzeugImWeg?.(this)) {
+      this.blockedT += dt;
+      if (this.blockedT > HONK_AFTER_S && !this.honked) {
+        this.honked = true;
+        this.onHonk?.();
       }
       return false;
     }
@@ -4069,7 +4095,8 @@ class DeliveryVehicle {
         if (this.fahrerState === "kaffee" && this.phaseT > this.parkSeconds - 12) {
           this.fahrerState = "rein";
         }
-        if (this.phaseT > this.parkSeconds && this.fahrerState === "drin") {
+        // Los erst, wenn Tor und Waage frei sind (E-193)
+        if (this.phaseT > this.parkSeconds && this.fahrerState === "drin" && this.darfLosfahren()) {
           /*
            * VOM WARTEPLATZ ZUM TOR (E-140). Bis hierher faedelte der Wagen auf
            * die Ausfahrt ein, von der er gekommen war (E-093) — am Punkt, der
@@ -4419,6 +4446,90 @@ export class VehicleManager {
   /** Eine Silo-Fuhre, die wartet, bis der Bagger aus der Silogasse ist (E-192). */
   private nachSilo: { k: DeliveryKind; kunde: CustomerProfile; silo: ContainerConfig } | null = null;
 
+  /* ------------------------------------- Laster gegen Laster (E-193) --- */
+
+  /** Eine Fuhre (NACHSCHUB), die kommen sollte, während Tor und Waage belegt waren (E-193). */
+  private nachTor: { k?: DeliveryKind; kunde?: CustomerProfile } | null = null;
+
+  /** Wer auf wen wartet — damit zwei, die aufeinander warten, sich nicht für immer blockieren. */
+  private wartetAuf = new Map<DeliveryVehicle, DeliveryVehicle>();
+
+  /**
+   * Würde `v` in den nächsten 4 m in einen anderen Laster fahren? Geprüft mit
+   * den Lagen, die seine Bauwerksprüfung gerade gerechnet hat, gegen die
+   * Umrisse aller anderen (`boxUeberlappung`, gedreht gegen gedreht). Weg vom
+   * anderen darf er immer (wie bei Bauwerken). Warten zwei aufeinander, fährt
+   * der mit Vorfahrt: wer den Hof verlässt, dann der Wagen auf dem Platz.
+   */
+  private fahrzeugVoraus(v: DeliveryVehicle): boolean {
+    const voraus = v.vorausFiguren;
+    if (voraus.length === 0) return false;
+    const jetzt: Box[] = [];
+    v.boxen(jetzt);
+    const andere: Box[] = [];
+    for (const o of [this.active, ...this.parked]) {
+      if (!o || o === v) continue;
+      andere.length = 0;
+      o.boxen(andere);
+      let tv = 0;
+      for (const a of voraus) for (const b of andere) tv = Math.max(tv, boxUeberlappung(a, b));
+      if (tv <= 0.05) continue;
+      let tj = 0;
+      for (const a of jetzt) for (const b of andere) tj = Math.max(tj, boxUeberlappung(a, b));
+      if (tv <= tj + 0.01) continue;
+      if (this.wartetAuf.get(o) === v && this.vorfahrt(v) > this.vorfahrt(o)) continue;
+      this.wartetAuf.set(v, o);
+      return true;
+    }
+    this.wartetAuf.delete(v);
+    return false;
+  }
+
+  /** Vorfahrt beim gegenseitigen Warten: Hinausfahrende zuerst, dann der Aktive, dann nach Reihenfolge. */
+  private vorfahrt(v: DeliveryVehicle): number {
+    const raus = v.phaseName === "out" || v.phaseName === "ausfaedeln" ? 2 : 0;
+    return raus + (v === this.active ? 1 : 0) - this.parked.indexOf(v) * 0.001;
+  }
+
+  /**
+   * Ist Tor und Waage gerade von einem fahrenden Laster belegt (außer `ausser`)?
+   * Dann fährt kein neuer herein und keiner vom Warteplatz los (E-193) — so
+   * stehen nie zwei zugleich auf der Waage oder begegnen sich im Tor.
+   * Der Bereich: Waagenspur, Tor und Verteiler bis zum Einbiegen auf den Platz
+   * (x −34 … −8, z 6 … 45). Wer dort parkt, belegt nichts.
+   */
+  private torBelegt(ausser: DeliveryVehicle | null = null): boolean {
+    for (const o of [this.active, ...this.parked]) {
+      if (!o || o === ausser || o.phaseName === "parked") continue;
+      const p = o.group.position;
+      if (p.x > -34 && p.x < -8 && p.z > 6 && p.z < 45) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Fährt noch einer zu seinem Warteplatz — oder vom Warteplatz zum Tor? Dann
+   * kommt kein neuer herein (E-193): Der Rückweg vom Warteplatz führt über die
+   * Waage, genau gegen die Einfahrt — zwei Laster dort kommen nur aneinander
+   * vorbei, wenn einer durch den anderen fährt.
+   */
+  private parktNoch(): boolean {
+    return this.parked.some((o) => o.phaseName !== "parked");
+  }
+
+  /**
+   * Darf `v` vom Warteplatz los? Nur einer zugleich, nicht während einer
+   * hereinkommt (Einfahrt, Waage, Anfahrt) oder selbst schon hinausfährt, und
+   * nur bei freiem Tor (E-193).
+   */
+  private warteplatzDarfLos(v: DeliveryVehicle): boolean {
+    if (this.torBelegt(v)) return false;
+    if (this.parked.some((o) => o !== v && o.phaseName !== "parked")) return false;
+    const a = this.active;
+    if (!a) return true;
+    return !["in", "weighIn", "approach", "settleCargo", "out", "ausfaedeln"].includes(a.phaseName);
+  }
+
   /** Steht der Bagger im Tastbereich der Strecke zu diesem Silo (`BLOCK_RADIUS`)? */
   private baggerInGasse(silo: ContainerConfig): boolean {
     const ex = this.getExcavatorPos?.();
@@ -4573,6 +4684,11 @@ export class VehicleManager {
 
   spawnNow(kind?: DeliveryKind, kunde?: CustomerProfile): void {
     if (this.active) return;
+    // Tor und Waage belegt, oder parkt noch einer ein (E-193)? Dann kommt er gleich danach.
+    if (this.torBelegt() || this.parktNoch()) {
+      this.nachTor = { k: kind, kunde };
+      return;
+    }
     // Der Abholer hat seinen eigenen Weg (E-177): kein Kunde, Fahrzeug nach Bestellung
     if (kind === "abholer") {
       this.spawnAbholer();
@@ -4689,6 +4805,17 @@ export class VehicleManager {
   /** Der nächste Müll-Abroller ist die Rückfahrt mit dem leeren (E-192). */
   private muellRueckfahrt = false;
 
+  /**
+   * ZUM START BRINGT DER ABROLLER DEN MÜLL-CONTAINER VON SELBST (E-193).
+   * Patrick, 21.10.2026: „der lkw bringt die neue mulde selbständig und wird
+   * abgeholt, sobald ich die abholung beantrage". Vorgemerkt wie eine
+   * Abholung, also vor der ersten Anlieferung; geholt wird erst auf ABHOLEN → Müll.
+   */
+  bringeMuellcontainer(): void {
+    this.vorgemerkt = { order: "rubble", aufbau: "muell" };
+    this.muellRueckfahrt = true;
+  }
+
   /** Wie der Abholer kommt, der als naechster faehrt (E-177). */
   pickupAufbau: AbholAufbau = "abroller";
 
@@ -4781,6 +4908,9 @@ export class VehicleManager {
     );
     v.itemQuelle = this.items;
     v.platzinventar = this.platzinventar;
+    // E-193: Laster gegen Laster, und vom Warteplatz nur bei freiem Tor
+    v.fahrzeugImWeg = (w) => this.fahrzeugVoraus(w);
+    v.darfLosfahren = () => this.warteplatzDarfLos(v);
     // E-192: Bagger in der Spur → warten statt durchfahren; das Büro sagt, was im Weg steht
     v.baggerNah = (x, z, r) => {
       const ex = this.getExcavatorPos?.();
@@ -4894,7 +5024,8 @@ export class VehicleManager {
       this.vorgemerkt = { order: order ?? null, aufbau };
       return "vorgemerkt";
     }
-    if (this.active) {
+    // Auch wenn Tor und Waage gerade belegt sind (E-193): vormerken, er kommt gleich
+    if (this.active || this.torBelegt() || this.parktNoch()) {
       this.vorgemerkt = { order: order ?? null, aufbau };
       return "vorgemerkt";
     }
@@ -4930,6 +5061,8 @@ export class VehicleManager {
     }
     this.nachMulde = null;
     this.nachSilo = null;
+    this.nachTor = null;
+    this.wartetAuf.clear();
     this.t = 0;
     this.nextSpawnT = FIRST_DELAY_S;
   }
@@ -5194,6 +5327,8 @@ export class VehicleManager {
       }
     }
     if (!this.active) {
+      // Erst wenn Tor und Waage frei sind und keiner mehr einparkt (E-193)
+      if (this.torBelegt() || this.parktNoch()) return;
       /*
        * STEHT EINE MULDE (E-141), IST DER ABLADEPLATZ ZU. Sie steht genau
        * dort, wo jeder andere Wagen zuruecksetzt. Geholt wird sie, sobald sie
@@ -5221,6 +5356,13 @@ export class VehicleManager {
         this.pickupAufbau = this.vorgemerkt.aufbau;
         this.vorgemerkt = null;
         this.spawnAbholer();
+        return;
+      }
+      // Wer vor dem belegten Tor wartete, kommt jetzt (E-193)
+      if (this.nachTor) {
+        const n = this.nachTor;
+        this.nachTor = null;
+        this.spawnNow(n.k, n.kunde);
         return;
       }
       // Wer auf die freie Silogasse wartet, kommt, sobald der Bagger draußen ist (E-192)

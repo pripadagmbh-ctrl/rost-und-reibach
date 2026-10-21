@@ -254,6 +254,26 @@ describe("E-192 — voll weg, dann leer zurück", () => {
     expect(p.meldungen).toContain("Abroller stellt den Müll-Container ab.");
   });
 
+  it("E-193: zum Start bringt der Abroller den leeren von selbst — geholt wird erst auf ABHOLEN → Müll", () => {
+    const p = bauePlatz();
+    p.c.raeumeMuell();
+    p.m.bringeMuellcontainer();
+    expect(p.m.abholungVorgemerkt, "ohne Bestellung vorgemerkt").toBe(true);
+    fahreAus(p);
+    for (let i = 0; i < 120; i++) takt(p);
+    const m = p.c.muell()!;
+    const a = MUELL_PLAETZE[0]!;
+    expect(m.aufgestellt).toBe(true);
+    expect(Math.hypot(m.ort.x - a.x, m.ort.z - a.z), "er steht nicht auf dem Müllplatz").toBeLessThan(0.7);
+    expect(p.meldungen).toContain("Büro an Bagger: Der Abroller bringt den leeren Müll-Container.");
+    expect(p.meldungen).not.toContain("Abroller holt den vollen Müll-Container.");
+    // Ohne Abholung kommt keiner, um ihn zu holen
+    for (let i = 0; i < 60 * 120; i++) takt(p);
+    expect(p.m.pickupTruck, "Abroller kam ungerufen").toBeNull();
+    expect(p.c.muell()!.aufgestellt).toBe(true);
+    expect(p.m.requestPickup("rubble")).toBe("gerufen");
+  });
+
   it("steht einer (voll): Fahrt eins holt ihn samt Inhalt, Fahrt zwei bringt einen leeren auf denselben Platz", () => {
     const p = bauePlatz();
     const drin = fuelle(p, 6);

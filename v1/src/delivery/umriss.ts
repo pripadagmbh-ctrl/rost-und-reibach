@@ -373,3 +373,40 @@ export function umrisseEntlang(
   }
   return out;
 }
+
+/**
+ * Wie tief zwei gedrehte Umrisse ineinander stecken (m), 0 = sie berühren
+ * sich nicht. Trennachsensatz über die vier Kantenrichtungen beider Rechtecke
+ * (E-193: Laster gegen Laster — beide stehen schräg, eine achsparallele
+ * Näherung wie bei den Bauwerken reicht dort nicht).
+ */
+export function boxUeberlappung(a: Box, b: Box): number {
+  const ea = umrissEcken(a);
+  const eb = umrissEcken(b);
+  let tief = Infinity;
+  for (const r of [a.rot, b.rot]) {
+    for (const [ax, az] of [
+      [Math.cos(r), -Math.sin(r)],
+      [Math.sin(r), Math.cos(r)],
+    ] as const) {
+      let minA = Infinity;
+      let maxA = -Infinity;
+      let minB = Infinity;
+      let maxB = -Infinity;
+      for (const [x, z] of ea) {
+        const p = x * ax + z * az;
+        minA = Math.min(minA, p);
+        maxA = Math.max(maxA, p);
+      }
+      for (const [x, z] of eb) {
+        const p = x * ax + z * az;
+        minB = Math.min(minB, p);
+        maxB = Math.max(maxB, p);
+      }
+      const ueber = Math.min(maxA, maxB) - Math.max(minA, minB);
+      if (ueber <= 0) return 0;
+      tief = Math.min(tief, ueber);
+    }
+  }
+  return tief;
+}

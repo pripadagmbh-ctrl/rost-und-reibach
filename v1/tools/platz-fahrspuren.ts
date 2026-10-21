@@ -74,11 +74,11 @@ const haltGierAus = (r: Array<[number, number]>): number => {
 };
 for (const p of plaetze) {
   const b = fahrzeugUmriss({ x: p.halt[0], z: p.halt[1], rot: haltGierAus(p.rueckweg) }, BED_LEN.abholer!);
-  ladeplaetze.push({ name: p.name, stand: p.stand, ecken: umrissEcken(b), eigene: [p.name, "Abladeplatz"] });
+  ladeplaetze.push({ name: p.name, stand: p.stand, ecken: [0, 1, 3, 2].map((k) => umrissEcken(b)[k]!), eigene: [p.name, "Abladeplatz"] });
 }
 {
   const b = fahrzeugUmriss({ x: ABSETZ_HALT[0], z: ABSETZ_HALT[1], rot: haltGierAus(abs.rueckweg) }, BED_LEN.absetzer!);
-  ladeplaetze.push({ name: "Absetzkipper-Halt", stand: BAGGER_STAND, ecken: umrissEcken(b), eigene: ["Absetzkipper"] });
+  ladeplaetze.push({ name: "Absetzkipper-Halt", stand: BAGGER_STAND, ecken: [0, 1, 3, 2].map((k) => umrissEcken(b)[k]!), eigene: ["Absetzkipper"] });
 }
 MUELL_PLAETZE.forEach((m, i) => {
   const r = wannenRechteck(m);

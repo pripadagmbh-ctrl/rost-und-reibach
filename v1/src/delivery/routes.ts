@@ -1055,7 +1055,19 @@ export function bayOut(c: ContainerConfig): Array<[number, number]> {
 export const PARK_SLOTS: Array<[number, number]> = [
   [-18.5, 24],
   [-14.5, 24],
-  [-26.0, 6],
+  /*
+   * SEIT E-193 an der Nordmauer (−0,3 | 23), vorher (−26 | 6) vor dem Tor der
+   * dritten Halle. Patrick, 21.10.2026: „er drehte direkt nach der Waage und
+   * blieb bei einem anderen LKW stecken". Gemessen gegen alle Fahrpläne
+   * (Einspurmodell, 0,3 m Rand): Der alte Platz lag bis 1,90 m in der
+   * Schleppkurve nach der Waage (Gespann zum Abladeplatz) und 0,8 m in den
+   * Strecken des Abholers zu ABFALL und BATTERIEN. Der neue berührt keine
+   * Strecke und kein Bauwerk (Mulde „Nordmauer Mitte" daneben eingerechnet).
+   * Einen Meter vor der Mauer und 0,3 m nach Westen, damit die Einparkfahrt
+   * 4,81 m Mitte-zu-Kante am Start-LKW-Wrack vorbeigeht (E-135 verlangt
+   * 2,6 m Spur + 2 m Luft; bei (0 | 24) waren es 4,31 m).
+   */
+  [-0.3, 23],
 ];
 /**
  * Wie weit suedlich des Platzes der LKW anhaelt, bevor er rueckwaerts an die

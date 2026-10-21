@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-193 | 21.10.2026 | Laster warten aufeinander, Warteplatz aus der Schleppkurve, Müll kommt von selbst | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-192 | 21.10.2026 | Müll vor dem Bagger in zwei Fahrten, Spuren frei, Bagger nie durchfahren | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-191 | 21.10.2026 | Bagger hupt: Abholer fährt los; Schere heißt Presse; Maschendraht raus | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-190 | 21.10.2026 | Müll-Container wird Abrollcontainer: voll weg, leer zurück | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -198,6 +199,11 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-193 — Laster gegen Laster, Waage, Müll zum Start** (iPad)
+- Sandkasten neu: bringt der Abroller als erstes den leeren Müll-Container rechts vor dich, ohne Bestellung? Holt ihn keiner, bis du ABHOLEN → Müll wählst?
+- Mehrere Fuhren und einen Abholer kurz hintereinander: wartet einer, bis der andere über die Waage ist — bleibt keiner mehr nach der Waage an einem anderen Laster hängen?
+- Dritter Warteplatz jetzt an der Nordmauer zwischen den grünen Mulden: stört er dort?
 
 **E-192 — Müll vor dem Bagger, Fahrspuren, Waage** (iPad)
 - Sandkasten neu: kein blauer Container vor dem Bagger? ABHOLEN → Müll: bringt der Abroller einen leeren rechts vor dich an die BUNT + VA?

@@ -287,6 +287,12 @@ describe("Die Federung kommt am Modell an", () => {
     let hoechste = 0;
     for (let fuhre = 0; fuhre < 10; fuhre++) {
       vm.spawnNow("kipper", kunde(5000, 0.9));
+      // E-193: Der nächste rollt erst ein, wenn der vorige eingeparkt hat
+      for (let w = 0; w < 60 * 120 && (vm as unknown as { active: Innen | null }).active === null; w++) {
+        vm.update(1 / 60);
+        items.clampSpeeds(1 / 60);
+        world.step();
+      }
       let schritte = 0;
       while ((vm as unknown as { active: Innen | null }).active !== null) {
         vm.update(1 / 60);

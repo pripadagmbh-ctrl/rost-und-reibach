@@ -198,3 +198,117 @@ describe("E-192 — 50 Anlieferungen hintereinander, keine bleibt an der Waage h
     expect(laengsteAnWaage, "ein Laster hing an der Waage").toBeLessThan(20);
   });
 });
+
+describe("E-193 — Laster gegen Laster: volle Warteplätze, Abholer, Müll, Anlieferer", () => {
+  it("≥ 50 Fuhren, kein Laster steht länger als 20 s Rumpf an Rumpf, keiner hängt fest", { timeout: 1_500_000 }, async () => {
+    if (typeof (globalThis as { document?: unknown }).document === "undefined") {
+      const ctx = new Proxy({}, { get: (_t, k) => (k === "measureText" ? () => ({ width: 10 }) : () => undefined), set: () => true });
+      const canvas = { width: 256, height: 128, getContext: () => ctx, style: {} };
+      (globalThis as { document?: unknown }).document = { createElement: () => canvas };
+    }
+    const { ContainerManager } = await import("../src/world/containers");
+    const { ContainerAbholung } = await import("../src/delivery/platzinventarAbholung");
+    const { boxUeberlappung } = await import("../src/delivery/umriss");
+    const p = bauePlatz(5);
+    const c = new ContainerManager(new THREE.Scene(), p.world, new EventBus());
+    c.nachtschichtAktiv = false;
+    c.raeumeMuell();
+    const m = p.m as unknown as {
+      active: Fahrzeug | null;
+      parked: Fahrzeug[];
+    };
+    type Fahrzeug = {
+      kind: string;
+      phaseName: string;
+      phaseT: number;
+      group: THREE.Group;
+      boxen(o: Array<{ x: number; z: number; hw: number; hd: number; rot: number }>): void;
+      cargo: { items: Array<{ body: RAPIER.RigidBody }>; car: unknown };
+    };
+    p.m.platzinventar = new ContainerAbholung(c, p.items, p.world);
+    p.m.acceptDeliveries = true;
+    p.m.intervalFactor = 0.05;
+    p.m.stelleAnstehendeAuf(3);
+    p.m.bringeMuellcontainer();
+    let fuhren = 0;
+    let letzte: unknown = null;
+    const rumpf = new Map<string, number>();
+    let laengsterRumpf = 0;
+    const stand = new Map<Fahrzeug, { x: number; z: number; s: number; ph: string }>();
+    let laengsterStand = 0;
+    const ruhig = new Set(["waitUnload", "waitLoad", "parked", "tipping", "tipHold", "tipBack", "tipCreep", "pauseBeforeUnload", "settleCargo", "weighIn", "shiftPause",
+      "muldeHeben", "muldeRuhe", "muldeKippen", "muldeLeeren", "muldeSenken", "muldeLoesen", "armeEin", "muldeHolen", "muldeAufnehmen", "hakenAb", "hakenEin", "hakenAus", "hakenAuf"]);
+    for (let i = 0; i < 60 * 60 * 120 && fuhren < 50; i++) {
+      p.takt();
+      if (i % 10 === 0) c.recount(p.items, new Set());
+      const a = m.active;
+      if (a !== letzte) {
+        if (letzte) fuhren++;
+        letzte = a;
+      }
+      if (a && a.phaseName === "waitUnload" && a.phaseT > 1) {
+        for (const it of [...a.cargo.items]) {
+          const e = p.items.itemByBody(it.body);
+          if (e) p.items.remove(e, true);
+        }
+        a.cargo.items.length = 0;
+        if (a.cargo.car) p.m.zurWaage();
+      }
+      if (a && a.phaseName === "waitLoad" && a.phaseT > 5) p.m.requestPickup();
+      if (i % (60 * 120) === 0 && i > 0) p.m.requestPickup(["mixed", "rubble", "steel"][(i / 7200) % 3]!);
+      if (i % 600 === 0) {
+        for (const it of [...p.items.items]) {
+          const q = it.body.isValid() ? it.body.translation() : null;
+          if (!q || !it.body.isDynamic() || Math.hypot(q.x - 6.3, q.z + 25) >= 10) continue;
+          if (p.composites.despawnByBody(it.body)) p.items.remove(it, false);
+          else p.items.remove(it, true);
+        }
+      }
+      if (i % 6) continue;
+      const alle = [a, ...m.parked].filter((v): v is Fahrzeug => !!v);
+      const jetzt = new Set<string>();
+      for (let x = 0; x < alle.length; x++) {
+        for (let y = x + 1; y < alle.length; y++) {
+          const A: Array<{ x: number; z: number; hw: number; hd: number; rot: number }> = [];
+          const B: typeof A = [];
+          alle[x]!.boxen(A);
+          alle[y]!.boxen(B);
+          let d = 0;
+          for (const u of A) for (const v of B) d = Math.max(d, boxUeberlappung(u, v));
+          if (d <= 0.3) continue;
+          const k = `${x}:${alle[x]!.kind}|${y}:${alle[y]!.kind}`;
+          jetzt.add(k);
+          rumpf.set(k, (rumpf.get(k) ?? 0) + 6 * DT);
+          laengsterRumpf = Math.max(laengsterRumpf, rumpf.get(k)!);
+        }
+      }
+      for (const k of [...rumpf.keys()]) if (!jetzt.has(k)) rumpf.delete(k);
+      for (const v of alle) {
+        const st = stand.get(v) ?? { x: v.group.position.x, z: v.group.position.z, s: 0, ph: v.phaseName };
+        if (Math.hypot(v.group.position.x - st.x, v.group.position.z - st.z) > 0.3 || st.ph !== v.phaseName) {
+          st.x = v.group.position.x;
+          st.z = v.group.position.z;
+          st.s = 0;
+          st.ph = v.phaseName;
+        } else if (!ruhig.has(v.phaseName)) st.s += 6 * DT;
+        stand.set(v, st);
+        laengsterStand = Math.max(laengsterStand, st.s);
+      }
+    }
+    expect(fuhren, "nicht 50 Fuhren geschafft").toBeGreaterThanOrEqual(50);
+    expect(laengsterRumpf, "zwei Laster standen Rumpf an Rumpf").toBeLessThan(20);
+    expect(laengsterStand, "ein Laster hing beim Fahren fest").toBeLessThan(60);
+    console.log(`Laster gegen Laster: ${fuhren} Fuhren, längstes Rumpf an Rumpf ${laengsterRumpf.toFixed(1)} s, längster Stillstand beim Fahren ${laengsterStand.toFixed(1)} s`);
+  });
+});
+
+describe("E-193 — boxUeberlappung", () => {
+  it("getrennt 0, gedreht berührend 0, ineinander die kleinste Eindringtiefe", async () => {
+    const { boxUeberlappung } = await import("../src/delivery/umriss");
+    const a = { x: 0, z: 0, hw: 1, hd: 2, rot: 0 };
+    expect(boxUeberlappung(a, { x: 3, z: 0, hw: 1, hd: 2, rot: 0 })).toBe(0);
+    expect(boxUeberlappung(a, { x: 1.5, z: 0, hw: 1, hd: 2, rot: 0 })).toBeCloseTo(0.5, 6);
+    // um 45° gedreht, Ecke knapp vor der Kante: Achsen des gedrehten trennen
+    expect(boxUeberlappung(a, { x: 1 + Math.SQRT2 + 0.01, z: 0, hw: 1, hd: 1, rot: Math.PI / 4 })).toBe(0);
+  });
+});
