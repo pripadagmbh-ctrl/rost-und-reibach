@@ -31,7 +31,7 @@ import { erfuellt, type ChallengeWertung } from "../challenges/challenge";
 import { CHALLENGES } from "../challenges/katalog";
 import { sprache, waehle, type Sprache } from "../challenges/texte";
 import { leseChallenges } from "../core/save";
-import { naechsteFreieAufgabe, nochmal, zumMenue } from "./hauptmenue";
+import { naechsteFreieAufgabe, nochmal, zumMenue, zurLektion } from "./hauptmenue";
 import { KRITERIEN, MESSGROESSEN, sterneText, wort } from "./aufgabentexte";
 import { laufAus, merkeLauf } from "../core/bestenliste";
 
@@ -135,6 +135,8 @@ export interface AbrechnungsAnschluss {
   ruf: { get(gruppe: "privat" | "haendler" | "gewerbe"): number };
   /** Die Uhr aus `world/daylight.ts` — wird auf den Morgen zurückgestellt */
   daylight: { time: number; neuerTag: boolean };
+  /** E-196: die Lektionen in ihrer Reihenfolge — WEITER fuehrt zur naechsten */
+  lektionen?: readonly { id: string }[];
 }
 
 export interface Abrechnung {
@@ -230,13 +232,60 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
       menue.hidden = false;
     }
   });
+  /*
+   * Das Ende einer Lektion (E-196) — dieselbe Tafel, ohne Sterne: Kopf
+   * „LEKTION GESCHAFFT · Name", statt der Sternzeile „✓ Lektion 3 von 12",
+   * eine Zeile Zeit. Knoepfe in der Reihenfolge WEITER (naechste Lektion;
+   * nach der letzten: Pruefung 1), NOCHMAL, ZUM MENÜ. NOCHMAL sitzt dafuer
+   * auf dem zweiten Knopf (`abr-naechste`). Beides laedt neu mit
+   * `#lektion=<id>` — eine Lektion ist kurz, der Platz wird frisch gebaut.
+   */
+  let lektion: { id: string; weiter: () => void } | null = null;
+  m.bus.on("lehrgang:geschafft", (e) => {
+    const s = sprache();
+    m.audio.playSterne(1); // dezent: ein Ton, keine Sternfolge
+    const ids = (m.lektionen ?? []).map((l) => l.id);
+    const i = ids.indexOf(e.id);
+    const naechsteLektion = i >= 0 ? ids[i + 1] : undefined;
+    const ersteP = CHALLENGES[0]?.id;
+    lektion = {
+      id: e.id,
+      weiter: () => (naechsteLektion ? zurLektion(naechsteLektion) : ersteP ? nochmal(ersteP) : zumMenue()),
+    };
+    const zeit = { name: waehle(KRITERIEN.zeitS.name, s), wert: KRITERIEN.zeitS.zahl(e.zeitS) };
+    if (!fuelle(`${wort("lektionGeschafft", s)} · ${waehle(e.name, s)}`, 0, [zeit], s)) {
+      m.hud.toast(`${wort("lektionGeschafft", s)} · ${waehle(e.name, s)}`);
+      return;
+    }
+    feld?.setAttribute("translate", "no");
+    if (sterneEl) {
+      sterneEl.textContent = wort("lektionVon", s)
+        .replace("{n}", String(e.nr))
+        .replace("{m}", String(ids.length || e.nr));
+    }
+    if (weiter) weiter.textContent = naechsteLektion || !ersteP ? wort("weiterGross", s) : wort("zurPruefung", s);
+    if (naechste) {
+      naechste.textContent = wort("nochmal", s);
+      naechste.hidden = false;
+    }
+    if (menue) {
+      menue.textContent = wort("zumMenue", s);
+      menue.hidden = false;
+    }
+  });
+
   menue?.addEventListener("click", zumMenue);
   naechste?.addEventListener("click", () => {
-    if (naechsteId) nochmal(naechsteId);
+    if (lektion) zurLektion(lektion.id);
+    else if (naechsteId) nochmal(naechsteId);
   });
 
   const weiterSpielen = (): void => {
     if (!offen) return;
+    if (lektion) {
+      lektion.weiter();
+      return;
+    }
     if (challengeId) {
       offen = false;
       feld?.classList.remove("open");

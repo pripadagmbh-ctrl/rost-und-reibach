@@ -169,7 +169,8 @@ describe("main.ts haengt im Simulator ab, was Geld und Leute ins Bild bringt", (
   });
 
   it("das Hauptmenue kommt vor dem Platz", () => {
-    const menue = main.indexOf("await waehleSpielart()");
+    // Seit E-196 bekommt das Menue die Lektionsliste: `await waehleSpielart(LEKTIONEN)`
+    const menue = main.indexOf("await waehleSpielart(");
     expect(menue, "main.ts wartet nie auf das Hauptmenue").toBeGreaterThan(0);
     expect(menue).toBeLessThan(main.indexOf("new Yard("));
   });
@@ -185,15 +186,18 @@ describe("Hauptmenue", () => {
   /*
    * Bis E-124 stand hier ein gesperrter CHALLENGES-Knopf („Kommen als
    * Naechstes"). Seit E-125 fuellt `ui/hauptmenue.ts` die Liste aus
-   * `challenges/katalog.ts` — der Platzhalter ist weg.
+   * `challenges/katalog.ts` — der Platzhalter ist weg. Seit E-196
+   * zweistufig: Hauptknoepfe in #hm-haupt, die Liste in #hm-eintraege;
+   * beschriftet wird alles aus `ui/hauptmenue.ts`.
    */
-  it("SANDKASTEN ist waehlbar, die Challenges kommen aus dem Katalog", () => {
-    expect(seite).toContain('<button id="hm-sandkasten">SANDKASTEN');
+  it("SANDKASTEN ist waehlbar, die Pruefungen kommen aus dem Katalog", () => {
+    expect(seite).toContain('<button id="hm-sandkasten"></button>');
     expect(seite).not.toContain("hm-challenges-knopf");
-    expect(seite).toContain('<div id="hm-challenges"></div>');
+    expect(seite).toContain('<div id="hm-eintraege"></div>');
     const menue = readFileSync(resolve(wurzel, "src/ui/hauptmenue.ts"), "utf8");
-    expect(menue).toMatch(/CHALLENGES\.forEach/);
-    expect(menue).toContain('getElementById("hm-challenges")');
+    expect(menue).toMatch(/CHALLENGES\.map/);
+    expect(menue).toContain('getElementById("hm-eintraege")');
+    expect(menue).toContain('haupt("hm-sandkasten"');
   });
 });
 

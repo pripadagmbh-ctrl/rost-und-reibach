@@ -178,7 +178,7 @@ export interface ChallengeKarte {
 }
 
 /** Einen Knopf an Zeiger statt an `click` haengen (Begruendung im Rumpf). */
-function tippKnopf(el: HTMLElement, tu: () => void): void {
+export function tippKnopf(el: HTMLElement, tu: () => void): void {
   /*
    * Warum nicht `click`: `core/touch.ts` verhindert auf iOS jedes `touchend`,
    * das binnen 320 ms nach dem vorigen kommt (gegen den Doppeltipp-Zoom). Wer
@@ -214,7 +214,7 @@ function tippKnopf(el: HTMLElement, tu: () => void): void {
 }
 
 /** Ein Element, das sich seinen letzten Text merkt — geschrieben wird nur bei Aenderung. */
-function zeile(el: HTMLElement, leerVersteckt = true): (text: string) => void {
+export function zeile(el: HTMLElement, leerVersteckt = true): (text: string) => void {
   let alt: string | null = null;
   return (text) => {
     if (text === alt) return;

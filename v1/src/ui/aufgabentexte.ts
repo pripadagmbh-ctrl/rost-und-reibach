@@ -21,7 +21,7 @@ export const WORTE = {
   // --- Karte
   pause: { de: "Pause", en: "Pause" },
   weiter: { de: "weiter", en: "resume" },
-  neustart: { de: "Aufgabe neu starten", en: "Restart task" },
+  neustart: { de: "Prüfung neu starten", en: "Restart test" },
   pressen: { de: "PRESSEN", en: "PRESS" },
   ziel: { de: "Ziel", en: "Goal" },
   platt: { de: "platt", en: "flattened" },
@@ -40,20 +40,40 @@ export const WORTE = {
   // --- Tafel
   geschafft: { de: "GESCHAFFT", en: "COMPLETE" },
   nochmal: { de: "NOCHMAL", en: "AGAIN" },
-  naechste: { de: "NÄCHSTE AUFGABE", en: "NEXT TASK" },
+  naechste: { de: "NÄCHSTE PRÜFUNG", en: "NEXT TEST" },
   zumMenue: { de: "ZUM MENÜ", en: "MAIN MENU" },
   nichtGemessen: { de: "nicht gemessen", en: "not measured" },
   dreiBis: { de: "★★★ bis", en: "★★★ max." },
   // --- Menue
-  aufgabe: { de: "AUFGABE", en: "TASK" },
+  // E-196: Die Aufgaben heissen jetzt Pruefungen. EN „TEST": kuerzer als
+  // „EXAM" (iPhone mini), und so heisst es beim Fuehrerschein/Maschinenschein
+  // („driving test", „operator test") — „exam" klingt nach Schule.
+  aufgabe: { de: "PRÜFUNG", en: "TEST" },
   nochNicht: { de: "Noch nicht geschafft.", en: "Not done yet." },
-  gesperrt: { de: "erst Aufgabe {n} schaffen", en: "finish task {n} first" },
+  gesperrt: { de: "erst Prüfung {n} bestehen", en: "pass test {n} first" },
   sandkasten: { de: "SANDKASTEN", en: "SANDBOX" },
-  sandkastenText: {
-    de: "Der Platz voller Schrott und Wracks. Ohne Ziel, ohne Uhr — zum Üben und Kaputtmachen.",
-    en: "The yard full of scrap and wrecks. No goal, no clock — for practice and smashing things.",
-  },
+  // L2b: einzeilig im 2×2-Raster des iPhone mini quer (vorher mit „…" gekürzt, qa 21.10.2026)
+  sandkastenText: { de: "Üben und Kaputtmachen, ohne Uhr.", en: "Practice and smash, no clock." },
   geschafftOhneSchwelle: { de: "geschafft", en: "completed" },
+  // --- Lehrgang (E-196): Menue, Karte, Tafel
+  lehrgang: { de: "LEHRGANG", en: "TRAINING" },
+  lehrgangText: { de: "{n} Lektionen: zuschauen, nachmachen.", en: "{n} lessons: watch, then try." },
+  pruefungen: { de: "PRÜFUNGEN", en: "TESTS" },
+  pruefungenText: { de: "Aufgaben mit Uhr und Sternen.", en: "Tasks against the clock, for stars." },
+  lektion: { de: "Lektion", en: "Lesson" },
+  schritt: { de: "Schritt", en: "Step" },
+  schauZu: { de: "Schau zu", en: "Watch" },
+  jetztDu: { de: "Jetzt du", en: "Your turn" },
+  antippen: { de: "Antippen überspringt", en: "Tap to skip" },
+  klickenUeberspringt: { de: "Klicken überspringt", en: "Click to skip" },
+  lektionGeschafft: { de: "LEKTION GESCHAFFT", en: "LESSON COMPLETE" },
+  lektionVon: { de: "✓ Lektion {n} von {m}", en: "✓ Lesson {n} of {m}" },
+  lektionErledigt: { de: "geschafft", en: "done" },
+  weiterGross: { de: "WEITER", en: "NEXT" },
+  zurPruefung: { de: "ZUR PRÜFUNG 1", en: "TO TEST 1" },
+  // --- Geisterdaumen: was eine Taste auf Touch heisst
+  ansichtTipp: { de: "ANSICHT: 2× tippen", en: "VIEW: double-tap" },
+  kranzTipp: { de: "halten, ziehen", en: "hold, swipe" },
   // --- Bestenliste (E-195)
   bestenliste: { de: "BESTENLISTE", en: "LEADERBOARD" },
   zurueck: { de: "Zurück", en: "Back" },

@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-196 | 21.10.2026 | Lehrgang Etappe 1: Vorführung im Spiel, dann nachmachen; Lektionen 1–3 | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-195 | 21.10.2026 | Bestenliste auf dem Gerät: beste 5 je Aufgabe, drei Sandkasten-Rekorde | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-194 | 21.10.2026 | Privatperson statt Firma: Pripada/GmbH raus, Repo rost-und-reibach, neue Bundle-ID | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
 | E-193 | 21.10.2026 | Laster warten aufeinander, Warteplatz aus der Schleppkurve, Müll kommt von selbst | gebaut | [E-181_bis_E-200.md](log/E-181_bis_E-200.md) |
@@ -201,6 +202,14 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-196 — Lehrgang Etappe 1** (iPad, dann iPhone mini quer)
+- Erststart nach Website-Daten löschen: Lektion 1 ohne Menü?
+- Nach jeder Vorführung steht der Bagger genau wie vorher (Lektion 2 und 3)?
+- Daumen aufsetzen bricht die Vorführung ab, „Jetzt du“ kommt?
+- Geisterdaumen folgen dem Bagger; Finger-Geist für Kamera-Gesten; „ANSICHT: 2× tippen“?
+- Lektion 3 Schritt 5: grüner Ring links am Boden, zwei Geisterdaumen?
+- Menü iPhone mini ohne Scrollen, Texte ohne „…“?
 
 **E-195 — Bestenliste** (iPad, dann iPhone mini quer)
 - Aufgabe 1 zweimal: „★ Neuer Rekord!“, dann „Platz 2 von 5“? Menüknopf mit Bestzeit?

@@ -733,6 +733,14 @@ export class TouchControls {
     canvas.addEventListener("pointercancel", clear);
   }
 
+  /**
+   * E-196: Liegt gerade ein Finger auf einem Stick oder im Mittelstreifen?
+   * Nur lesen — die Vorfuehrung im Lehrgang bricht ab, sobald einer aufsetzt.
+   */
+  get daumenAuf(): boolean {
+    return this.left?.id != null || this.right?.id != null || this.camZeiger.size > 0;
+  }
+
   consumePress(code: string): boolean {
     if (!this.pressed.has(code)) return false;
     this.pressed.delete(code);

@@ -60,6 +60,14 @@ export class OrbitCamera {
   /** von main gesetzt, wenn der Ansicht-Button per Touch gedrückt wurde */
   touchViewPress = false;
 
+  /**
+   * E-196: Nur lesen — der Lehrgang (Lektion Kamera) beobachtet, ob der
+   * Spieler gedreht, geneigt oder gezoomt hat. Aendert nichts an der Kamera.
+   */
+  get blick(): { modus: ViewMode; gier: number; nick: number; abstand: number } {
+    return { modus: this.mode, gier: this.yaw, nick: this.pitch, abstand: this.dist };
+  }
+
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(55, aspect, 0.1, 300);
     this.camera.rotation.order = "YXZ";

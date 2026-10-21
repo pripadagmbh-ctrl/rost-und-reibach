@@ -11,6 +11,7 @@ import {
 import type { ItemManager } from "../world/scrapItems";
 import type { PressManager } from "../world/press";
 import type { ChallengeQuellen } from "./challenge";
+import type { LektionQuellen, LektionZustand } from "./lektion";
 
 /**
  * DIE QUELLEN EINER AUFGABE IM SPIEL (E-162).
@@ -100,4 +101,31 @@ export function hoehenspanne(body: RAPIER.RigidBody): { unten: number; oben: num
         }
   }
   return unten <= oben ? { unten, oben } : null;
+}
+
+/**
+ * DIE QUELLEN EINER LEKTION (E-196) — Bagger und Kamera, NUR LESEN.
+ * Die Feldnamen sind die echten aus `excavator.ts` bzw. `OrbitCamera.blick`.
+ */
+export function lektionQuellen(w: { bagger: Excavator; kamera: { readonly blick: LektionZustand["kamera"] } }): LektionQuellen {
+  const sensor = new THREE.Vector3();
+  return {
+    zustand: () => {
+      const b = w.bagger;
+      const s = b.getSensorPosition(sensor);
+      return {
+        cabYaw: b.cabYaw,
+        boom: b.boomAngle,
+        stick: b.stickAngle,
+        closure: b.closure,
+        rotator: b.rotatorYaw,
+        x: b.position.x,
+        z: b.position.z,
+        heading: b.heading,
+        abgestuetzt: b.abgestuetzt,
+        spinne: { x: s.x, y: s.y, z: s.z },
+        kamera: w.kamera.blick,
+      };
+    },
+  };
 }

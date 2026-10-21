@@ -2,6 +2,7 @@ import type { Tagesbilanz } from "../economy/shift";
 import type { ChallengeMessung, ChallengeWertung } from "../challenges/challenge";
 import type { Zweisprachig } from "../challenges/texte";
 import type { ControlFunction } from "./controlConfig";
+import type { Spur } from "./spur";
 
 /**
  * Typisierter Event-Bus (Briefing Kap. 17): Module kommunizieren nur über Events,
@@ -193,6 +194,38 @@ export interface GameEvents {
   "challenge:pressen": Record<string, never>;
   /** E-162: Knopf ↻ auf der Karte oder NOCHMAL — dieselbe Aufgabe von vorn. */
   "challenge:neustart": Record<string, never>;
+  /*
+   * --- LEHRGANG (E-196, Patrick 21.10.2026: „ausführliches Intro zu allen
+   * Funktionalitäten … wie wir die ersten Challenges aufbauen") ---
+   * Eine Lektion hat Schritte; jeder Schritt hat zwei Phasen: "zeigen" (der
+   * Bagger führt die Bewegung über eine Eingabe-Spur vor, `core/spur.ts`) und
+   * "du" (der Spieler macht es nach, Häkchen wenn gesehen). Karte, Geister-
+   * daumen und Wiedergabe hängen nur an diesen Ereignissen.
+   */
+  /** Eine Lektion beginnt (auch nach ↻). `nr` = Stelle im Lehrgang (ab 1). */
+  "lehrgang:start": { id: string; nr: number; von: number; name: Zweisprachig; ziel: Zweisprachig };
+  /** Ein Schritt bzw. seine Phase beginnt. Bei "zeigen" folgt `lehrgang:vorfuehren`. */
+  "lehrgang:schritt": {
+    id: string;
+    nr: number;
+    von: number;
+    titel: Zweisprachig;
+    text: Zweisprachig;
+    zeige: { fn: ControlFunction; richtung: "plus" | "minus" | "beide" } | null;
+    phase: "zeigen" | "du";
+    /** Bodenmarke dieses Schritts (z. B. Lektion 3 „Spinne über die Marke"), in beiden Phasen gleich; null/fehlend = keine */
+    marke?: { x: number; y: number; z: number; radiusM: number } | null;
+  };
+  /** Lauf → Wiedergabe: diese Spur jetzt abspielen (über den Eingabeweg des Spielers). */
+  "lehrgang:vorfuehren": { spur: Spur };
+  /** Wiedergabe → Lauf: Spur zu Ende oder abgebrochen; danach Phase "du". */
+  "lehrgang:vorfuehrungEnde": { abgebrochen: boolean };
+  /** Karte (Antippen) → Wiedergabe: Vorführung abbrechen. */
+  "lehrgang:abbrechen": Record<string, never>;
+  /** Ein Schritt ist nachgemacht (Häkchen). */
+  "lehrgang:haekchen": { id: string; nr: number };
+  /** Die Lektion ist geschafft — Fortschritt speichern, Abschluss zeigen. */
+  "lehrgang:geschafft": { id: string; nr: number; name: Zweisprachig; zeitS: number };
   /**
    * Eine Challenge ist geschafft (E-125). Die Sterne sind fertig gerechnet
    * (`challenges/challenge.ts`); das Abschlussbild liest sie nur ab.

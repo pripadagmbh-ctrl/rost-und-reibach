@@ -222,6 +222,71 @@ export function merkeChallenge(id: string, sterne: number): void {
   }
 }
 
+/**
+ * DER FORTSCHRITT IM LEHRGANG (E-196) — welche Lektionen geschafft sind, und
+ * ob der Lehrgang je begonnen wurde (dann zeigt der naechste Start das Menue
+ * statt Lektion 1). Eigener Schluessel wie `CHALLENGE_KEY`, eigene
+ * Schemanummer: Ein Stand mit fremder Nummer oder kaputtem Inhalt gilt als
+ * leer — schlimmstenfalls faengt der Lehrgang wieder bei Lektion 1 an, nie
+ * ein Schwarzbild. Kommt Schema 2, wird hier von 1 migriert.
+ */
+export const LEHRGANG_KEY = "schrottplatz_lehrgang";
+export const LEHRGANG_SCHEMA = 1;
+export interface LehrgangStand {
+  v: typeof LEHRGANG_SCHEMA;
+  begonnen: boolean;
+  /** IDs der geschafften Lektionen, in der Reihenfolge des Schaffens */
+  geschafft: string[];
+}
+
+export function leererLehrgang(): LehrgangStand {
+  return { v: LEHRGANG_SCHEMA, begonnen: false, geschafft: [] };
+}
+
+/** Rein: gelesener Text → Stand. Alles, was nicht genau passt, ergibt leer. */
+export function lehrgangAus(text: string | null): LehrgangStand {
+  if (!text) return leererLehrgang();
+  try {
+    const d = JSON.parse(text) as Partial<LehrgangStand> | null;
+    if (!d || d.v !== LEHRGANG_SCHEMA || typeof d.begonnen !== "boolean" || !Array.isArray(d.geschafft)) {
+      return leererLehrgang();
+    }
+    return { v: LEHRGANG_SCHEMA, begonnen: d.begonnen, geschafft: d.geschafft.filter((x): x is string => typeof x === "string") };
+  } catch {
+    return leererLehrgang();
+  }
+}
+
+export function leseLehrgang(): LehrgangStand {
+  try {
+    return lehrgangAus(localStorage.getItem(LEHRGANG_KEY));
+  } catch {
+    return leererLehrgang();
+  }
+}
+
+function schreibeLehrgang(d: LehrgangStand): void {
+  try {
+    localStorage.setItem(LEHRGANG_KEY, JSON.stringify(d));
+  } catch {
+    /* privates Fenster: gilt nur fuer diese Sitzung */
+  }
+}
+
+/** Beim Start einer Lektion: begonnen ist begonnen (naechster Start = Menue). */
+export function merkeLehrgangBegonnen(): void {
+  const d = leseLehrgang();
+  if (d.begonnen) return;
+  schreibeLehrgang({ ...d, begonnen: true });
+}
+
+/** Beim Ereignis `lehrgang:geschafft`. */
+export function merkeLektion(id: string): void {
+  const d = leseLehrgang();
+  if (!d.geschafft.includes(id)) d.geschafft.push(id);
+  schreibeLehrgang({ ...d, begonnen: true });
+}
+
 export function clearSave(): void {
   try {
     localStorage.removeItem(SAVE_KEY);

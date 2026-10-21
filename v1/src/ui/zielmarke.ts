@@ -109,5 +109,25 @@ export function installZielmarke(scene: THREE.Scene, bus: EventBus): Zielmarke {
     leeren();
   });
 
+  /*
+   * E-196: Lektionen (z. B. Lektion 3 „Spinne über die Marke") senden ihre
+   * Bodenmarke mit dem Schritt. Eine grüne Marke, der Ring so gross wie der
+   * Zielkreis; ohne Marke oder nach der Lektion weg.
+   */
+  bus.on("lehrgang:schritt", (e) => {
+    leeren();
+    if (!e.marke) return;
+    const mk = vorrat[0] ?? neueMarke();
+    mk.kegel.material = mat.ziel;
+    mk.ring.material = mat.ziel;
+    mk.kegel.position.set(e.marke.x, e.marke.y + SCHWEBE_M, e.marke.z);
+    mk.ring.position.set(e.marke.x, e.marke.y + RING_UEBER_M, e.marke.z);
+    mk.ring.scale.setScalar(e.marke.radiusM / 0.6); // 0,6 m = Ring-Halbmesser oben
+    mk.kegel.visible = true;
+    mk.ring.visible = true;
+    sichtbar = 1;
+  });
+  bus.on("lehrgang:geschafft", leeren);
+
   return { leeren };
 }

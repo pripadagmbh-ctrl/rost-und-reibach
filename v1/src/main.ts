@@ -67,7 +67,11 @@ import { nochmal, waehleSpielart, type Spielwahl } from "./ui/hauptmenue";
 import { challengeNach, challengeNr } from "./challenges/katalog";
 import { ChallengeLauf, type ChallengeDaten } from "./challenges/challenge";
 import { baueAufgabe, grundbestandVon, raeumeAuf, type Grundbestand } from "./challenges/aufbau";
-import { weltQuellen } from "./challenges/quellen";
+import { lektionQuellen, weltQuellen } from "./challenges/quellen";
+import { LEKTIONEN, lektionNr } from "./challenges/lehrgang";
+import { LektionLauf } from "./challenges/lektion";
+import { Wiedergabe } from "./core/wiedergabe";
+import { installLektionsKarte } from "./ui/lektionskarte";
 import { installChallengeKarte } from "./ui/challengekarte";
 import { installGeisterdaumen } from "./ui/geisterdaumen";
 import { installZielmarke } from "./ui/zielmarke";
@@ -103,8 +107,13 @@ async function main(): Promise<void> {
    * faellt sie ohne Menue auf die erste. Eine Challenge ist keine dritte
    * Spielart, sondern eine Wahl im Simulator (Begruendung in core/spielart.ts).
    */
-  const wahl: Spielwahl = BETRIEB ? { art: "sandkasten" } : await waehleSpielart();
+  const wahl: Spielwahl = BETRIEB ? { art: "sandkasten" } : await waehleSpielart(LEKTIONEN);
   const challengeDaten = wahl.art === "challenge" ? challengeNach(wahl.id) : null;
+  // E-196: Lektion des Lehrgangs — wie eine Pruefung auf dem aufgeraeumten Platz
+  const lektionId = wahl.art === "lektion" ? wahl.id : null;
+  const lektionDaten = lektionId ? (LEKTIONEN.find((l) => l.id === lektionId) ?? null) : null;
+  /** E-196: Pruefung oder Lektion — aufgeraeumter Platz, keine Laster, kein Spielstand */
+  const aufgabenPlatz = !!challengeDaten || !!lektionDaten;
   await physikBereit;
   document.getElementById("loading")!.remove();
 
@@ -177,7 +186,7 @@ async function main(): Promise<void> {
    */
   const ausblenden = BETRIEB
     ? NUR_IM_SIMULATOR
-    : challengeDaten
+    : aufgabenPlatz
       ? [...NUR_IM_BETRIEB.filter((id) => id !== "tutorial"), ...NUR_IM_SANDKASTEN]
       : NUR_IM_BETRIEB;
   for (const id of new Set(ausblenden)) {
@@ -207,7 +216,7 @@ async function main(): Promise<void> {
   // Eine Challenge baut ihren eigenen Platz und liest keinen Stand (E-125) —
   // nur die Senderwahl kommt mit, sie gehoert dem Spieler, nicht dem Platz.
   const gespeichert = readSave();
-  const save = challengeDaten ? null : gespeichert;
+  const save = aufgabenPlatz ? null : gespeichert;
   let fence: FenceManager;
   if (save) {
     account.moneyEur = save.moneyEur;
@@ -229,7 +238,7 @@ async function main(): Promise<void> {
       car.body.setRotation({ x: c.rot[0], y: c.rot[1], z: c.rot[2], w: c.rot[3] }, true);
       car.restoreState(c);
     }
-  } else if (challengeDaten) {
+  } else if (aufgabenPlatz) {
     /*
      * DER PLATZ EINER CHALLENGE (E-125): aufgeraeumt — kein Haufen, kein
      * Streuschrott, keine Startautos. Nur, was die Challenge aufbaut.
@@ -460,6 +469,31 @@ async function main(): Promise<void> {
     vehicles.acceptDeliveries = false;
     starteAufgabe(challengeDaten);
   }
+  /*
+   * --- E-196: LEHRGANG (Orchestrator-Verdrahtung) ---
+   * Eine Lektion: Vorfuehrung ueber den Eingabeweg (core/wiedergabe.ts schreibt
+   * nur touch.axes, Tastendruecke und Kamera-Gesten — Regel 2), dann macht der
+   * Spieler es nach (challenges/lektion.ts). Zuhoerer vor dem Start anlegen.
+   */
+  let lektion: LektionLauf | null = null;
+  let wiedergabe: Wiedergabe | null = null;
+  let lektionsKarte: ReturnType<typeof installLektionsKarte> | null = null;
+  let lektionsGeist: ReturnType<typeof installGeisterdaumen> | null = null;
+  if (lektionDaten) {
+    wiedergabe = new Wiedergabe(bus, {
+      achsen: touch.axes,
+      kamera: input,
+      druecke: (code) => input.drueckeVirtuell(code),
+      eingriff: () => touch.daumenAuf || input.aktiv,
+    });
+    const karte = installLektionsKarte({ bus, steuerung: () => touch.config, audio });
+    lektionsKarte = karte;
+    onSprache(() => karte.neuBeschriften());
+    lektionsGeist = installGeisterdaumen({ bus, steuerung: () => touch.config, vorfuehrung: wiedergabe });
+    installZielmarke(scene, bus);
+    vehicles.acceptDeliveries = false;
+    lektion = new LektionLauf(lektionDaten, lektionNr(lektionDaten.id), LEKTIONEN.length, lektionQuellen({ bagger: excavator, kamera: orbit }), bus);
+  }
 
   // --- Pausenmenü ---
   // Tagesablauf: Annahme → Sortieren → Annahme (Briefing Kap. 21)
@@ -495,8 +529,8 @@ async function main(): Promise<void> {
     document.getElementById("tut-pause")!.textContent = tutorial.paused ? "weiter" : "Pause";
     tutEl.classList.add("open");
   };
-  // In einer Challenge gehoert die Karte der Challenge (E-125)
-  if (!challenge) {
+  // In einer Challenge (und Lektion, E-196) gehoert die Karte ihr (E-125)
+  if (!aufgabenPlatz) {
     document.getElementById("tut-skip")!.addEventListener("click", () => {
       tutorial.skip();
       zeigeTutorial();
@@ -574,7 +608,7 @@ async function main(): Promise<void> {
     setPaused(false);
   });
   // In der Challenge fuehrt derselbe Knopf ins Menue — neu geladen wird ohnehin
-  if (challenge) document.getElementById("pause-load")!.textContent = "Zum Hauptmenü";
+  if (aufgabenPlatz) document.getElementById("pause-load")!.textContent = "Zum Hauptmenü";
   document.getElementById("pause-load")!.addEventListener("click", () => location.reload());
   document.getElementById("pause-new")!.addEventListener("click", () => {
     clearSave();
@@ -1008,7 +1042,7 @@ async function main(): Promise<void> {
   bus.on("bagger:hupe", () => audio.playHupe());
   bus.on("bagger:hupe", () => {
     // E-190: Ein Anlieferer, der abgeladen hat und wartet, fährt auf die Hupe zur Waage
-    if (!challenge && vehicles.anliefererWartet) {
+    if (!aufgabenPlatz && vehicles.anliefererWartet) {
       vehicles.zurWaage();
       return;
     }
@@ -1140,6 +1174,7 @@ async function main(): Promise<void> {
    */
   const abrechnung = installAbrechnung({
     bus,
+    lektionen: LEKTIONEN, // E-196: Tafel „Lektion geschafft" mit WEITER zur naechsten
     shift,
     hud,
     audio,
@@ -1363,9 +1398,9 @@ async function main(): Promise<void> {
     vehicles.sandkastenAbholer = true;
     containers.nachtschichtAktiv = false;
     // E-131: Zum Start stehen schon Fuhren an, die erste rollt gleich los
-    if (!challenge) vehicles.stelleAnstehendeAuf(ANSTEH_START_ANZAHL);
+    if (!aufgabenPlatz) vehicles.stelleAnstehendeAuf(ANSTEH_START_ANZAHL);
     // E-192/E-193: Kein Müll-Container zum Start — der Abroller bringt ihn gleich von selbst
-    if (!challenge) {
+    if (!aufgabenPlatz) {
       containers.raeumeMuell();
       vehicles.bringeMuellcontainer();
     }
@@ -1379,7 +1414,7 @@ async function main(): Promise<void> {
    */
   let nachschubNr = 0;
   const holeNachschub = (): void => {
-    if (challenge) return; // keine Fuhre mitten in die Aufgabe (E-125)
+    if (aufgabenPlatz) return; // keine Fuhre mitten in die Aufgabe (E-125) oder Lektion (E-196)
     if (vehicles.activeKind !== null) {
       hud.toast("Noch eine Fuhre auf dem Platz — Nachschub erst, wenn sie weg ist.");
       return;
@@ -1414,6 +1449,7 @@ async function main(): Promise<void> {
   }
 
   function schrittInhalt(): void {
+    wiedergabe?.schritt(FIXED_DT); // E-196: Vorfuehrung in Physikzeit — Achsen je Schritt (qa 21.10.: Bildzeit driftete bis 13°)
     excavator.update(FIXED_DT, input);
     excavator.getSensorPosition(sensorPos);
     grip.update(excavator.closure, excavator.closing, sensorPos, FIXED_DT);
@@ -1575,7 +1611,11 @@ async function main(): Promise<void> {
       requestAnimationFrame(frame);
       return;
     }
-    excavator.touch = touch.active ? touch.axes : null;
+    // E-196: Vorfuehrung schreibt nach touch.update und vor Bagger/Kamera in den Eingabeweg
+    wiedergabe?.takt(frameDt);
+    lektionsKarte?.takt(frameDt);
+    lektionsGeist?.takt();
+    excavator.touch = touch.active || wiedergabe?.laeuft ? touch.axes : null;
     if (touch.consumePress("KeyC")) orbit.touchViewPress = true;
     if (touch.consumePress("KeyX")) excavator.toggleCabLift();
     if (touch.consumePress("KeyO")) excavator.toggleOutriggers();
@@ -1596,7 +1636,7 @@ async function main(): Promise<void> {
     if (!BETRIEB && (input.wasPressed("Digit1") || touch.consumePress("Digit1"))) holeNachschub();
     // Lambert und Ausbau gibt es nur im Betrieb (E-118); die Abholung seit
     // E-120 auch im Sandkasten — dort ohne Fraktionswahl, es gibt kein Geld.
-    if (!challenge && (input.wasPressed("KeyV") || touch.consumePress("KeyV"))) {
+    if (!aufgabenPlatz && (input.wasPressed("KeyV") || touch.consumePress("KeyV"))) {
       const wagen = vehicles.pickupTruck;
       if (wagen?.waitingForLoad || wagen?.setztUm) {
         vehicles.requestPickup(); // „… fährt los." kommt über den Bus (E-177)
@@ -1640,7 +1680,7 @@ async function main(): Promise<void> {
     if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
       hud.toast(radioWeiter(audio));
     }
-    if (!challenge && input.wasPressed("KeyK")) {
+    if (!aufgabenPlatz && input.wasPressed("KeyK")) {
       hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
     }
     if (input.wasPressed("KeyB") || touch.consumePress("KeyB")) {
@@ -1652,7 +1692,7 @@ async function main(): Promise<void> {
     if (input.wasPressed("KeyL")) {
       location.reload(); // Boot lädt den letzten Stand
     }
-    if (!challenge && input.wasPressed("KeyN")) {
+    if (!aufgabenPlatz && input.wasPressed("KeyN")) {
       clearSave();
       location.reload();
     }
@@ -1907,6 +1947,8 @@ async function main(): Promise<void> {
     } else if (challenge) {
       // Challenge (E-125): keine Anlieferer, die Uhr der Aufgabe laeuft
       challenge.takt(frameDt);
+    } else if (lektion) {
+      lektion.takt(frameDt); // E-196: Lektion, Uhr steht in der Pause
     } else {
       rekorde?.takt(frameDt); // E-195: Spielzeit der Sandkasten-Rekorde, steht in der Pause
       /*
@@ -2044,7 +2086,8 @@ async function main(): Promise<void> {
     input.endFrame();
     requestAnimationFrame(frame);
   }
-  if (!BETRIEB && !challenge) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
+  lektion?.start(); // E-196: erst jetzt — alle Zuhoerer (Karte, Geist, Wiedergabe, Tafel) haengen
+  if (!BETRIEB && !aufgabenPlatz) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
   requestAnimationFrame(frame);
 }
 

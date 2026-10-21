@@ -927,6 +927,76 @@
       @keyframes geist-quer { 0%, 100% { transform: translate(-70%,0); } 50% { transform: translate(70%,0); } }
       @keyframes geist-laengs { 0%, 100% { transform: translate(0,-70%); } 50% { transform: translate(0,70%); } }
       @keyframes tut-pressen-puls { 0%, 100% { box-shadow: 0 0 0 0 rgba(240,180,41,0.75); } 50% { box-shadow: 0 0 0 6px rgba(240,180,41,0); } }
+      /* --- Lehrgang (E-196): der Geist folgt der Vorfuehrung ---
+         `.folgt`: keine Schleife, der Daumen steht dort, wo die Spur den Stick
+         gerade hindrueckt (--dx/--dy, −1 … +1, aus ui/geisterdaumen.ts).
+         --weg = halber Ring minus halber Daumen: iPad 69 − 28 = 41 px,
+         Telefon 40 − 16 = 24 px (wie die Pfeil-Bewegung oben). */
+      #geisterdaumen .geist { --weg: 41px; }
+      #geisterdaumen .geist.folgt .daumen {
+        animation: none; transition: transform 0.08s linear;
+        transform: translate(calc(var(--dx, 0) * var(--weg)), calc(var(--dy, 0) * var(--weg)));
+      }
+      /* Kamera-Geste im Mittelstreifen: ein Finger zieht, zwei kneifen, Doppeltipp.
+         Mitte des Streifens (x 50 %), auf halber Hoehe — unter der Karte
+         (iPhone mini quer: Karte bis y 163, Finger 44 px bei y 165..209). */
+      #geisterdaumen .kamgeist { display: none; position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+      body.touch #geisterdaumen .kamgeist.an { display: block; }
+      #geisterdaumen .kamgeist .finger {
+        position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%;
+        background: rgba(240,240,236,0.5); box-shadow: 0 0 0 2px rgba(240,180,41,0.7);
+        animation: 1.2s ease-in-out infinite;
+      }
+      #geisterdaumen .kamgeist .finger + .finger { display: none; }
+      #geisterdaumen .kamgeist[data-geste="auf"] .finger + .finger,
+      #geisterdaumen .kamgeist[data-geste="zu"] .finger + .finger { display: block; }
+      #geisterdaumen .kamgeist[data-geste="rechts"] .finger { animation-name: kam-rechts; }
+      #geisterdaumen .kamgeist[data-geste="links"] .finger { animation-name: kam-links; }
+      #geisterdaumen .kamgeist[data-geste="hoch"] .finger { animation-name: kam-hoch; }
+      #geisterdaumen .kamgeist[data-geste="runter"] .finger { animation-name: kam-runter; }
+      #geisterdaumen .kamgeist[data-geste="auf"] .finger { animation-name: kam-auf-a; }
+      #geisterdaumen .kamgeist[data-geste="auf"] .finger + .finger { animation-name: kam-auf-b; }
+      #geisterdaumen .kamgeist[data-geste="zu"] .finger { animation-name: kam-zu-a; }
+      #geisterdaumen .kamgeist[data-geste="zu"] .finger + .finger { animation-name: kam-zu-b; }
+      #geisterdaumen .kamgeist[data-geste="doppeltipp"] .finger { animation: kam-tipp 0.6s ease-out infinite; }
+      @keyframes kam-rechts { 0% { transform: translate(-40px,0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(40px,0); opacity: 0; } }
+      @keyframes kam-links { 0% { transform: translate(40px,0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(-40px,0); opacity: 0; } }
+      @keyframes kam-hoch { 0% { transform: translate(0,30px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(0,-30px); opacity: 0; } }
+      @keyframes kam-runter { 0% { transform: translate(0,-30px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(0,30px); opacity: 0; } }
+      @keyframes kam-auf-a { 0% { transform: translate(-12px,12px); } 100% { transform: translate(-40px,40px); opacity: 0.2; } }
+      @keyframes kam-auf-b { 0% { transform: translate(12px,-12px); } 100% { transform: translate(40px,-40px); opacity: 0.2; } }
+      @keyframes kam-zu-a { 0% { transform: translate(-40px,40px); } 100% { transform: translate(-12px,12px); opacity: 0.2; } }
+      @keyframes kam-zu-b { 0% { transform: translate(40px,-40px); } 100% { transform: translate(12px,-12px); opacity: 0.2; } }
+      @keyframes kam-tipp { 0%, 50% { transform: scale(1); opacity: 1; } 25%, 75% { transform: scale(0.75); opacity: 0.6; } 100% { opacity: 1; } }
+      /* Knopf-Schild: welche Kranz-Funktion die Vorfuehrung gerade ausloest
+         („STÜTZEN: halten, ziehen", „ANSICHT: 2× tippen"). Ueber dem rechten
+         Geist-Ring, rechtsbuendig mit ihm (iPad: links der Drehtasten ab x 954):
+         iPad Unterkante 118 + 138 + 8 = 264, Telefon quer 84 + 80 + 8 = 172. */
+      #geisterdaumen .tastengeist {
+        display: none; position: absolute; right: calc(var(--sa-r) + 111px); bottom: calc(var(--sa-b) + 264px);
+        padding: 6px 10px; border-radius: 8px; background: rgba(20,23,26,0.88);
+        border: 2px solid rgba(240,180,41,0.85); color: #f0d060; font: 700 14px "Consolas", monospace;
+        white-space: nowrap;
+      }
+      body.touch #geisterdaumen .tastengeist.an { display: block; }
+      /* Pedale und Drehtasten leuchten, solange die Vorfuehrung sie braucht */
+      #touch #pedals.geist-zeigt .pedal, #touch .btn.geist-zeigt {
+        box-shadow: 0 0 0 3px rgba(240,180,41,0.9); border-color: #f0b429;
+      }
+      @media (max-height: 430px) {
+        #geisterdaumen .geist { --weg: 24px; }
+        #geisterdaumen .tastengeist { right: calc(var(--sa-r) + 20px); bottom: calc(var(--sa-b) + 172px); }
+      }
+      @media (max-width: 500px) and (min-height: 431px) {
+        #geisterdaumen .geist { --weg: 24px; }
+        #geisterdaumen .tastengeist { right: calc(var(--sa-r) + 12px); bottom: calc(var(--sa-b) + 354px); }
+      }
+      /* Lektionskarte (E-196): dieselbe Karte, eine Hinweiszeile mehr. Am
+         Rechner ist sie waehrend der Vorfuehrung anklickbar (Klick = weiter);
+         auf Touch bleibt sie durchlaessig — dort bricht jeder Daumen ab,
+         der auf einem Stick oder im Mittelstreifen aufsetzt. */
+      #tutorial.aufgabe .hinweis { color: #9aa2a8; }
+      body:not(.touch) #tutorial.lektion.zeigt .karte { pointer-events: auto; cursor: pointer; }
       /* --- Hauptmenue (E-118) ---
          Steht VOR dem Aufbau der Welt, darum deckend statt durchscheinend:
          Dahinter ist noch nichts. Knoepfe wie im Pausenfeld, die Erklaerzeile
@@ -962,6 +1032,61 @@
       }
       #hauptmenue button:hover:not(:disabled) small { color: #3a3020; }
       #hauptmenue button:disabled { opacity: 0.45; cursor: default; }
+      /* --- Zweistufig (E-196) ---
+         Stufe 1 #hm-haupt: LEHRGANG, PRUEFUNGEN, (SCHICHT), SANDKASTEN,
+         BESTENLISTE. Stufe 2 #hm-liste: Zurueck + Lektionen (Raster 3 breit)
+         bzw. Pruefungen (2 breit). Das Feld ist 640 breit statt 420, damit
+         die Raster Platz haben.
+         iPad quer (1024 x 768): Stufe 1 einspaltig, fuenf Knoepfe mit
+         Erklaerzeile; Stufe 2 Lektionen 4 Reihen x 52 = 232 px.
+         iPhone mini quer (812 x 375, Rand l/r 50, unten 21 -> 712 x 354)
+         — weiter unten bei max-height: 430px, gerechnet in
+         test/hauptmenue-platz.test.ts. Kein Scrollen. */
+      #hauptmenue .panel { width: 100%; max-width: 640px; }
+      #hm-haupt, #hm-eintraege { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
+      #hm-haupt button, #hm-eintraege button { margin: 0; }
+      #hm-haupt[hidden], #hm-liste[hidden], #hauptmenue button[hidden] { display: none; }
+      #hm-liste .kopf { display: flex; align-items: center; gap: 12px; }
+      #hm-liste h2 { margin: 0; font-size: 18px; letter-spacing: 3px; color: #f0b429; }
+      #hauptmenue #hm-zurueck {
+        width: auto; min-height: 44px; padding: 8px 14px; font-size: 15px; letter-spacing: 0;
+      }
+      /* minmax(0, 1fr): sonst macht eine einzeilige (nowrap) Erklaerzeile die Spalte breiter als das Feld */
+      #hm-eintraege.lektionen { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      #hm-eintraege.pruefungen { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      #hm-haupt button, #hm-eintraege button { min-width: 0; }
+      #hm-eintraege button { text-align: left; }
+      #hauptmenue #hm-eintraege.lektionen button {
+        min-height: 44px; padding: 12px 12px; font-size: 15px; line-height: 1.2; letter-spacing: 0;
+      }
+      #hauptmenue #hm-eintraege.pruefungen button { padding: 10px 12px; font-size: 15px; letter-spacing: 0; }
+      /* iPhone mini quer: Erklaerzeile einzeilig, Ueberschrift nur in Stufe 1.
+         Stufe 1: 2 Spalten, 3 Reihen (BESTENLISTE bzw. der fuenfte Knopf ueber
+         beide). Knopf 10 + 21 + 5 + 17 + 10 + 4 Rahmen = 67, BESTENLISTE ohne
+         Zeile 45: 67 + 67 + 45 + 2 x 8 = 195; Feld 2 x 10 + 4 + Titel 22 + 4
+         + Zeile 16 + 6 + 10 + 195 = 277 von 354.
+         Stufe 2 (Titel aus): Lektionen 4 Reihen x 2 Zeilen: 8 + 34 + 8 + 4 = 54,
+         4 x 54 + 3 x 8 = 240; Pruefungen 3 Reihen: 8 + 17 + 4 + 34 + 8 + 4 = 75,
+         3 x 75 + 2 x 8 = 241; dazu Feld 24 + Kopf 44 + 10 = 78 -> 318 / 319. */
+      @media (max-height: 430px) {
+        #hauptmenue .panel { padding: 10px 14px; max-height: 100%; }
+        #hauptmenue h1 { font-size: 18px; letter-spacing: 3px; margin: 0 0 4px; }
+        #hauptmenue .sub { margin: 0 0 6px; }
+        #hauptmenue.liste h1, #hauptmenue.liste .sub { display: none; }
+        #hm-haupt { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        #hm-haupt > button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+        #hauptmenue #hm-haupt button { padding: 10px 12px; }
+        #hauptmenue #hm-haupt button small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+        #hauptmenue #hm-eintraege.lektionen button { padding: 8px 10px; font-size: 14px; }
+        #hauptmenue #hm-eintraege.pruefungen button { padding: 8px 10px; font-size: 14px; line-height: 1.2; }
+        #hauptmenue #hm-eintraege.pruefungen small { margin-top: 4px; line-height: 1.3; }
+        #hm-eintraege .beschr { display: none; }
+      }
+      /* Telefon hoch: schmal — Lektionen 2 breit, Pruefungen untereinander; Hoehe reicht */
+      @media (max-width: 500px) and (min-height: 431px) {
+        #hm-eintraege.lektionen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #hm-eintraege.pruefungen { grid-template-columns: minmax(0, 1fr); }
+      }
       /* --- Bestenliste (E-195) ---
          Deckt alles ab (ueber Pausen- und Hauptmenue), Zurueck oben links.
          Kein Scrollen: Uebersicht = Karten je Aufgabe + Sandkasten-Rekorde,
@@ -1463,18 +1588,29 @@
         <button id="abr-menue" hidden>ZUM MENÜ</button>
       </div>
     </div>
-    <!-- Hauptmenue (E-118). Steht vor dem Aufbau der Welt; main.ts wartet auf
-         die Wahl. Die Challenges haengt ui/hauptmenue.ts als Knoepfe in
-         #hm-challenges, je mit der besten Sternzahl (E-125). -->
+    <!-- Hauptmenue (E-118, zweistufig seit E-196). Steht vor dem Aufbau der
+         Welt; main.ts wartet auf die Wahl. Alle Texte setzt ui/hauptmenue.ts
+         in der gewaehlten Sprache (darum translate="no").
+         Stufe 1 #hm-haupt: die Hauptknoepfe in DIESER Reihenfolge. Ein neuer
+         Hauptknopf (SCHICHT) kommt als <button id="hm-schicht"></button>
+         zwischen PRUEFUNGEN und SANDKASTEN — das Raster nimmt vier oder fuenf.
+         Stufe 2 #hm-liste: Lektionen bzw. Pruefungen, mit Zurueck. -->
     <div id="hauptmenue">
       <div class="panel">
         <!-- Firmenname setzt ui/hauptmenue.ts aus world/werbung.FIRMA (E-131) -->
         <h1></h1>
         <p class="sub">Bagger-Simulator</p>
-        <button id="hm-sandkasten">SANDKASTEN<small>Der Platz voller Schrott und Wracks. Ohne Ziel, ohne Uhr — zum Üben und Kaputtmachen.</small></button>
-        <!-- E-195: beschriftet von ui/hauptmenue.ts, oeffnet ui/bestenliste.ts -->
-        <button id="hm-bestenliste" translate="no">BESTENLISTE</button>
-        <div id="hm-challenges"></div>
+        <div id="hm-haupt" translate="no">
+          <button id="hm-lehrgang"></button>
+          <button id="hm-pruefungen"></button>
+          <button id="hm-sandkasten"></button>
+          <!-- E-195: oeffnet ui/bestenliste.ts -->
+          <button id="hm-bestenliste"></button>
+        </div>
+        <div id="hm-liste" translate="no" hidden>
+          <div class="kopf"><button id="hm-zurueck"></button><h2 id="hm-listentitel"></h2></div>
+          <div id="hm-eintraege"></div>
+        </div>
       </div>
     </div>
     <!-- E-195: Bestenliste — ganze Flaeche, alle Texte setzt ui/bestenliste.ts -->

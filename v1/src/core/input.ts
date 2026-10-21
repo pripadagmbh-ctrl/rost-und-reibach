@@ -80,6 +80,21 @@ export class Input {
     return this.mouseDown.has(button);
   }
 
+  /**
+   * E-196: Ein Tastendruck ohne Taste — die Vorfuehrung im Lehrgang
+   * (`core/wiedergabe.ts`) drueckt so wie der Spieler: `wasPressed(code)` ist
+   * genau in diesem Bild wahr, `endFrame` raeumt ihn weg. Nichts haengt am
+   * Spieler; ohne Lehrgang ruft das niemand.
+   */
+  drueckeVirtuell(code: string): void {
+    this.pressedThisFrame.add(code);
+  }
+
+  /** E-196: Haelt der Spieler gerade eine Taste oder Maustaste? (Abbruch der Vorfuehrung) */
+  get aktiv(): boolean {
+    return this.down.size > 0 || this.mouseDown.size > 0;
+  }
+
   /** -1..+1 aus zwei Tasten */
   axis(negCode: string, posCode: string): number {
     return (this.isDown(posCode) ? 1 : 0) - (this.isDown(negCode) ? 1 : 0);
