@@ -554,6 +554,15 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Ansage 21.10.2026** — Patrick, wörtlich: „Bagger bekommt auch Hupe für
+      Abfahrt, Schere wird Presse heißen. Maschendraht verschwindet."
+
+      | # | Punkt |
+      |---|---|
+      | 35a | Bagger bekommt eine Hupe — Signal zur Abfahrt für den wartenden Laster |
+      | 35b | „Schere" heißt überall „Presse" |
+      | 35c | Maschendraht(zaun) verschwindet |
+
 - [ ] **Ansage 21.10.2026, Müll** — Patrick, wörtlich: „Der Müllcontainer soll ein
       abholcontainer werden der raufgezogen wird."
       Antworten: „Voll weg, leer zurück" (erst leeren abstellen, dann vollen
