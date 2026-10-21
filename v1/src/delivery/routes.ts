@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { WEIGH_X } from "../world/yard";
 import { STATIC_OBSTACLES } from "../world/obstacles";
 import { START_LKW } from "../world/startplatz";
-import { fahrzeugUmriss, type Rechteck } from "./umriss";
+import { fahrzeugUmriss, umrisseEntlang, type Rechteck } from "./umriss";
 import { MUELL_WANNE } from "./hakenlift";
 import {
   bahnLagen,
@@ -435,9 +435,13 @@ export function zumTor(
    * Was außerdem umfahren wird (E-202): In der Schicht fährt der Anlieferer
    * von der Annahme am stehenden Verlader vorbei. Ohne Angabe bitgleich wie vorher.
    */
-  extra: readonly Rechteck[] = []
+  extra: readonly Rechteck[] = [],
+  /** Sicherheitsrand der Prüfung (m); ohne Angabe der des Rangierplaners. */
+  rand = RANGIER.rand
 ): Array<[number, number]> {
-  const key = JSON.stringify(extra.length ? ["tor", vorher, ohneSlot, vorn, extra] : ["tor", vorher, ohneSlot, vorn]);
+  const key = JSON.stringify(
+    extra.length || rand !== RANGIER.rand ? ["tor", vorher, ohneSlot, vorn, extra, rand] : ["tor", vorher, ohneSlot, vorn]
+  );
   const schon = torSpeicher.get(key);
   if (schon) return schon;
   const r = RANGIER.radiusVor;
@@ -450,7 +454,7 @@ export function zumTor(
   const frei = (von: Pose, nach: Pose): Pose[] | null => {
     for (const b of dubins(von, nach, r)) {
       const lagen = bahnLagen(von, b.glieder, r, 1);
-      if (bahnTiefe(lagen, hind) <= 0) return lagen;
+      if (bahnTiefe(lagen, hind, 0, rand) <= 0) return lagen;
     }
     return null;
   };
@@ -897,7 +901,48 @@ export function rangierVerladerVorn(): Rangierzug {
   return rangierzug(VORN_VORLAUF, [VERLADER_VORN.x, VERLADER_VORN.z], VERLADER_VORN.gier, null, BED_LEN.abholer, true);
 }
 
-/** Ausfahrt: vorwärts nach Westen, dann wie alle zum Tor. */
+/**
+ * Die Standfläche eines Wagens an seinem Halt (Ende des Rückwegs),
+ * achsparallel umschlossen, mit `zuschlag` rundum (m).
+ */
+export function standflaeche(p: AbholPlatz, zuschlag = 0, bedLen = BED_LEN.pritsche!): Rechteck {
+  const um = umrisseEntlang(p.rueckweg, bedLen, true);
+  const b = um[um.length - 1]!;
+  const c = Math.abs(Math.cos(b.rot));
+  const s = Math.abs(Math.sin(b.rot));
+  return { x: b.x, z: b.z, hw: b.hw * c + b.hd * s + zuschlag, hd: b.hw * s + b.hd * c + zuschlag };
+}
+
+/**
+ * WO EINE SORTENREINE PRITSCHE AM LAGER STEHT (E-202, Befund S5-1): ihre
+ * Standfläche am Verladeplatz jedes Lagersilos. Die Plätze liegen an der Gasse
+ * x −18 — genau dort, wo der Verlader vorn zum Tor fährt.
+ */
+export function lagerStandflaechen(zuschlag = 0): Rechteck[] {
+  return CONFIGS.filter((c) => c.lager === true).map((c) => standflaeche(abholPlatzFuer(c.fractionId), zuschlag));
+}
+
+/**
+ * Wie weit die Ausfahrt des Verladers vorn an einer Pritsche am Lager vorbeigeht
+ * (m). SW: 0,4 m wie `SCHLEPP_ZUSCHLAG_M` (`schichtfuhrpark.ts`) — so weit
+ * schwenkt der Bahnfolger im Bogen höchstens nach außen (gemessen 0,21 m).
+ */
+const VORN_AUS_ZUSCHLAG = 0.4;
+/**
+ * Sicherheitsrand dieser Ausfahrt gegen Bauwerke (m). SW: 0,1 m. Mit dem Rand
+ * des Rangierplaners (0,3 m) ist auch der heutige Weg nicht frei — er war der
+ * „kürzeste" Ersatzweg von `zumTor` und streift die Bauwerke trotzdem nicht
+ * (Wächter in `test/schichtplatz.test.ts`, Toleranz 1 cm).
+ */
+const VORN_AUS_RAND = 0.1;
+
+/**
+ * Ausfahrt: vorwärts nach Westen, dann wie alle zum Tor — an jeder Pritsche
+ * vorbei, die am Lager steht (Befund S5-1, Freitag Saat 3: Der direkte Weg
+ * streifte die Pritsche am KUPFER-LAGER um 0,72 m, der volle Verlader stand
+ * dahinter, bis sie leer war, und dann warteten beide aufs Tor). Gemessen
+ * 21.10.2026: 1,6 m länger, über den alten Wegpunkt (−12 | 4).
+ */
 export function verladerVornAusfahrt(): Array<[number, number]> {
   const { x, z, gier } = VERLADER_VORN;
   return zumTor(
@@ -906,7 +951,9 @@ export function verladerVornAusfahrt(): Array<[number, number]> {
       [x + Math.sin(gier), z + Math.cos(gier)],
     ],
     null,
-    true
+    true,
+    lagerStandflaechen(VORN_AUS_ZUSCHLAG),
+    VORN_AUS_RAND
   );
 }
 

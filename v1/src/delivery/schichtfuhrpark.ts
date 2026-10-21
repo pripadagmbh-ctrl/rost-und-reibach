@@ -20,8 +20,11 @@ import {
   BED_LEN,
   VERLADER_VORN,
   zumTor,
+  standflaeche,
+  rangierAbsetzplatz,
+  type AbholPlatz,
 } from "./routes";
-import { fahrzeugUmriss } from "./umriss";
+import { fahrzeugUmriss, umrisseEntlang, boxUeberlappung } from "./umriss";
 import { planeRangierzug, bahnTiefe, type Rangierzug } from "./rangierplan";
 import type { Rechteck } from "./umriss";
 import { beimUmschalten } from "../world/schichtplatz";
@@ -118,6 +121,38 @@ export function verladerVomWarteplatz(): Rangierzug {
     BED_LEN.abholer
   ));
 }
+
+/**
+ * SPERRT EINE PRITSCHE AM LAGER EINEN WEG DER SCHICHT? (Befund S5-1)
+ *
+ * Die Verladeplätze der Lager liegen an der Gasse x −18. Zwei Rangierzüge
+ * schwenken bis dorthin aus: der des Nachrückers nach vorn (Kabine 2,3 m in
+ * einer Pritsche am ALU-LAGER) und der des Absetzkippers an die Annahme
+ * (0,4 m, dasselbe Lager) — gemessen 21.10.2026 gegen die Standfläche am Halt.
+ * Einen freien Zug darum herum findet der Rangierplaner nicht. Also wartet,
+ * wer zuletzt käme: der Wagen vor seiner Fahrt (Nordmauer bzw. Tor), solange
+ * dort eine Pritsche steht oder hinwill, und die Pritsche am Tor, solange der
+ * Nachrücker nach vorn unterwegs ist (`VehicleManager.wegSperrtSilo`). Je Lager
+ * und Weg einmal gerechnet.
+ */
+export function lagerSperrt(platz: AbholPlatz, weg: "nachVorn" | "absetzer"): boolean {
+  const key = `${weg}:${platz.halt.join("|")}`;
+  let sperrt = lagerSperren.get(key);
+  if (sperrt === undefined) {
+    const steht = { ...standflaeche(platz, SCHLEPP_ZUSCHLAG_M), rot: 0 };
+    const zug = weg === "nachVorn" ? verladerVomWarteplatz() : rangierAbsetzplatz();
+    const bed = weg === "nachVorn" ? BED_LEN.abholer! : BED_LEN.absetzer!;
+    const lagen = [...umrisseEntlang(zug.anfahrt, bed, false), ...umrisseEntlang(zug.rueckweg, bed, true)];
+    sperrt = lagen.some((u) => boxUeberlappung(u, steht) > 0.01);
+    lagerSperren.set(key, sperrt);
+  }
+  return sperrt;
+}
+const lagerSperren = new Map<string, boolean>();
+beimUmschalten(() => lagerSperren.clear());
+
+/** Phasen, in denen ein Wagen noch zu seinem Halt fährt (Tor, Waage, Rangierzug). */
+export const ANFAHRT_PHASEN: ReadonlySet<string> = new Set(["settleCargo", "in", "weighIn", "approach", "shiftPause", "reverseIn"]);
 
 /**
  * Der stehende Verlader als achsparalleles Rechteck (seine gedrehte

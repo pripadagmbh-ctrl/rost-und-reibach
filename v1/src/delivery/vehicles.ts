@@ -381,6 +381,8 @@ import {
   verladerVomWarteplatz,
   kassenTeilAus,
   annahmeAusfahrt,
+  lagerSperrt,
+  ANFAHRT_PHASEN,
 } from "./schichtfuhrpark";
 import { rollSchichtKunde } from "./customers";
 import type { Fahrt } from "../economy/schichtplan";
@@ -4601,6 +4603,23 @@ export function bueroFunk(v: DeliveryVehicle): string {
     : `Büro an Bagger: ${v.fahrzeugName} mit ${ladungImFunk(v)} kommt an den Abladeplatz.`;
 }
 
+/**
+ * WARTEN IM KREIS (E-193, erweitert mit Befund S5-1): Wartet `o` — direkt
+ * oder über eine Kette — auf `v`? Dann die Kette von `o` bis vor `v`, sonst
+ * null. E-193 kannte nur das Paar (A wartet auf B, B auf A). Gemessen in der
+ * Schicht, Freitag Saat 3: ein Kreis aus drei — der alte Verlader wartete auf
+ * die Pritsche am Lager, die auf den Nachrücker, der auf den alten Verlader.
+ */
+export function warteKreis<T>(wartetAuf: ReadonlyMap<T, T>, v: T, o: T): T[] | null {
+  const kette: T[] = [];
+  for (let w: T | undefined = o; w !== undefined; w = wartetAuf.get(w)) {
+    if (w === v) return kette;
+    if (kette.includes(w)) return null; // ein Kreis, aber ohne v
+    kette.push(w);
+  }
+  return null;
+}
+
 /** Eine Fuhre aus dem Schicht-Fahrplan, mit ihrer Standzeit (E-202). */
 export interface SchichtFuhre extends Fahrt {
   /** Sekunden, die sie wartend oder am Halt gestanden hat (Fahren zählt nicht). */
@@ -4674,12 +4693,27 @@ export class VehicleManager {
       let tj = 0;
       for (const a of jetzt) for (const b of andere) tj = Math.max(tj, boxUeberlappung(a, b));
       if (tv <= tj + 0.01) continue;
-      if (this.wartetAuf.get(o) === v && this.vorfahrt(v) > this.vorfahrt(o)) continue;
+      // Warten sie im Kreis aufeinander, fährt der mit der meisten Vorfahrt
+      const kreis = warteKreis(this.wartetAuf, v, o);
+      if (kreis && kreis.every((k) => this.vorDem(v, k))) continue;
       this.wartetAuf.set(v, o);
       return true;
     }
     this.wartetAuf.delete(v);
     return false;
+  }
+
+  /**
+   * Hat `v` Vorfahrt vor `k`? Gleichstand (zwei, die beide hinausfahren — der
+   * Kreis aus S5-1) entscheidet die Reihenfolge auf dem Hof, sonst warteten
+   * beide für immer.
+   */
+  private vorDem(v: DeliveryVehicle, k: DeliveryVehicle): boolean {
+    const a = this.vorfahrt(v);
+    const b = this.vorfahrt(k);
+    if (a !== b) return a > b;
+    const alle = this.alle();
+    return alle.indexOf(v) < alle.indexOf(k);
   }
 
   /** Vorfahrt beim gegenseitigen Warten: Hinausfahrende zuerst, dann der Aktive, dann nach Reihenfolge. */
@@ -5750,7 +5784,20 @@ export class VehicleManager {
   private torFuer(v: DeliveryVehicle): boolean {
     this.pruefeTor();
     if (this.torHalter === v) return true;
-    if (this.torHalter || this.torBelegt(v)) return false;
+    /*
+     * WER DEN ABSCHNITT HÄLT, ABER AUF `v` WARTET, KOMMT OHNEHIN NICHT WEITER
+     * (Befund S5-1, Freitag Saat 3): Der volle Verlader nahm das Tor und stand
+     * dann hinter der Pritsche am KUPFER-LAGER; die wollte danach hinaus und
+     * wartete aufs Tor — beide bis Feierabend. Dann fährt `v` zuerst, solange
+     * der Halter den Torabschnitt noch nicht erreicht hat (wie E-193: wer den
+     * Hof verlässt und fahren kann, fährt).
+     */
+    const h = this.torHalter;
+    if (h && this.wartetAuf.get(h) === v && !this.torBelegt(v)) {
+      this.torHalter = v;
+      return true;
+    }
+    if (h || this.torBelegt(v)) return false;
     this.torHalter = v;
     return true;
   }
@@ -5800,6 +5847,28 @@ export class VehicleManager {
     const a = this.alterVerlader;
     if (!a || a.done || !this.raus.includes(a)) return true;
     return Math.hypot(a.group.position.x - VERLADER_VORN.x, a.group.position.z - VERLADER_VORN.z) >= NACHRUECK_ABSTAND_M;
+  }
+
+  /**
+   * Steht (oder kommt) die Silo-Pritsche an einem Lager, durch das dieser Weg
+   * führt (`lagerSperrt`, S5-1)? Dann wartet der Wagen vor seiner Fahrt, bis
+   * sie wieder hinausfährt.
+   */
+  private siloSperrt(weg: "nachVorn" | "absetzer"): boolean {
+    const s = this.siloWagen;
+    return !!s?.festerPlatz && s.phaseName !== "out" && lagerSperrt(s.festerPlatz, weg);
+  }
+
+  /**
+   * Und umgekehrt: Fährt der Nachrücker gerade nach vorn, kommt keine Pritsche
+   * an ein solches Lager — er kommt von der Nordmauer, nicht durchs Tor, beide
+   * wären zugleich unterwegs. Der Absetzkipper braucht das nicht: Er ist durchs
+   * Tor vor ihr und längst aus der Gasse, wenn sie dort steht (gemessen,
+   * Freitag Saat 5: 10 s vor ihr).
+   */
+  private wegSperrtSilo(f: SchichtFuhre): boolean {
+    const n = this.verlader;
+    return !!n && ANFAHRT_PHASEN.has(n.phaseName) && lagerSperrt(abholPlatzFuer(f.sorte ?? "copper"), "nachVorn");
   }
 
   /* ---------------------------------------------------------- Einfahren --- */
@@ -5916,7 +5985,7 @@ export class VehicleManager {
 
     // Der Nachrücker rückt vor, sobald vorn frei ist (Box voll → er holt die Box)
     const n = this.nachruecker;
-    if (!this.verlader && n?.wartetAufRuf && this.vornFrei()) {
+    if (!this.verlader && n?.wartetAufRuf && this.vornFrei() && !this.siloSperrt("nachVorn")) {
       /*
        * Für welche Sorte er kommt, steht erst jetzt fest — nicht beim Losschicken
        * (gemessen, Mittwoch: Ein zweiter BUNT-Abholer kam für 0,35 t, weil der
@@ -5936,7 +6005,7 @@ export class VehicleManager {
     // Durchs Tor: erst die Mulde holen, dann der Nachrücker, dann wer am längsten wartet
     if (!this.torFrei()) return;
     if (this.mulde && !this.active) {
-      if (this.muldeAbholbereit()) {
+      if (this.muldeAbholbereit() && !this.siloSperrt("absetzer")) {
         this.holeMulde();
         const f = this.muldeFuhre;
         if (f) f.amHalt = false; // die Fahrt herein zählt nicht
@@ -5949,8 +6018,13 @@ export class VehicleManager {
       this.schichtNachrueckerRufen();
       return;
     }
-    const misch = !this.active && !this.mulde && this.acceptDeliveries ? this.mischWarten[0] : undefined;
-    const silo = !this.siloWagen ? this.siloWarten[0] : undefined;
+    const erste = this.mischWarten[0];
+    const misch =
+      !this.active && !this.mulde && this.acceptDeliveries && !(erste?.fahrzeug === "absetzer" && this.siloSperrt("absetzer"))
+        ? erste
+        : undefined;
+    const naechste = this.siloWarten[0];
+    const silo = !this.siloWagen && naechste && !this.wegSperrtSilo(naechste) ? naechste : undefined;
     if (silo && (!misch || silo.tS <= misch.tS)) {
       this.schichtSiloAnliefern(this.siloWarten.shift()!);
     } else if (misch) {

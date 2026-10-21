@@ -35,7 +35,9 @@ import {
   rangierVerladerVorn,
   routeOut,
   verladerVornAusfahrt,
+  standflaeche,
 } from "../src/delivery/routes";
+import { lagerSperrt } from "../src/delivery/schichtfuhrpark";
 import {
   boxUeberlappung,
   fahrzeugUmriss,
@@ -195,6 +197,23 @@ describe("Schicht-Platz: Verlader vorn", () => {
       expect(p.stand).toEqual({ x: S.x, z: S.z });
     }
     expect(abholPlaetzeEinmal().filter((p) => p.name === "Abladeplatz beim Bagger")).toEqual([]);
+  });
+
+  it("S5-1: seine Ausfahrt geht an jeder Pritsche am Lager vorbei (vorher 0,72 m in der am KUPFER-LAGER)", () => {
+    aktiviereSchichtPlatz();
+    const um = umrisseEntlang(verladerVornAusfahrt(), ABHOLER, false);
+    for (const c of CONFIGS.filter((k) => k.lager === true)) {
+      const steht = { ...standflaeche(abholPlatzFuer(c.fractionId), 0.2), rot: 0 };
+      expect(Math.max(...um.map((u) => boxUeberlappung(u, steht))), c.label).toBeLessThanOrEqual(0.01);
+    }
+  });
+
+  it("S5-1: nur eine Pritsche am ALU-LAGER sperrt den Weg nach vorn und den Absetzkipper (dann wartet, wer zuletzt käme)", () => {
+    aktiviereSchichtPlatz();
+    const sperrt = CONFIGS.filter((k) => k.lager === true)
+      .filter((c) => lagerSperrt(abholPlatzFuer(c.fractionId), "nachVorn") || lagerSperrt(abholPlatzFuer(c.fractionId), "absetzer"))
+      .map((c) => c.label);
+    expect(sperrt).toEqual(["ALU-LAGER"]);
   });
 });
 

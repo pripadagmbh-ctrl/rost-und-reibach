@@ -239,6 +239,8 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - Misch auf den Verlader bis voll: fährt er los, steht der nächste nach rund 25 s vor dir, und kommt der Kipper sauber an ihm vorbei zum Tor?
 - STAHL-Halde voll: kommt als nächster Verlader einer „für Stahlschrott"? Leerer Verlader auf die Hupe: bleibt er stehen?
 - Mittwoch: Pritsche am Lager gemeldet — hinfahren, ins Silo laden, fährt sie leer weg? Ladekran von dir weg?
+- Nachtrag S5-1, Freitag: Pritsche am KUPFER-LAGER, Verlader voll — fährt er nördlich an ihr vorbei zum Tor, ohne anzuhalten?
+- Nachtrag S5-1: Pritsche am ALU-LAGER, Verlader fährt ab — bleibt der Nachrücker an der Nordmauer, bis sie leer ist, und kommt dann sofort? Wirkt das Warten verständlich?
 
 **E-201 — Schicht-Platz „Kreis in der Ecke"** (iPad; erst nach der Verdrahtung in `main.ts`)
 - Schicht starten: Platz leer — kein Haufen, keine Autos, kein blauer Müll-Container, keine wartenden Laster?

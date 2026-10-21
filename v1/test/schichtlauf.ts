@@ -438,6 +438,8 @@ export interface LeistungsBefund {
   griffe: number;
   /** Fuhren, die auf den Hof gekommen sind (Anlieferer + Silo-Pritschen). */
   fuhren: number;
+  /** Lücke Abfahrt des Verladers → der nächste steht am Halt bereit (s), wie `tools/schicht-lauf.ts`. */
+  luecken: number[];
 }
 
 /**
@@ -460,8 +462,10 @@ export function leistungsLauf(o: LeistungsOptionen): LeistungsBefund {
     koerperMax: 0, dynMax: 0, wachMax: 0, koerperMaxT: 0, koerperStart: p.phys.counts().bodies,
     physMittel: 0, physP95: 0, taktMittel: 0, taktP95: 0, laengsterStand: 0, wer: "",
     feierabend: false, abfahrtenVorFeierabend: 0, abfahrten: 0, wachPlatz: 0, wachLaster: 0, wachWo: [],
-    griffe: 0, fuhren: 0,
+    griffe: 0, fuhren: 0, luecken: [],
   };
+  let abfahrtenVorher = 0;
+  let abfahrtAb: number | null = null;
   type F = (typeof p.vehicles.fahrzeuge)[number];
   const stand = new Map<F, { x: number; z: number; s: number; ph: string }>();
   const gesehen = new Set<F>();
@@ -476,6 +480,14 @@ export function leistungsLauf(o: LeistungsOptionen): LeistungsBefund {
     if (i > 60) {
       phys.push(p.letzteMs);
       takt.push(dauer);
+    }
+    if (p.vehicles.verladerAbfahrten > abfahrtenVorher) {
+      abfahrtenVorher = p.vehicles.verladerAbfahrten;
+      abfahrtAb = p.schichtS;
+    }
+    if (abfahrtAb !== null && p.vehicles.schichtVerlader?.waitingForLoad) {
+      b.luecken.push(p.schichtS - abfahrtAb);
+      abfahrtAb = null;
     }
     if (!b.feierabend && p.betrieb.vorbei) {
       b.feierabend = true;
