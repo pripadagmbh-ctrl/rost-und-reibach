@@ -568,6 +568,10 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 39d | Prüfungen direkt anschließend |
       | 39e | Lehrgang überspringbar |
 
+      Antwort: **„Alles in einem Durchgang"** — ein einziger Lehrgang mit allen
+      Funktionen (Grundsteuerung und Stützen, Presse, Magnet, Zerlegen, Abholer …),
+      danach die Prüfungen.
+
 - [ ] **Vorschläge 21.10.2026: Intro und Spielprinzip** — Patrick (Sprachnachricht,
       sinngemäß wörtlich): ausführliches Intro zu allen Funktionen (Perspektivwechsel,
       Stützen, Pressen und was sonst verfügbar ist) mit Erklärung, gern mit
