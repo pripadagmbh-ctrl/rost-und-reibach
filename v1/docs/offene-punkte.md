@@ -563,6 +563,9 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       | 35b | „Schere" heißt überall „Presse" |
       | 35c | Maschendraht(zaun) verschwindet |
 
+      Antworten: gemeint ist der **Maschendraht-Besen** (grüne Rolle, 15.09.) samt
+      Maschendraht-Ballen; die Zaunfelder bleiben. Hupe: **Hupen = Laster darf abfahren**.
+
 - [ ] **Ansage 21.10.2026, Müll** — Patrick, wörtlich: „Der Müllcontainer soll ein
       abholcontainer werden der raufgezogen wird."
       Antworten: „Voll weg, leer zurück" (erst leeren abstellen, dann vollen
