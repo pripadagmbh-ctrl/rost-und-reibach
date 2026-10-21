@@ -3,6 +3,7 @@ import { WEIGH_X } from "../world/yard";
 import { STATIC_OBSTACLES } from "../world/obstacles";
 import { START_LKW } from "../world/startplatz";
 import { fahrzeugUmriss, type Rechteck } from "./umriss";
+import { MUELL_WANNE } from "./hakenlift";
 import {
   bahnLagen,
   bahnTiefe,
@@ -21,6 +22,7 @@ import {
   lagerMuldeFuer,
   type ContainerConfig,
 } from "../world/containers";
+import { beimUmschalten, istSchichtPlatz } from "../world/schichtplatz";
 
 /**
  * Halteplatz auf der Brueckenwaage.
@@ -321,19 +323,26 @@ export function fahrHindernisse(): Array<Rechteck & { label: string }> {
   /*
    * Der Müllplatz vor dem Bagger (E-192, `MUELL_PLAETZE`): keine Fahrt darf
    * durch ihn geplant sein — auch wenn dort gerade kein Container steht.
+   *
+   * SCHICHT (E-201): Dort steht kein Container, sondern der Verlader. Der Platz
+   * bleibt trotzdem für alle anderen Fahrten gesperrt — so bleiben ihre
+   * Strecken bitgleich mit dem Sandkasten, und genau die streifen den Verlader
+   * nachweislich nicht (`test/schichtplatz.test.ts`). Gemessen ohne die
+   * Sperre: drei Warteplatz-Anfahrten streiften ihn (0,5 … 0,9 m); mit dem
+   * Verlader selbst als Hindernis fuhr die Annahme 66 m statt 16 m vorwärts.
+   * Nur der Verlader plant ohne sie (`verladerHindernisse`).
+   * Maße aus `MUELL_WANNE` (dieselbe Quelle wie `CONFIGS` „r_rubble"), weil
+   * der Schicht-Platz den Container aus CONFIGS nimmt.
    */
-  const muell = CONFIGS.find((c) => c.id === "r_rubble");
-  if (muell) {
-    MUELL_PLAETZE.forEach((p, i) =>
-      out.push({
-        x: p.x,
-        z: p.z,
-        hw: muell.size[0] / 2,
-        hd: muell.size[1] / 2,
-        label: i === 0 ? "MUELL Startplatz" : `MUELL Stellplatz ${i + 1}`,
-      })
-    );
-  }
+  MUELL_PLAETZE.forEach((p, i) =>
+    out.push({
+      x: p.x,
+      z: p.z,
+      hw: MUELL_WANNE.breite / 2,
+      hd: MUELL_WANNE.laenge / 2,
+      label: i === 0 ? "MUELL Startplatz" : `MUELL Stellplatz ${i + 1}`,
+    })
+  );
   // Wrack 6,00 x 2,50 m, laengs (`startplatz.ts`)
   out.push({ x: START_LKW.x, z: START_LKW.z, hw: 1.25, hd: 3.0, label: "LKW-Wrack Startplatz" });
   out.push({ x: BAGGER_STAND.x, z: BAGGER_STAND.z, hw: 3, hd: 3, label: "Baggerstand" });
@@ -351,12 +360,14 @@ function rangierzug(
   halt: readonly [number, number],
   gierHalt: number,
   ohneSlot: readonly [number, number] | null = null,
-  bedLen = RANGIER.bedLen
+  bedLen = RANGIER.bedLen,
+  /** Der Zug des Verladers vorn selbst (E-201): ohne ihn, mit der Annahme-Belegung. */
+  vorn = false
 ): Rangierzug {
-  const key = JSON.stringify([vorlauf, halt, gierHalt, ohneSlot, bedLen]);
+  const key = JSON.stringify([vorlauf, halt, gierHalt, ohneSlot, bedLen, vorn]);
   let z = rangierSpeicher.get(key);
   if (!z) {
-    z = planeRangierzug(vorlauf, halt, gierHalt, planHindernisse(ohneSlot), bedLen);
+    z = planeRangierzug(vorlauf, halt, gierHalt, vorn ? verladerHindernisse() : planHindernisse(ohneSlot), bedLen);
     rangierSpeicher.set(key, z);
   }
   return z;
@@ -417,9 +428,16 @@ export function routeOut(): Array<[number, number]> {
  */
 export function zumTor(
   vorher: Array<[number, number]>,
-  ohneSlot: readonly [number, number] | null = null
+  ohneSlot: readonly [number, number] | null = null,
+  /** Die Ausfahrt des Verladers vorn (E-201) — wie beim Rangierzug. */
+  vorn = false,
+  /**
+   * Was außerdem umfahren wird (E-202): In der Schicht fährt der Anlieferer
+   * von der Annahme am stehenden Verlader vorbei. Ohne Angabe bitgleich wie vorher.
+   */
+  extra: readonly Rechteck[] = []
 ): Array<[number, number]> {
-  const key = JSON.stringify(["tor", vorher, ohneSlot]);
+  const key = JSON.stringify(extra.length ? ["tor", vorher, ohneSlot, vorn, extra] : ["tor", vorher, ohneSlot, vorn]);
   const schon = torSpeicher.get(key);
   if (schon) return schon;
   const r = RANGIER.radiusVor;
@@ -428,7 +446,7 @@ export function zumTor(
   const [bx, bz] = vorher[n - 2]!;
   const a: Pose = { x: ax, z: az, gier: Math.atan2(ax - bx, az - bz) };
   const ziel: Pose = { x: TOR_RAUS[0]![0], z: TOR_RAUS[0]![1], gier: -Math.PI / 4 };
-  const hind = planHindernisse(ohneSlot);
+  const hind = [...(vorn ? verladerHindernisse() : planHindernisse(ohneSlot)), ...extra];
   const frei = (von: Pose, nach: Pose): Pose[] | null => {
     for (const b of dubins(von, nach, r)) {
       const lagen = bahnLagen(von, b.glieder, r, 1);
@@ -655,6 +673,8 @@ export interface AbholPlatz {
 /** Der Halteplatz zu einer Bestellung. Reine Rechnung, ohne Nebenwirkung. */
 export function abholPlatzFuer(order: string | null): AbholPlatz {
   const ziel = abholZielSilo(order);
+  // Schicht (E-201): Der Abladeplatz ist die Annahme — abgeholt wird vorn
+  if (!ziel && istSchichtPlatz()) return verladeplatzVorn(order);
   if (!ziel) {
     /*
      * Beim Bagger. Er benutzt die Strecken der Anlieferer unveraendert —
@@ -821,6 +841,97 @@ export function umsetzZug(von: AbholPlatz, nach: AbholPlatz, bedLen = BED_LEN.ab
   const [hx, hz] = von.halt;
   return rangierzug([[hx - Math.sin(g), hz - Math.cos(g)], [hx, hz]], nach.halt, haltGier(nach), null, bedLen);
 }
+
+/* ------------------------- SCHICHT: DER VERLADER VORN (E-201) ---------- */
+
+/*
+ * Im Schicht-Platz („Kreis in der Ecke", `docs/schicht-konzept.md` Abschnitt 3)
+ * stehen zwei Laster am Bagger: der Anlieferer am Abladeplatz Ost (= Annahme,
+ * wie heute) und der Verlader (Abroller 34 m³) QUER VOR dem Bagger, Kabine
+ * nach Westen; er setzt nach Osten zurück.
+ *
+ * Gefunden mit `tools/schicht-platz.ts` (Suche 25° rechts … 35° links,
+ * 6,6 … 7,8 m, beide Kabinenrichtungen, echter Rangierplaner): acht Lagen mit
+ * freiem Zug, alle nur OHNE den Müll-Container vor dem Bagger (E-192).
+ * Gewählt 10° links, 7,2 m: alle vier Ladeflächenecken 6,52 … 8,89 m vom Sitz
+ * (Band 5,8 … 9,2), der Wagen 5,65 m vom Sitz (Tastbereich 5,5 m).
+ */
+const VORN_WINKEL = (10 * Math.PI) / 180; // SW: tools/schicht-platz.ts, Patrick 21.10.2026 (Variante A)
+const VORN_ABSTAND = 7.2; // SW: dto.
+/** Halt des Verladers vorn: Wagenmitte (Ladeflächenmitte) und Kabinenrichtung. */
+export const VERLADER_VORN: { x: number; z: number; gier: number } = {
+  x: BAGGER_STAND.x + VORN_ABSTAND * Math.sin(VORN_WINKEL),
+  z: BAGGER_STAND.z + VORN_ABSTAND * Math.cos(VORN_WINKEL),
+  gier: VORN_WINKEL - Math.PI / 2, // Kabine nach Westen, quer zum Blick des Fahrers
+};
+/** Bis hierher wie jeder Anlieferer (`rangierAbladeplatz`), ab (−12 | 4) rechnet der Zug. */
+const VORN_VORLAUF: Array<[number, number]> = [WAAGE_HALT, VERTEILER, [-21, 10], [-12, 4]];
+/** Halbmaß des Kipphaufens an der Annahme (SW, wie `tools/schicht-platz.ts`). */
+const ANNAHME_HAUFEN_HALB = 2.4;
+
+/**
+ * Was der Verlader außer den Bauwerken umfahren muss: den Anlieferer, der
+ * gleichzeitig an der Annahme steht (Kipper, der längste), und seinen Haufen.
+ */
+export function annahmeBelegung(): Rechteck[] {
+  const k = fahrzeugUmriss({ x: ABLADE_SPUR_X, z: ABLADE_HALT_Z, rot: 0 }, BED_LEN.kipper!);
+  return [
+    { x: k.x, z: k.z, hw: k.hw, hd: k.hd },
+    { x: ABKIPP_ZONE[0], z: ABKIPP_ZONE[1] - 0.6, hw: ANNAHME_HAUFEN_HALB, hd: ANNAHME_HAUFEN_HALB },
+  ];
+}
+
+/**
+ * Wogegen der Verlader selbst plant: alles ohne den Müllplatz (dort steht er
+ * ja), dazu der Anlieferer an der Annahme mit seinem Haufen.
+ */
+export function verladerHindernisse(): Rechteck[] {
+  return [
+    ...planHindernisse().filter((o) => !String((o as { label?: string }).label ?? "").startsWith("MUELL")),
+    ...annahmeBelegung(),
+  ];
+}
+
+/** Anfahrt und Rückweg des Verladers vorn — gemerkt wie jeder Rangierzug. */
+export function rangierVerladerVorn(): Rangierzug {
+  return rangierzug(VORN_VORLAUF, [VERLADER_VORN.x, VERLADER_VORN.z], VERLADER_VORN.gier, null, BED_LEN.abholer, true);
+}
+
+/** Ausfahrt: vorwärts nach Westen, dann wie alle zum Tor. */
+export function verladerVornAusfahrt(): Array<[number, number]> {
+  const { x, z, gier } = VERLADER_VORN;
+  return zumTor(
+    [
+      [x, z],
+      [x + Math.sin(gier), z + Math.cos(gier)],
+    ],
+    null,
+    true
+  );
+}
+
+/** Der Halteplatz vorn als Abholplatz (E-177): Dort hält der Verlader in der Schicht. */
+export function verladeplatzVorn(order: string | null): AbholPlatz {
+  const zug = rangierVerladerVorn();
+  return {
+    order,
+    ziel: null,
+    name: "Verladeplatz vorn",
+    halt: [VERLADER_VORN.x, VERLADER_VORN.z],
+    stand: { x: BAGGER_STAND.x, z: BAGGER_STAND.z },
+    anfahrt: zug.anfahrt,
+    rueckweg: zug.rueckweg,
+    ausfahrt: verladerVornAusfahrt(),
+  };
+}
+
+/* Umschalten Sandkasten ↔ Schicht: Hindernisse ändern sich, alles Gemerkte ist alt. */
+beimUmschalten(() => {
+  rangierSpeicher.clear();
+  torSpeicher.clear();
+  platzListe = null;
+  abholPlatz = null;
+});
 
 /* ------------------------------------------- KIPPER: gemischte Ladung ---- */
 
