@@ -554,6 +554,20 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Gerätebefund 21.10.2026, Lehrgang** — Patrick, wörtlich: „also grundsätzlich
+      sollte es mit kaum oder keinen text auskommen, weil der text die ganze sicht
+      verdeckt, auch sollte irgendwie gehighlighten sein, wenn eine aktion
+      erfolgrecih war. Grundlegende Lehrgang steuerung in einem abhandeln.
+      Prüfungen anschliessend. sollte auch geskippt werden können."
+
+      | # | Punkt |
+      |---|---|
+      | 39a | Kaum oder kein Text — Text verdeckt die Sicht |
+      | 39b | Erfolgreiche Aktion sichtbar hervorheben |
+      | 39c | Grundlegende Steuerung in einem einzigen Durchgang |
+      | 39d | Prüfungen direkt anschließend |
+      | 39e | Lehrgang überspringbar |
+
 - [ ] **Vorschläge 21.10.2026: Intro und Spielprinzip** — Patrick (Sprachnachricht,
       sinngemäß wörtlich): ausführliches Intro zu allen Funktionen (Perspektivwechsel,
       Stützen, Pressen und was sonst verfügbar ist) mit Erklärung, gern mit
