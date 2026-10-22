@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-210 | 22.10.2026 | Riesenteile überall gedeckelt: höchstens 2× Katalog, Fuhre aus mehr Teilen | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-209 | 22.10.2026 | Lehrgangsleiste zeigt kurzes Wort je Schritt, wächst nach links | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-208 | 22.10.2026 | Funktionskranz nur per Knopf unter ☰, Stillhalten öffnet nichts | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-207 | 22.10.2026 | Lehrgang zeigt Gesten als Bewegung, Zoom rein und raus, Pfeil zum Ziel | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
@@ -213,6 +214,10 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-210 — Riesenteile gedeckelt** (Schicht Montag, dann Sandkasten)
+- Bringt jeder Kipper einen Haufen aus vielen Teilen, mit Mischschrott? Wirkt noch ein Teil viel zu schwer (Überlast, obwohl es klein aussieht)?
+- Sandkasten: Kommt der Kipper weiter „voll“ an, und stimmt die Waage mit dem überein, was er aufhat?
+- Kippen an der Annahme: Fliegt etwas weit weg? Fallen von einer Pritsche beim Ankommen Teile herunter?
 **E-209 — Wort je Schritt in der Lehrgangsleiste** (iPhone mini quer, dann iPad)
 - Schritt 7: „Hauptarm heben/senken“ ganz da, ohne „…“? ⏭ an derselben Stelle wie in Schritt 6?
 - Linker Daumen oben links unter der verbreiterten Leiste: Stick reagiert wie sonst?

@@ -226,6 +226,41 @@ const PARK_RUECK_SPEED = 1.6;
 const LADE_BODEN = 0.1;
 /** Rand vorn und hinten, damit nichts ueber die Kante steht. */
 const LADE_RAND = 0.2;
+/** Dichte-Deckel beim Umlegen der Kundenmenge (kg/m³ auf `deckelVolumen` × 0,55) — Begruendung in `loadCargo`. */
+const DICHTE_MAX = 2600;
+/**
+ * Ein Teil wiegt hoechstens so viel mal sein Katalog-Gewicht (45c, Patrick
+ * 22.10.2026, angenommen in `docs/spiel-konzept.md` Fassung 3).
+ */
+export const KATALOG_FAKTOR_MAX = 2;
+/**
+ * Hoechstens so viele Stuecke legt `loadCargo` auf eine Flaeche — jedes ist ein
+ * eigener Physikkoerper (gemessen 42 bei Kleinteil-Fuhren, Deckel seit E-105).
+ */
+export const STUECK_MAX = 28;
+/**
+ * Wie schwer ein Teil beim Umlegen der Kundenmenge hoechstens wird: der
+ * Dichte-Deckel (Begruendung in `loadCargo`) und `KATALOG_FAKTOR_MAX` × sein
+ * Katalog-Gewicht, das Kleinere. Eine Rechnung fuer `loadCargo` und Waechter.
+ */
+export function teilDeckelKg(shape: Pick<ScrapShape, "kind" | "dims">, katalogKg: number): number {
+  return Math.min(DICHTE_MAX * deckelVolumen(shape.kind, shape.dims) * 0.55, KATALOG_FAKTOR_MAX * katalogKg);
+}
+/**
+ * Hoechstens bis hierhin fuellt `loadCargo` nach, wenn der Katalog-Deckel
+ * Masse fehlen laesst (Fuellgrad nach `deckelVolumen`, 45c). SW aus der
+ * Messung `test/kipper.test.ts`-Reihe (24 Saaten, gewuerfelte Haendlerfuhre):
+ * bis 1,0 nachgefuellt schleuderte der Kipper im Median 42 km/h (Schranke 40),
+ * bis 0,9 waren es 23 km/h — so viel wie vorher (24).
+ */
+const FUELL_MAX = 0.9;
+/**
+ * Ein Stueck einer gemischten Fuhre nimmt hoechstens diesen Anteil der
+ * bestellten Fuellung ein (45c). SW: Bis hierher durfte das ERSTE Stueck
+ * beliebig gross sein — gemessen 200 Montags-Kipper: eine Fuhre aus einem
+ * Teil, 3 mit einem Teil ueber 60 % der Masse; mit 0,5 keine (`tools/riesenteile.ts`).
+ */
+const STUECK_ANTEIL_MAX = 0.5;
 /** Gehtempo des Fahrers (m/s) */
 const FAHRER_TEMPO = 1.5;
 import { alleHindernisse } from "../world/obstacles";
@@ -288,6 +323,7 @@ import {
   ANHAENGER_WAND,
   WRACK_KG,
   FUELL_KLASSEN,
+  fuellKlasse,
   NUTZLAST,
   ladeHoeheGrenze,
   ABSETZMULDE,
@@ -2914,6 +2950,8 @@ class DeliveryVehicle {
         // im Hof stehen. Uebersprungen, nicht abgebrochen: Vielleicht passt
         // das naechste Stueck noch.
         if (steht > 0 && steht + anteil(sp) > zielFuellung) continue;
+        // 45c: und auch das erste nicht mehr als `STUECK_ANTEIL_MAX` der Bestellung
+        if (anteil(sp) > zielFuellung * STUECK_ANTEIL_MAX) continue;
         kandidaten.push(sp);
         const probe = packeLadung(
           kandidaten.map((k) => stueckMass(k.shape.kind, k.shape.dims)),
@@ -2930,11 +2968,13 @@ class DeliveryVehicle {
             : 0;
       }
       // Eine Fuhre aus null Teilen gibt es nicht: Passt gar nichts, kommt das
-      // kleinste Stueck des Wurfs trotzdem drauf.
-      if (erste && kandidaten.length === specs.length && nachschub.length > 0) {
-        kandidaten.push(
-          nachschub.reduce((a2, b) => (anteil(b) < anteil(a2) ? b : a2), nachschub[0]!)
-        );
+      // kleinste Stueck des Wurfs trotzdem drauf — sofern es nicht allein
+      // groesser ist als die ganze Bestellung (45c: sonst kam eine Drehmaschine
+      // von 20 m³ Deckelvolumen als einziges Teil); dann versucht es die
+      // naechste Runde mit kleinerem Zeug.
+      const kleinstes = nachschub.reduce((a2, b) => (anteil(b) < anteil(a2) ? b : a2), nachschub[0]!);
+      if (erste && kandidaten.length === specs.length && nachschub.length > 0 && anteil(kleinstes) <= zielFuellung) {
+        kandidaten.push(kleinstes);
       }
       const st = kandidaten.map((sp) => stueckMass(sp.shape.kind, sp.shape.dims));
       const pl = packeLadung(st, halbBreite, nutzLaenge, maxHoehe);
@@ -2942,7 +2982,7 @@ class DeliveryVehicle {
       // Deckel auf die Stueckzahl: Jedes Stueck ist ein eigener Physikkoerper.
       // Bei sortenreinen Fuhren aus Kleinteilen kamen gemessen 42 auf eine
       // Flaeche — das fuellt zwar schoen, kostet aber jedes Bild Rechenzeit.
-      if (liegen > 28 && !erste) break;
+      if (liegen > STUECK_MAX && !erste) break;
       /*
        * Der Fuellgrad rechnet mit `deckelVolumen`, nicht mit dem echten
        * Huellvolumen — siehe die Begruendung dort. Kurz: Mit dem echten
@@ -2974,6 +3014,67 @@ class DeliveryVehicle {
       } else {
         leerlauf = 0;
       }
+    }
+
+    /*
+     * RIESENTEILE GIBT ES NICHT MEHR — AUFFÜLLEN STATT AUFBLASEN (45c, Patrick
+     * 22.10.2026: „Riesenteile überall deckeln — höchstens 2× Katalog-Gewicht").
+     *
+     * Bis hierher wurde die Kundenmenge auf die liegenden Stücke gezogen, nur
+     * durch die Dichte gedeckelt. Lagen wenige Teile, bekam jedes ein
+     * Vielfaches seines Gewichts: ein Cateringwagen-Aufbau (Katalog 300 kg)
+     * mit 9 500 kg als einziges Teil einer Kipperfuhre, im Mittel das 5,7-Fache
+     * je Teil (gemessen, `tools/riesenteile.ts`). Jetzt trägt ein Teil
+     * höchstens `KATALOG_FAKTOR_MAX` × sein Katalog-Gewicht. Fehlt dann Masse,
+     * legt der Kunde Teile nach — über die bestellte Füllung hinaus, bis die
+     * Masse steht, die Fläche nichts mehr aufnimmt oder `STUECK_MAX` liegen.
+     * Reicht beides nicht, fährt er mit weniger vor; die Waage zeigt es.
+     * Nicht bei der Einzelstück-Fuhre (sie wiegt ihr Katalog-Gewicht, E-126)
+     * und nicht bei Spänen (geschüttet bis zum Füllgrad, E-147).
+     */
+    const katalog = specs.map((sp) => sp.massKg);
+    const traegt = (i: number): number => teilDeckelKg(specs[i]!.shape, katalog[i]!);
+    if (c && !einzel && !c.spaene) {
+      /*
+       * „Bis die Fläche voll ist" — aber in der Füllklasse, die der Kunde
+       * angekündigt hat (E-033: der Füllgrad steht auf der Fläche). Eine
+       * viertelvolle Fuhre bleibt ein Viertel und fährt eben mit weniger vor.
+       */
+      const fuellGrenze = Math.min(FUELL_MAX, FUELL_KLASSEN[fuellKlasse(zielFuellung)].bis);
+      const liegend = (): number => plaetze.filter(Boolean).length;
+      const kann = (): number => specs.reduce((a2, _, i) => a2 + (plaetze[i] ? traegt(i) : 0), 0);
+      for (let runde = 0, leer = 0; runde < 12 && leer < 3 && liegend() < STUECK_MAX && kann() < c.massKg; runde++) {
+        const vorher = liegend();
+        // Brocken wie in der ersten Runde (halb Großteile), damit die Masse mit
+        // wenigen Körpern kommt; keine Schwergewichte.
+        for (const sp of randomCargo(6, 0.5, 0, this.sortedMaterial ?? undefined)) {
+          if (liegend() >= STUECK_MAX || kann() >= c.massKg) break;
+          if (raum > 0 && fuellung + deckelVolumen(sp.shape.kind, sp.shape.dims) / raum > fuellGrenze) continue;
+          const probe = [...specs, sp];
+          const pl = packeLadung(
+            probe.map((k) => stueckMass(k.shape.kind, k.shape.dims)),
+            halbBreite,
+            nutzLaenge,
+            maxHoehe
+          );
+          // Nur behalten, wenn es dazukommt, ohne ein liegendes zu verdrängen
+          // (`packeLadung` packt jedes Mal neu, groß zuerst).
+          if (pl.filter(Boolean).length !== liegend() + 1) continue;
+          // In die Lücken am Boden, nicht obendrauf: ein höherer Haufen schleudert
+          // beim Kippen mehr (gemessen, `test/kipper.test.ts`-Reihe)
+          if ((pl[probe.length - 1]?.y ?? 1) > 0.01) continue;
+          specs = probe;
+          fuellung += raum > 0 ? deckelVolumen(sp.shape.kind, sp.shape.dims) / raum : 0;
+          katalog.push(sp.massKg);
+          plaetze = pl;
+          stuecke = probe.map((k) => stueckMass(k.shape.kind, k.shape.dims));
+        }
+        leer = liegend() === vorher ? leer + 1 : 0;
+      }
+      fuellung =
+        raum > 0
+          ? specs.reduce((a2, sp, i) => a2 + (plaetze[i] ? deckelVolumen(sp.shape.kind, sp.shape.dims) : 0), 0) / raum
+          : fuellung;
     }
 
     const bedQuat = new THREE.Quaternion();
@@ -3019,9 +3120,8 @@ class DeliveryVehicle {
      * der Messung, was eine Berichtigung kosten wuerde (rund 18 % Tagesgeld).
      * Es zu aendern ist eine Wirtschaftsentscheidung, keine Aufraeumarbeit.
      */
-    const DICHTE_MAX = 2600;
-    const grenze = (i: number): number =>
-      DICHTE_MAX * deckelVolumen(specs[i]!.shape.kind, specs[i]!.shape.dims) * 0.55;
+    // Dichte-Deckel (DICHTE_MAX) und Katalog-Deckel (45c) — `traegt` steht oben beim Auffüllen.
+    const grenze = traegt;
     const gewicht = new Map<number, number>();
     for (const i of draufIdx) gewicht.set(i, specs[i]!.massKg);
     // Ein Einzelstueck wiegt, was es wiegt — die Kundenmenge IST sein Gewicht.

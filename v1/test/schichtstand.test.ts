@@ -136,6 +136,16 @@ describe("E-204 — die Pritsche an der Annahme fährt nach STANDZEIT_S mit Ladu
         ladung = w.cargo.items.map((x) => x.body.handle);
         ladungKg = w.cargo.items.reduce((s, x) => s + x.massKg, 0);
       }
+      /*
+       * Was beim Losfahren auf der Fläche liegt, ist die Ladung — nicht, was
+       * bei der Ankunft lag. Seit 45c (Teile höchstens 2× Katalog, also
+       * leichter) rutschen beim Freigeben an der Annahme mehr Teile herunter
+       * (gemessen 12 Pritschen, je 15 s nach Ankunft: 12 von 167 Teilen statt 3 von 123); sie liegen
+       * dann an der Annahme, wo sie hingehören, und fahren nicht mit.
+       */
+      if (ankunft >= 0 && abfahrt < 0 && w!.phaseName === "waitUnload") {
+        ladung = w!.cargo.items.filter((x) => w!.liegtAuf(x.body)).map((x) => x.body.handle);
+      }
       if (ankunft >= 0 && abfahrt < 0 && w!.phaseName !== "waitUnload") abfahrt = p.schichtS;
       if (abfahrt >= 0 && p.vehicles.schichtAnlieferer !== w) break;
     }

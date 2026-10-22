@@ -19,7 +19,9 @@ import { initPhysics } from "../src/physics/physicsWorld";
 import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
 import { EventBus } from "../src/core/events";
-import { VehicleManager } from "../src/delivery/vehicles";
+import { VehicleManager, teilDeckelKg } from "../src/delivery/vehicles";
+import type { ScrapItem } from "../src/world/scrapItems";
+import { katalogKg } from "./riesenteile-hilfe";
 import type { CustomerProfile } from "../src/delivery/customers";
 import {
   ANHAENGER_HALB_BREITE,
@@ -152,35 +154,45 @@ describe("Der Füllgrad des Kunden steht auf der Fläche", () => {
   }, 60000);
 });
 
-describe("Was angekündigt war, kommt auch an", () => {
-  it("die Kilogramm auf der Fläche sind die des Kunden", () => {
+describe("Was angekündigt war, kommt auch an — bis an den Deckel jedes Teils", () => {
+  it("die Kilogramm auf der Fläche sind die des Kunden, oder jedes Teil trägt schon, was es tragen darf", () => {
     /*
      * BEFUND 15.09.2026 (E-044), aufgefallen erst, als Waage und Anblick
      * dieselbe Zahl benutzen. `loadCargo` verteilt die Kundenmenge auf die
      * Stücke, die wirklich liegen, gedeckelt durch die Dichte. Der zweite
      * Durchgang dieser Verteilung hat dabei ÜBERSCHRIEBEN statt aufgefüllt —
      * er ersetzte die volle Zuteilung durch den Anteil am kleinen Restbetrag.
+     * Gemessen vorher: 8500 kg angekündigt, 105 kg geliefert.
      *
-     * Gemessen an zwanzig gewürfelten Fuhren vorher: 8500 kg angekündigt,
-     * 105 kg geliefert; 9500 angekündigt, 821 geliefert. Rund jede vierte
-     * Fuhre verlor mehr als die Hälfte — und zwar die vollen zuerst.
-     *
-     * Nachher: alle zwanzig auf das Kilogramm genau.
+     * SEIT 45c (Patrick 22.10.2026: „höchstens 2× Katalog-Gewicht") kommt die
+     * Kundenmenge nicht mehr immer ganz an — ein Teil trägt höchstens
+     * `teilDeckelKg`, fehlt Masse, wird nachgelegt, und reicht auch das nicht,
+     * fährt der Kunde mit weniger vor. Bewacht wird deshalb die Regel selbst:
+     * Fehlt etwas, steht JEDES Teil an seinem Deckel. Ein Überschreiben wie
+     * E-044 ließe Teile darunter und fiele hier auf.
      */
     let voll = 0;
     for (let i = 0; i < 12; i++) {
       const c = kunde({ massKg: 2000 + i * 600, fuellgrad: 0.9 });
       const angekuendigt = c.massKg;
-      beladen("pritsche", c, 800 + i);
-      // `loadCargo` schreibt die Menge auf das herunter, was die Fläche trägt
+      const { v } = beladen("pritsche", c, 800 + i);
       expect(c.massKg, `Fuhre ${i + 1}`).toBeLessThanOrEqual(angekuendigt);
-      expect(
-        c.massKg / angekuendigt,
-        `Fuhre ${i + 1}: ${angekuendigt} kg angekündigt, ${c.massKg} kg geliefert`
-      ).toBeGreaterThan(0.85);
-      if (c.massKg === angekuendigt) voll++;
+      const teile = v.cargo.items as unknown as ScrapItem[];
+      const kg = teile.reduce((a, t) => a + t.massKg, 0);
+      expect(Math.abs(kg - c.massKg), `Fuhre ${i + 1}: Waage ${c.massKg}, Fläche ${kg}`).toBeLessThan(teile.length + 1);
+      if (c.massKg >= angekuendigt - 1) {
+        voll++;
+        continue;
+      }
+      for (const t of teile) {
+        const k = katalogKg(t)!;
+        expect(
+          t.massKg,
+          `Fuhre ${i + 1}: ${angekuendigt} kg angekündigt, ${c.massKg} kg geliefert — ${t.shape?.name} unter seinem Deckel`
+        ).toBeGreaterThanOrEqual(Math.round(teilDeckelKg(t.shape!, k)) - 1);
+      }
     }
-    expect(voll, `nur ${voll} von 12 Fuhren kamen vollständig an`).toBeGreaterThanOrEqual(10);
+    console.log(`45c: ${voll} von 12 Pritschen (2,0–8,6 t angekündigt) kamen vollständig an`);
   }, 120000);
 });
 
