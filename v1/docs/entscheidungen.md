@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-211 | 22.10.2026 | Volle Box ruft ihren Abholer sofort, Misch-Verlader macht Platz | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-210 | 22.10.2026 | Riesenteile überall gedeckelt: höchstens 2× Katalog, Fuhre aus mehr Teilen | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-209 | 22.10.2026 | Lehrgangsleiste zeigt kurzes Wort je Schritt, wächst nach links | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-208 | 22.10.2026 | Funktionskranz nur per Knopf unter ☰, Stillhalten öffnet nichts | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
@@ -214,6 +215,10 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-211 — Box-Abholer kommt sofort** (Schicht Montag)
+- BUNT + VA bis „voll“ füllen: Fährt der Verlader vorn sofort weg (auch leer), sagt das Büro „Abholer für BUNT + VA kommt“, steht nach rund einer halben Minute der Abholer vorn?
+- Box auf ihn laden und hupen: Fährt er, und kommt danach wieder ein Misch-Verlader?
+- Box-Abholer leer stehen lassen: Bleibt er, solange die Box voll ist — wirkt das verständlich?
 **E-210 — Riesenteile gedeckelt** (Schicht Montag, dann Sandkasten)
 - Bringt jeder Kipper einen Haufen aus vielen Teilen, mit Mischschrott? Wirkt noch ein Teil viel zu schwer (Überlast, obwohl es klein aussieht)?
 - Sandkasten: Kommt der Kipper weiter „voll“ an, und stimmt die Waage mit dem überein, was er aufhat?

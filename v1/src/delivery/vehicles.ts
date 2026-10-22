@@ -419,10 +419,13 @@ import {
   annahmeAusfahrt,
   lagerSperrt,
   ANFAHRT_PHASEN,
+  BOX_ORDERS,
+  boxFuer,
+  type BoxOrder,
 } from "./schichtfuhrpark";
 import { rollSchichtKunde } from "./customers";
 import type { Fahrt } from "../economy/schichtplan";
-import type { KassenTeil } from "../economy/kasse";
+import { MISCH, type KassenTeil } from "../economy/kasse";
 
 type Phase =
   | "settleCargo"
@@ -3495,6 +3498,15 @@ class DeliveryVehicle {
     );
   }
 
+  /**
+   * Darf er jetzt losfahren, ohne dass etwas an ihm haengt? Dieselben zwei
+   * Sicherungen wie „voll faehrt los" (E-120): Ladung ruhig, kein gegriffenes
+   * Teil ueber der Flaeche. Fuer den Disponenten, der einen Verlader abruft (45b).
+   */
+  get ladungBereit(): boolean {
+    return !this.greiferUeberFlaeche() && this.ladeflaecheRuhig();
+  }
+
   /** Liegt alles auf der Flaeche ruhig? Mass wie `cargoAtRest`. */
   private ladeflaecheRuhig(): boolean {
     this.bedGroup.updateWorldMatrix(true, false);
@@ -4739,6 +4751,8 @@ export interface VerladerAbfahrt {
 export interface SchichtHaken {
   /** Für welche Sorte der nächste Verlader kommt: eine volle Box, sonst `mixed`. */
   nachrueckerOrder(): string;
+  /** Ist diese Box über ihrer Schwelle (`BOX_SCHWELLE_KG`)? Für den leeren Box-Abholer (45b). */
+  boxVoll(order: string): boolean;
   /** Welcher Wagen dafür kommt (E-177: Abroller bei viel, Absetzkipper bei wenig). */
   aufbauFuer(order: string): AbholAufbau;
   onVerladerAbfahrt(e: VerladerAbfahrt): void;
@@ -5936,7 +5950,8 @@ export class VehicleManager {
     if (!v || !v.consumeDeparted()) return;
     const teile: KassenTeil[] = v.containedItems(this.items).map(kassenTeilAus);
     this.verladerAbfahrten++;
-    this.schichtHaken?.onVerladerAbfahrt({ order: v.bestellung, teile });
+    // Leer fährt er einfach (45b: der Misch-Verlader macht Platz für den Box-Abholer) — keine 0-€-Zeile
+    if (teile.length > 0) this.schichtHaken?.onVerladerAbfahrt({ order: v.bestellung, teile });
     this.raus.push(v);
     this.alterVerlader = v;
     this.verlader = null;
@@ -6039,6 +6054,51 @@ export class VehicleManager {
     this.torHalter = n;
   }
 
+  private boxRufT = 0;
+  private leerSeitS = 0;
+
+  /**
+   * EIN ABHOLER, DER KOMMT, KOMMT AUCH (45b, Konzept §6, Patrick 22.10.2026).
+   *
+   * Befund Montag Saat 18: BUNT + VA voll, die Anzeige sagte „Abholer kommt",
+   * aber der Box-Abholer war nur der NÄCHSTE Verlader — und der leere
+   * Misch-Verlader vorn wurde nie voll und ließ sich nicht weghupen (ab 1 kg).
+   * Bis 16:00 kam keiner.
+   *
+   * Jetzt: Hat eine Box ihre Schwelle erreicht und steht vorn der
+   * Misch-Verlader, fährt er ab (beladen gebucht wie jede Abfahrt, leer ohne
+   * Zeile), und der Nachrücker rückt als Abholer dieser Box vor (seine Sorte
+   * steht erst beim Vorrücken fest). Mehrere volle Boxen: die vollste zuerst
+   * (`naechsteOrder`), dann die nächste, dann wieder Misch.
+   *
+   * Ein Box-Abholer, der leer steht, während seine Box unter der Schwelle ist
+   * (nichts mehr für ihn da), fährt nach `VOLL_WARTE_S` von selbst. Weghupen
+   * lässt sich ein leerer nicht: Solange seine Box voll ist, käme sofort der
+   * nächste für dieselbe Box — Hupen hieße nur „noch einmal hin und her".
+   */
+  private boxAbholerRufen(dt: number): void {
+    const v = this.verlader;
+    this.boxRufT -= dt;
+    if (!v || !v.waitingForLoad || this.boxRufT > 0) return;
+    this.boxRufT = VOLL_PRUEF_S;
+    const haken = this.schichtHaken!;
+    if (v.bestellung === MISCH) {
+      this.leerSeitS = 0;
+      const box = haken.nachrueckerOrder();
+      if (box === MISCH || !v.ladungBereit) return;
+      v.requestRelease();
+      const name = (BOX_ORDERS as readonly string[]).includes(box) ? boxFuer(box as BoxOrder).label : abholWas(box);
+      this.onMeldung?.(`Büro an Bagger: Abholer für ${name} kommt — der Verlader fährt vor.`);
+      return;
+    }
+    const leer = v.ladeflaecheKg() < 1 && !haken.boxVoll(v.bestellung ?? MISCH);
+    this.leerSeitS = leer ? this.leerSeitS + VOLL_PRUEF_S : 0;
+    if (this.leerSeitS >= VOLL_WARTE_S) {
+      this.leerSeitS = 0;
+      v.requestRelease();
+    }
+  }
+
   /** Ein Bild des Schicht-Fuhrparks. */
   private updateSchicht(dt: number): void {
     this.t += dt;
@@ -6082,6 +6142,8 @@ export class VehicleManager {
       this.siloWagen = null;
     }
     if (this.schichtVorbei) return;
+
+    this.boxAbholerRufen(dt);
 
     // Der Nachrücker rückt vor, sobald vorn frei ist (Box voll → er holt die Box)
     const n = this.nachruecker;

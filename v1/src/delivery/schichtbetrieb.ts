@@ -117,6 +117,7 @@ export class SchichtBetrieb {
     this.order = naechsteOrder((o) => ports.boxKg(o));
     vehicles.starteSchicht({
       nachrueckerOrder: () => this.order,
+      boxVoll: (o) => (BOX_ORDERS as readonly string[]).includes(o) && ports.boxKg(o as BoxOrder) >= BOX_SCHWELLE_KG[o as BoxOrder],
       aufbauFuer: (o) => VERLADER_AUFBAU[o] ?? "abroller",
       onVerladerAbfahrt: (e) => this.onVerladerAbfahrt?.(e),
       onStandzeit: (e) => this.onStandzeit?.(e),

@@ -285,8 +285,9 @@ describe("E-202 — der Verlader vorn", () => {
     box.steel = BOX_SCHWELLE_KG.steel + 500; // Stahl hat eine Fuhre beisammen
     for (let i = 0; i < 30; i++) p.takt();
     expect(p.betrieb.naechsterVerlader).toBe("steel");
-    expect(p.vehicles.requestPickup()).toBe("abgefahren");
+    // 45b: Der Misch-Verlader fährt von selbst, sobald die Box voll ist — keine Hupe nötig
     bis(p, 10, () => p.protokoll.abfahrten.length > 0);
+    expect(p.protokoll.abfahrten[0]?.order).toBe("mixed");
     bis(p, 60, () => !!p.vehicles.schichtVerlader?.waitingForLoad);
     expect(p.vehicles.schichtVerlader?.bestellung, "der Nachrücker ist nicht für Stahl").toBe("steel");
     expect(p.protokoll.meldungen.some((m) => /für Stahlschrott ist unterwegs/.test(m))).toBe(true);
