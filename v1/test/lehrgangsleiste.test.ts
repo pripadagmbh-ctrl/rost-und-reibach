@@ -34,7 +34,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as THREE from "three";
-import { FASSUNGEN, knopfKasten, luft, px, pxOderNull, schriftgroesse, ueberlappt, wert, zeilenabstand, EM_BREITE, type Fassung, type Kasten, type Rand } from "./cssmass";
+import { FASSUNGEN, knopfKasten, luft, px, ueberlappt, wert, EM_BREITE, type Fassung, type Kasten, type Rand } from "./cssmass";
 import { EventBus, type GameEvents } from "../src/core/events";
 import { LEKTIONEN } from "../src/challenges/lehrgang";
 import { tastenText } from "../src/ui/geisterdaumen";
@@ -144,18 +144,14 @@ function schild(f: Fassung, text: string): Kasten {
  */
 const KRANZ_LAENGSTER = "ZUR WAAGE";
 
-/** Die alte Lektionskarte (E-196): Kopf, Ziel, Titel, Text zwei Zeilen, Hinweis — wie in aufgabenkarte-platz gerechnet. */
+/**
+ * Die alte Lektionskarte (E-196): Kopf, Ziel, Titel, Text zwei Zeilen, Hinweis.
+ * Ihr CSS ist mit der Aufgabenkarte gegangen (41-P2); die Masse stehen hier
+ * fest, wie sie aufgabenkarte-platz.test.ts gerechnet hat (iPhone mini quer:
+ * x 58..524, oben 6, 2 x 2 + 2 x 3 + 28 + 5 x 17 = 123 hoch).
+ */
 function alteKarte(f: Fassung): Kasten {
-  const HALTER = ["#tutorial", "#tutorial.aufgabe", "body.touch #tutorial", "body.touch #tutorial.aufgabe"];
-  const KARTE = ["#tutorial .karte", "#tutorial.aufgabe .karte"];
-  const ZUSATZ = ["#tutorial.aufgabe .zusatz"];
-  const links = px(HALTER, "left", f);
-  const breite = pxOderNull(HALTER, "width", f)!;
-  const oben = px(HALTER, "top", f);
-  const padY = viererWert(KARTE, "padding", f, 0);
-  const zeile = Math.ceil(schriftgroesse(ZUSATZ, f) * zeilenabstand(ZUSATZ, f));
-  const hoehe = 2 * 2 + 2 * padY + px(["#tutorial .kopf", "#tutorial.aufgabe .kopf"], "min-height", f) + 5 * zeile;
-  return vonOben("alte Lektionskarte", f, links, links + breite, oben, oben + hoehe);
+  return vonOben("alte Lektionskarte", f, 58, 524, 6, 6 + 123);
 }
 
 describe("Mittelzone nachgerechnet: die Fassungen der Messung Q4 (headless, ohne sicheren Rand)", () => {

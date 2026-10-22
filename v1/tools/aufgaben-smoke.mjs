@@ -34,6 +34,8 @@ mkdirSync(AUS, { recursive: true });
 const PORT = Number(process.env.SMOKE_PORT ?? 5199);
 const BASIS = `http://127.0.0.1:${PORT}/`;
 const LAEUFE = Number(process.env.LAEUFE ?? 3); // Auftrag: 3 Laeufe je Bedingung
+/** 41-Q: Ergebnisdatei je Lauf (mehrere Geraete in einen Ordner) */
+const ERGEBNIS_DATEI = process.env.SMOKE_JSON ?? "aufgaben-smoke.json";
 const GERAETE = {
   mini: { width: 812, height: 375, deviceScaleFactor: 3, mobile: true },
   ipad: { width: 1180, height: 820, deviceScaleFactor: 2, mobile: true },
@@ -107,7 +109,7 @@ class Cdp {
       ws.onerror = (e) => nein(e);
     });
   }
-  send(method, params = {}, sessionId) {
+  send(method, params = {}, sessionId, fristMs = 300000) {
     if (process.env.SMOKE_SPUR) console.log("CDP", method);
     const id = ++this.id;
     if (this.ws.readyState !== 1) return Promise.reject(new Error("CDP-Verbindung geschlossen"));
@@ -117,7 +119,7 @@ class Cdp {
       const frist = setTimeout(() => {
         this.offen.delete(id);
         nein(new Error(`CDP-Frist: ${method}`));
-      }, 300000);
+      }, fristMs);
       this.offen.set(id, { ok: (v) => (clearTimeout(frist), ok(v)), nein: (e) => (clearTimeout(frist), nein(e)) });
     });
   }
@@ -128,9 +130,12 @@ const VORSKRIPT = `(() => {
   const S = (window.__smoke = { log: [], karteMs: null, gameMs: null, fehler: [] });
   window.addEventListener("error", (e) => S.fehler.push(String(e.message)));
   window.addEventListener("unhandledrejection", (e) => S.fehler.push(String(e.reason)));
+  // 41-Q: WebGL-Kontext verloren? (Shaderfehler mit leerem Log deuten darauf)
+  S.kontext = []; window.addEventListener("webglcontextlost", () => S.kontext.push({ verloren: performance.now(), phase: S.phase }), true); window.addEventListener("webglcontextrestored", () => S.kontext.push({ zurueck: performance.now() }), true);
   const pruefe = () => {
-    const k = document.getElementById("tutorial");
-    if (S.karteMs === null && k && k.classList.contains("open")) {
+    // 41-Q: In Pruefungen steht oben die Zielzeile (#zielzeile), die Karte #tutorial nur noch im Betrieb
+    const k = document.getElementById("tutorial"), z = document.getElementById("zielzeile");
+    if (S.karteMs === null && ((k && k.classList.contains("open")) || (z && !z.hidden))) {
       S.karteMs = -1;
       S.karteOffenMs = performance.now();
       requestAnimationFrame(() => requestAnimationFrame(() => { S.karteMs = performance.now(); }));
@@ -143,12 +148,31 @@ const VORSKRIPT = `(() => {
     pruefe();
   };
   if (document.body) beobachte(); else document.addEventListener("DOMContentLoaded", beobachte);
+  // 41-Q: Kamera (Flug) und laufende Pruefung abhoeren — nur das Prototyp-Objekt, das Verhalten bleibt gleich
+  S.fluege = []; S.flugSpur = []; S.flugHalt = S.flugHalt ?? null; S.taktImFlug = 0; S.taktZahl = 0;
+  import("/src/excavator/orbitCamera.ts").then((m) => {
+    const P = m.OrbitCamera.prototype, u = P.update, ft = P.flugTakt, sf = P.starteFlug;
+    P.update = function (...a) { window.__orbit = this; if (this.flug && !S.flugGesehen) S.flugGesehen = { t: performance.now(), blick: { ...this.blick } }; return u.apply(this, a); };
+    P.starteFlug = function (...a) { window.__orbit = this; S.fluege.push({ t: performance.now(), teil: { ...a[0] }, ziel: { ...a[1] }, blick: { ...this.blick } }); return sf.apply(this, a); };
+    // Bilder bei festen Flugzeiten: ab S.flugHalt steht die Flugzeit (dt 0), bis der Rauchtest weiterschaltet
+    P.flugTakt = function (dt, gt) {
+      if (S.flugHalt !== null && this.flug && this.flug.t >= S.flugHalt - 1e-9) dt = 0;
+      const vor = this.flug ? this.flug.t : null, r = ft.call(this, dt, gt), c = this.camera.position, d = this.camera.getWorldDirection(c.clone());
+      S.flugSpur.push({ w: performance.now(), n: S.n, dt, vor, nach: this.flug ? this.flug.t : null, pos: [c.x, c.y, c.z], dir: [d.x, d.y, d.z] });
+      if (S.flugSpur.length > 400) S.flugSpur.shift();
+      return r;
+    };
+  });
+  import("/src/challenges/challenge.ts").then((m) => {
+    const P = m.ChallengeLauf.prototype, t = P.takt;
+    P.takt = function (...a) { S.lauf = this; S.taktZahl++; if (window.__orbit && window.__orbit.fliegt) S.taktImFlug++; return t.apply(this, a); };
+  });
   const warte = setInterval(() => {
     const g = window.__game;
     if (!g) return;
     clearInterval(warte);
     S.gameMs = performance.now();
-    for (const n of ["challenge:start", "challenge:schritt", "challenge:geschafft", "challenge:neustart"])
+    for (const n of ["challenge:start", "challenge:schritt", "challenge:geschafft", "challenge:neustart", "challenge:vorschau", "challenge:pressen", "spiel:pause"])
       g.bus.on(n, (e) => S.log.push({ n, t: performance.now(), nr: e && e.nr, sterne: e && e.sterne }));
   }, 2);
 })();`;
@@ -167,10 +191,10 @@ const ZAEHLE = `(() => {
     boilerBox: boiler.map((b) => b.containerId),
     koerper: c.bodies, wach: c.awake, beweglich: c.dynamic, kollider: w.colliders.len(), gelenke: w.impulseJoints.len(),
     wracks: g.composites.cars.length, netze, szeneKinder: sc.children.length,
-    schritt: document.getElementById("tut-schritt")?.textContent,
-    uhr: document.querySelector("#tutorial .uhr")?.textContent,
-    titel: document.getElementById("tut-titel")?.textContent,
-    karteOffen: document.getElementById("tutorial")?.classList.contains("open"),
+    schritt: (window.__smoke.log.filter((e) => e.n === "challenge:schritt").at(-1) || {}).nr ?? null,
+    uhr: document.getElementById("zz-uhr")?.textContent,
+    titel: document.getElementById("zz-satz")?.textContent,
+    karteOffen: !document.getElementById("zielzeile")?.hidden,
     gegriffen: g.grip.grippedCount,
     gierGrad: +(g.excavator.cabinBaseYaw * 180 / Math.PI).toFixed(1),
     heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null,
@@ -185,9 +209,9 @@ const LAGE = `(() => {
   return {
     bodyTouch: document.body.classList.contains("touch"),
     fenster: [innerWidth, innerHeight, devicePixelRatio],
-    karte: r(document.getElementById("tutorial")),
-    karteText: document.getElementById("tutorial")?.innerText,
-    neuKnopf: r(document.getElementById("tut-neu")),
+    karte: r(document.getElementById("zielzeile")),
+    karteText: document.getElementById("zielzeile")?.innerText,
+    neuKnopf: r(document.getElementById("zz-neu")),
     geister,
     stickLinks: r(document.getElementById("zone-left")), stickRechts: r(document.getElementById("zone-right")),
     webgl: (() => { try { const c = document.createElement("canvas").getContext("webgl2"); const x = c.getExtension("WEBGL_debug_renderer_info"); return x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : "?"; } catch (e) { return String(e); } })(),
@@ -199,8 +223,8 @@ const ZUSTAND = `(() => {
   const g = window.__game, x = g.excavator, c = g.physics.counts();
   return { koerper: c.bodies, wach: c.awake, kollider: g.physics.world.colliders.len(), gelenke: g.physics.world.impulseJoints.len(),
     items: g.items.items.length, wracks: g.composites.cars.length,
-    schritt: document.getElementById("tut-schritt")?.textContent, uhr: document.querySelector("#tutorial .uhr")?.textContent,
-    karteText: document.getElementById("tutorial")?.innerText.replace(/\\n+/g, " | "),
+    schritt: (window.__smoke.log.filter((e) => e.n === "challenge:schritt").at(-1) || {}).nr ?? null, uhr: document.getElementById("zz-uhr")?.textContent,
+    karteText: document.getElementById("zielzeile")?.innerText.replace(/\\n+/g, " | "),
     greifer: x.form && (x.form.id ?? x.form.name), magnetForm: !!(x.form && x.form.magnet), magnetAn: x.magnetAn,
     schliessung: +x.closure.toFixed(3), gierGrad: +(x.cabinBaseYaw * 180 / Math.PI).toFixed(2),
     abgestuetzt: x.abgestuetzt, pratzeUnten: +x.outriggerDown.toFixed(2), pratzeSoll: x.outriggerTarget, gegriffen: g.grip.grippedCount,
@@ -225,7 +249,7 @@ const PROJEKTION = (id) => `(async () => {
   const namen = (d.aufbau.teile ?? []).map((t) => t.name);
   const teile = g.items.items.slice(-namen.length).map((i) => { const p = i.body.translation(); return { name: i.shape && i.shape.name, ...auf(p.x, p.y, p.z) }; });
   const wracks = g.composites.cars.map((c) => { const p = c.body.translation(); return { art: c.def && c.def.id, ...auf(p.x, p.y, p.z) }; });
-  const k = document.getElementById("tutorial").getBoundingClientRect();
+  const k = document.getElementById("zielzeile").getBoundingClientRect();
   const unterKarte = (q) => q.x >= k.left && q.x <= k.right && q.y >= k.top && q.y <= k.bottom;
   const alle = [...teile.map((q) => ({ was: "teil " + q.name, ...q })), ...wracks.map((q) => ({ was: "wrack", ...q })),
     ...(marken ?? []).map((m) => ({ was: "marke " + m.art, ...auf(m.x, m.y, m.z) })),
@@ -253,7 +277,8 @@ const DURCHLAUF = `(async () => {
     for (const k of [...unten]) if (!ks.includes(k)) { window.dispatchEvent(new KeyboardEvent("keyup", { code: k })); unten.delete(k); }
     for (const k of ks) if (!unten.has(k)) { window.dispatchEvent(new KeyboardEvent("keydown", { code: k })); unten.add(k); }
   };
-  const nr = () => parseInt(document.getElementById("tut-schritt").textContent, 10) || 0;
+  // 41-Q: Die Zielzeile zeigt keine Schrittnummer mehr — sie kommt vom Bus (challenge:schritt)
+  const nr = () => (S.log.filter((e) => e.n === "challenge:schritt").at(-1) || {}).nr || 0;
   // Zwei Aufrufe: A = Schritte 1-5 per Tasten, B = Oeffnen (der Finger auf dem Stick kommt per CDP dazwischen)
   const B = !!window.__dl;
   const dl = (window.__dl ??= { t0: performance.now(), schritte: 0, spur: [], gesehen: [] });
@@ -684,7 +709,7 @@ async function lehrgangSmoke(cdp, neueSeite) {
         ab = hk.k;
         log(geraet, "Schritt", nr, "zeigen:", S.vorfuehrungSeiteMs ?? "-", "ms Startlage:", S.inStartlage ?? "-", "Haken:", S.haekchen, S.duSeiteMs, "ms, Text in Zone:",
           [S.textZeigen, S.textDu].map((t) => (t ? t.inZone.length : "-")).join("/"), JSON.stringify(S.aktion).slice(0, 160));
-        writeFileSync(join(AUS, "aufgaben-smoke.json"), JSON.stringify(ergebnis, null, 2));
+        writeFileSync(join(AUS, ERGEBNIS_DATEI), JSON.stringify(ergebnis, null, 2));
       }
       return ab;
     };
@@ -784,7 +809,509 @@ async function lehrgangSmoke(cdp, neueSeite) {
 
     R.seitenfehler = await p.werte("__smoke.fehler");
     cdp.hoerer.splice(cdp.hoerer.indexOf(hoer), 1);
-    writeFileSync(join(AUS, "aufgaben-smoke.json"), JSON.stringify(ergebnis, null, 2));
+    writeFileSync(join(AUS, ERGEBNIS_DATEI), JSON.stringify(ergebnis, null, 2));
+    await p.zu();
+  }
+}
+
+/* ---------------- 41-Q: die sechs Pruefungen mit Zielzeile und Kameraflug ---------------- */
+
+const PRUEF_IDS = ["erster-griff", "verladen", "sortieren", "platt-machen", "magnet", "schwere-last"];
+/** Auftrag 41-Q: Flugbilder und Tipp im Flug — Pruefung 1, 2, 3, 6 auf dem mini, Pruefung 1 auch auf dem iPad */
+const FLUG_PRUEFUNGEN = { mini: ["erster-griff", "verladen", "sortieren", "schwere-last"], ipad: ["erster-griff"], mini1: [] };
+/** Flugzeiten fuer die Bilder (s Flugzeit, nicht Wanduhr); 3,0 = Ende = normale Lage */
+const FLUG_HALTE = [0.5, 1.0, 2.0];
+
+/** Vor dem ersten Skript (nach VORSKRIPT): Physikschritte zaehlen — ruht die Simulation im Flug? */
+const PRUEF_HAKEN = `(() => {
+  const S = window.__smoke; S.n = 0;
+  const z = setInterval(() => { const g = window.__game; if (!g) return; clearInterval(z); const x = g.excavator, u = x.update;
+    x.update = function (...a) { S.n++; return u.apply(this, a); }; }, 5);
+})();`;
+
+const KAMERA = `(() => { const o = window.__orbit; if (!o) return null; const c = o.camera, d = c.getWorldDirection(c.position.clone());
+  return { modus: o.mode, blick: { ...o.blick }, pos: [c.position.x, c.position.y, c.position.z], dir: [d.x, d.y, d.z], fliegt: o.fliegt, flugT: o.flug ? o.flug.t : null }; })()`;
+
+const BAGGER = `(() => { const x = __game.excavator, S = __smoke;
+  return { cab: x.cabYaw, base: x.cabinBaseYaw, boom: x.boomAngle, stick: x.stickAngle, closure: x.closure, x: x.position.x, z: x.position.z, heading: x.heading,
+    schritte: S.n, takte: S.taktZahl, taktImFlug: S.taktImFlug, zeitS: S.lauf ? S.lauf.zeitS : null, pausiert: __game.isPaused(),
+    kranz: !!document.querySelector("#radial.open, .radial.open"), seite: performance.getEntriesByType("navigation")[0]?.type }; })()`;
+
+/** Zielzeile im DOM: was steht, was ist sichtbar, wo */
+const ZZ_LESEN = `(() => { const z = document.getElementById("zielzeile"); if (!z) return null;
+  const r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height),
+    sichtbar: !!(e.checkVisibility ? e.checkVisibility({ visibilityProperty: true, opacityProperty: true }) : e.offsetParent) && b.width > 0 }; };
+  const satz = document.getElementById("zz-satz"), t = (satz.textContent || "").trim();
+  const knoepfe = {}; for (const id of ["zz-ziel", "zz-pressen", "zz-tipp", "zz-pause", "zz-neu"]) { const e = document.getElementById(id); knoepfe[id] = { ...r(e), aria: e.getAttribute("aria-label") }; }
+  return { sichtbar: !z.hidden, zu: z.classList.contains("zu"), uhr: document.getElementById("zz-uhr").textContent,
+    sterne: document.querySelectorAll("#zz-sterne .stern:not(.aus)").length, mess: document.getElementById("zz-mess").innerText.trim(), messSichtbar: !document.getElementById("zz-mess").hidden,
+    satz: t, satzSichtbar: r(satz).sichtbar, worte: t ? t.split(/\\s+/).length : 0, aria: z.getAttribute("aria-label"), kasten: r(z), knoepfe,
+    tutorialOffen: !!document.querySelector("#tutorial.open"), alteKarte: ["tut-neu", "tut-schritt"].filter((id) => { const e = document.getElementById(id); return e && e.offsetParent; }) }; })()`;
+
+/** 41-Q (5): Sortenfarben — Leuchten/Weg am Teil (Materialfarbe aus der Szene) gegen das Schild seiner Zielmulde (Leinwand-Pixel) */
+const SORTEN_PROBE = `(async () => {
+  const g = __game, T = g.THREE, S = __smoke; const { SORTEN } = await import("/src/materials/sorten.ts");
+  const marken = await new Promise((ok) => { let da = false; g.bus.on("challenge:stand", (e) => { if (!da) { da = true; ok(e.marken.map((m) => ({ ...m, nach: m.nach ? { ...m.nach } : null }))); } }); setTimeout(() => ok(null), 3000); });
+  let sc = g.excavator.root; while (sc.parent) sc = sc.parent;
+  const inst = []; sc.traverse((o) => { if (o.isInstancedMesh && o.instanceColor) inst.push(o); });
+  const hof = inst.find((o) => o.geometry.type === "RingGeometry"), weg = inst.find((o) => o.geometry.type === "PlaneGeometry");
+  const hex = (h) => (h == null ? null : "#" + h.toString(16).padStart(6, "0"));
+  const farbeBei = (n, x, z, ab = 0) => { if (!n) return null; let best = null, bd = 1e9; const m = new T.Matrix4(), p = new T.Vector3(), c = new T.Color();
+    for (let i = 0; i < n.count; i++) { n.getMatrixAt(i, m); p.setFromMatrixPosition(m); const d = Math.hypot(p.x - x, p.z - z); if (d >= ab && d < bd) { bd = d; n.getColorAt(i, c); best = { hex: hex(c.getHex()), d: +d.toFixed(2) }; } } return best; };
+  // Striche AUF der Strecke Teil → nach (quer < 5 cm): ihre Farben — der naechste Strich am Teil kann zu einem anderen Weg gehoeren
+  const wegAuf = (mk) => { if (!weg || !mk.nach) return null; const dx = mk.nach.x - mk.x, dz = mk.nach.z - mk.z, L = Math.hypot(dx, dz), m = new T.Matrix4(), p = new T.Vector3(), c = new T.Color(), farben = {};
+    let n = 0; for (let i = 0; i < weg.count; i++) { weg.getMatrixAt(i, m); p.setFromMatrixPosition(m); const ax = p.x - mk.x, az = p.z - mk.z, entlang = (ax * dx + az * dz) / L, quer = Math.abs(ax * dz - az * dx) / L;
+      if (quer < 0.05 && entlang >= 1.1 && entlang <= L + 0.1) { n++; weg.getColorAt(i, c); const h = hex(c.getHex()); farben[h] = (farben[h] || 0) + 1; } }
+    return { laengeM: +L.toFixed(2), striche: n, farben }; };
+  const lauf = S.lauf, wegZiel = lauf.wegZiel, teile = lauf.objekte.teile;
+  const zeilen = [];
+  for (const mk of (marken || []).filter((m) => m.art === "teil")) {
+    let t = null, td = 1e9; for (const q of teile) { const p = q.body.translation(); const d = Math.hypot(p.x - mk.x, p.z - mk.z); if (d < td) { td = d; t = q; } }
+    const zielId = t ? wegZiel.get(t.id) ?? null : null, c = zielId ? g.containers.byId(zielId) : null, lab = c && c.label;
+    let px = null; if (lab && lab.canvas) { const d = lab.canvas.getContext("2d").getImageData(20, 20, 1, 1).data; px = (d[0] << 16) | (d[1] << 8) | d[2]; }
+    zeilen.push({ teil: t && t.shape && t.shape.name, abstandMarkeTeilM: +td.toFixed(2), sorte: mk.sorte ?? null, sorteFarbe: hex(mk.sorte ? SORTEN[mk.sorte].farbe : null), ziel: zielId,
+      schildSorte: lab ? lab.sorte : null, schildPixel: hex(px), hof: farbeBei(hof, mk.x, mk.z), naechsterFremdstrich: farbeBei(weg, mk.x, mk.z, 1.2), eigenerWeg: wegAuf(mk),
+      nachZurMuldeM: mk.nach && c ? +Math.hypot(mk.nach.x - c.ort.x, mk.nach.z - c.ort.z).toFixed(2) : null });
+  }
+  return { marken: marken ? marken.length : null, hofGefunden: !!hof, wegGefunden: !!weg, zeilen,
+    zielMarken: (marken || []).filter((m) => m.art === "ziel").map((m) => ({ sorte: m.sorte ?? null, x: +m.x.toFixed(2), z: +m.z.toFixed(2) })) };
+})()`;
+
+/** 41-Q (4): deutsche Woerter, die in der englischen Fassung nicht vorkommen (Katalog + Bedienwoerter) */
+const DEUTSCH_WOERTER = (id) => `(async () => {
+  const { challengeNach } = await import("/src/challenges/katalog.ts"); const { WORTE } = await import("/src/ui/aufgabentexte.ts");
+  const d = challengeNach(${JSON.stringify(id)});
+  const teile = (s) => s.toLowerCase().split(/[^a-z\\u00e4\\u00f6\\u00fc\\u00df0-9]+/).filter((w) => w.length >= 3);
+  const de = [], en = [];
+  for (const q of [d.kurz, d.ziel, d.name, ...Object.values(WORTE)]) { if (!q || typeof q.de !== "string") continue; de.push(...teile(q.de)); en.push(...teile(q.en ?? "")); }
+  const enS = new Set(en); return [...new Set(de.filter((w) => !enS.has(w)))];
+})()`;
+
+async function pruefungenSmoke(cdp, neueSeite) {
+  const geraet = process.env.SMOKE_GERAET ?? "mini";
+  const ids = (process.env.SMOKE_PRUEFUNG ?? PRUEF_IDS.join(",")).split(",");
+  const teilAus = new Set((process.env.SMOKE_TEIL ?? "haupt,tipp,tippkurz,englisch,andere,pausebild").split(","));
+  const R = (ergebnis.pruefungen = ergebnis.pruefungen ?? {});
+  const G = (R[geraet] = { haupt: {}, tipp: {}, englisch: {}, andere: {} });
+  const nrVon = (id) => PRUEF_IDS.indexOf(id) + 1;
+  const sichere = () => writeFileSync(join(AUS, ERGEBNIS_DATEI), JSON.stringify(ergebnis, null, 2));
+
+  /** Seite mit Konsole, deutsch (oder englisch), Touch */
+  const seite = async (sprache = "de", vorab = "") => {
+    const p = await neueSeite(geraet);
+    const konsole = [];
+    const st = { phase: "laden" }; // in welchem Abschnitt eine Meldung kam
+    const hoer = (d) => {
+      if (d.sessionId !== p.sid) return;
+      if (d.method === "Runtime.consoleAPICalled" && ["error", "warning", "warn", "assert"].includes(d.params.type))
+        konsole.push(`[${st.phase}] ${d.params.type}: ${d.params.args.map((a) => a.value ?? a.description ?? "").join(" ")}`.slice(0, 300));
+      if (d.method === "Runtime.exceptionThrown") konsole.push(`[${st.phase}] exception: ${d.params.exceptionDetails.exception?.description ?? d.params.exceptionDetails.text}`.slice(0, 300));
+    };
+    cdp.hoerer.push(hoer);
+    await p.s("Page.addScriptToEvaluateOnNewDocument", { source: PRUEF_HAKEN });
+    if (vorab) await p.s("Page.addScriptToEvaluateOnNewDocument", { source: vorab });
+    // Patricks Geraete sind deutsch; Chromium headless meldet sonst en-US (ui/sprache.ts ermittleSprache)
+    const ua = (await cdp.send("Browser.getVersion")).userAgent;
+    const de = sprache === "de";
+    await p.s("Network.setUserAgentOverride", { userAgent: ua, acceptLanguage: de ? "de-DE,de" : "en-GB,en" });
+    await p.s("Emulation.setLocaleOverride", { locale: de ? "de-DE" : "en-GB" }).catch(() => null);
+    const zu = async () => {
+      cdp.hoerer.splice(cdp.hoerer.indexOf(hoer), 1);
+      await p.zu();
+    };
+    const T = (type, pts) => p.s("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([x, y, id]) => ({ x, y, id, force: 0.5 })) });
+    const punkt = async (zone, fx = 0.5, fy = 0.55) =>
+      p.werte(`(() => { const b = document.getElementById(${JSON.stringify(zone)}).getBoundingClientRect(); return [Math.round(b.x + b.width * ${fx}), Math.round(b.y + b.height * ${fy})]; })()`);
+    const phase = async (ph) => {
+      st.phase = ph;
+      await p.werte(`(__smoke.phase = ${JSON.stringify(ph)}, true)`).catch(() => null);
+    };
+    return { ...p, konsole, zu, T, punkt, st, phase };
+  };
+  // Der erste challenge:start kommt, bevor __game steht (main.ts) — er fehlt in der Mitschrift; geladen = Zielzeile da
+  const warteGeladen = (p, ms = 90000) => p.warte("window.__game && document.getElementById('zielzeile') && !document.getElementById('zielzeile').hidden", ms);
+  const warteStart = (p, ab = 0, ms = 90000) => p.warte(`__smoke.log.slice(${ab}).find((e) => e.n === "challenge:start") || null`, ms);
+  const rad = (v) => +((v * 180) / Math.PI).toFixed(3);
+  const abst = (a, b) => +Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]).toFixed(4);
+  const winkel = (a, b) => +((Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) * 180) / Math.PI).toFixed(3);
+  const baggerDelta = (a, b) => ({
+    cabGrad: rad(b.cab - a.cab), boomGrad: rad(b.boom - a.boom), stickGrad: rad(b.stick - a.stick), schliessung: +(b.closure - a.closure).toFixed(4),
+    wegM: +Math.hypot(b.x - a.x, b.z - a.z).toFixed(4), headingGrad: rad(b.heading - a.heading), schritte: b.schritte - a.schritte,
+  });
+  /*
+   * Server-Erstlauf: Vite wandelt beim ersten Abruf um und laedt die Seite dabei
+   * u. U. neu — die Adresse #challenge= ist dann schon geloescht, und es kaeme
+   * das Menue. Darum einmal vorab laden, samt Fahrer-Modul (nicht gemessen).
+   */
+  {
+    const p = await neueSeite(geraet);
+    await p.s("Page.navigate", { url: `${BASIS}#challenge=erster-griff` });
+    await p.warte("window.__game", 120000).catch(() => null);
+    await p.werte(`import("/tools/pruefungsfahrer.ts").then(() => true)`, 120000).catch((e) => log("Erstlauf Fahrer:", String(e)));
+    await pause(3000);
+    await p.zu();
+  }
+  const zoneText = async (p) => {
+    const t = await p.werte(TEXT_SICHT);
+    return { zone: t.zone, inZone: t.inZone, saetze: t.saetze.map((x) => x.text), alle: t.texte.map((x) => x.text) };
+  };
+
+  /* ---- A: Hauptlauf je Pruefung — Flug (Bilder), Zielzeile, F3, ↻, Durchfahren, Tafel */
+  if (teilAus.has("haupt"))
+    for (const id of ids) {
+      const nr = nrVon(id),
+        mitBildern = FLUG_PRUEFUNGEN[geraet]?.includes(id);
+      const A = (G.haupt[id] = { nr });
+      const p = await seite("de", mitBildern ? `window.__smoke.flugHalt = ${FLUG_HALTE[0]};` : "");
+      try {
+        const t0 = Date.now();
+        await p.s("Page.navigate", { url: `${BASIS}#challenge=${id}` });
+        await warteGeladen(p);
+        A.ladeBisStartMs = Date.now() - t0;
+        // Flug: kommt er? (ohne Flug liefe der Lauf — dann sind nach 30 Takten keiner mehr zu erwarten)
+        A.flug = { gesehen: (await p.warte("__smoke.flugGesehen ? 'ja' : (__smoke.taktZahl > 30 ? 'kein' : null)", 30000).catch(() => "kein")) === "ja" };
+        A.flug.start = await p.werte("__smoke.fluege[0] || null");
+        
+        A.flug.blickVor = await p.werte("__smoke.flugGesehen ? __smoke.flugGesehen.blick : null");
+        A.flug.bagger0 = await p.werte(BAGGER);
+        if (A.flug.start) {
+          const t = A.flug.start.teil,
+            z = A.flug.start.ziel;
+          A.flug.teilZielM = +Math.hypot(z.x - t.x, z.y - t.y, z.z - t.z).toFixed(2);
+        }
+        A.flug.bilder = [];
+        await p.phase("flug");
+        if (A.flug.gesehen && mitBildern) {
+          for (let i = 0; i < FLUG_HALTE.length; i++) {
+            const h = FLUG_HALTE[i];
+            await p.warte(`window.__orbit && window.__orbit.flug && window.__orbit.flug.t >= ${h} - 1e-9`, 60000);
+            await p.werte("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))");
+            const b = { soll: h, kamera: await p.werte(KAMERA), bagger: await p.werte(BAGGER), zz: await p.werte(ZZ_LESEN), text: await zoneText(p) };
+            b.bild = await p.bild(`Q_flug_P${nr}_${geraet}_t${String(h).replace(".", "")}`);
+            A.flug.bilder.push(b);
+            await p.werte(`(__smoke.flugHalt = ${FLUG_HALTE[i + 1] ?? "null"}, true)`);
+          }
+        }
+        const tFlug = Date.now();
+        await p.warte("window.__orbit && !window.__orbit.fliegt", 120000);
+        A.flug.wandBisEndeMs = Date.now() - tFlug;
+        A.flug.spur = await p.werte(
+          `__smoke.flugSpur.map((s) => ({ w: Math.round(s.w), n: s.n, dt: +s.dt.toFixed(3), vor: s.vor === null ? null : +s.vor.toFixed(3), nach: s.nach === null ? null : +s.nach.toFixed(3), pos: s.pos.map((v) => +v.toFixed(3)), dir: s.dir.map((v) => +v.toFixed(4)) }))`
+        );
+        A.flug.nachEnde = await p.werte(KAMERA);
+        A.flug.baggerEnde = await p.werte(BAGGER);
+        A.flug.zzEnde = await p.werte(ZZ_LESEN);
+        await pause(1000);
+        A.flug.nach1s = await p.werte(KAMERA);
+        A.flug.bagger1s = await p.werte(BAGGER);
+        A.flug.ersteUhrNachFlug = await p.werte("__smoke.lauf ? +__smoke.lauf.zeitS.toFixed(2) : null");
+        if (mitBildern) A.flug.bildEnde = await p.bild(`Q_flug_P${nr}_${geraet}_t30`);
+        // Sprung am Ende: letztes Flugbild gegen erstes normales Bild
+        const sp = A.flug.spur;
+        const k = sp.findIndex((s) => s.vor !== null && s.nach === null);
+        A.flug.sprungAmEnde = k >= 0 && sp[k - 1] ? { posM: abst(sp[k - 1].pos, sp[k].pos), blickGrad: winkel(sp[k - 1].dir, sp[k].dir) } : null;
+        const schrittweiten = [];
+        for (let i = 1; i < sp.length; i++) if (sp[i].vor !== null) schrittweiten.push(abst(sp[i - 1].pos, sp[i].pos));
+        A.flug.groessterSchrittM = schrittweiten.length ? Math.max(...schrittweiten) : null;
+        A.flug.flugbilder = sp.filter((s) => s.vor !== null).length;
+        A.flug.ruheImFlug = baggerDelta(A.flug.bagger0, A.flug.baggerEnde);
+        // Physikschritte zwischen erstem und letztem Flugbild (S.n zaehlt excavator.update)
+        const imFlug = sp.filter((x) => x.vor !== null);
+        A.flug.schritteImFlug = imFlug.length ? imFlug.at(-1).n - imFlug[0].n : null;
+        A.flug.flugWandMs = imFlug.length ? imFlug.at(-1).w - imFlug[0].w : null;
+        A.flug.blickGleich = A.flug.blickVor ? ["modus", "gier", "nick", "abstand"].every((x) => A.flug.blickVor[x] === A.flug.nachEnde.blick[x]) : null;
+        A.flug.driftNach1s = { posM: abst(A.flug.nachEnde.pos, A.flug.nach1s.pos), blickGrad: winkel(A.flug.nachEnde.dir, A.flug.nach1s.dir) };
+        log(geraet, `P${nr}`, "Flug", JSON.stringify({ gesehen: A.flug.gesehen, wandMs: A.flug.wandBisEndeMs, bilder: A.flug.flugbilder, taktImFlug: A.flug.baggerEnde.taktImFlug, ruhe: A.flug.ruheImFlug, sprung: A.flug.sprungAmEnde, gross: A.flug.groessterSchrittM, blickGleich: A.flug.blickGleich, uhr: A.flug.ersteUhrNachFlug }));
+
+        await p.phase("zielzeile");
+        // Zielzeile: Woerter, nach 4 s Aufgabenzeit nur Bilder (Uhr = Pruefungsuhr)
+        const Z = (A.zielzeile = {});
+        Z.anfang = await p.werte(ZZ_LESEN);
+        Z.anfangText = await zoneText(p);
+        if (nr === 1 || nr === 2) Z.bildWoerter = await p.bild(`Q_zz_P${nr}_${geraet}_woerter`);
+        await p.warte("__smoke.lauf && __smoke.lauf.zeitS >= 4.3", 60000);
+        await pause(200);
+        Z.nach4s = await p.werte(ZZ_LESEN);
+        Z.nach4sText = await zoneText(p);
+        Z.nach4sZeit = await p.werte("+__smoke.lauf.zeitS.toFixed(2)");
+        await p.phase("zz-bildzu");
+        if (nr === 1 || nr === 2) Z.bildZu = await p.bild(`Q_zz_P${nr}_${geraet}_zu`);
+        if (nr === 1) {
+          // Antippen holt die Woerter zurueck, nach 4 s wieder weg
+          await p.phase("zz-antippen");
+          await p.tippe("#zz-ziel");
+          await pause(300);
+          Z.angetippt = await p.werte(ZZ_LESEN);
+          Z.angetipptText = await zoneText(p);
+          const z0 = await p.werte("__smoke.lauf.zeitS");
+          await p.warte(`__smoke.lauf.zeitS >= ${z0} + 4.3`, 60000);
+          await pause(200);
+          Z.angetippt4s = await p.werte(ZZ_LESEN);
+        }
+        await p.phase("f3");
+        // F3, Koerper
+        A.f3 = await p.werte(F3_LESEN);
+        A.zahl = await p.werte(
+          `(() => { const c = __game.physics.counts(); return { koerper: c.bodies, wach: c.awake, beweglich: c.dynamic, kollider: __game.physics.world.colliders.len(), heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null }; })()`
+        );
+        if (nr === 1) A.f3Bild = await p.bild(`Q_f3_P${nr}_${geraet}`);
+        await p.werte(`(() => { window.dispatchEvent(new KeyboardEvent("keydown", { code: "F3" })); window.dispatchEvent(new KeyboardEvent("keyup", { code: "F3" })); return true; })()`);
+        if (id === "sortieren" || id === "magnet") {
+          A.sorten = await p.werte(SORTEN_PROBE, 30000);
+          A.sortenBild = await p.bild(`Q_sorten_P${nr}_${geraet}`);
+        }
+        await p.phase("neustart");
+        // ↻ per Finger auf #zz-neu: neuer Start ohne Neuladen, kein zweiter Flug, Woerter wieder da
+        const N = (A.neustart = {});
+        await p.werte("window.__marke = 'gleiche Seite'; true");
+        const ab = await p.werte("__smoke.log.length");
+        const fluegeVor = await p.werte("__smoke.fluege.length");
+        await p.tippe("#zz-neu");
+        N.start = !!(await warteStart(p, ab, 8000).catch(() => null));
+        await pause(1500);
+        N.gleicheSeite = await p.werte("window.__marke === 'gleiche Seite'").catch(() => false);
+        N.neuerFlug = (await p.werte("__smoke.fluege.length")) > fluegeVor || (await p.werte("!!(window.__orbit && window.__orbit.fliegt)"));
+        N.zz = await p.werte(ZZ_LESEN);
+        N.text = await zoneText(p);
+        N.uhrAb = await p.werte("+__smoke.lauf.zeitS.toFixed(2)");
+        // SMOKE_OHNE_FAHRT=1: nur Flug, Zielzeile, F3, Sortenprobe, ↻ (kurzer Lauf)
+        if (process.env.SMOKE_OHNE_FAHRT) throw new Error("ohne Fahrt (SMOKE_OHNE_FAHRT)");
+        await p.phase("fahrt");
+        // Durchfahren
+        await p.werte(`import("/tools/pruefungsfahrer.ts").then((m) => { window.__fahrer = m; return true; })`, 60000);
+        await p.warte("__smoke.lauf && __smoke.lauf.zeitS > 0.5", 20000);
+        A.uhrBeiFahrtbeginn = await p.werte("+__smoke.lauf.zeitS.toFixed(2)");
+        let fahrt = await p.werte(`__fahrer.fahre(${JSON.stringify(id)})`, 900000);
+        if (fahrt.wartetAufPressen) {
+          A.pressen = { zz: await p.werte(ZZ_LESEN) };
+          A.pressen.bild = await p.bild(`Q_zz_P${nr}_${geraet}_pressen`);
+          await p.tippe("#zz-pressen");
+          await pause(300);
+          A.pressen.busPressen = await p.werte(`__smoke.log.some((e) => e.n === "challenge:pressen")`);
+          A.pressen.laeuft = await p.werte("__game.press.running");
+          A.phase1 = fahrt;
+          fahrt = await p.werte(`__fahrer.weiter()`, 900000);
+        }
+        A.fahrt = fahrt;
+        await p.phase("tafel");
+        const offen = await p.warte("document.getElementById('abrechnung').classList.contains('open')", 15000).catch(() => false);
+        await pause(1500);
+        A.tafel = offen
+          ? await p.werte(`(() => { const t = (id) => { const e = document.getElementById(id); return e ? e.innerText.replace(/\\n+/g, " | ") : null; };
+            return { kopf: t("abr-kopf"), sterneText: t("abr-sterne"), zahlen: t("abr-zahlen") }; })()`)
+          : null;
+        A.tafelBild = await p.bild(`Q_tafel_P${nr}_${geraet}`);
+        A.zzNachGeschafft = await p.werte(ZZ_LESEN);
+        A.seitenfehler = await p.werte("__smoke.fehler");
+        A.kontext = await p.werte("__smoke.kontext");
+      } catch (e) {
+        A.abbruch = String(e?.stack ?? e);
+        A.abbruchBild = await p.bild(`Q_ABBRUCH_P${nr}_${geraet}`).catch(() => null);
+        console.error(e);
+      }
+      A.konsole = p.konsole;
+      log(geraet, `P${nr}`, id, "geschafft", A.fahrt?.geschafft, "Sterne", A.fahrt?.sterne, "Zeit", A.fahrt?.zeitS, "Schritt-ms", JSON.stringify(A.fahrt?.schrittMs), "Koerper", A.zahl?.koerper,
+        "F3", (A.f3 ?? "").replace(/\n/g, " | ").slice(0, 200), "Konsole", A.konsole.length, A.abbruch ? "ABBRUCH " + A.abbruch.slice(0, 300) : "");
+      sichere();
+      await p.zu();
+    }
+
+  /* ---- B: Tipp mitten im Flug — sofort Normallage, Ansicht bleibt, Bagger ruht */
+  if (teilAus.has("tipp"))
+    for (const id of FLUG_PRUEFUNGEN[geraet] ?? []) {
+      if (!ids.includes(id)) continue;
+      const nr = nrVon(id);
+      const B = (G.tipp[id] = { nr });
+      const p = await seite("de");
+      try {
+        await p.s("Page.navigate", { url: `${BASIS}#challenge=${id}` });
+        await warteGeladen(p);
+        await p.warte("window.__orbit && window.__orbit.flug && window.__orbit.flug.t >= 1.0", 60000);
+        B.zone = id === "verladen" ? "zone-mitte" : "zone-right"; // wo der Daumen liegt: rechter Stick; einmal der Mittelstreifen
+        const [x, y] = await p.punkt(B.zone);
+        B.punkt = [x, y];
+        B.vor = { kamera: await p.werte(KAMERA), bagger: await p.werte(BAGGER) };
+        const n0 = await p.werte("__smoke.flugSpur.length");
+        const t0 = Date.now();
+        await p.T("touchStart", [[x, y, 21]]);
+        // Halten, bis die Seite den Abbruch sieht (headless 6–12 Bilder/s; ein echter Tipp ist 50–100 ms)
+        B.abgebrochen = !!(await p.warte("window.__orbit && !window.__orbit.fliegt", 3000).catch(() => false));
+        B.gehaltenMs = Date.now() - t0;
+        await p.T("touchEnd", []);
+        B.direkt = { kamera: await p.werte(KAMERA), bagger: await p.werte(BAGGER) };
+        B.bildDirekt = await p.bild(`Q_tipp_P${nr}_${geraet}_direkt`);
+        B.flugbilderBisAbbruch = await p.werte(`__smoke.flugSpur.slice(${n0}).filter((s) => s.vor !== null).length`);
+        await pause(1500);
+        B.nach15s = { kamera: await p.werte(KAMERA), bagger: await p.werte(BAGGER), zz: await p.werte(ZZ_LESEN) };
+        B.bild = await p.bild(`Q_tipp_P${nr}_${geraet}_nach15s`);
+        B.ansichtGleich = B.vor.kamera.modus === B.nach15s.kamera.modus;
+        B.baggerRuht = baggerDelta(B.vor.bagger, B.nach15s.bagger);
+        B.kameraDirektZuNach15s = { posM: abst(B.direkt.kamera.pos, B.nach15s.kamera.pos), blickGrad: winkel(B.direkt.kamera.dir, B.nach15s.kamera.dir) };
+        const A = G.haupt[id];
+        if (A?.flug?.nach1s) B.gegenVollenFlug = { posM: abst(A.flug.nach1s.pos, B.nach15s.kamera.pos), blickGrad: winkel(A.flug.nach1s.dir, B.nach15s.kamera.dir) };
+        B.uhrBeimAbbruch = B.direkt.bagger.zeitS;
+        log(geraet, `P${nr}`, "Tipp im Flug", JSON.stringify({ abgebrochen: B.abgebrochen, gehaltenMs: B.gehaltenMs, ansicht: B.ansichtGleich, ruht: B.baggerRuht, kam: B.kameraDirektZuNach15s, gegen: B.gegenVollenFlug, uhr: B.uhrBeimAbbruch, kranz: B.nach15s.bagger.kranz }));
+      } catch (e) {
+        B.abbruch = String(e?.stack ?? e);
+        console.error(e);
+      }
+      B.konsole = p.konsole;
+      sichere();
+      await p.zu();
+    }
+
+  /* ---- B2: ein kurzer Tipp (80 ms, wie ein Finger auf dem Glas) mitten im Flug — Pruefung 1 */
+  if (teilAus.has("tippkurz")) {
+    const K = (G.tippKurz = {});
+    const p = await seite("de");
+    try {
+      await p.s("Page.navigate", { url: `${BASIS}#challenge=erster-griff` });
+      await warteGeladen(p);
+      await p.warte("window.__orbit && window.__orbit.flug && window.__orbit.flug.t >= 1.0", 60000);
+      K.fps = await p.werte("new Promise((r) => { const t0 = performance.now(); let n = 0; const f = () => (++n < 10 ? requestAnimationFrame(f) : r(+(9000 / (performance.now() - t0)).toFixed(1))); requestAnimationFrame(f); })");
+      const [x, y] = await p.punkt("zone-right");
+      K.flugTVor = await p.werte("window.__orbit.flug ? window.__orbit.flug.t : null");
+      await p.T("touchStart", [[x, y, 22]]);
+      await pause(80);
+      await p.T("touchEnd", []);
+      await pause(800);
+      K.fliegtNoch = await p.werte("!!window.__orbit.fliegt");
+      K.flugTNach = await p.werte("window.__orbit.flug ? window.__orbit.flug.t : null");
+      K.bagger = await p.werte(BAGGER);
+    } catch (e) {
+      K.abbruch = String(e?.stack ?? e);
+    }
+    K.konsole = p.konsole;
+    log(geraet, "P1 kurzer Tipp im Flug", JSON.stringify(K));
+    sichere();
+    await p.zu();
+  }
+
+  /* ---- C: Englisch — keine deutschen Woerter in Zielzeile und Bild */
+  if (teilAus.has("englisch"))
+    for (const id of ids) {
+      const nr = nrVon(id);
+      const E = (G.englisch[id] = { nr });
+      const p = await seite("en", `try { localStorage.setItem("sprache", "en"); } catch (e) {}`);
+      try {
+        await p.s("Page.navigate", { url: `${BASIS}#challenge=${id}` });
+        await warteGeladen(p);
+        await p.warte("__smoke.flugGesehen || __smoke.taktZahl > 30", 30000);
+        await pause(800);
+        const deutsch = await p.werte(DEUTSCH_WOERTER(id));
+        E.deutscheWoerterGeprueft = deutsch.length;
+        const lies = async () => {
+          const t = await zoneText(p),
+            zz = await p.werte(ZZ_LESEN);
+          const texte = [...t.alle, zz.aria ?? "", zz.satz, ...Object.values(zz.knoepfe).map((k) => k.aria ?? "")];
+          const treffer = texte.filter((s) => /[äöüß]/i.test(s) || s.toLowerCase().split(/[^a-zäöüß0-9]+/).some((w) => deutsch.includes(w)));
+          return { satz: zz.satz, aria: zz.aria, knoepfe: Object.fromEntries(Object.entries(zz.knoepfe).map(([k, v]) => [k, v.aria])), sichtbar: t.alle, treffer, inZone: t.inZone.map((x) => x.text) };
+        };
+        E.imFlug = await lies();
+        if (nr === 1 || nr === 3) E.bild = await p.bild(`Q_en_P${nr}_${geraet}`);
+        await p.warte("window.__orbit && !window.__orbit.fliegt", 120000);
+        await pause(500);
+        E.nachFlug = await lies();
+        log(geraet, `P${nr}`, "EN", JSON.stringify({ satz: E.nachFlug.satz, treffer: [...E.imFlug.treffer, ...E.nachFlug.treffer] }));
+      } catch (e) {
+        E.abbruch = String(e?.stack ?? e);
+        console.error(e);
+      }
+      E.konsole = p.konsole;
+      sichere();
+      await p.zu();
+    }
+
+  /* ---- D: Lehrgang, Sandkasten, Schicht — kein Flug, keine Fehler, Lehrgangsleiste da */
+  if (teilAus.has("andere"))
+    for (const art of ["lehrgang", "sandkasten", "schicht"]) {
+      const D = (G.andere[art] = {});
+      const p = await seite("de");
+      try {
+        if (art === "lehrgang") {
+          await p.s("Page.navigate", { url: BASIS });
+          await p.warte("window.__game && document.getElementById('lehrgangsleiste') && !document.getElementById('lehrgangsleiste').hidden", 90000);
+        } else if (art === "sandkasten") {
+          // Das Menue erscheint erst, wenn schon etwas begonnen wurde: einmal Pruefung 1, dann ohne Adresse
+          await p.s("Page.navigate", { url: `${BASIS}#challenge=erster-griff` });
+          await warteGeladen(p);
+          await p.s("Page.navigate", { url: BASIS });
+          await p.warte("document.getElementById('hauptmenue')?.classList.contains('open')", 60000);
+          await pause(500);
+          await p.tippe("#hm-sandkasten");
+          await p.warte("window.__game && window.__smoke.gameMs", 60000);
+        } else {
+          await p.s("Page.navigate", { url: `${BASIS}#schicht=montag` });
+          await p.warte("window.__game && window.__smoke.gameMs", 90000);
+        }
+        await pause(5000);
+        D.fluege = await p.werte("__smoke.fluege.length");
+        D.fliegt = await p.werte("!!(window.__orbit && window.__orbit.fliegt)");
+        D.flugGesehen = await p.werte("!!__smoke.flugGesehen");
+        D.zielzeileSichtbar = await p.werte(`!document.getElementById("zielzeile").hidden`);
+        D.leiste = await p.werte(LEISTE_LESEN);
+        D.text = await zoneText(p);
+        D.seitenfehler = await p.werte("__smoke.fehler");
+        D.bild = await p.bild(`Q_${art}_${geraet}`);
+        D.f3 = await p.werte(F3_LESEN);
+        log(geraet, art, JSON.stringify({ fluege: D.fluege, fliegt: D.fliegt, zz: D.zielzeileSichtbar, leiste: D.leiste && { sichtbar: D.leiste.sichtbar, kasten: D.leiste.kasten, phase: D.leiste.phase }, fehler: D.seitenfehler }));
+      } catch (e) {
+        D.abbruch = String(e?.stack ?? e);
+        console.error(e);
+      }
+      D.konsole = p.konsole;
+      sichere();
+      await p.zu();
+    }
+
+  /*
+   * ---- E (zuletzt): Pause. Headless verlor Chromium bei offenem Pausenmenue den WebGL-Kontext — auf dem mini beim
+   * PNG des Menues, auf dem iPad schon beim Oeffnen ueber Escape (alter Weg ☰) — und sperrte WebGL danach fuer die
+   * naechste Seite („Web page caused context loss and was blocked"). Darum steht die Pause allein am Ende.
+   */
+  if (teilAus.has("pausebild")) {
+    const p = await seite("de");
+    const P = (G.pause = {});
+    try {
+      await p.s("Page.navigate", { url: `${BASIS}#challenge=erster-griff` });
+      await warteGeladen(p);
+      await p.warte("window.__orbit && !window.__orbit.fliegt", 120000);
+      await pause(1000);
+      // ⏸ oeffnet das Pausenmenue (Bus spiel:pause), die Pruefungsuhr steht
+      await p.phase("zz-pause");
+      await p.tippe("#zz-pause");
+      await pause(500);
+      const u0 = await p.werte("__smoke.lauf.zeitS");
+      await pause(1500);
+      P.zz = {
+        pausiert: await p.werte("__game.isPaused()"),
+        menueOffen: await p.werte(`document.getElementById("pause").classList.contains("open")`),
+        uhrSteht: (await p.werte("__smoke.lauf.zeitS")) === u0,
+        busPause: await p.werte(`__smoke.log.some((e) => e.n === "spiel:pause")`),
+        kontextVorBild: await p.werte("__smoke.kontext.length"),
+      };
+      await p.phase("zz-pausebild");
+      P.bild = await p.bild(`Q_zz_P1_${geraet}_pause`, true);
+      await p.phase("zz-weiter");
+      await p.tippe("#pause-resume");
+      await pause(800);
+      P.zz.weiter = !(await p.werte("__game.isPaused()"));
+      // Gegenprobe ueber den alten Weg (Escape wie ☰)
+      await p.phase("esc-pause");
+      const esc = `(() => { window.dispatchEvent(new KeyboardEvent("keydown", { code: "Escape" })); setTimeout(() => window.dispatchEvent(new KeyboardEvent("keyup", { code: "Escape" })), 50); return true; })()`;
+      await p.werte(esc);
+      await pause(2000);
+      P.esc = { pausiert: await p.werte("__game.isPaused()") };
+      await p.werte(esc);
+      await pause(1500);
+      P.esc.weiter = !(await p.werte("__game.isPaused()"));
+      P.kontext = await p.werte("__smoke.kontext");
+    } catch (e) {
+      P.abbruch = String(e?.stack ?? e);
+    }
+    P.konsole = p.konsole;
+    log(geraet, "Pause", JSON.stringify({ ...P, konsole: P.konsole.length }));
+    sichere();
     await p.zu();
   }
 }
@@ -837,7 +1364,7 @@ try {
     const { browserContextId } = await cdp.send("Target.createBrowserContext", { disposeOnDetach: true });
     const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank", browserContextId });
     const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
-    const s = (m, p) => cdp.send(m, p, sessionId);
+    const s = (m, p, frist) => cdp.send(m, p, sessionId, frist);
     await s("Page.enable");
     await s("Runtime.enable");
     await s("Network.enable");
@@ -845,8 +1372,8 @@ try {
     await s("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
     await s("Emulation.setCPUThrottlingRate", { rate: drossel });
     await s("Page.addScriptToEvaluateOnNewDocument", { source: VORSKRIPT });
-    const werte = async (expr) => {
-      const r = await s("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
+    const werte = async (expr, frist) => {
+      const r = await s("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true }, frist);
       if (r.exceptionDetails) throw new Error(`Seite: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
       return r.result.value;
     };
@@ -864,7 +1391,13 @@ try {
       throw new Error(`Zeitueberschreitung: ${expr}`);
     };
     const bild = async (name, schnell = false) => {
-      const { data } = await s("Page.captureScreenshot", schnell ? { format: "jpeg", quality: 85, optimizeForSpeed: true } : { format: "png" });
+      // 41-Q: Im Pausenmenue scheiterte das PNG headless einmal („Unable to capture screenshot") — dann einmal als JPEG
+      const r = await s("Page.captureScreenshot", schnell ? { format: "jpeg", quality: 85, optimizeForSpeed: true } : { format: "png" }).catch(async () => {
+        await pause(300);
+        schnell = true;
+        return s("Page.captureScreenshot", { format: "jpeg", quality: 90 });
+      });
+      const { data } = r;
       const pfad = join(AUS, `${name}.${schnell ? "jpg" : "png"}`);
       writeFileSync(pfad, Buffer.from(data, "base64"));
       return pfad;
@@ -882,7 +1415,8 @@ try {
     return { s, sid: sessionId, werte, warte, bild, tippe, zu };
   };
   /** Bis die Karte offen ist und zwei Bilder gezeichnet sind (ms ab Navigationsstart). */
-  const karteBereit = (p) => p.warte("window.__smoke && window.__smoke.karteMs > 0 && window.__game && window.__smoke.karteMs");
+  // 41-Q: bereit = Zielzeile da UND Kameraflug vorbei (waehrend des Flugs ruht die Simulation)
+  const karteBereit = (p) => p.warte("window.__smoke && window.__smoke.karteMs > 0 && window.__game && !(window.__orbit && window.__orbit.fliegt) && window.__smoke.karteMs");
   const ladeMs = async (p) => {
     await karteBereit(p);
     return p.werte("({ karteMs: Math.round(__smoke.karteMs), karteOffenMs: Math.round(__smoke.karteOffenMs), dclMs: Math.round(performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd ?? -1), anfragen: performance.getEntriesByType('resource').length, gameMs: Math.round(__smoke.gameMs), fehler: __smoke.fehler })");
@@ -955,7 +1489,7 @@ try {
         await pause(500);
         // ↻ per Finger auf den Knopf (nach Drehen/Schliessen — kein Fahren, also ohne Neuladen)
         await p.werte("window.__marke = 'gleiche Seite'; true");
-        await p.tippe("#tut-neu");
+        await p.tippe("#zz-neu");
         await pause(2000);
         await p.s("HeapProfiler.collectGarbage");
         r.nachFinger = await p.werte(ZUSTAND);
@@ -965,10 +1499,14 @@ try {
         cdp.hoerer.splice(cdp.hoerer.indexOf(hoer), 1);
         ergebnis.aufgaben[`${id}/${geraet}`] = r;
         log(id, geraet, "Karte", JSON.stringify(r.lage1.karte), "Koerper", r.vorher.koerper, r.nachBus.koerper, r.nachFinger.koerper, "Geist", JSON.stringify(r.geist), JSON.stringify(r.geistProbe ?? null), "Konsole", konsole.length);
-        writeFileSync(join(AUS, "aufgaben-smoke.json"), JSON.stringify(ergebnis, null, 2));
+        writeFileSync(join(AUS, ERGEBNIS_DATEI), JSON.stringify(ergebnis, null, 2));
         await p.zu();
       }
     }
+    break ablauf;
+  }
+  if (NUR === "pruefungen") {
+    await pruefungenSmoke(cdp, neueSeite);
     break ablauf;
   }
   if (NUR === "lehrgang") {
@@ -1060,7 +1598,7 @@ try {
     } else {
       const vor = await p.werte("__smoke.log.length");
       const t0 = Date.now();
-      await p.tippe("#tut-neu");
+      await p.tippe("#zz-neu");
       await p.warte(`__smoke.log.slice(${vor}).some((e) => e.n === "challenge:start")`, 5000);
       dauer = { finger: true, wandMs: Date.now() - t0 };
     }
@@ -1116,7 +1654,7 @@ try {
     window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" })); g.autoStep(true); return true; })()`);
   ergebnis.rueckfallFahrweg = await p.werte("+__game.excavator.position.distanceTo(window.__s0).toFixed(2)");
   await p.werte("window.__smoke.karteMs = 0");
-  await p.tippe("#tut-neu");
+  await p.tippe("#zz-neu");
   await pause(300);
   ergebnis.rueckfall = await ladeMs(p);
   ergebnis.rueckfall.neueSeite = await p.werte("window.__marke !== 'gleiche Seite'");
@@ -1142,7 +1680,7 @@ try {
   ergebnis.abbruch = String(e?.stack ?? e);
   console.error(e);
 } finally {
-  writeFileSync(join(AUS, "aufgaben-smoke.json"), JSON.stringify(ergebnis, null, 2));
+  writeFileSync(join(AUS, ERGEBNIS_DATEI), JSON.stringify(ergebnis, null, 2));
   toete(chrome);
   toete(vite);
   try {
@@ -1150,5 +1688,5 @@ try {
   } catch {
     /* Chromium haelt das Profil noch — liegt im Temp-Ordner */
   }
-  log(`Ergebnis: ${join(AUS, "aufgaben-smoke.json")}`);
+  log(`Ergebnis: ${join(AUS, ERGEBNIS_DATEI)}`);
 }

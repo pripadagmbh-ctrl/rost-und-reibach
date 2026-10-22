@@ -884,115 +884,122 @@
         }
         #tutorial p { font-size: 11px; }
       }
-      /* --- Aufgabenkarte (E-162) ---
-         In einer Aufgabe traegt #tutorial die Klasse `aufgabe` (ui/challengekarte.ts).
-         Konto und Tagesablauf sind dort ausgeblendet (main.ts, NUR_IM_BETRIEB) —
-         die Karte darf darum ganz nach oben.
-         Text 14 px (Kap. 20), Zeilenabstand 1,25 wie im HUD-Datenblock.
-
-         Rechnung iPhone mini quer (812 x 375, Rand l/r 50, unten 21) —
-         nachgerechnet in test/aufgabenkarte-platz.test.ts:
-         - Karte x 58..524 (max(8, 50+8) + 466). Die rechte Stick-Zone beginnt
-           bei 0,65 x 812 = 527,8: 3,8 px Luft.
-         - Knoepfe am rechten Rand des Kopfs: 524 - 2 Rahmen - 10 Polster = 512;
-           ↻ 468..512, Klappknopf ▾ 391..462, PRESSEN 289..385 (je 6 px
-           Luecke; seit E-164 von links gesetzt, siehe „Zusammenklappen").
-           Die linke Stick-Zone endet bei 0,35 x 812 = 284,2 — alle drei
-           Knoepfe liegen im Kamera-Mittelstreifen, auch mit der 3 px breiteren
-           Trefferflaeche. Kein Daumen, der einen Stick setzt, trifft einen Knopf.
-         - Hoehe: siehe die knappere Fassung fuer Telefon quer weiter unten
-           (G2b): Unterkante bei Schritt 1 von Aufgabe 1 bei 129, im
-           schlimmsten Fall bei 163; der linke Geisterdaumen beginnt bei 190.
-         - Sternziele in EINER Zeile („★★ 3:00 · ★★★ 1:30"), auf allen Geraeten.
-         - Die Karte selbst nimmt keine Beruehrung an: Ein Daumen, der hoeher
-           aufsetzt, setzt den Stick trotzdem (unter der Karte).
-         iPad quer: Karte x 12..478, Unterkante bei hoechstens 189; die
-         Aufsetzfelder beginnen bei 512 — 323 px Luft. */
-      #tutorial.aufgabe { width: 466px; max-width: none; }
-      body.touch #tutorial.aufgabe { top: max(12px, calc(var(--sa-t) + 8px)); }
-      #tutorial.aufgabe .karte { padding: 6px 12px; }
-      #tutorial.aufgabe .kopf {
-        min-height: 32px; margin-bottom: 0; gap: 8px; font-size: 14px; color: #c8ced2;
+      /* --- Zielzeile der Pruefungen (Auftrag 41-P2, ersetzt die Aufgabenkarte
+         E-162/E-164 in #tutorial) ---
+         Patrick 22.10.2026: „sehr viel Text … kein Fan von diesen Textboxen".
+         Oben eine Zeile, Bilder statt Saetze (ui/zielzeile.ts):
+           [Uhr ★★★ ✓4/6]  [Teil → Ziel] [PRESSEN|Tipp] [↻]   (⏸ seit 43a neben ☰)
+                            Kupfer in BUNT + VA   (nur 4 s, Antippen zeigt sie wieder)
+         Knoepfe ab der linken Kante des Kamera-Mittelstreifens (35 % + 6),
+         die Anzeige links davor, rechtsbuendig an derselben Kante; sie nimmt
+         keine Beruehrung an — ein Daumen dort setzt den Stick.
+         Masse: Knoepfe 44 x 44, Ziel 80 x 44, Luecke 4 — mit PRESSEN oder Tipp
+         (nie beide, ui/zielzeile.ts) 80 + 2 x 44 + 2 x 4 = 176 (bis 43a mit ⏸: 224).
+         iPhone mini quer (812 x 375): Knoepfe x 290..466 im Streifen
+         284,2..527,8; Anzeige hoechstens x 98..278; Satz x 290..522,
+         y 56..81 — die Mittelzone beginnt bei 94 (25 %).
+         iPad 1024 x 768: Knoepfe 364..540 (Streifen 358,4..665,6), Anzeige
+         ab 172; iPad 1180 x 820: Knoepfe 419..595 (413..767).
+         Gerechnet in test/zielzeile-platz.test.ts. */
+      #zielzeile {
+        position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 12;
+        pointer-events: none; color: #e8e8e4; font: 700 14px "Consolas", monospace;
       }
-      #tutorial.aufgabe .kopf .uhr { color: #f0d060; font-weight: 700; }
-      /* Knoepfe: sichtbar 32 px hoch, Trefferflaeche 44 px (::before ragt
-         6 px nach oben und unten). touch-action: none, user-select: none —
-         ein Tipp ist ein Tipp, kein Zoom und keine Textauswahl. */
-      #tutorial.aufgabe .kopf button {
-        position: relative; box-sizing: border-box; height: 32px; padding: 0 8px;
-        font: 600 14px "Consolas", monospace; color: #e8e8e4;
-        background: rgba(46,52,57,0.92); border: 2px solid rgba(255,255,255,0.3); border-radius: 7px;
-        touch-action: none; user-select: none; -webkit-user-select: none;
+      #zielzeile[hidden] { display: none; }
+      #zielzeile svg { display: block; width: 100%; height: 100%; }
+      #zielzeile .zz-info {
+        position: fixed; right: calc(65% + 6px); top: max(8px, calc(var(--sa-t) + 8px));
+        box-sizing: border-box; height: 44px; display: flex; align-items: center; gap: 6px;
+        padding: 0 8px; border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+        background: rgba(20,23,26,0.62); white-space: nowrap;
       }
-      #tutorial.aufgabe .kopf button::before {
-        content: ""; position: absolute; left: -3px; right: -3px; top: -6px; bottom: -6px;
+      #zielzeile .zz-uhr { flex: none; width: 40px; text-align: right; color: #f0d060; }
+      #zielzeile .zz-sterne { flex: none; display: flex; gap: 1px; color: #f0d060; }
+      #zielzeile .stern { width: 16px; height: 16px; }
+      /* verloren: nur noch Umriss UND blass — nie nur Farbe (Kap. 20) */
+      #zielzeile .stern.aus { opacity: 0.45; }
+      #zielzeile .zz-mess { flex: none; display: flex; align-items: center; gap: 3px; width: 60px; }
+      #zielzeile .zz-mess[hidden] { display: none; }
+      #zielzeile .zz-mess svg { width: 16px; height: 16px; flex: none; color: #4fd06a; }
+      #zielzeile .zz-mess .spur { display: block; width: 60px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.2); overflow: hidden; }
+      #zielzeile .zz-mess .spur i { display: block; height: 100%; background: #f0b429; }
+      #zielzeile .zz-knoepfe {
+        position: fixed; left: calc(35% + 6px); top: max(8px, calc(var(--sa-t) + 8px));
+        display: flex; gap: 4px;
       }
-      #tutorial.aufgabe .kopf button[hidden] { display: none; }
-      #tutorial.aufgabe #tut-pause { width: 72px; }
-      #tutorial.aufgabe #tut-neu { width: 44px; padding: 0; font-size: 20px; line-height: 1; }
-      /* PRESSEN: nur solange das Wrack in der Kammer liegt — gross, gelb, pulsierend */
-      #tutorial.aufgabe #tut-pressen {
-        width: 96px; padding: 0; font-weight: 700; letter-spacing: 1px;
+      #zielzeile button {
+        flex: none; box-sizing: border-box; width: 44px; height: 44px; padding: 8px; margin: 0;
+        border-radius: 8px; border: 2px solid rgba(255,255,255,0.3); background: rgba(46,52,57,0.92);
+        color: #e8e8e4; cursor: pointer; pointer-events: auto;
+        touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+      }
+      #zielzeile button[hidden] { display: none; }
+      #zielzeile #zz-ziel { width: 80px; padding: 0 4px; display: flex; align-items: center; gap: 2px; }
+      #zielzeile #zz-ziel[hidden] { display: none; }
+      #zielzeile #zz-ziel .bild { flex: none; width: 26px; height: 26px; }
+      #zielzeile #zz-ziel .pfeil { flex: none; width: 12px; height: 12px; color: #f0d060; }
+      /* PRESSEN: nur solange das Wrack in der Kammer liegt — gelb und pulsierend */
+      #zielzeile #zz-pressen {
         background: #f0b429; border-color: #f0b429; color: #1a1c1e;
         animation: tut-pressen-puls 1.1s ease-in-out infinite;
       }
-      #tutorial.aufgabe .zusatz { font-size: 14px; line-height: 1.25; color: #e8e8e4; }
-      #tutorial.aufgabe .zusatz[hidden] { display: none; }
-      #tutorial.aufgabe .ziel { color: #f0d060; }
-      #tutorial.aufgabe .tipp { color: #f0b429; }
-      #tutorial.aufgabe .stern { color: #9aa2a8; }
-      #tutorial.aufgabe h3 { margin: 2px 0 0; font-size: 15px; line-height: 1.25; letter-spacing: 0; }
-      #tutorial.aufgabe p { font-size: 14px; line-height: 1.25; color: #e8e8e4; }
-      #tutorial.aufgabe .balken { display: flex; align-items: center; gap: 8px; }
-      #tutorial.aufgabe .balken .spur {
-        flex: 1; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.15); overflow: hidden;
+      #zielzeile #zz-tipp { color: #f0b429; border-color: rgba(240,180,41,0.75); }
+      #zielzeile .zz-satz {
+        position: fixed; left: calc(35% + 6px); right: calc(35% + 6px);
+        top: max(56px, calc(var(--sa-t) + 56px));
       }
-      #tutorial.aufgabe .balken .fuell { display: block; height: 100%; width: 0; background: #f0b429; }
-      #tutorial.pausiert .zusatz { display: none; }
-      /* Telefon quer (G2b, 19.10.2026): Die Karte verdeckte bei Schritt 1 das
-         Kupferteil (Smoke-Test 812 x 375: Unterkante 160). Knapper gesetzt,
-         Schrift bleibt 14 px: Zeilenabstand 1,2, Titel 14 px ohne Rand,
-         Knoepfe sichtbar 28 px (Trefferflaeche weiter 44: ::before 8 px nach
-         oben und unten), Kopf 28, Polster 3 px, Abstand oben 6 px.
-         Schritt 1 von Aufgabe 1 (Ziel, Titel, Text 2 Zeilen, Sternzeile):
-         2 + 3 + 28 + 17 + 17 + 34 + 17 + 3 + 2 = 123, Unterkante 6 + 123 = 129
-         (vorher 165) — ab y 130 ist das Arbeitsfeld frei. Schlimmster Fall
-         (dazu Zaehler, Sternzeile umgebrochen): 157, Unterkante 163; der linke
-         Geisterdaumen beginnt bei 190. */
-      @media (max-height: 430px) {
-        #tutorial.aufgabe { left: max(8px, calc(var(--sa-l) + 8px)); }
-        body.touch #tutorial.aufgabe { top: max(6px, calc(var(--sa-t) + 6px)); }
-        #tutorial.aufgabe .karte { padding: 3px 10px; }
-        #tutorial.aufgabe .kopf { min-height: 28px; }
-        #tutorial.aufgabe .kopf button { height: 28px; }
-        #tutorial.aufgabe .kopf button::before { top: -8px; bottom: -8px; }
-        #tutorial.aufgabe .zusatz, #tutorial.aufgabe p { line-height: 1.2; }
-        #tutorial.aufgabe h3 { margin: 0; font-size: 14px; line-height: 1.2; }
+      #zielzeile.zu .zz-satz { display: none; }
+      #zielzeile #zz-satz {
+        display: inline-block; max-width: 100%; box-sizing: border-box; padding: 3px 6px;
+        border: 1px solid rgba(240,208,96,0.5); border-radius: 8px; background: rgba(20,23,26,0.78);
+        color: #f0d060; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
-      /* Zusammenklappen auf dem Telefon quer (E-164, Patrick 20.10.2026 „A"):
-         Jeder neue Schritt steht 5 s voll da, dann bleibt nur der Kopf —
-         2 + 3 + 28 + 3 + 2 = 38 px, Unterkante 6 + 38 = 44. Der Fortschritt
-         rueckt in den Kopf („1/2 · 0:42 · 4/6 richtig", `.kurz`).
-         Der Klappknopf (#tut-pause, ▾ / ▴) ist die Trefferflaeche zum
-         Aufklappen und fuellt den Kopf von der linken Stick-Zone bis ↻:
-         Schrifthalter 73 + 208 + 8 Luecke = 289, mit ::before 286 — die linke
-         Stick-Zone endet bei 284,2. Ohne PRESSEN ▾ 289..462 (173 px), mit
-         PRESSEN 289..385 und ▾ 391..462. Der Text links nimmt keine
-         Beruehrung an: Ein Daumen dort setzt den Stick, nicht die Karte.
-         Gerechnet in test/aufgabenkarte-platz.test.ts. */
-      #tutorial.aufgabe .kurz { display: none; }
-      @media (max-height: 430px) {
-        #tutorial.aufgabe .kopf .links { flex: none; width: 208px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-        #tutorial.aufgabe .kopf .knoepfe { flex: 1; }
-        #tutorial.aufgabe #tut-pause { flex: 1; width: auto; font-size: 22px; line-height: 1; }
-        #tutorial.aufgabe.pausiert .kurz { display: inline; }
-      }
-      /* Telefon hoch: volle Breite bis vor den Menueknopf (12 + 46 + 4 Rahmen
-         + 8 Luft = 70 px vom rechten Rand). */
+      /* Telefon hoch: Der Streifen ist nur 75 px breit. Knoepfe rechts vor
+         ⏸ und ☰ (43a: ⏸ endet bei 82 + 46 = 128, + 8 Luft = 136), Anzeige darunter
+         links, der Satz darunter. Nicht abgenommen (Pruefungen laufen quer). */
       @media (max-width: 500px) and (min-height: 431px) {
-        #tutorial.aufgabe { width: auto; left: max(8px, calc(var(--sa-l) + 8px)); right: 70px; }
-        body.touch #tutorial.aufgabe { top: max(8px, calc(var(--sa-t) + 8px)); }
+        #zielzeile .zz-knoepfe { left: auto; right: max(136px, calc(var(--sa-r) + 136px)); }
+        #zielzeile .zz-info { right: auto; left: max(8px, calc(var(--sa-l) + 8px)); top: calc(var(--sa-t) + 60px); }
+        #zielzeile .zz-satz { left: max(8px, calc(var(--sa-l) + 8px)); right: max(8px, calc(var(--sa-r) + 8px)); top: calc(var(--sa-t) + 108px); }
       }
+      /* --- ⏸ neben ☰ und das ▶-Feld (Auftrag 43a, ui/pausenknopf.ts) ---
+         Patrick 22.10.2026: eigener ⏸ neben ☰ im ganzen Spiel, friert ein und
+         macht still; ein grosses ▶ in der Bildmitte setzt fort. Kein Wort.
+         ⏸ (Id btn-halt — "btn-pause" ist der PAUSE-Eintrag im Kranz, 43a-N):
+         in der ☰-Reihe links davon, 8 px Luft zur GROESSEREN ☰-Fassung, damit
+         er vor und nach L8-B2 frei steht. border-box, sonst setzt "#touch .btn"
+         seinen Innenrand durch.
+           iPad:  ☰ vor L8-B2 62 x 72 -> rechts 12 + 62 + 8 = 82
+                  (mit Rand: Rand + 8 + 62 + 8 = Rand + 78), oben 12, 46 x 46
+                  (1024: x 896..942; ☰ 950..1012 vor, 966..1012 nach L8-B2).
+           flach: ☰ vor L8-B2 56 x 66 -> rechts Rand + 8 + 56 + 8 = Rand + 72,
+                  oben 8, 44 x 44 (iPhone mini quer: x 646..690; ☰ 698..754
+                  vor, 710..754 nach L8-B2).
+         ▶-Feld: das ganze Bild nimmt den Tipp an (z 19: ueber HUD, Zielzeile
+         und Lehrgangsleiste, unter dem Pausenmenue 20). Kein Abdunkeln, nur
+         das Zeichen — SW: 120 px, Scheibe 50 %, Dreieck 85 % deckend.
+         Gerechnet in test/pausenknopf-platz.test.ts. */
+      #touch #btn-halt {
+        box-sizing: border-box; width: 46px; height: 46px; padding: 0; z-index: 3;
+        top: max(12px, calc(var(--sa-t) + 8px));
+        right: max(82px, calc(var(--sa-r) + 78px));
+      }
+      #touch #btn-halt svg { display: block; width: 24px; height: 24px; margin: 9px auto; pointer-events: none; }
+      @media (max-height: 430px) {
+        #touch #btn-halt {
+          width: 44px; height: 44px;
+          top: max(8px, calc(var(--sa-t) + 8px));
+          right: max(72px, calc(var(--sa-r) + 72px));
+        }
+        #touch #btn-halt svg { margin: 8px auto; }
+      }
+      #weiterfeld {
+        position: fixed; inset: 0; z-index: 19; display: flex; align-items: center; justify-content: center;
+        background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+        touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+      }
+      #weiterfeld[hidden] { display: none; }
+      #weiterfeld svg { width: 120px; height: 120px; pointer-events: none; }
       /* --- Geisterdaumen (E-162) ---
          Ring in Stickgroesse, Daumen darin, Pfeil darauf. Zeigt, WO der Daumen
          hin soll und WOHIN er schiebt (ui/geisterdaumen.ts). Nur auf Touch,
@@ -1751,6 +1758,10 @@
           <circle cx="4" cy="14" r="2.3" /><circle cx="6.93" cy="6.93" r="2.3" />
         </svg>
       </div>
+      <!-- 43a: ⏸ links neben ☰ — friert ein und macht still (ui/pausenknopf.ts) -->
+      <div class="btn" id="btn-halt" role="button" aria-label="Pause">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M8 5v14M16 5v14" /></svg>
+      </div>
       <!-- Traeger der Tastencodes; unsichtbar, der Kranz liest Beschriftung
            und Reihenfolge daraus. So bleibt die Zuordnung an einer Stelle. -->
       <div class="hidden-actions">
@@ -1879,6 +1890,16 @@
       <div class="zeile"><span class="phase"></span><span class="fn"></span><span class="wort"></span><button id="lg-skip" type="button"></button></div>
       <div class="frage"><span class="fsym" aria-hidden="true"></span><button id="lg-ja" type="button"></button><button id="lg-nein" type="button"></button></div>
       <div class="punkte" aria-hidden="true"></div>
+    </div>
+    <!-- 43a: grosses ▶ in der Bildmitte, das ganze Feld setzt fort (ui/pausenknopf.ts) -->
+    <button id="weiterfeld" type="button" aria-label="Weiter" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11.5" fill="rgba(20,22,24,0.5)" /><path d="M9.5 7v10l8-5z" fill="rgba(255,255,255,0.85)" /></svg>
+    </button>
+    <!-- 41-P2: Zielzeile der Pruefungen (ui/zielzeile.ts) — Bilder statt Text, aria-label traegt das Ziel -->
+    <div id="zielzeile" role="group" translate="no" hidden>
+      <div class="zz-info"><span id="zz-uhr" class="zz-uhr"></span><span id="zz-sterne" class="zz-sterne"></span><span id="zz-mess" class="zz-mess" hidden></span></div>
+      <div class="zz-knoepfe"><button id="zz-ziel" type="button"></button><button id="zz-pressen" type="button" hidden></button><button id="zz-tipp" type="button" hidden></button><button id="zz-neu" type="button"></button></div>
+      <div class="zz-satz"><span id="zz-satz"></span></div>
     </div>
     <div id="shop">
       <div class="panel">

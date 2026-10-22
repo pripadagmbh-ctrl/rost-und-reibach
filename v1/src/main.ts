@@ -81,7 +81,8 @@ import { LektionLauf } from "./challenges/lektion";
 import { Wiedergabe } from "./core/wiedergabe";
 import { lehrgangEinstieg } from "./core/save";
 import { installLektionsKarte } from "./ui/lektionskarte";
-import { installChallengeKarte } from "./ui/challengekarte";
+import { installZielzeile } from "./ui/zielzeile";
+import { installPausenknopf } from "./ui/pausenknopf";
 import { installGeisterdaumen } from "./ui/geisterdaumen";
 import { installZielmarke } from "./ui/zielmarke";
 import { onSprache, sprache, t } from "./ui/sprache";
@@ -197,15 +198,15 @@ async function main(): Promise<void> {
    */
   /*
    * In einer Challenge (E-125) kommt dazu, was nur ins freie Spiel gehoert
-   * (`NUR_IM_SANDKASTEN`). Die Lernkarte `#tutorial` bleibt dort im Bild: Sie
-   * zeigt die Schritte der Challenge (`ui/challengekarte.ts`).
+   * (`NUR_IM_SANDKASTEN`). Seit Auftrag 41 zeigt die Zielzeile (`#zielzeile`,
+   * `ui/zielzeile.ts`) die Pruefung; `#tutorial` braucht nur noch der Betrieb.
    */
   const ausblenden = BETRIEB
     ? NUR_IM_SIMULATOR
     : schichtStufe
       ? [...NUR_IM_BETRIEB, ...NUR_AUSSER_SCHICHT] // E-205: eigene Anzeige statt Konto/Uhr/Ladeanzeige, kein NACHSCHUB, kein Speichern
       : aufgabenPlatz
-      ? [...NUR_IM_BETRIEB.filter((id) => id !== "tutorial"), ...NUR_IM_SANDKASTEN]
+      ? [...NUR_IM_BETRIEB, ...NUR_IM_SANDKASTEN]
       : NUR_IM_BETRIEB;
   for (const id of new Set(ausblenden)) {
     const el = document.getElementById(id)!;
@@ -481,9 +482,20 @@ async function main(): Promise<void> {
       if (!press.start()) hud.toast(press.sperrgrund ?? "Presse läuft bereits …");
     });
     bus.on("challenge:geschafft", (e) => merkeChallenge(e.id, e.sterne));
+    /*
+     * Auftrag 41-P3b: Kameraflug Teil → Ziel zum Start (3 s, Tippen
+     * ueberspringt). Nur beim ersten Start nach dem Laden — ein ↻ ohne
+     * Neuladen fliegt nicht noch einmal (wer neu versucht, kennt den Weg).
+     */
+    let geflogen = false;
+    bus.on("challenge:vorschau", ({ teil, ziel }) => {
+      if (geflogen) return;
+      geflogen = true;
+      orbit.starteFlug(teil, ziel);
+    });
     // Begonnen ist begonnen: Der naechste Start zeigt das Menue
     merkeChallenge(challengeDaten.id, 0);
-    const karte = installChallengeKarte({ bus, steuerung: () => touch.config, audio });
+    const karte = installZielzeile({ bus, audio }); // Auftrag 41-P2: Zielzeile statt Fliesstext-Karte
     onSprache(() => karte.neuBeschriften());
     installGeisterdaumen({ bus, steuerung: () => touch.config });
     installZielmarke(scene, bus);
@@ -590,14 +602,25 @@ async function main(): Promise<void> {
 
   const pauseEl = document.getElementById("pause")!;
   let paused = false;
-  const setPaused = (v: boolean): void => {
+  /** 43a: ⏸ haelt ohne Menue an — nur das ▶ in der Bildmitte (ui/pausenknopf.ts) */
+  let still = false;
+  const zeigePause = (v: boolean, ohneMenue: boolean): void => {
     paused = v;
-    pauseEl.classList.toggle("open", v);
-    if (v) zeigeGreiferwahl();
+    still = v && ohneMenue;
+    pauseEl.classList.toggle("open", v && !ohneMenue);
+    if (v && !ohneMenue) zeigeGreiferwahl();
+    if (v) touch.releaseAll(); // 43a: Geister-Zeiger-Sicherung — kein Stick-/Pedalfinger bleibt haengen
     if (!v) {
       pauseEl.classList.remove("settings");
       document.getElementById("controls-menu")!.classList.remove("open");
     }
+  };
+  /** ☰, ESC/P, WEITER und alle Menueknoepfe — wie bisher, dazu der Bus (43a: Audio verstummt an spiel:pause) */
+  const setPaused = (v: boolean): void => {
+    const vorher = paused;
+    zeigePause(v, false);
+    if (v) bus.emit("spiel:pause", { art: "menue" });
+    else if (vorher) bus.emit("spiel:weiter", {});
   };
   /*
    * Greiferwahl (E-059). Der Knopf steht im Pausenmenue, weil er nichts ist,
@@ -624,6 +647,15 @@ async function main(): Promise<void> {
     speichereGreifer(e.greifer);
   });
   document.getElementById("pause-resume")!.addEventListener("click", () => setPaused(false));
+  // 43a: ⏸ neben ☰ friert ohne Menue ein (▶ setzt fort); ESC/P waehrend der Stille laufen ueber setPaused(false)
+  bus.on("spiel:pause", (e) => {
+    if (e.art === "still" && !paused) zeigePause(true, true);
+  });
+  bus.on("spiel:weiter", () => {
+    if (still) zeigePause(false, false);
+  });
+  const pausenknopf = installPausenknopf({ bus });
+  onSprache(() => pausenknopf.neuBeschriften());
   document.getElementById("pause-save")!.addEventListener("click", () => {
     hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
     setPaused(false);
@@ -1107,7 +1139,8 @@ async function main(): Promise<void> {
   for (const u of UPGRADES) if (ausbau.has(u.id)) wendeAn(u.id);
   // Baggerausbau und größere Presse wirken über diese Abfragen
   excavator.getSpeedBonus = () => (ausbau.has("boom") ? 1.35 : 1);
-  grip.getCapacityBonus = () => (ausbau.has("boom") ? 1.5 : 1);
+  // Auftrag 41 (qa 41-Q Befund 3): In Pruefung und Lehrgang ohne Ausbau-Bonus — sonst kommt in Pruefung 6 nie die Ueberlast, die sie lehrt (E-163); die Aufgaben-Tests rechnen ebenfalls ohne
+  grip.getCapacityBonus = () => (ausbau.has("boom") && !aufgabenPlatz ? 1.5 : 1);
   press.getBaleBonus = () => (ausbau.has("press") ? 1.6 : 1);
   // Bulldozer und Stapler tun Verschiedenes: der eine macht Lambert schneller,
   // der andere lässt ihn schwerer heben. Wer beide hat, merkt beides.
@@ -1679,6 +1712,29 @@ async function main(): Promise<void> {
     }
     if (paused || abrechnung.offen || schichtTafel?.offen) {
       // In der Pause ruht die Simulation; nur Rendern und Eingaben laufen weiter
+      renderer.render(scene, orbit.camera);
+      input.endFrame();
+      requestAnimationFrame(frame);
+      return;
+    }
+    if (orbit.fliegt) {
+      // Auftrag 41-P3b: Kameraflug — die Simulation ruht wie in der Pause (keine Physik, keine Pruefungsuhr)
+      orbit.update(
+        frameDt,
+        input,
+        (out) => excavator.getCameraTarget(out),
+        (out) => {
+          excavator.getCabinEye(out);
+          return excavator.cabinBaseYaw;
+        }
+      );
+      // 41-Q Befund 1: Marken (Leuchten, Weg, Pfeil) schon im Flug zeigen — takt(0) laesst die Uhr stehen
+      challenge?.takt(0);
+      // Erst rechnen, dann abbrechen: Der Ueberspring-Tipp schaltet nichts anderes mit
+      if (touch.daumenAuf || input.aktiv) {
+        orbit.abbrechenFlug();
+        touch.consumePress("KeyC");
+      }
       renderer.render(scene, orbit.camera);
       input.endFrame();
       requestAnimationFrame(frame);

@@ -147,19 +147,3 @@ describe("Hauptmenü Stufe 2: 12 Lektionen und alle Prüfungen ohne Scrollen", (
     }
   }
 });
-
-describe("Lektionskarte auf dem iPhone mini quer", () => {
-  const f = FASSUNGEN.find((x) => x.name === "iPhone mini quer")!;
-  it("Kopf, Ziel, Titel, Text in 2 Zeilen, Hinweis: Unterkante ≤ 129 wie Aufgabe 1", () => {
-    const zeile = Math.ceil(14 * 1.2); // `.zusatz`, h3, p: 14 px × 1,2 (index.html, Telefon quer)
-    expect(schriftgroesse(["#tutorial.aufgabe .zusatz"], f)).toBe(14);
-    const oben = px(["#tutorial", "#tutorial.aufgabe", "body.touch #tutorial", "body.touch #tutorial.aufgabe"], "top", f);
-    const kopf = px(["#tutorial .kopf", "#tutorial.aufgabe .kopf"], "min-height", f);
-    const [pad] = fassungInnen(["#tutorial .karte", "#tutorial.aufgabe .karte"], f);
-    const h = 2 * RAHMEN + 2 * pad + kopf + zeile * (1 + 1 + 2 + 1);
-    if (process.env["MASS"]) console.log("Karte", oben, h);
-    expect(oben + h).toBeLessThanOrEqual(129);
-    // Der Kopf passt in die 208 px links: „Lektion 12 · Schritt 4/4"
-    expect(zeilen("Lektion 12 · Schritt 4/4", 208, 14)).toBe(1);
-  });
-});

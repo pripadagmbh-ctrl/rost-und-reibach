@@ -95,6 +95,7 @@ export const EN: Record<string, string> = {
   "Bildmitte ziehen: Kamera drehen · zwei Finger: Zoom": "Drag the middle: turn camera · two fingers: zoom",
   "Knopf rechts oben: Funktionskranz": "Button top right: function ring",
   Funktionen: "Functions", // L7-A: aria-label des Kranz-Knopfs
+  Weiter: "Resume", // 43a: aria-label des ▶-Felds (ui/pausenknopf.ts)
   Zurück: "Back",
 
   // --- Steuerungsmenü ---

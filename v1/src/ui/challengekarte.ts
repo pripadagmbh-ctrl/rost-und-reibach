@@ -1,34 +1,23 @@
 /**
- * DIE AUFGABENKARTE (E-125, ausgebaut mit E-162 am 19.10.2026) — dieselbe
- * Karte wie der gefuehrte Einstieg des Betriebs (`#tutorial`): gleiche Stelle,
- * gleiche Bauart, kein zweites Kaertchen. In einer Aufgabe gehoert sie der
- * Aufgabe; der Handelskreislauf ist dort nicht angeschlossen.
+ * BEDIENWOERTER UND KNOPF-HELFER DER PRUEFUNGEN (E-125/E-162).
  *
- * Was darauf steht (Konzept `docs/aufgaben-konzept.md`, abgenommen 19.10.2026):
+ * Hier stand bis Auftrag 41-P2 (22.10.2026) die Aufgabenkarte, die Fliesstext-
+ * Karte in `#tutorial`. Sie ist ersetzt durch die Zielzeile
+ * (`ui/zielzeile.ts`: Bild Teil → Bild Ziel, Uhr, Sterne, Zaehler). Was
+ * weiterlebt, weil Geisterdaumen, Lehrgangsleiste und Zielzeile es teilen:
  *
- *   2/6 · 0:42                    [PRESSEN] [Pause] [↻]
- *   Ziel: Leg das Kupferteil in die Box BUNT + VA.
- *   Senk die Spinne ab                       (der Mini-Schritt)
- *   Linker Stick nach unten: Hauptarm senken (SEINE Belegung)
- *   4/6 richtig  — oder —  platt ▓▓▓░░ 60 %
- *   Tipp (erst nach einem Ereignis)
- *   ★★ 3:00 · ★★★ 1:30 · 0 Fehlwürfe   (eine Zeile, E-162 G2b)
+ *  - `achseVon`, `stickRichtung`, `bedientext`: aus der Stickbelegung, die
+ *    gerade gilt, Name und Richtung des Bedienelements — EINE Stelle fuer
+ *    Vorlesetext und Geisterdaumen;
+ *  - `Klappe`: auf/zu nach einer Frist auf der Aufgabenuhr (E-164; die
+ *    Zielzeile blendet damit ihre Woerter aus);
+ *  - `tippKnopf`, `zeile`: Knopf an Zeiger statt `click`, Text nur bei Aenderung.
  *
- * Haengt nur am Bus (Regel 10): Sie liest `challenge:start/schritt/stand/
- * geschafft` und sendet `challenge:neustart` (↻) und `challenge:pressen`.
- * Ob ↻ neu laedt oder neu aufbaut, entscheidet main.ts.
- *
- * Die Karte schreibt nur, was sich geaendert hat: `challenge:stand` kommt
- * einmal je Bild, die Uhr springt aber nur jede ganze Sekunde.
- *
- * Die Platzhalter im Text werden HIER zu den Namen der Bedienelemente, und
- * zwar aus der Stickbelegung, die gerade gilt: Wer im Steuerungsmenue
- * umbelegt hat, liest seine eigene Belegung — in seiner Sprache.
+ * Der Dateiname bleibt, damit die Importe stehen bleiben koennen.
  */
-import type { EventBus, GameEvents } from "../core/events";
 import type { AxisId, ControlConfig, ControlFunction } from "../core/controlConfig";
-import { sprache, waehle, type Sprache } from "../challenges/texte";
-import { sternZiele, uhr, wort } from "./aufgabentexte";
+import { sprache, type Sprache } from "../challenges/texte";
+import { wort } from "./aufgabentexte";
 
 /** Welche Achse fuehrt die Funktion? (die erste, wenn doppelt belegt) */
 export function achseVon(fn: ControlFunction, c: ControlConfig): AxisId | null {
@@ -131,21 +120,27 @@ export const ZUKLAPPEN_S = 5;
 export class Klappe {
   zu = false;
   private t = 0;
-  private bis = ZUKLAPPEN_S;
-  constructor(private readonly auto: () => boolean) {}
+  private bis: number;
+  /** `frist`: Sekunden offen — Karte `ZUKLAPPEN_S`, Zielzeile `WOERTER_S` (41-P2) */
+  constructor(
+    private readonly auto: () => boolean,
+    private readonly frist = ZUKLAPPEN_S
+  ) {
+    this.bis = frist;
+  }
 
   /** Neue Aufgabe oder ↻: Uhr von vorn, Karte auf. */
   neustart(): void {
     this.t = 0;
     this.zu = false;
-    this.bis = ZUKLAPPEN_S;
+    this.bis = this.frist;
   }
 
   /** Neuer Schritt, neuer Tipp, PRESSEN erscheint. */
   zeige(): void {
     if (!this.auto()) return;
     this.zu = false;
-    this.bis = this.t + ZUKLAPPEN_S;
+    this.bis = this.t + this.frist;
   }
 
   /** Der Klappknopf. */
@@ -153,7 +148,7 @@ export class Klappe {
     if (!this.zu) this.zu = true;
     else {
       this.zu = false;
-      this.bis = this.t + ZUKLAPPEN_S;
+      this.bis = this.t + this.frist;
     }
   }
 
@@ -162,19 +157,6 @@ export class Klappe {
     this.t = t;
     if (this.auto() && !this.zu && t >= this.bis) this.zu = true;
   }
-}
-
-/** Was die Karte von aussen braucht — mehr nicht. */
-export interface KartenAnschluss {
-  bus: EventBus;
-  steuerung: () => ControlConfig;
-  /** Ein Schritt ist geschafft: der Doppelklick aus `audioManager.playSchritt` */
-  audio: { playSchritt(): void };
-}
-
-export interface ChallengeKarte {
-  /** Nach einem Sprachwechsel: alles neu beschriften (der Bauleiter haengt es an die Sprachwahl). */
-  neuBeschriften(): void;
 }
 
 /** Einen Knopf an Zeiger statt an `click` haengen (Begruendung im Rumpf). */
@@ -222,247 +204,4 @@ export function zeile(el: HTMLElement, leerVersteckt = true): (text: string) => 
     el.textContent = text;
     if (leerVersteckt) el.hidden = text === "";
   };
-}
-
-export function installChallengeKarte(m: KartenAnschluss): ChallengeKarte {
-  const karte = document.getElementById("tutorial");
-  const innen = karte?.querySelector<HTMLElement>(".karte");
-  const kopf = karte?.querySelector<HTMLElement>(".kopf");
-  const knoepfe = karte?.querySelector<HTMLElement>(".knoepfe");
-  const schritt = document.getElementById("tut-schritt");
-  const titel = document.getElementById("tut-titel");
-  const text = document.getElementById("tut-text");
-  const pause = document.getElementById("tut-pause");
-  const skip = document.getElementById("tut-skip");
-  const leer: ChallengeKarte = { neuBeschriften() {} };
-  if (!karte || !innen || !kopf || !knoepfe || !schritt || !titel || !text || !pause) return leer;
-
-  // Die Karte gehoert hier der Aufgabe: eigene Fassung (index.html, `.aufgabe`),
-  // eigene Sprache — die Seitenuebersetzung (`ui/sprache.ts`) laesst sie aus.
-  karte.classList.add("aufgabe");
-  karte.setAttribute("translate", "no");
-  // Ueberspringen gibt es hier nicht: ein Schritt ist geschafft, wenn er gesehen wurde
-  if (skip) skip.hidden = true;
-
-  // --- Kopf: „2/6 · 0:42" links, Knoepfe rechts
-  const links = document.createElement("span");
-  links.className = "links";
-  const uhrEl = document.createElement("span");
-  uhrEl.className = "uhr";
-  // Zusammengeklappt (Telefon quer) steht der Fortschritt mit im Kopf: „1/2 · 0:42 · 4/6 richtig"
-  const kurzEl = document.createElement("span");
-  kurzEl.className = "kurz";
-  kopf.insertBefore(links, schritt);
-  links.append(schritt, " · ", uhrEl, kurzEl);
-
-  const pressen = document.createElement("button");
-  pressen.type = "button";
-  pressen.id = "tut-pressen";
-  pressen.hidden = true;
-  const neu = document.createElement("button");
-  neu.type = "button";
-  neu.id = "tut-neu";
-  neu.textContent = "↻";
-  knoepfe.insertBefore(pressen, pause);
-  knoepfe.appendChild(neu);
-  pause.setAttribute("type", "button");
-
-  // --- Zeilen unter dem Kopf. `.zusatz` klappt mit der Karte ein (Pause).
-  const neueZeile = (klasse: string): HTMLDivElement => {
-    const d = document.createElement("div");
-    d.className = `zusatz ${klasse}`;
-    d.hidden = true;
-    return d;
-  };
-  const zielEl = neueZeile("ziel");
-  const zaehlerEl = neueZeile("zaehler");
-  const balkenEl = neueZeile("balken");
-  const balkenWort = document.createElement("span");
-  const balkenSpur = document.createElement("span");
-  balkenSpur.className = "spur";
-  const balkenFuell = document.createElement("span");
-  balkenFuell.className = "fuell";
-  const balkenZahl = document.createElement("span");
-  balkenSpur.appendChild(balkenFuell);
-  balkenEl.append(balkenWort, balkenSpur, balkenZahl);
-  const tippEl = neueZeile("tipp");
-  const sternEl = neueZeile("stern");
-  innen.insertBefore(zielEl, titel);
-  innen.append(zaehlerEl, balkenEl, tippEl, sternEl);
-
-  const setzeUhr = zeile(uhrEl);
-  const setzeSchritt = zeile(schritt);
-  const setzeTitel = zeile(titel);
-  const setzeText = zeile(text);
-  const setzeZiel = zeile(zielEl);
-  const setzeZaehler = zeile(zaehlerEl);
-  const setzeTipp = zeile(tippEl);
-  const setzeSterne = zeile(sternEl);
-  const setzeKurz = zeile(kurzEl, false);
-  // Knoepfe: Sichtbarkeit steuert der Zustand, nicht der Text
-  const setzePause = zeile(pause, false);
-  const setzePressen = zeile(pressen, false);
-
-  // --- Was zuletzt gemeldet wurde: daraus wird nach einem Sprachwechsel neu beschriftet
-  let start: GameEvents["challenge:start"] | null = null;
-  let letzterSchritt: GameEvents["challenge:schritt"] | null = null;
-  let stand: GameEvents["challenge:stand"] | null = null;
-  let balkenProzent = -1;
-  let pressenSichtbar = false;
-  let laeuft = false;
-  let tippAlt = "";
-
-  // --- Auf/zu (E-164): dieselbe Grenze wie das flache Layout in index.html
-  const klein = matchMedia("(max-height: 430px)");
-  const klappe = new Klappe(() => klein.matches);
-  /*
-   * Ein Knopf, eine Bedienung: Auf dem Telefon quer heisst er ▾ / ▴ und ist
-   * die Trefferflaeche zum Aufklappen („Pause" klang nach Spielpause,
-   * Patrick 20.10.); sonst bleibt er „Pause" / „weiter".
-   */
-  const beschrifteKlappe = (s: Sprache): void => {
-    const zu = karte.classList.contains("pausiert");
-    if (klein.matches) {
-      setzePause(zu ? "▾" : "▴");
-      pause.setAttribute("aria-label", wort(zu ? "karteAufklappen" : "karteEinklappen", s));
-    } else {
-      setzePause(wort(zu ? "weiter" : "pause", s));
-      pause.setAttribute("aria-label", wort("karteEinklappen", s));
-    }
-  };
-  const zeigeKlappe = (): void => {
-    if (karte.classList.contains("pausiert") === klappe.zu) return;
-    karte.classList.toggle("pausiert", klappe.zu);
-    beschrifteKlappe(sprache());
-  };
-  klein.addEventListener("change", () => beschrifteKlappe(sprache()));
-
-  const beschrifteFest = (s: Sprache): void => {
-    beschrifteKlappe(s);
-    neu.setAttribute("aria-label", wort("neustart", s));
-    neu.title = wort("neustart", s);
-    setzePressen(wort("pressen", s));
-    balkenWort.textContent = wort("platt", s);
-  };
-
-  const zeigeStart = (s: Sprache): void => {
-    if (!start) return;
-    setzeZiel(`${wort("ziel", s)}: ${waehle(start.ziel, s)}`);
-    setzeSterne(sternZiele(start.wertung, s));
-  };
-
-  const zeigeSchritt = (s: Sprache): void => {
-    const e = letzterSchritt;
-    if (!e) return;
-    setzeSchritt(`${e.nr}/${e.von}`);
-    setzeTitel(waehle(e.titel, s));
-    setzeText(bedientext(waehle(e.text, s), m.steuerung(), s));
-  };
-
-  const zeigeStand = (s: Sprache): void => {
-    const e = stand;
-    if (!e) return;
-    setzeUhr(uhr(e.zeitS));
-    setzeZaehler(e.zaehler ? `${e.zaehler.ist}/${e.zaehler.von} ${waehle(e.zaehler.wort, s)}` : "");
-    const pct = e.balken01 === null ? -1 : Math.round(Math.max(0, Math.min(1, e.balken01)) * 100);
-    if (pct !== balkenProzent) {
-      balkenProzent = pct;
-      balkenEl.hidden = pct < 0;
-      if (pct >= 0) {
-        balkenFuell.style.width = `${pct}%`;
-        // Zahl UND Balken: Farbe/Laenge ist nie der einzige Kanal (Kap. 20)
-        balkenZahl.textContent = `${pct} %`;
-      }
-    }
-    setzeTipp(e.tipp ? waehle(e.tipp, s) : "");
-    setzeKurz(
-      e.zaehler
-        ? ` · ${e.zaehler.ist}/${e.zaehler.von} ${waehle(e.zaehler.wort, s)}`
-        : pct >= 0
-          ? ` · ${wort("platt", s)} ${pct} %`
-          : ""
-    );
-    // Ein neuer Tipp oder PRESSEN klappt die Karte auf (E-164). Verglichen
-    // wird der deutsche Text, damit ein Sprachwechsel nicht als neuer Tipp zaehlt.
-    const tipp = e.tipp?.de ?? "";
-    if (tipp !== tippAlt) {
-      tippAlt = tipp;
-      if (tipp !== "") klappe.zeige();
-    }
-    if (e.pressenBereit !== pressenSichtbar) {
-      pressenSichtbar = e.pressenBereit;
-      pressen.hidden = !pressenSichtbar;
-      if (pressenSichtbar) klappe.zeige();
-    }
-    klappe.zeit(e.zeitS);
-    zeigeKlappe();
-  };
-
-  const allesNeu = (): void => {
-    const s = sprache();
-    beschrifteFest(s);
-    zeigeStart(s);
-    zeigeSchritt(s);
-    zeigeStand(s);
-  };
-
-  // --- Knoepfe
-  tippKnopf(pause, () => {
-    klappe.tippe();
-    zeigeKlappe();
-  });
-  let zuletztNeu = -Infinity;
-  tippKnopf(neu, () => {
-    // Ein zweiter Tipp waehrend des Neustarts ist kein zweiter Neustart
-    const jetzt = performance.now();
-    if (jetzt - zuletztNeu < 800) return; // SW: 0,8 s Sperre
-    zuletztNeu = jetzt;
-    m.bus.emit("challenge:neustart", {});
-  });
-  tippKnopf(pressen, () => {
-    if (pressenSichtbar && laeuft) m.bus.emit("challenge:pressen", {});
-  });
-
-  // --- Bus
-  m.bus.on("challenge:start", (e) => {
-    start = e;
-    letzterSchritt = null;
-    stand = null;
-    balkenProzent = -1;
-    balkenEl.hidden = true;
-    pressenSichtbar = false;
-    laeuft = true;
-    tippAlt = "";
-    klappe.neustart();
-    zeigeKlappe();
-    const s = sprache();
-    beschrifteFest(s);
-    zeigeStart(s);
-    setzeUhr(uhr(0));
-    setzeZaehler("");
-    setzeTipp("");
-    karte.classList.add("open");
-  });
-  m.bus.on("challenge:schritt", (e) => {
-    if (letzterSchritt && e.nr > letzterSchritt.nr) m.audio.playSchritt(); // der vorige Schritt ist geschafft
-    letzterSchritt = e;
-    laeuft = true;
-    zeigeSchritt(sprache());
-    klappe.zeige();
-    zeigeKlappe();
-    karte.classList.add("open");
-  });
-  m.bus.on("challenge:stand", (e) => {
-    stand = e;
-    zeigeStand(sprache());
-  });
-  m.bus.on("challenge:geschafft", () => {
-    laeuft = false;
-    pressenSichtbar = false;
-    pressen.hidden = true;
-    karte.classList.remove("open");
-  });
-
-  beschrifteFest(sprache());
-  return { neuBeschriften: allesNeu };
 }

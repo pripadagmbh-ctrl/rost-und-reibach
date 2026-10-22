@@ -197,3 +197,61 @@ export function unterLicht(hex: number, licht: number, staerke: number): number 
     linearZuSrgb(b * lb * staerke)
   );
 }
+
+/* ------------------------------------------- Farbsehschwaeche (Auftrag 41) ---- */
+
+export type Sehschwaeche = "deutan" | "protan" | "tritan";
+
+/**
+ * Simulationsmatrizen fuer Farbsehschwaechen nach Machado, Oliveira und
+ * Fernandes (2009), „A Physiologically-based Model for Simulation of Color
+ * Vision Deficiency", IEEE TVCG 15(6), 1291–1298 — Tabelle der Autoren
+ * (Projektseite UFRGS, „matrices for simulating CVD"), Schweregrad 1,0, also
+ * Deuteranopie, Protanopie und Tritanopie. Angewendet auf LINEARES RGB, so wie
+ * die Autoren und die gaengigen Umsetzungen (DaltonLens, colorspacious) es tun.
+ *
+ * Zeilen = Ausgabe R, G, B; Spalten = Eingabe R, G, B.
+ */
+export const MACHADO_2009: Readonly<Record<Sehschwaeche, readonly (readonly number[])[]>> = {
+  protan: [
+    [0.152286, 1.052583, -0.204868],
+    [0.114503, 0.786281, 0.099216],
+    [-0.003882, -0.048116, 1.051998],
+  ],
+  deutan: [
+    [0.367322, 0.860646, -0.227968],
+    [0.280085, 0.672501, 0.047413],
+    [-0.01182, 0.04294, 0.968881],
+  ],
+  tritan: [
+    [1.255528, -0.076749, -0.178779],
+    [-0.078411, 0.930809, 0.147602],
+    [0.004733, 0.691367, 0.3039],
+  ],
+};
+
+/** Wie eine Farbe (0xrrggbb) mit dieser Farbsehschwaeche erscheint. */
+export function simuliereSehschwaeche(hex: number, art: Sehschwaeche): number {
+  const lin = hexZuRgb(hex).map(srgbZuLinear);
+  const m = MACHADO_2009[art];
+  const aus = m.map((zeile) => zeile[0]! * lin[0]! + zeile[1]! * lin[1]! + zeile[2]! * lin[2]!);
+  return rgbZuHex(linearZuSrgb(aus[0]!), linearZuSrgb(aus[1]!), linearZuSrgb(aus[2]!));
+}
+
+/** ΔE2000 zweier Farben, wie sie jemand mit dieser Farbsehschwaeche sieht. */
+export function deltaEHexBei(a: number, b: number, art: Sehschwaeche): number {
+  return deltaEHex(simuliereSehschwaeche(a, art), simuliereSehschwaeche(b, art));
+}
+
+/** Relative Leuchtdichte nach WCAG 2.1 (sRGB, 0 … 1). */
+export function leuchtdichte(hex: number): number {
+  const [r, g, b] = hexZuRgb(hex).map(srgbZuLinear);
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+
+/** Kontrastverhaeltnis nach WCAG 2.1, 1 … 21. 4,5 : 1 ist die Stufe AA fuer Text. */
+export function kontrast(a: number, b: number): number {
+  const la = leuchtdichte(a);
+  const lb = leuchtdichte(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}

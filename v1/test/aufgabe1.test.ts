@@ -588,7 +588,7 @@ describe("Aufgabe 1: der Ablauf mit Attrappen", () => {
     a.ueberTeil();
     a.fassen();
     a.lauf.takt(1);
-    expect(a.staende.at(-1)!.marken).toEqual([{ x: -7.6, y: 2.0, z: -19.8, art: "ziel" }]);
+    expect(a.staende.at(-1)!.marken).toEqual([{ x: -7.6, y: 2.0, z: -19.8, art: "ziel", sorte: "bunt" }]); // Auftrag 41: in der Farbe von BUNT + VA
     expect(a.staende.at(-1)!).toMatchObject({ zaehler: null, balken01: null, pressenBereit: false, tipp: null });
   });
 

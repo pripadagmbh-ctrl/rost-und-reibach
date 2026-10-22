@@ -114,6 +114,10 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
       de: "Leg das Kupferteil in die Box BUNT + VA.",
       en: "Put the copper part into the NON-FERROUS + SS bay.",
     },
+    // Auftrag 41: Ziel-Satz der Zielzeile (≤ 5 Woerter) und Bild Teil → Ziel
+    kurz: { de: "Kupfer in BUNT + VA", en: "Copper into NON-FERROUS" },
+    // Teil: Kupferbild in Zinnober, Ziel: das Schild der Mulde — dieselbe Farbe, zwei Bilder
+    zeichen: { teil: { sorte: "kupfer" }, ziel: { sorte: "bunt" } },
     aufbau: {
       /*
        * Der Kupfer-Boiler (`scrapItems.ts`, Grossteile): 65 kg, liegend
@@ -219,6 +223,9 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
       de: "Leg das Wrack in die Presse und press es.",
       en: "Put the wreck in the press and crush it.",
     },
+    // Auftrag 41: Ziel-Satz der Zielzeile (≤ 5 Woerter) und Bild Teil → Ziel
+    kurz: { de: "Auto in die Presse", en: "Car into the press" },
+    zeichen: { teil: { bild: "wrack" }, ziel: { bild: "presse" } },
     aufbau: {
       wracks: [
         {
@@ -308,6 +315,9 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
       de: "Bring alle sechs Teile in die richtige Mulde.",
       en: "Put all six parts into the right bay.",
     },
+    // Auftrag 41: Ziel-Satz der Zielzeile (≤ 5 Woerter) und Bild Teil → Ziel
+    kurz: { de: "Jedes Teil in seine Mulde", en: "Each part to its bay" },
+    zeichen: { teil: { bild: "gemischt" }, ziel: { bild: "mulden" } },
     /*
      * SECHS TEILE, die man an der Form erkennt (G3, Konzept Aufgabe 3) — je
      * Sorte gewaehlt nach dem, was die Griff-Info sagt (`fraktionVonTeil`),
@@ -395,6 +405,9 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
       de: "Mach den Wohnwagen platt — nur mit der Spinne.",
       en: "Flatten the caravan — with the grapple only.",
     },
+    // Auftrag 41: Ziel-Satz der Zielzeile (≤ 5 Woerter) und Bild Teil → Ziel
+    kurz: { de: "Wohnwagen platt machen", en: "Flatten the caravan" },
+    zeichen: { teil: { bild: "wohnwagen" }, ziel: { bild: "platt" } },
     /*
      * DER WOHNWAGEN (E-135, knautscht dreimal so schnell wie ein Pkw) steht
      * vorn LINKS auf 22°, 7,4 m, Deichsel gerade zum Bagger (G5).
@@ -498,6 +511,10 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
       de: "Eisen auf STAHL, Späne auf MISCH, Kupfer liegen lassen.",
       en: "Iron to STEEL, swarf to MIXED, leave the copper.",
     },
+    // Auftrag 41: Ziel-Satz der Zielzeile (≤ 5 Woerter) und Bild Teil → Ziel
+    kurz: { de: "Eisen auf STAHL", en: "Iron onto STEEL" },
+    // Spaene auf MISCH sagt das Bild: Sie leuchten Purpur und ihr Weg fuehrt zur Mischhalde
+    zeichen: { teil: { bild: "eisen" }, ziel: { sorte: "stahl" } },
     /*
      * DER HAUFEN (Konzept Aufgabe 5): fuenf magnetische Teile — zwei
      * Spaeneknaeuel (E-147, 82 % Stahl), Stahlknueppel, LKW-Felge,
@@ -594,6 +611,9 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
       de: "Leg das LKW-Wrack in den grünen Kreis.",
       en: "Put the truck wreck into the green circle.",
     },
+    // Auftrag 41: Ziel-Satz der Zielzeile (≤ 5 Woerter) und Bild Teil → Ziel
+    kurz: { de: "LKW-Wrack in den Kreis", en: "Truck wreck into the circle" },
+    zeichen: { teil: { bild: "lkw" }, ziel: { bild: "kreis" } },
     /*
      * DAS AUSGESCHLACHTETE LKW-WRACK (Patrick 20.10.2026, Wahl B): alle Teile
      * ab (`restoreState`), der Rumpf allein `LKW_DEF.hullMassKg` = 4 990 kg.
@@ -654,8 +674,9 @@ export const CHALLENGES: readonly ChallengeDaten[] = [
     // Der Kreis steht von Anfang an (Patrick 20.10.2026, G4) — man sieht, wohin es geht, bevor man greift
     zielMarkeAbStart: true,
     tippNachUeberlast: {
-      de: "Zu schwer so weit draußen: Stütz dich ab (STÜTZEN) und versuch es nochmal.",
-      en: "Too heavy that far out: put the outriggers down (OUTRIGGER) and try again.",
+      // Auftrag 41: hoechstens 5 Woerter / 28 Zeichen (Zielzeile iPhone mini, 41-P2)
+      de: "Erst STÜTZEN setzen",
+      en: "Set OUTRIGGERS first",
     },
     schritte: [
       {

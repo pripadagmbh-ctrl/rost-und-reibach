@@ -24,7 +24,7 @@ import type { TouchAxes } from "../src/core/touch";
 import { bedientext } from "../src/ui/challengekarte";
 import { defaultConfig } from "../src/core/controlConfig";
 import { DT, GRAD, platzLeinwand, werkbank } from "./aufgabenwerkbank";
-import { FASSUNGEN, fassungInnen, px, pxOderNull, schriftgroesse, zeilen } from "./cssmass";
+import { zeilen } from "./cssmass";
 
 /* ------------------------------------------------------------------------ */
 /* 1. Ablauf mit Attrappen                                                  */
@@ -420,18 +420,9 @@ describe("Der Lehrgang ist vom Wiedergabe-Fahrer schaffbar (echter Bagger, echte
 /* 3. Daten und Texte                                                        */
 /* ------------------------------------------------------------------------ */
 
-const MINI = FASSUNGEN.find((f) => f.name === "iPhone mini quer")!;
-const HALTER = ["#tutorial", "#tutorial.aufgabe", "body.touch #tutorial", "body.touch #tutorial.aufgabe"];
-const KARTE = ["#tutorial .karte", "#tutorial.aufgabe .karte"];
-const ZUSATZ = ["#tutorial.aufgabe .zusatz"];
-const TEXT = ["#tutorial p", "#tutorial.aufgabe p"];
-/** Innenbreite der Aufgabenkarte (wie `test/aufgabenkatalog.test.ts`) — bis die Lehrgang-Karte eigene Masse hat */
-function innen(): number {
-  const links = px(HALTER, "left", MINI);
-  const breite = pxOderNull(HALTER, "width", MINI);
-  const rechts = breite === null ? MINI.w - px(HALTER, "right", MINI) : links + breite;
-  return rechts - links - 5 - 2 - 2 * fassungInnen(KARTE, MINI)[1];
-}
+/** Innenbreite der frueheren Aufgabenkarte auf dem iPhone mini quer (wie `test/aufgabenkatalog.test.ts`, 41-P2: Karte ersetzt, Texte bleiben so kurz) */
+const innen = (): number => 439;
+const SCHRIFT_PX = 14;
 
 function platzhalter(t: string): string[] {
   return (t.match(/\{[a-z]+[+-]?\}/g) ?? []).sort();
@@ -466,10 +457,10 @@ describe("Lehrgang: Daten und Texte", () => {
       }
       const breite = innen();
       for (const s of ["de", "en"] as const) {
-        expect(zeilen(l.ziel[s], breite, schriftgroesse(ZUSATZ, MINI)), `${s} Ziel: ${l.ziel[s]}`).toBe(1);
+        expect(zeilen(l.ziel[s], breite, SCHRIFT_PX), `${s} Ziel: ${l.ziel[s]}`).toBe(1);
         for (const st of l.schritte) {
           const text = bedientext(st.text[s], defaultConfig(), s);
-          expect(zeilen(text, breite, schriftgroesse(TEXT, MINI)), `${s} ${st.titel[s]}: ${text}`).toBeLessThanOrEqual(2);
+          expect(zeilen(text, breite, SCHRIFT_PX), `${s} ${st.titel[s]}: ${text}`).toBeLessThanOrEqual(2);
         }
       }
     });

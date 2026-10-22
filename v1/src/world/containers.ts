@@ -14,6 +14,7 @@ import type { ItemManager, ScrapItem } from "./scrapItems";
 import type { EventBus } from "../core/events";
 import { t } from "../ui/sprache"; // E-170: Schilder in der Spielsprache
 import { MUELL_WANNE } from "../delivery/hakenlift"; // E-190: eine Quelle für Container und Haken
+import { AMPEL_ZEICHEN, SORTEN, farbeCss, sorteVonKonfig, zeichnePfade, zeichneSortenbild, type SorteId } from "../materials/sorten"; // Auftrag 41: Bildschild
 
 /**
  * Sortierziele (Design-Pivot 2026-08-27): offene **Haufen-Zonen** für die großen
@@ -1331,8 +1332,16 @@ class GameContainer {
             body
           );
       }
-      this.label = new ContainerLabel(cfg.label, fraction.color);
-      this.label.sprite.position.set(cfg.x, hh + 1.4, cfg.z + hd / 2 + 1.0);
+      this.label = new ContainerLabel(cfg);
+      /*
+       * Schild über der HINTEREN Kante (Bucht-Mauer), wie bei den Mulden am
+       * geschlossenen Ende (Auftrag 41). Vorher stand es 1 m vor der vorderen
+       * Kante — genau neben der Startkamera (−0,5 | 7,1 | −32,5; 5,2 und 6,4 m):
+       * halb ausgeblendet hing es als Geisterbild oben links und rechts im
+       * ersten Bild, und das grössere Bildschild hätte dort eine Ecke des
+       * Schirms belegt. Hinten sieht man es, sobald man sich zur Halde dreht.
+       */
+      this.label.sprite.position.set(cfg.x, hh + 1.4, cfg.z - hd / 2 - 0.5);
     } else if (cfg.kind === "bay") {
       // Betonlego-Box (Design-Wunsch 2026-08-27): drei Wände aus gestapelten
       // Beton-Legosteinen mit Noppen, vorn offen — wie auf echten Schrottplätzen.
@@ -1514,7 +1523,7 @@ class GameContainer {
           body
         );
       }
-      this.label = new ContainerLabel(cfg.label, fraction.color);
+      this.label = new ContainerLabel(cfg);
       /*
        * Schild am hinteren (geschlossenen) Ende — so steht es nicht im
        * Blickfeld. Die Seite kommt aus `bayRuecken`, nicht aus `+ w/2`: Bei
@@ -1676,7 +1685,7 @@ class GameContainer {
         teil(sx / 2, h / 2, sz / 2, wx, wandY, wz);
       }
       this.koerper = body;
-      this.label = new ContainerLabel(cfg.label, fraction.color);
+      this.label = new ContainerLabel(cfg);
       this.label.sprite.position.set(cfg.x, KUFE + T + h + 0.9, cfg.z);
     } else if (cfg.kind === "pile") {
       /*
@@ -1689,7 +1698,7 @@ class GameContainer {
       pole.position.set(0, 1.15, d / 2 + 0.3);
       pole.castShadow = true;
       group.add(pole);
-      this.label = new ContainerLabel(cfg.label, fraction.color);
+      this.label = new ContainerLabel(cfg);
       this.label.sprite.position.set(cfg.x, 2.9, cfg.z + d / 2 + 0.3);
     } else {
       // Kleinbox mit Wänden + Kollidern (Kupfer/Kabel)
@@ -1724,7 +1733,7 @@ class GameContainer {
           body
         );
       }
-      this.label = new ContainerLabel(cfg.label, fraction.color);
+      this.label = new ContainerLabel(cfg);
       this.label.sprite.position.set(cfg.x, h + 1.15, cfg.z);
     }
     scene.add(this.label.sprite);
@@ -2026,22 +2035,66 @@ export function muldenSchrift(text: string, w: number, d: number, y: number, h: 
   return m;
 }
 
-/** World-Space-Label als Canvas-Sprite (Name, Füllung, Reinheit, Erlös + Ampelrahmen). */
+/*
+ * BILDSCHILD (Auftrag 41, Patrick 22.10.2026: „Farbe und Bildschild an jeder
+ * Mulde, im ganzen Spiel"). Aufbau der Leinwand, 256 x 272 Punkte:
+ *
+ *     0 … 148  Farbfeld in der Sortenfarbe, darin gross das Bild (132 px)
+ *   148 … 184  dunkler Streifen mit dem Namen, klein
+ *   184 … 264  nur beim Darueberschwenken: Fuellung, Reinheit, Erloes
+ *
+ * Farbe und Bild aus `materials/sorten.ts` — keine zweite Liste hier. Die
+ * Ampel (E-061) bleibt der Rahmen und bekommt ein Zeichen ✓ / ! / ✕ in der
+ * Ecke, damit sie auch ohne Farbsehen lesbar ist.
+ */
+/** Breite und Hoehe der Leinwand in Punkten (zwei Zahlenzeilen plus Ampelrahmen brauchen 264). */
+const SCHILD_PX = 256;
+const SCHILD_HOCH_PX = 272;
+/** Breite des Schilds in der Welt — dieselbe wie vorher (2,30 m), nur hoeher. */
+const SCHILD_M = 2.3;
+/** Farbfeld (Punkte auf der Leinwand). */
+const FELD_H = 148;
+// SW: 132 px Bild = 1,19 m in der Welt; Ziel ≥ 24 px aus der Startkamera auf dem iPhone mini quer (Messung P1)
+const BILD_PX = 132;
+const NAME_H = 36;
+const TAFEL_H = FELD_H + NAME_H; // 184
+/**
+ * Ankerpunkt (Sprite-Mitte, von unten gezaehlt). Die Unterkante der Tafel
+ * liegt 0,235 m unter dem Anker — genau dort, wo die Unterkante des alten
+ * Namensstreifens lag (0,47 m hoch, mittig am Anker). So wandert kein Schild
+ * in eine Wand; es waechst nach oben.
+ */
+const ANKER_V = 1 - TAFEL_H / SCHILD_HOCH_PX + 0.235 / ((SCHILD_M * SCHILD_HOCH_PX) / SCHILD_PX);
+/** Zahlenzeilen unter dem Namen: Abstand der Grundlinien, erste Grundlinie unter der Tafel. */
+const ZEILE_PX = 32;
+const ZEILE_1 = 28;
+
+/** Ampelfarben wie bisher (E-061). */
+export const AMPEL_FARBE: Readonly<Record<AmpelState, string>> = { green: "#35c24d", yellow: "#e0b528", red: "#d84a38" };
+/** Scheibe und Strich des Ampelzeichens ✓ / ! / ✕ (Kontrast im Test). */
+export const ZEICHEN_GRUND = "#f4f4f0";
+export const ZEICHEN_STRICH = "#141618";
+
+/** World-Space-Label als Canvas-Sprite (Bild der Sorte, Name; beim Darueberschwenken Fuellung, Reinheit, Erloes + Ampel). */
 class ContainerLabel {
   readonly sprite: THREE.Sprite;
   private canvas = document.createElement("canvas");
   private texture: THREE.CanvasTexture;
 
-  constructor(_title: string, private fractionColor: number) {
-    this.canvas.width = 256;
-    this.canvas.height = 128;
+  /** Der Datensatz statt einer festen Farbe: Die Schicht stellt `c_mixed` vor dem Bau auf MÜLL um (E-201). */
+  constructor(private cfg: ContainerConfig) {
+    this.canvas.width = SCHILD_PX;
+    this.canvas.height = SCHILD_HOCH_PX;
     this.texture = new THREE.CanvasTexture(this.canvas);
+    // Sortenfarbe so, wie sie in der Tabelle steht (sRGB), nicht ausgewaschen
+    this.texture.colorSpace = THREE.SRGBColorSpace;
     // Tiefentest an: das Schild gehört zur Szene und verschwindet hinter
     // Bagger oder Haufen. Ohne ihn schwebte es über allem und beherrschte
     // jede Einstellung (Design-Fix 29.08.2026).
     const mat = new THREE.SpriteMaterial({ map: this.texture, transparent: true });
     this.sprite = new THREE.Sprite(mat);
-    this.sprite.scale.set(2.3, 1.15, 1);
+    this.sprite.scale.set(SCHILD_M, (SCHILD_M * SCHILD_HOCH_PX) / SCHILD_PX, 1);
+    this.sprite.center.set(0.5, ANKER_V);
   }
 
   /**
@@ -2081,39 +2134,96 @@ class ContainerLabel {
     this.sprite.visible = a > 0.02;
   }
 
+  /** Welche Sorte gerade auf dem Schild steht (für Wächter und Bildwerkzeuge). */
+  get sorte(): SorteId | null {
+    return sorteVonKonfig(this.cfg);
+  }
+
   draw(lines: string[], ampel: AmpelState | null): void {
     this.zeigtAmpel = ampel !== null;
     const ctx = this.canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, 256, 128);
-    const kurz = lines.length === 1;
-    // Nur-Name-Schild ist flach und ruhig, das ausführliche nutzt die
-    // ganze Tafel
-    const h = kurz ? 52 : 128;
-    const y0 = kurz ? 38 : 128;
-    ctx.fillStyle = kurz ? "rgba(20,22,24,0.62)" : "rgba(20,22,24,0.82)";
-    ctx.fillRect(0, 0, 256, h);
-    ctx.strokeStyle =
-      ampel === "green" ? "#35c24d" : ampel === "yellow" ? "#e0b528" : ampel === "red" ? "#d84a38" :
-      "#" + this.fractionColor.toString(16).padStart(6, "0");
-    ctx.lineWidth = ampel ? 12 : 4;
-    ctx.strokeRect(0, 0, 256, h);
+    ctx.clearRect(0, 0, SCHILD_PX, SCHILD_HOCH_PX);
+    const sorte = this.sorte;
+    // Im Simulator gibt es keine Preiszeile: nur zeichnen, was da ist (qa-Befund 19.10.2026, „undefined" auf dem Schild)
+    const info = lines.slice(1).filter((z) => !!z);
+    // Unter der letzten Zeile 8 Punkte Luft und der 12 Punkte breite Ampelrahmen — er darf keine Schrift schneiden
+    const hoehe = info.length > 0 ? TAFEL_H + ZEILE_1 + ZEILE_PX * (info.length - 1) + 8 + 12 : TAFEL_H;
+
+    // Farbfeld in der Sortenfarbe; ohne Sorte das Grau des alten Schilds
+    ctx.fillStyle = sorte ? farbeCss(SORTEN[sorte].farbe) : "rgba(20,22,24,0.62)";
+    rundRechteck(ctx, 0, 0, SCHILD_PX, FELD_H + 12, 14);
+    ctx.fill();
+    if (sorte) zeichneSortenbild(ctx, sorte, (SCHILD_PX - BILD_PX) / 2, (FELD_H - BILD_PX) / 2, BILD_PX);
+
+    // Namensstreifen, darunter die Zahlen, solange die Ampel steht
+    ctx.fillStyle = info.length > 0 ? "rgba(20,22,24,0.86)" : "rgba(20,22,24,0.72)";
+    rundRechteck(ctx, 0, FELD_H, SCHILD_PX, hoehe - FELD_H, 14, true);
+    ctx.fill();
     ctx.fillStyle = "#e8e8e4";
     ctx.textAlign = "center";
-    if (kurz) {
-      ctx.font = "bold 27px Consolas, monospace";
-      ctx.fillText(lines[0], 128, y0);
-    } else {
-      ctx.font = "bold 30px Consolas, monospace";
-      ctx.fillText(lines[0], 128, 42);
-      ctx.font = "24px Consolas, monospace";
-      ctx.fillText(lines[1], 128, 76);
-      // Im Simulator gibt es keine Preiszeile (mitPreis=false): nur zeichnen, was da ist (qa-Befund 19.10.2026, „undefined" auf dem Schild)
-      if (lines[2]) ctx.fillText(lines[2], 128, 108);
+    ctx.textBaseline = "alphabetic";
+    const name = lines[0] ?? "";
+    let px = 26;
+    ctx.font = `bold ${px}px Consolas, monospace`;
+    // Lange englische Namen („STAINLESS STORE") werden kleiner statt abgeschnitten
+    while (px > 16 && ctx.measureText(name).width > SCHILD_PX - 16) {
+      px -= 2;
+      ctx.font = `bold ${px}px Consolas, monospace`;
     }
-    this.sprite.scale.set(2.3, kurz ? 0.47 : 1.15, 1);
-    this.sprite.center.set(0.5, kurz ? 0.79 : 0.5);
+    ctx.fillText(name, SCHILD_PX / 2, FELD_H + 27);
+    ctx.font = "24px Consolas, monospace";
+    info.forEach((z, i) => ctx.fillText(z, SCHILD_PX / 2, TAFEL_H + ZEILE_1 + ZEILE_PX * i));
+
+    // Rahmen: in der Ampelfarbe dreimal so dick wie sonst (E-061), sonst ein dunkler Saum
+    ctx.strokeStyle = ampel ? AMPEL_FARBE[ampel] : "rgba(20,22,24,0.55)";
+    ctx.lineWidth = ampel ? 12 : 4;
+    const rand = ctx.lineWidth / 2;
+    rundRechteck(ctx, rand, rand, SCHILD_PX - 2 * rand, hoehe - 2 * rand, 14 - rand);
+    ctx.stroke();
+    if (ampel) {
+      // Das Zeichen in der Ecke: schwarz auf weisser Scheibe (Kontrast 16,5 : 1,
+      // Test), der Ring in der Ampelfarbe. Schwarz auf dem Ampelrot hätte nur 4,3 : 1.
+      const r = 27;
+      const cx = SCHILD_PX - r - 5;
+      const cy = r + 5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = ZEICHEN_GRUND;
+      ctx.fill();
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = AMPEL_FARBE[ampel];
+      ctx.stroke();
+      zeichnePfade(ctx, AMPEL_ZEICHEN[ampel], cx - r * 0.75, cy - r * 0.75, r * 1.5, ZEICHEN_STRICH, 3);
+    }
     this.texture.needsUpdate = true;
   }
+}
+
+/**
+ * Abgerundetes Rechteck als Pfad. `obenEckig`: der Streifen unter dem
+ * Farbfeld. Von Hand statt `roundRect`, das es erst ab Safari 16 gibt.
+ */
+function rundRechteck(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  obenEckig = false
+): void {
+  const o = obenEckig ? 0 : r;
+  ctx.beginPath();
+  ctx.moveTo(x + o, y);
+  ctx.lineTo(x + w - o, y);
+  if (o) ctx.arcTo(x + w, y, x + w, y + o, o);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + o);
+  if (o) ctx.arcTo(x, y, x + o, y, o);
+  ctx.closePath();
 }
 
 export class ContainerManager {

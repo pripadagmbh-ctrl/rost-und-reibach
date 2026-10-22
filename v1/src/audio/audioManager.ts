@@ -98,6 +98,10 @@ const NACHSEHEN_MS = [250, 1200];
  * Aufwecken); beim dritten ist der Kanal vermutlich verloren.
  */
 const NEUAUFBAU_AB = 3;
+/** Hauptlautstaerke vor allen Gruppen (seit Anbeginn 0,5 — die Pegel darunter sind darauf abgeglichen, E-130). */
+const MASTER_LAUT = 0.5;
+/** SW: 40 ms Zeitkonstante beim Verstummen und Wiederkommen (Auftrag 43a) — knackfrei und doch sofort. */
+const PAUSE_RAMPE_S = 0.04;
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -160,6 +164,14 @@ export class AudioManager {
   private weckversuche = 0;
   /** Seit dem letzten hoerbaren Moment gab es eine Unterbrechung */
   private unterbrochen = false;
+  /**
+   * Das Spiel ist angehalten (Auftrag 43a: ⏸ oder ☰-Menue) — alles still.
+   * Still wird ueber die Hauptlautstaerke, NICHT ueber `ctx.suspend()`: Den
+   * Kanal wecken Geste, Rueckkehr und Nachfassfristen sofort wieder (oben),
+   * und keiner davon fasst den Master an. Stummschalter (E-172) und
+   * Gruppenregler (E-139) bleiben unberuehrt und gelten danach wie vorher.
+   */
+  private pausiert = false;
 
   /**
    * @param bus Ereignisbus (Regel 10). Ohne Bus (Labor) bleiben Aufprall,
@@ -179,6 +191,9 @@ export class AudioManager {
       // E-139: Hämmern und Drücken mit der Spinne
       bus.on("spinne:aufschlag", (e) => this.playSpinnenAufschlag(e.wucht, e.untergrund));
       bus.on("spinne:druecken", (e) => this.playSpinnenDruecken(e.staerke, e.untergrund));
+      // Auftrag 43a: Pause (beide Arten) = still, weiter = wie vorher
+      bus.on("spiel:pause", () => this.setzePause(true));
+      bus.on("spiel:weiter", () => this.setzePause(false));
     }
     this.holeProben();
     const start = (): void => this.ensureStarted();
@@ -483,7 +498,7 @@ export class AudioManager {
       const ctx = new AudioContext();
       this.ctx = ctx;
       this.master = ctx.createGain();
-      this.master.gain.value = 0.5;
+      this.master.gain.value = this.pausiert ? 0 : MASTER_LAUT; // ein Neuaufbau in der Pause bleibt still
       this.master.connect(ctx.destination);
       /*
        * Begrenzer statt Kompressor: Er greift erst kurz vor dem Klirren und
@@ -1101,6 +1116,16 @@ export class AudioManager {
   /** Gruppe Bagger: Motor, Hydraulik, Greifer-Mechanik, Kabine (E-139). */
   private get baggerBus(): AudioNode {
     return this.gruppen?.bagger ?? this.master!;
+  }
+
+  /** Angehalten = Hauptlautstaerke 0 (Auftrag 43a). Laeuft auch ohne Tonkanal: Er wird dann still gebaut. */
+  private setzePause(an: boolean): void {
+    this.pausiert = an;
+    const g = this.master?.gain;
+    if (!g || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(an ? 0 : MASTER_LAUT, t, PAUSE_RAMPE_S);
   }
 
   /** Lautstaerke einer Gruppe 0..1 (E-139). */

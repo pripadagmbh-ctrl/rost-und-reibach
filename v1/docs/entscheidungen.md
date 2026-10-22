@@ -10,6 +10,9 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-214 | 22.10.2026 | ⏸ neben ☰ friert ein und macht still, ☰-Menü ebenfalls still | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
+| E-213 | 22.10.2026 | Prüfungen ohne Text: Zielzeile, Teil leuchtet in Sortenfarbe mit Weg, Kameraflug | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
+| E-212 | 22.10.2026 | Bildschild in Sortenfarbe an jeder Mulde, Ampel mit ✓ ! ✕ | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-211 | 22.10.2026 | Volle Box ruft ihren Abholer sofort, Misch-Verlader macht Platz | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-210 | 22.10.2026 | Riesenteile überall gedeckelt: höchstens 2× Katalog, Fuhre aus mehr Teilen | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-209 | 22.10.2026 | Lehrgangsleiste zeigt kurzes Wort je Schritt, wächst nach links | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
@@ -215,6 +218,19 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-214 — ⏸ friert ein und macht still** (iPhone mini quer, dann iPad)
+- In einer Prüfung ⏸: Steht alles still, auch die Uhr, sofort leise, nur das ▶ in der Mitte, kein Menü?
+- Irgendwo aufs Bild tippen: Läuft es weiter, Ton in derselben Lautstärke zurück (auch mit leisem Musik-Regler)?
+- App in der Pause verlassen und zurück: Bleibt es still bis ▶? ☰ öffnen: auch dort still? ⏸ sicher getroffen, ohne ☰ oder Kranz-Knopf?
+**E-213 — Prüfungen ohne Text** (Prüfung 1, 3, 6)
+- Prüfung 1 ohne Anfassen: Kameraflug Kupferteil → BUNT-Box → zurück, ruhig? Oben Kupferrohr → orange Mulde + „Kupfer in BUNT + VA“, nach 4 s nur Bilder, Antippen holt die Wörter?
+- Im Flug tippen: Kamera sofort normal, Ansicht und Bagger unverändert?
+- Prüfung 3: Jedes Teil leuchtet in der Farbe seiner Mulde, Striche zur richtigen Mulde? Verwirren gekreuzte Wege? Gegriffen: Pfeil gleicher Farbe über der Zielmulde?
+- Prüfung 1 > 1:30: dritter Stern blasser Umriss? Prüfung 6 ohne Pratzen: Überlast und Stützen-Zeichen („Erst STÜTZEN setzen“)?
+**E-212 — Bildschilder an den Mulden** (Sandkasten, Prüfung 1)
+- BUNT + VA ohne Lesen erkannt (orange, drei Barren)? Über BUNT + VA ✓, über MÜLL ✕ am Schild?
+- Halden hinter dem Bagger: STAHL (hellblau, Träger) und MISCH (rosa, Formen) über der hinteren Mauer gut zu sehen, keine Geisterschilder im Startbild?
+- Nah an einer Mulde: Stört das halb ausgeblendete große Schild? Stahl und Müll (beide blau) sicher zu unterscheiden?
 **E-211 — Box-Abholer kommt sofort** (Schicht Montag)
 - BUNT + VA bis „voll“ füllen: Fährt der Verlader vorn sofort weg (auch leer), sagt das Büro „Abholer für BUNT + VA kommt“, steht nach rund einer halben Minute der Abholer vorn?
 - Box auf ihn laden und hupen: Fährt er, und kommt danach wieder ein Misch-Verlader?

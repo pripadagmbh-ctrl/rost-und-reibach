@@ -5,6 +5,15 @@ import type { LehrgangSymbol } from "../challenges/lektion";
 import type { ControlFunction } from "./controlConfig";
 import type { Spur } from "./spur";
 import type { Schichtbilanz, Schichtstufe } from "../economy/kasse";
+import type { SorteId } from "../materials/sorten";
+
+/**
+ * Auftrag 41: ein Bild der Zielzeile — eine Sorte (Farbe + Bild aus
+ * `materials/sorten.ts`) oder ein Ding ohne Sorte.
+ */
+export type ZielBild =
+  | { sorte: SorteId }
+  | { bild: "wrack" | "wohnwagen" | "lkw" | "gemischt" | "eisen" | "presse" | "kreis" | "mulden" | "platt" };
 
 /**
  * Typisierter Event-Bus (Briefing Kap. 17): Module kommunizieren nur über Events,
@@ -173,7 +182,23 @@ export interface GameEvents {
    * `challenge:schritt`. `nr` ist die Stelle im Katalog (ab 1), `wertung` die
    * Sternziele — die Karte zeigt sie von Anfang an (Patrick 19.10.2026).
    */
-  "challenge:start": { id: string; nr: number; name: Zweisprachig; ziel: Zweisprachig; wertung: ChallengeWertung };
+  "challenge:start": {
+    id: string;
+    nr: number;
+    name: Zweisprachig;
+    ziel: Zweisprachig;
+    wertung: ChallengeWertung;
+    /** Auftrag 41 (Zielzeile): hoechstens 5 Woerter, z. B. „Kupfer in BUNT + VA" */
+    kurz?: Zweisprachig;
+    /** Auftrag 41: Bild Teil → Bild Ziel fuer die Zielzeile */
+    zeichen?: { teil: ZielBild; ziel: ZielBild };
+  };
+  /**
+   * Auftrag 41: Kameraflug zum Start einer Pruefung (3 s Teil → Ziel →
+   * zurueck, Tippen ueberspringt). Einmal nach `challenge:start`; main.ts
+   * gibt ihn an die Kamera.
+   */
+  "challenge:vorschau": { teil: { x: number; y: number; z: number }; ziel: { x: number; y: number; z: number } };
   /**
    * E-162: Der laufende Stand einer Aufgabe, einmal je Bild ausserhalb der
    * Pause. Die Karte schreibt nur, was sich geaendert hat.
@@ -190,10 +215,27 @@ export interface GameEvents {
     balken01: number | null;
     pressenBereit: boolean;
     tipp: Zweisprachig | null;
-    marken: ReadonlyArray<{ x: number; y: number; z: number; art: "teil" | "ziel" }>;
+    marken: ReadonlyArray<{
+      x: number;
+      y: number;
+      z: number;
+      art: "teil" | "ziel";
+      /** Auftrag 41: Sorte fuer Farbe (Leuchten, Pfeil, Weg); null/fehlend = ohne Sorte (Wrack, Presse, Kreis) */
+      sorte?: SorteId | null;
+      /** Auftrag 41, nur bei "teil": wohin es gehoert (Punkt auf dem Ziel) — Ende des gestrichelten Wegs */
+      nach?: { x: number; y: number; z: number } | null;
+    }>;
   };
   /** E-162: Knopf PRESSEN auf der Karte — main.ts startet die Presse wie der Kranz. */
   "challenge:pressen": Record<string, never>;
+  /**
+   * Auftrag 43a (Patrick): Das Spiel haelt an — alles friert ein und alle Toene verstummen.
+   * "still" = ⏸-Knopf neben ☰ (nur ein grosses ▶ in der Bildmitte), "menue" = ☰-Pausenmenue.
+   * Wer pausieren will, sendet es (⏸); main.ts sendet es selbst bei ☰/ESC/P. Audio und HUD hoeren nur zu.
+   */
+  "spiel:pause": { art: "still" | "menue" };
+  /** Auftrag 43a: Das Spiel laeuft weiter (▶-Tipp, WEITER im Menue, ESC/P) — Toene wieder an. */
+  "spiel:weiter": Record<string, never>;
   /** E-162: Knopf ↻ auf der Karte oder NOCHMAL — dieselbe Aufgabe von vorn. */
   "challenge:neustart": Record<string, never>;
   /*

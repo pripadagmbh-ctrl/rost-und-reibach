@@ -1,5 +1,7 @@
 import type RAPIER from "@dimforge/rapier3d-compat";
-import type { EventBus, GameEvents } from "../core/events";
+import type { EventBus, GameEvents, ZielBild } from "../core/events";
+import { sorteVonBehaelter } from "../materials/sorten";
+import { CONFIGS, gehoertHierhin } from "../world/containers";
 import type { WrackArt } from "../dismantle/carDef";
 import type { Zweisprachig } from "./texte";
 
@@ -97,6 +99,17 @@ import type { Zweisprachig } from "./texte";
  *   was in IRGENDEINEM dieser Ziele liegt und dort nicht hingehoert.
  *   Mit `zielMarkeAbStart` steht die gruene Marke vom ersten Bild an
  *   (Aufgabe 6, Patrick 20.10.2026), sonst erst, wenn das Wrack haengt.
+ *
+ * Seit Auftrag 41 (22.10.2026, Pruefungen ohne Text):
+ *   Jede Teil-Marke traegt die SORTE ihres Ziels (`sorteVonBehaelter`) und
+ *   `nach`, den Punkt auf dem Ziel (Behaelter-Mitte auf der Oberkante, bei
+ *   Presse und Kreis `zielMarke`) — die Zielmarke faerbt danach Leuchten,
+ *   Pfeil und Weg. Beim Sortieren ohne `zielBehaelter` ist das Ziel die
+ *   Mulde, in der das Material richtig ist (`gehoertHierhin`, dieselbe Regel
+ *   wie `itemEntered.correct`); dort steht dann auch die Ziel-Marke, solange
+ *   das Teil haengt. NUR fuer die Marken — Zaehlen und Fehlwurf bleiben bei
+ *   `zielJe` bzw. `itemEntered.correct`.
+ *   Am Start kommt einmal `challenge:vorschau` (Kameraflug Teil → Ziel).
  */
 export type Beobachtung =
   | "blick_auf_teil"
@@ -224,6 +237,10 @@ export interface ChallengeDaten {
   beschreibung: Zweisprachig;
   /** Ein Satz auf der Karte: was zu tun ist */
   ziel: Zweisprachig;
+  /** Auftrag 41: der Ziel-Satz der Zielzeile, hoechstens 5 Woerter (Waechter `test/zielmarke-sorte.test.ts`) */
+  kurz: Zweisprachig;
+  /** Auftrag 41: Bild Teil → Bild Ziel fuer die Zielzeile */
+  zeichen: { teil: ZielBild; ziel: ZielBild };
   aufbau: ChallengeAufbau;
   /**
    * Wohin die Teile gehoeren (Container-ID aus `world/containers.ts`). Ist er
@@ -424,7 +441,8 @@ export type AufgabenKoerper = Pick<RAPIER.RigidBody, "handle" | "translation" | 
 
 /** Die Objekte, die `aufbau.ts` fuer die Aufgabe gebaut hat (`ScrapItem` / `CarComposite` passen). */
 export interface ChallengeObjekte {
-  teile: ReadonlyArray<{ id: string; body: AufgabenKoerper }>;
+  /** `materialId` (wie `ScrapItem`): sucht beim Sortieren die richtige Mulde fuer Marke und Weg */
+  teile: ReadonlyArray<{ id: string; body: AufgabenKoerper; materialId?: string }>;
   wracks: ReadonlyArray<{ body: AufgabenKoerper }>;
 }
 
@@ -487,6 +505,8 @@ export class ChallengeLauf {
   private readonly zielJe = new Map<string, string>();
   /** Alle Ziele der Aufgabe — was dort falsch liegt und kein Pflichtteil ist, ist ein Fremdteil */
   private readonly alleZiele = new Set<string>();
+  /** Auftrag 41, nur fuer die Marken: Pflichtteil → Behaelter, auf den sein Weg zeigt (`zielJe`, sonst die richtige Mulde) */
+  private readonly wegZiel = new Map<string, string>();
 
   constructor(
     readonly daten: ChallengeDaten,
@@ -503,6 +523,11 @@ export class ChallengeLauf {
       const z = daten.aufbau.teile?.[i]?.ziel ?? daten.zielBehaelter;
       if (z && this.pflichtIds.has(t.id)) this.zielJe.set(t.id, z);
     });
+    for (const t of objekte.teile) {
+      if (!this.pflichtIds.has(t.id)) continue;
+      const z = this.zielJe.get(t.id) ?? richtigeMulde(t.materialId, q);
+      if (z) this.wegZiel.set(t.id, z);
+    }
     if (daten.zielBehaelter) this.alleZiele.add(daten.zielBehaelter);
     for (const z of this.zielJe.values()) this.alleZiele.add(z);
     this.eigeneHandles = new Set([
@@ -568,8 +593,43 @@ export class ChallengeLauf {
       if (t.body.isValid()) this.liegeY.set(t.id, t.body.translation().y);
     }
     const d = this.daten;
-    this.bus.emit("challenge:start", { id: d.id, nr: this.nr, name: d.name, ziel: d.ziel, wertung: d.wertung });
+    this.bus.emit("challenge:start", {
+      id: d.id,
+      nr: this.nr,
+      name: d.name,
+      ziel: d.ziel,
+      wertung: d.wertung,
+      kurz: d.kurz,
+      zeichen: d.zeichen,
+    });
+    const v = this.vorschau();
+    if (v) this.bus.emit("challenge:vorschau", v);
     this.melde();
+  }
+
+  /**
+   * Auftrag 41, Kameraflug: das erste Pflichtteil und sein Ziel, sonst das
+   * Wrack und `zielMarke` — ohne Ziel (Aufgabe 4, platt machen an Ort und
+   * Stelle) ist das Wrack selbst das Ziel.
+   */
+  private vorschau(): GameEvents["challenge:vorschau"] | null {
+    const t = this.objekte.teile.find((x) => this.pflichtIds.has(x.id) && x.body.isValid());
+    if (t) {
+      const ziel = this.zielPunkt(t.id);
+      const p = t.body.translation();
+      return { teil: { x: p.x, y: p.y, z: p.z }, ziel: ziel ?? { x: p.x, y: p.y, z: p.z } };
+    }
+    const w = this.objekte.wracks.find((x) => x.body.isValid());
+    if (!w) return null;
+    const p = w.body.translation();
+    return { teil: { x: p.x, y: p.y, z: p.z }, ziel: this.daten.zielMarke ? { ...this.daten.zielMarke } : { x: p.x, y: p.y, z: p.z } };
+  }
+
+  /** Punkt auf dem Ziel eines Pflichtteils: Behaelter-Mitte auf der Oberkante; null = kein Ziel bekannt. */
+  private zielPunkt(teilId: string): Punkt | null {
+    const z = this.wegZiel.get(teilId);
+    const o = z ? this.q.behaelter(z) : null;
+    return o ? { x: o.x, y: o.oberkante, z: o.z } : null;
   }
 
   /** Nach ↻ oder Verlassen: ab jetzt stumm, zaehlt und meldet nichts mehr. */
@@ -672,12 +732,18 @@ export class ChallengeLauf {
       }
       const alt = this.liegeY.get(t.id);
       if (alt === undefined || p.y < alt) this.liegeY.set(t.id, p.y);
-      if (this.pflichtIds.has(t.id) && !imZiel(t)) marken.push({ x: p.x, y: p.y + this.liegeY.get(t.id)!, z: p.z, art: "teil" });
+      if (this.pflichtIds.has(t.id) && !imZiel(t)) {
+        const z = this.wegZiel.get(t.id);
+        marken.push({ x: p.x, y: p.y + this.liegeY.get(t.id)!, z: p.z, art: "teil", sorte: z ? sorteVonBehaelter(z) : null, nach: this.zielPunkt(t.id) });
+      }
     }
     const teil = gefasst ?? pflicht.find((t) => !imZiel(t)) ?? null;
     const ziel = teil ? this.zielJe.get(teil.id) : undefined;
     const zielOrt = ziel ? q.behaelter(ziel) : null;
-    if (gefasst && zielOrt) marken.push({ x: zielOrt.x, y: zielOrt.oberkante, z: zielOrt.z, art: "ziel" });
+    // Die Ziel-Marke folgt dem Weg (beim Sortieren die richtige Mulde), die Schritte oben dem Ziel der Daten
+    const markeZiel = gefasst ? this.wegZiel.get(gefasst.id) : undefined;
+    const markeOrt = markeZiel ? this.zielPunkt(gefasst!.id) : null;
+    if (markeOrt) marken.push({ ...markeOrt, art: "ziel", sorte: sorteVonBehaelter(markeZiel!) });
 
     let blick = false;
     let amTeil = false;
@@ -738,8 +804,8 @@ export class ChallengeLauf {
       }
       this.wrackWarGefasst = wGefasst;
       const fertig = this.inKammer || this.gepresst || abgelegt || this.platt;
-      if (!wGefasst && !fertig) marken.push({ x: wp.x, y: spanne.oben, z: wp.z, art: "teil" });
-      if (d.zielMarke && (wGefasst || d.zielMarkeAbStart)) marken.push({ ...d.zielMarke, art: "ziel" });
+      if (!wGefasst && !fertig) marken.push({ x: wp.x, y: spanne.oben, z: wp.z, art: "teil", sorte: null, nach: d.zielMarke ? { ...d.zielMarke } : null });
+      if (d.zielMarke && (wGefasst || d.zielMarkeAbStart)) marken.push({ ...d.zielMarke, art: "ziel", sorte: null });
     }
 
     return {
@@ -812,6 +878,16 @@ export class ChallengeLauf {
       wertung: this.daten.wertung,
     });
   }
+}
+
+/**
+ * Auftrag 41: die Mulde am Bagger, in der dieses Material richtig ist —
+ * dieselbe Regel wie `itemEntered.correct` (`gehoertHierhin`), ohne die
+ * Silo-Reihe (`lager`), nur was auf dem Platz steht (`q.behaelter`).
+ */
+function richtigeMulde(materialId: string | undefined, q: ChallengeQuellen): string | null {
+  if (!materialId) return null;
+  return CONFIGS.find((c) => !c.nurHuelle && c.lager !== true && gehoertHierhin(c, materialId) && q.behaelter(c.id))?.id ?? null;
 }
 
 /** Kleinster Winkel von b nach a, −π … π. */

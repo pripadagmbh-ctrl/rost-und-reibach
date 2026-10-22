@@ -18,15 +18,15 @@ import type { ChallengeMessung, ChallengeWertung } from "../challenges/challenge
 
 /** Alle festen Woerter der Aufgaben-Anzeige. Erweiterbar: eine Zeile, beide Sprachen. */
 export const WORTE = {
-  // --- Karte
+  // --- Zielzeile (41-P2): sichtbar ist davon nichts ausser dem Satz — Vorlesetext (aria-label)
   pause: { de: "Pause", en: "Pause" },
-  weiter: { de: "weiter", en: "resume" },
   neustart: { de: "Prüfung neu starten", en: "Restart test" },
   pressen: { de: "PRESSEN", en: "PRESS" },
   ziel: { de: "Ziel", en: "Goal" },
   platt: { de: "platt", en: "flattened" },
-  karteEinklappen: { de: "Karte einklappen", en: "Collapse card" },
-  karteAufklappen: { de: "Karte aufklappen", en: "Expand card" },
+  zielZeigen: { de: "Ziel in Worten zeigen", en: "Show goal in words" },
+  tipp: { de: "Tipp zeigen", en: "Show tip" },
+  sterneMoeglich: { de: "{n} von 3 Sternen möglich", en: "{n} of 3 stars possible" },
   // --- Stick-Woerter fuer `bedientext`
   linkerStick: { de: "linker Stick", en: "left stick" },
   rechterStick: { de: "rechter Stick", en: "right stick" },
@@ -176,8 +176,8 @@ function laenge(cm: number): string {
 
 /**
  * Eine Obergrenze als Ziel in Worten: „unter 3:00", „0 Fehlwürfe",
- * „auf 40 cm genau". Kurz, weil die Sternziele in eine Kartenzeile sollen
- * (iPhone mini quer: 57 Zeichen, Rechnung in `index.html` bei `#tutorial.aufgabe`).
+ * „auf 40 cm genau". Kurz, weil die Sternziele in eine Zeile der Tafel sollen
+ * (iPhone mini quer: 57 Zeichen, die Breite der frueheren Aufgabenkarte).
  */
 export function schwelleText(k: Messgroesse, grenze: number, s: Sprache): string {
   if (k === "zeitS") return `${s === "de" ? "unter" : "under"} ${uhr(grenze)}`;

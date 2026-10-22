@@ -121,7 +121,7 @@ describe("Aufgabe 4: der Ablauf mit Attrappen", () => {
     const a = lauf();
     a.l.takt(1);
     expect(a.staende.at(-1)).toMatchObject({ balken01: 0, zaehler: null, tipp: null });
-    expect(a.staende.at(-1)!.marken).toEqual([{ x: WW.x, y: 2.4, z: WW.z, art: "teil" }]);
+    expect(a.staende.at(-1)!.marken).toEqual([{ x: WW.x, y: 2.4, z: WW.z, art: "teil", sorte: null, nach: null }]); // Auftrag 41: platt an Ort und Stelle, kein Weg
     a.biss(0.9, 99); // fremdes Wrack
     a.schlag(0); // Schlag aufs Wrack ohne Knautschen
     a.l.takt(1);

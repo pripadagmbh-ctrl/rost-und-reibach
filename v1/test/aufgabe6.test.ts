@@ -151,7 +151,7 @@ describe("Aufgabe 6: der Ablauf mit Attrappen", () => {
 
   it("gruener Kreis ab dem ersten Stand, gelbe Marke am Wrack nur bis zum Greifen (Patrick 20.10.2026, G4)", () => {
     const a = attrappe();
-    const ziel = { ...A6.zielMarke!, art: "ziel" };
+    const ziel = { ...A6.zielMarke!, art: "ziel", sorte: null }; // Auftrag 41: der Kreis hat keine Sorte
     a.lauf.takt(1);
     expect(a.staende).toHaveLength(1);
     expect(a.staende[0]!.marken).toContainEqual(ziel);

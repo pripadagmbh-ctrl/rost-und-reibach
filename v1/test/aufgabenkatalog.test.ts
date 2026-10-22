@@ -20,20 +20,18 @@ import type { Beobachtung } from "../src/challenges/challenge";
 import { sternZiele } from "../src/ui/aufgabentexte";
 import { bedientext } from "../src/ui/challengekarte";
 import { defaultConfig } from "../src/core/controlConfig";
-import { FASSUNGEN, fassungInnen, px, pxOderNull, schriftgroesse, zeilen } from "./cssmass";
+import { zeilen } from "./cssmass";
 
-const MINI = FASSUNGEN.find((f) => f.name === "iPhone mini quer")!;
-const HALTER = ["#tutorial", "#tutorial.aufgabe", "body.touch #tutorial", "body.touch #tutorial.aufgabe"];
-const KARTE = ["#tutorial .karte", "#tutorial.aufgabe .karte"];
-const ZUSATZ = ["#tutorial.aufgabe .zusatz"];
-const TEXT = ["#tutorial p", "#tutorial.aufgabe p"];
-/** Innenbreite der Karte — dieselbe Rechnung wie `innen0` in test/aufgabenkarte-platz.test.ts (Rahmen 5 + 2 px) */
-function innen(): number {
-  const links = px(HALTER, "left", MINI);
-  const breite = pxOderNull(HALTER, "width", MINI);
-  const rechts = breite === null ? MINI.w - px(HALTER, "right", MINI) : links + breite;
-  return rechts - links - 5 - 2 - 2 * fassungInnen(KARTE, MINI)[1];
-}
+/*
+ * 41-P2: Die Aufgabenkarte ist durch die Zielzeile ersetzt; Ziel, Schritt und
+ * Tipp stehen nur noch als Vorlesetext und auf der Tafel. Sie bleiben so kurz
+ * wie auf der Karte: deren Innenbreite auf dem iPhone mini quer, 466 − 5 − 2 −
+ * 2 × 10 = 439 px, 14 px Schrift (Platzpruefung der Zielzeile:
+ * test/zielzeile-platz.test.ts).
+ */
+const KARTE_INNEN_PX = 439;
+const SCHRIFT_PX = 14;
+const innen = (): number => KARTE_INNEN_PX;
 
 const FERTIG: Record<string, Beobachtung> = {
   "erster-griff": "teil_im_ziel",
@@ -67,8 +65,8 @@ describe("Der Aufgabenkatalog fuer 1.0", () => {
 
       it("iPhone mini quer: Ziel 1 Zeile, Schritte und Tipp hoechstens 2, Sternziele hoechstens 2", () => {
         const b = innen();
-        const zs = schriftgroesse(ZUSATZ, MINI);
-        const ts = schriftgroesse(TEXT, MINI);
+        const zs = SCHRIFT_PX;
+        const ts = SCHRIFT_PX;
         for (const s of ["de", "en"] as const) {
           expect(zeilen(c.ziel[s], b, zs), `${s} Ziel: ${c.ziel[s]}`).toBe(1);
           for (const st of c.schritte) {

@@ -175,9 +175,9 @@ describe("Aufgabe 5: der Ablauf mit Attrappen", () => {
   it("gruene Marke ueber der Halde des gehaltenen Teils: Spaene MISCH, Eisen STAHL", () => {
     const a = attrappe();
     a.halten(SPAENE[0]!);
-    expect(a.staende.at(-1)!.marken.filter((m) => m.art === "ziel")).toEqual([{ x: -3, y: 5, z: -32, art: "ziel" }]);
+    expect(a.staende.at(-1)!.marken.filter((m) => m.art === "ziel")).toEqual([{ x: -3, y: 5, z: -32, art: "ziel", sorte: "misch" }]);
     a.halten(EISEN[0]!);
-    expect(a.staende.at(-1)!.marken.filter((m) => m.art === "ziel")).toEqual([{ x: 4, y: 5, z: -32, art: "ziel" }]);
+    expect(a.staende.at(-1)!.marken.filter((m) => m.art === "ziel")).toEqual([{ x: 4, y: 5, z: -32, art: "ziel", sorte: "stahl" }]);
   });
 
   it("vertauscht ist ein Fehlwurf und zaehlt nicht — umgelegt geht es weiter, ★★★ ist weg", () => {
