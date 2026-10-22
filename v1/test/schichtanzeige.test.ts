@@ -84,6 +84,16 @@ describe("Anzeige reagiert auf schicht:start und schicht:stand", () => {
       { name: "MÜLL", anteil: 0, wert: "0,0/3 t", voll: false },
     ]);
   });
+  it("E-211: steht der Abholer der Box vorn, heißt es „Abholer da\" — auch wenn sie schon leerer ist", () => {
+    const { bus, a } = aufbau();
+    bus.emit("schicht:stand", stand({ verlader: { order: "copper", kg: 400, anteil: 0.3 } }));
+    expect(a.bild.boxen[1]).toMatchObject({ wert: "Abholer da", voll: true });
+    bus.emit("schicht:stand", stand({ verlader: { order: "copper", kg: 1200, anteil: 0.8 }, boxen: [{ order: "steel", kg: 0, schwelleKg: 6000 }, { order: "copper", kg: 300, schwelleKg: 1500 }, { order: "rubble", kg: 0, schwelleKg: 3000 }] }));
+    expect(a.bild.boxen[1]).toMatchObject({ wert: "Abholer da", voll: false });
+    // Gegenprobe: Misch-Verlader vorn → bei voller Box „Abholer kommt"
+    bus.emit("schicht:stand", stand());
+    expect(a.bild.boxen[1]).toMatchObject({ wert: "Abholer kommt" });
+  });
   it("vor dem ersten Lagebild: leere Balken, nichts ist „voll\"", () => {
     const { bus, a } = aufbau();
     bus.emit("schicht:start", { stufe: "montag", dauerS: 600 });

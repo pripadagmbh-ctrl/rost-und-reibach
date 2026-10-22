@@ -89,12 +89,18 @@ export function verladerBalken(v: Stand["verlader"], s: Sprache): Balken {
   return { name, anteil: a, wert: `${sorte(v.order, s)} ${Math.round(a * 100)} %`, voll: a >= 1 };
 }
 
-export function boxBalken(b: Stand["boxen"][number], s: Sprache): Balken {
+/**
+ * `verladerOrder`: Sorte des Wagens, der vorn zum Laden steht (E-211). Steht dort
+ * schon der Abholer dieser Box, heißt der Balken „Abholer da"; ist die Box voll
+ * und er noch unterwegs, „Abholer kommt" — seit E-211 kommt er auch (§6).
+ */
+export function boxBalken(b: Stand["boxen"][number], s: Sprache, verladerOrder: string | null = null): Balken {
   const voll = b.schwelleKg > 0 && b.kg >= b.schwelleKg; // ohne Schwelle (vor dem ersten Stand) nie „voll"
+  const da = verladerOrder === b.order;
   return {
     name: sorte(b.order, s),
     anteil: b.schwelleKg > 0 ? anteil01(b.kg / b.schwelleKg) : 0,
-    wert: voll ? schichtWort("abholerKommt", s) : `${tonnenZahl(b.kg / 1000, s)}/${schwelleT(b.schwelleKg, s)} t`,
+    wert: da ? schichtWort("abholerDa", s) : voll ? schichtWort("abholerKommt", s) : `${tonnenZahl(b.kg / 1000, s)}/${schwelleT(b.schwelleKg, s)} t`,
     voll,
   };
 }
@@ -189,7 +195,7 @@ export class SchichtAnzeige {
       buchung: f ? { text: buchungText(f.art, f.eur, f.order, s), minus: f.eur < 0 } : null,
       warn: st ? warnZeile(st.wartend, st.annahmeVoll, s) : null,
       verlader: verladerBalken(st ? st.verlader : null, s),
-      boxen: (st ? st.boxen : OHNE_STAND).map((b) => boxBalken(b, s)),
+      boxen: (st ? st.boxen : OHNE_STAND).map((b) => boxBalken(b, s, st?.verlader?.order ?? null)),
     };
   }
 }

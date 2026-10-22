@@ -819,6 +819,8 @@ export const MUSTER: Array<[RegExp, string]> = [
   [/^Büro an Bagger: (.+) (\d+) m³ für (.+) ist unterwegs\.$/, "Office to loader: $1 $2 m³ for $3 is on its way."],
   [/^Büro an Bagger: (.+) mit (.+) kommt, kippt ins (.+)\.$/, "Office to loader: $1 with $2 coming, tipping into the $3."],
   [/^Büro an Bagger: (.+) mit (.+) kommt an den Abladeplatz\.$/, "Office to loader: $1 with $2 coming to the unloading bay."],
+  // E-211: volle Box ruft ihren Abholer, der Misch-Verlader macht Platz
+  [/^Büro an Bagger: Abholer für (.+) kommt — der Verlader fährt vor\.$/, "Office to loader: pickup for $1 is coming — the loading truck is moving off."],
   [/^Büro an Bagger: (.+) holt seine Mulde\.$/, "Office to loader: $1 is collecting its skip."],
   [/^(.+) steht bereit — laden, dann ABHOLEN drücken \(V\)\.$/, "$1 is ready — load it, then press PICKUP (V)."],
   [/^(.+) (\d+) m³ · ([\d,]+) m³ da$/, "$1 $2 m³ · $3 m³ ready"],

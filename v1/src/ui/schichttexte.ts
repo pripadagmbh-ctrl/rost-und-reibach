@@ -33,6 +33,8 @@ export const SCHICHT_WORTE = {
   verlader: { de: "VERLADER", en: "OUTBOUND" },
   verladerKommt: { de: "kommt …", en: "coming …" },
   abholerKommt: { de: "Abholer kommt", en: "pickup coming" },
+  // E-211: steht der Abholer dieser Box schon vorn, sagt der Balken das (ehrlich statt „kommt")
+  abholerDa: { de: "Abholer da", en: "pickup here" },
   standgeld: { de: "Standgeld", en: "waiting fee" },
   fehlwurf: { de: "Fehlwurf", en: "wrong bin" },
   schaden: { de: "Schaden", en: "damage" },
