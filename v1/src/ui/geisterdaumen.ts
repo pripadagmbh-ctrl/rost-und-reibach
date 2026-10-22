@@ -258,6 +258,11 @@ export function tastenText(code: string, kranz: (code: string) => string | null,
   return kranz(code);
 }
 
+/** Rein (L8-Nachtrag): Tastencode → Aufschrift der Taste am Rechner, "KeyO" → "O", "Digit2" → "2". */
+export function pcTaste(code: string): string {
+  return code.replace(/^(Key|Digit)/, "");
+}
+
 export interface Geisterdaumen {
   /** Lehrgang: einmal je Bild (in Pruefungen harmlos, dort frischt `challenge:stand` auf). */
   takt(): void;
@@ -403,6 +408,14 @@ export function installGeisterdaumen(m: {
 
   const auffrischen = (): void => {
     const touch = document.body.classList.contains("touch");
+    // L8-Nachtrag: Am Rechner gibt es keinen Geist und keinen Kranz — bei Kranz-Schritten steht die Taste als Schild (O, B, 2)
+    if (!touch) {
+      const t = !aus && kranzSchritt?.code ? pcTaste(kranzSchritt.code) : "";
+      schild.classList.toggle("an", t !== "");
+      schild.classList.toggle("pc", t !== "");
+      schild.textContent = t;
+      return;
+    }
     const w = phase === "zeigen" ? (m.vorfuehrung?.werte ?? null) : null;
     const a = w ? stickAusschlag(w.achsen, m.steuerung()) : null;
     // In der Vorfuehrung: jede Seite, die sich bewegt, dazu die Seite des Schritts in Ruhe

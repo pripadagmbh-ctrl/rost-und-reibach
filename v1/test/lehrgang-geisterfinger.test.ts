@@ -296,6 +296,27 @@ describe("Teil 2: Geisterfinger am Funktionskranz", async () => {
     }
   });
 
+  it("L8-Nachtrag: am PC steht bei Kranz-Schritten die Taste als Schild (O, B, 2) — auf Touch nicht, ohne Kranz nicht", async () => {
+    const { pcTaste } = await import("../src/ui/geisterdaumen");
+    expect(["KeyO", "KeyB", "Digit2"].map(pcTaste)).toEqual(["O", "B", "2"]);
+    for (const [touch, kranz, soll] of [
+      [false, { code: "KeyO" }, "O"],
+      [false, { code: "Digit2" }, "2"],
+      [false, null, ""], // GEGENPROBE: Schritt ohne Kranz
+      [true, { code: "KeyO" }, ""], // GEGENPROBE: Touch zeigt den Finger, kein Schild
+    ] as const) {
+      const { body } = seite(touch);
+      const bus = new EventBus();
+      const geist = installGeisterdaumen({ bus, steuerung: defaultConfig, kranzOffen: () => false });
+      bus.emit("lehrgang:start", startEv);
+      bus.emit("lehrgang:schritt", schrittEv(15, "du", kranz ? { kranz } : {}));
+      geist.takt();
+      const schild = body.querySelector(".tastengeist")!;
+      expect(schild.classList.contains("pc"), `touch ${touch}, ${kranz?.code}`).toBe(soll !== "");
+      if (soll) expect(schild.textContent).toBe(soll);
+    }
+  });
+
   it("ohne kranzOffen-Anschluss gilt der Kranz als zu (Finger bleibt am Knopf)", () => {
     const { body } = seite();
     const bus = new EventBus();
@@ -518,6 +539,8 @@ describe("Teil 2: nach dem Lehrgang → Montag (Platzhalter bis W1)", async () =
       const weiter = body.alle().find((e) => e.id === "abr-weiter")!;
       expect(weiter.textContent).toBe(text);
       expect(weiter.textContent).not.toMatch(/PRÜFUNG|TEST/);
+      // L8-Nachtrag: keine Zeitzeile — der Lehrgang hat keine Uhr (nach Wiedereinstieg zaehlte sie nur ab dort)
+      expect(body.alle().find((e) => e.id === "abr-zahlen")!.children).toHaveLength(0);
       weiter.klick();
       expect(ort.hash).toBe("schicht=montag");
       expect(neu).toHaveBeenCalledTimes(1);

@@ -1197,6 +1197,8 @@
         white-space: nowrap;
       }
       body.touch #geisterdaumen .tastengeist.an { display: block; }
+      /* L8-Nachtrag: am Rechner nur das Tastenschild der Kranz-Schritte (O, B, 2), ui/geisterdaumen.ts pcTaste */
+      body:not(.touch) #geisterdaumen .tastengeist.pc.an { display: block; }
       /* Pedale und Drehtasten leuchten, solange die Vorfuehrung sie braucht */
       #touch #pedals.geist-zeigt .pedal, #touch .btn.geist-zeigt {
         box-shadow: 0 0 0 3px rgba(240,180,41,0.9); border-color: #f0b429;

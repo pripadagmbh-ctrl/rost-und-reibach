@@ -254,10 +254,10 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
       id: e.id,
       weiter: () => (naechsteLektion ? zurLektion(naechsteLektion) : nachDemLehrgang()),
     };
-    const zeit = { name: waehle(KRITERIEN.zeitS.name, s), wert: KRITERIEN.zeitS.zahl(e.zeitS) };
     // L4: EIN Lehrgang heisst LEHRGANG — der Name hinter „LEHRGANG GESCHAFFT" waere doppelt
     const kopf = ids.length > 1 ? `${wort("lektionGeschafft", s)} · ${waehle(e.name, s)}` : wort("lektionGeschafft", s);
-    if (!fuelle(kopf, 0, [zeit], s)) {
+    // L8-Nachtrag (Orchestrator 22.10.2026): keine Zeitzeile — der Lehrgang hat keine Uhr, und nach einem Wiedereinstieg zaehlte sie nur ab dort
+    if (!fuelle(kopf, 0, [], s)) {
       m.hud.toast(kopf);
       return;
     }
