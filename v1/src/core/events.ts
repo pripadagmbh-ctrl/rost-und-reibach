@@ -220,6 +220,23 @@ export interface GameEvents {
     /** E-197: Bildzeichen der Funktion (Leiste am Rand statt Text) und hoechstens ein Wort */
     symbol?: LehrgangSymbol | null;
     wort?: Zweisprachig | null;
+    /** L5-B (40c): Teilziele des Schritts, 1 = ohne (Zoom: rein UND raus = 2) — die Leiste teilt den Strich */
+    teile: number;
+  };
+  /** L5-B (40c): ein Teilziel ist erreicht, der Schritt noch nicht (`teil` von `von`; das letzte meldet `lehrgang:haekchen`). */
+  "lehrgang:teilziel": { id: string; nr: number; teil: number; von: number };
+  /**
+   * L5-B (40f): was in Phase „du" gerade zum Ziel fuehrt — je Funktion eine
+   * Richtung (Geisterdaumen: Einzelpfeil), `kamera` die noch fehlende Zoom-
+   * Geste. Nur bei Aenderung; leere Liste = kein Stick-Hinweis. Schritte, fuer
+   * die der Lauf keine Richtung weiss (Fahren, Kamera drehen, Ansicht),
+   * senden nichts — dort bleibt der Geist bei der Spur.
+   */
+  "lehrgang:richtung": {
+    id: string;
+    nr: number;
+    bedarf: Array<{ fn: "cab" | "boom" | "stick"; richtung: "plus" | "minus" }>;
+    kamera: "auf" | "zu" | null;
   };
   /** Lauf → Wiedergabe: diese Spur jetzt abspielen (über den Eingabeweg des Spielers). */
   "lehrgang:vorfuehren": { spur: Spur };

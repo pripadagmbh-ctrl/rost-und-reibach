@@ -10,6 +10,8 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-207 | 22.10.2026 | Lehrgang zeigt Gesten als Bewegung, Zoom rein und raus, Pfeil zum Ziel | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
+| E-206 | 22.10.2026 | Fahrpedale unten mittig, kleiner; Griff-Zeile unten links | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-205 | 21.10.2026 | SCHICHT im Hauptmenü, Schicht-Anzeige, Feierabend-Tafel, Bestenliste SCHICHTEN | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-204 | 21.10.2026 | Schäden an die Kasse, Lagebild und Buchungen für die Schicht-Anzeige | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-203 | 21.10.2026 | Schicht-Kasse mit festen Preisen, Bilanz, Sterne und Schicht-Uhr | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
@@ -209,6 +211,16 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-207 — Lehrgang: Gesten, Zoom, Pedal-Finger, Richtung** (iPhone mini quer, dann iPad)
+- „Ansicht wechseln“: Tippt rechts ein Finger sichtbar zweimal (zwei Ringe)? Doppeltipp genau dort wechselt die Ansicht?
+- „Zoomen“: nur rein → halber Strich grün, Leiste leuchtet, Finger zeigen danach Kneifen? Häkchen erst nach dem Rauszoomen?
+- „Fahren“: Finger wandert aufs Pedal und tippt? Nach deinem Tipp Finger weg, Daumen-Geist ↑ links?
+- „Auf die Marke“: linker Geist zeigt ←? Pfeile wechseln auf Hauptarm/Stiel, sobald du auf Höhe bist — ohne Flackern?
+**E-206 — Pedale unten mittig** (iPad und iPhone mini quer)
+- Eine Minute baggern, linker Daumen auch weit unten links: schaltet das Fahren je ungewollt um?
+- Umgreifen und Pedal antippen: auf Anhieb getroffen, groß genug?
+- Im Mittelstreifen nach unten über die Pedale wischen: Kamera dreht weiter, Fahren schaltet nicht?
+- iPhone mini quer: Pedal mehrmals antippen — springt die Home-Geste an? Stört die Griff-Zeile unten links?
 **E-197 — Lehrgang ohne Text** (iPhone mini quer, dann iPad)
 - Website-Daten löschen: oben nur die Leiste (Auge/Hand), sonst kein Satz im Bild? Vorführung von Schritt 1 sichtbar?
 - Schritt 5/6: Pedale pulsieren, bis man sie antippt bzw. wieder ausschaltet?

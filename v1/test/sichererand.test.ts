@@ -155,11 +155,17 @@ describe("Sichere Raender", () => {
      * (Stand 15.09.2026, Messung docs/messungen/2026-09-15-greifanzeige) —
      * faellt einer, ist die iPad-Fassung verschoben worden.
      */
+    /*
+     * GEAENDERT am 22.10.2026 (Befund 40e): Pedale unten mittig statt unten
+     * links, der untere Block links daneben. Gewollte Verschiebung — die
+     * neuen Werte stehen hier, damit die naechste ungewollte wieder auffaellt.
+     * Vorher: Pedale [12, 10], Block links 198 / rechts 82.
+     */
     const iPad = FASSUNGEN[0];
     const pedale = pedalKasten(iPad);
-    expect([pedale.x0, pedale.y0]).toEqual([12, 10]);
-    expect(px(["#hudunten", "body.touch #hudunten"], "left", iPad)).toBe(198);
-    expect(px(["#hudunten", "body.touch #hudunten"], "right", iPad)).toBe(82);
+    expect([pedale.x0, pedale.y0]).toEqual([439, 10]);
+    expect(px(["#hudunten", "body.touch #hudunten"], "left", iPad)).toBe(12);
+    expect(px(["#hudunten", "body.touch #hudunten"], "right", iPad)).toBe(597);
     expect(px(["#hudunten", "body.touch #hudunten"], "bottom", iPad)).toBe(10);
     expect(px(["#touch .btn", "#touch #btn-rot-l"], "bottom", iPad)).toBe(238);
     expect(px(["#touch .btn", "#touch #btn-rot-r"], "bottom", iPad)).toBe(180);
@@ -182,6 +188,8 @@ describe("Sichere Raender", () => {
     expect(loese("max(12px, calc(var(--sa-r) + 8px))", { ...rand, r: 0 })).toBe(12);
     expect(loese("auto", rand)).toBeNull();
     expect(() => loese("50%", rand)).toThrow();
+    // Prozent nur mit Bezugsgroesse (22.10.2026, Pedale mittig): 512 + 85
+    expect(loese("calc(50% + 85px)", rand, 1024)).toBe(597);
     expect(() => loese("var(--unbekannt)", rand)).toThrow();
   });
 });

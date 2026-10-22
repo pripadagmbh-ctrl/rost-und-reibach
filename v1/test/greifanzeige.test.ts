@@ -382,7 +382,8 @@ describe("Unterer HUD-Block: Griff-Info und Ladeanzeige", () => {
          * Materialangabe UND wartender Abholer. Was der Spieler staendig
          * sieht, deckelt der Test darueber auf 27 %.
          *
-         * Gemessen: iPad 12,5 % · iPhone quer 37,6 % · iPhone hoch 36,0 %.
+         * Gemessen (22.10.2026, Pedale mittig, Block links daneben):
+         * iPad 14,8 % · iPhone quer 37,6 % · iPhone hoch 33,7 %.
          */
         const hoechste = Math.max(voll.oben, ziel.oben);
         expect(hoechste / f.h, `Block reicht bis ${hoechste} px von ${f.h}`).toBeLessThan(0.4);

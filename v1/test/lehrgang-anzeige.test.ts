@@ -367,6 +367,7 @@ const schritt = (phase: "zeigen" | "du", nr = 1): GameEvents["lehrgang:schritt"]
   text: { de: "{boom-}", en: "{boom-}" },
   zeige: { fn: "boom", richtung: "minus" },
   phase,
+  teile: 1,
 });
 
 describe("Lehrgangsleiste: Phase, Zeichen, Vorlesetext", () => {
@@ -551,11 +552,11 @@ describe("Geisterdaumen folgt der Vorführung", () => {
     expect(kameraGeste({ zuruecksetzen: true })).toBeNull();
     expect(kameraGeste(null)).toBeNull();
   });
-  it("Tasten-Schild: Ansicht = 2× tippen, Kranz-Funktionen mit ihrem Namen", () => {
+  it("Tasten-Schild: Kranz-Funktionen mit ihrem Namen; die Ansicht zeigt der tippende Finger, kein Schild (L5-B)", () => {
     const kranz = (code: string) => ({ KeyO: "STÜTZEN" })[code] ?? null;
     // L4: Zeichen plus hoechstens ein Wort
-    expect(tastenText("KeyC", kranz, "de")).toBe("2× ANSICHT");
-    expect(tastenText("KeyC", kranz, "en")).toBe("2× VIEW");
+    expect(tastenText("KeyC", kranz, "de")).toBeNull();
+    expect(tastenText("KeyC", kranz, "en")).toBeNull();
     expect(tastenText("KeyO", kranz, "de")).toBe("STÜTZEN"); // der Kranzname kommt übersetzt aus der Seite
     expect(tastenText(KAMERA_ZURUECK, kranz, "de")).toBeNull();
     expect(tastenText("KeyQ", kranz, "de")).toBeNull();

@@ -75,8 +75,6 @@ export const WORTE = {
   lektionVon: { de: "✓ Lektion {n} von {m}", en: "✓ Lesson {n} of {m}" },
   weiterGross: { de: "WEITER", en: "NEXT" },
   zurPruefung: { de: "ZUR PRÜFUNG 1", en: "TO TEST 1" },
-  // --- Geisterdaumen: was eine Taste auf Touch heisst (L4: Zeichen plus hoechstens ein Wort)
-  ansichtTipp: { de: "2× ANSICHT", en: "2× VIEW" },
   // --- Bestenliste (E-195)
   bestenliste: { de: "BESTENLISTE", en: "LEADERBOARD" },
   zurueck: { de: "Zurück", en: "Back" },

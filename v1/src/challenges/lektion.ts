@@ -66,8 +66,13 @@ export type Groesse = "cabYaw" | "boom" | "stick" | "rotator" | "closure" | "kam
  * aus `challenge.ts` — die Quellen dann wie `ChallengeQuellen`.
  */
 export type LektionZiel =
-  /** um mindestens `ab` geaendert (in `richtung` des Befehls, "beide" = Betrag) */
-  | { art: "aenderung"; groesse: Groesse; richtung: "plus" | "minus" | "beide"; ab: number }
+  /**
+   * um mindestens `ab` geaendert (in `richtung` des Befehls, "beide" = Betrag).
+   * "hinUndZurueck" (L5-B, Patrick 22.10. Punkt 40c): plus UND minus je
+   * mindestens `ab`, Reihenfolge egal — zwei Teilziele, das erste meldet
+   * `lehrgang:teilziel`.
+   */
+  | { art: "aenderung"; groesse: Groesse; richtung: "plus" | "minus" | "beide" | "hinUndZurueck"; ab: number }
   /** Ansicht: "gewechselt" = eine andere als bei Beginn, sonst genau diese */
   | { art: "ansicht"; modus: ViewMode | "gewechselt" }
   /** Kamera war verstellt und steht wieder auf dem Startpunkt der Aussenansicht (Doppeltipp) */
@@ -171,6 +176,107 @@ const RAND_REL = 0.02;
 type Arm = "boom" | "stick";
 const ARM: readonly Arm[] = ["boom", "stick"];
 
+/*
+ * --- L5-B (Patrick 22.10.2026 Punkt 40f): WAS IST GERADE NOETIG? ---
+ * „bei der letzten Aufgabe … nicht ganz klar, dass man nach links schwenken
+ * muss, weil quasi die Pfeiltasten nur nach oben und nach unten zeigen". Der
+ * Lauf kennt Ziel, Marke und Wendepunkte; er sagt, welche Funktion in welche
+ * Richtung gerade zaehlt (`lehrgang:richtung`), der Geisterdaumen uebersetzt
+ * das auf Stick und Pfeil.
+ */
+type Richtung = "plus" | "minus";
+export type Bedarf = GameEvents["lehrgang:richtung"]["bedarf"];
+const gegen = (r: Richtung): Richtung => (r === "plus" ? "minus" : "plus");
+/**
+ * Marke: Seitenfehler (Bogen um die Drehmitte), ab dem geschwenkt statt
+ * ein-/ausgefahren wird, als Anteil des Markenhalbmessers.
+ * SW: ins Ein-/Ausfahren ab 0,5, zurueck ins Schwenken erst ab 0,75 (das
+ * Pendel der Spinne soll den Pfeil nicht flackern lassen). Bei 0,75 seitlich
+ * bleiben bis zum Rand noch sqrt(1 − 0,75²) = 0,66 radial — wer dort steht und
+ * nicht drin ist, liegt radial daneben, der Arm-Pfeil stimmt also.
+ */
+const SEITE_REIN = 0.5;
+const SEITE_RAUS = 0.75;
+/** Ein Gelenk „hilft spuerbar" ab dieser Ausladungsaenderung (m je rad). // SW: 0,5 m/rad ≈ 1 cm je Grad; aus der Startlage tragen Stiel 2,3 und Hauptarm 0,7 */
+const WIRKUNG_MIN = 0.5;
+/** „beide": die andere Richtung gilt erst, wenn sie um so viel (Anteil von `ab`) vorn liegt. // SW: 10 % — Zittern am Stick dreht den Pfeil nicht */
+const BEIDE_VORSPRUNG = 0.1;
+
+/** Erste Richtung, in die die (gerichtete) Spur diese Groesse bewegt — sonst plus. */
+function ersteRichtung(spur: Spur | null, g: Groesse): Richtung {
+  for (const a of spur ?? []) {
+    if (g === "zoom") {
+      const f = a.kamera?.zoomProS ?? 1;
+      if (Math.abs(f - 1) > 1e-3) return f > 1 ? "plus" : "minus"; // zoom plus = weiter weg
+    } else if (g === "cabYaw" || g === "boom" || g === "stick") {
+      const v = a.achsen?.[g === "cabYaw" ? "cab" : g] ?? 0;
+      if (Math.abs(v) > 1e-3) return v > 0 ? "plus" : "minus";
+    }
+  }
+  return "plus";
+}
+
+/** Liegt `rest` in Richtung `r` noch vor dem Anschlag (mit Luft wie `richteSpur`)? Der Drehkranz hat keinen. */
+function frei(g: Groesse, r: Richtung, rest: number, z: LektionZustand, b: LektionZustand): boolean {
+  const s = r === "plus" ? 1 : -1;
+  if (g === "boom" || g === "stick") {
+    const ziel = z[g] + s * rest;
+    return ziel >= GRENZEN[g].min + RAND_RAD && ziel <= GRENZEN[g].max - RAND_RAD;
+  }
+  if (g === "zoom") {
+    const ziel = z.kamera.abstand + s * rest * b.kamera.abstand; // `zoom` ist relativ zum Abstand bei Beginn
+    return ziel >= GRENZEN.abstand.min * (1 + RAND_REL) && ziel <= GRENZEN.abstand.max * (1 - RAND_REL);
+  }
+  return true;
+}
+
+/**
+ * Rein: Was bringt die Spinne jetzt zur Marke? Erst der Winkel um die
+ * Drehmitte (Schwenken; `cab+` dreht nach links, der Winkel atan2(x, z)
+ * steigt — wie `schwenkRad` in `beginne`), dann die Ausladung: Hauptarm und
+ * Stiel je in die Richtung, die die Spitze zur Marke hin schiebt (s. u.). Am
+ * Anschlag faellt ein Gelenk weg. `seitlich` = zuletzt wurde geschwenkt
+ * (Hysterese, s. o.).
+ */
+export function markeBedarf(
+  z: LektionZustand,
+  m: { x: number; z: number; radiusM: number },
+  seitlich: boolean
+): { bedarf: Bedarf; seitlich: boolean } {
+  const sx = z.spinne.x - z.x;
+  const sz = z.spinne.z - z.z;
+  const mx = m.x - z.x;
+  const mz = m.z - z.z;
+  const rM = Math.hypot(mx, mz);
+  let dw = Math.atan2(mx, mz) - Math.atan2(sx, sz);
+  dw = Math.atan2(Math.sin(dw), Math.cos(dw)); // auf −π … π
+  const seite = Math.abs(dw) * rM; // Bogen auf dem Kreis der Marke, m
+  if (seite > m.radiusM * (seitlich ? SEITE_REIN : SEITE_RAUS)) return { bedarf: [{ fn: "cab", richtung: dw > 0 ? "plus" : "minus" }], seitlich: true };
+  const raus = Math.hypot(sx, sz) < rM; // Spinne naeher als die Marke → hinaus
+  /*
+   * Je Gelenk die Ausladungsaenderung je rad (Spitze gegen den Drehpunkt des
+   * Hauptarms, wie `spitzeR`): dR/dStiel = −S·sin(w), dR/dboom = −(Hoehe der
+   * Spitze). Jedes Gelenk, das spuerbar hilft, bekommt seine Richtung — aus
+   * der Startlage heranholen = Hauptarm hoch + Stiel ein, wie die
+   * Vorfuehrung. Liegt der Stiel waagrecht (w ≈ 0), ist die Ausladung dort am
+   * groessten und er hilft nicht mehr; dann fuehrt der Hauptarm allein
+   * (Browserlauf 22.10.: Hauptarm am 70°-Anschlag, Stiel waagrecht — der
+   * Stiel-Pfeil kippte bei jedem Ruck um, die Spinne kam nicht weiter hinaus).
+   */
+  const w = z.boom + z.stick;
+  const wirkung: Record<Arm, number> = {
+    boom: -(GRENZEN.boom.m * Math.sin(z.boom) + GRENZEN.stick.m * Math.sin(w)),
+    stick: -GRENZEN.stick.m * Math.sin(w),
+  };
+  const kandidaten = ARM.map((g) => {
+    const richtung: Richtung = wirkung[g] > 0 === raus ? "plus" : "minus";
+    return { fn: g, richtung, m: Math.abs(wirkung[g]), frei: frei(g, richtung, 0, z, z) };
+  }).filter((k) => k.frei);
+  const spuerbar = kandidaten.filter((k) => k.m >= WIRKUNG_MIN);
+  const wahl = spuerbar.length ? spuerbar : kandidaten.sort((a, b) => b.m - a.m).slice(0, 1);
+  return { bedarf: wahl.map(({ fn, richtung }) => ({ fn, richtung })), seitlich: false };
+}
+
 /** Gelenkwinkel an jedem Abschnittsende (Index 0 = Beginn), nominell */
 function lagen(spur: Spur, z: Pick<LektionZustand, Arm>): Array<Record<Arm, number>> {
   const l = { boom: z.boom, stick: z.stick };
@@ -247,6 +353,14 @@ export class LektionLauf {
   /** L3b: Wendepunkte der Messgroesse seit Beginn von "du" */
   private tief = 0;
   private hoch = 0;
+  /** L5-B: die gerichtete Spur des Schritts (erste Richtung fuer den Geist) */
+  private spur: Spur | null = null;
+  /** L5-B (40c): Teilziele „hinUndZurueck" — plus bzw. minus schon erreicht */
+  private teilPlus = false;
+  private teilMinus = false;
+  /** L5-B (40f): zuletzt gesendete Richtung (gesendet wird nur bei Aenderung), Hysterese der Marke */
+  private richtungKey = "";
+  private seitlich = true;
 
   constructor(
     readonly daten: LektionDaten,
@@ -303,7 +417,10 @@ export class LektionLauf {
     this.fahrt += (z.x - this.letzt.x) * Math.sin(z.heading) + (z.z - this.letzt.z) * Math.cos(z.heading);
     this.letzt = { x: z.x, z: z.z };
     if (!amStart(z.kamera)) this.kameraWeg = true;
-    if (!this.erreicht(z)) return;
+    if (!this.erreicht(z)) {
+      this.richtung(z);
+      return;
+    }
     this.bus.emit("lehrgang:haekchen", { id: this.daten.id, nr: this.schritt + 1 });
     this.phase = "pause";
     this.pauseS = HAEKCHEN_PAUSE_S;
@@ -322,6 +439,7 @@ export class LektionLauf {
     const s = d.schritte[i]!;
     const z = this.q.zustand();
     const g = s.vorfuehrung ? richteSpur(s.vorfuehrung, z) : null;
+    this.spur = g?.spur ?? null;
     // Der Geist zeigt die erste Bewegung der Vorfuehrung — ist sie umgedreht, er auch
     const zf = s.zeige;
     this.zeige =
@@ -358,8 +476,49 @@ export class LektionLauf {
     this.kameraWeg = !amStart(z.kamera);
     this.tief = 0;
     this.hoch = 0;
+    this.teilPlus = false;
+    this.teilMinus = false;
+    this.richtungKey = "";
+    this.seitlich = true;
     this.phase = "du";
     this.melde("du");
+    this.richtung(z);
+  }
+
+  /** L5-B (40f): `lehrgang:richtung` senden, wenn sich der Bedarf geaendert hat. Schritte ohne Meinung senden nichts. */
+  private richtung(z: LektionZustand): void {
+    const r = this.bedarf(z);
+    if (!r) return;
+    const key = JSON.stringify(r);
+    if (key === this.richtungKey) return;
+    this.richtungKey = key;
+    this.bus.emit("lehrgang:richtung", { id: this.daten.id, nr: this.schritt + 1, ...r });
+  }
+
+  private bedarf(z: LektionZustand): Pick<GameEvents["lehrgang:richtung"], "bedarf" | "kamera"> | null {
+    const ziel = this.daten.schritte[this.schritt]!.ziel;
+    if (ziel.art === "marke") {
+      const r = markeBedarf(z, this.markeOrt!, this.seitlich);
+      this.seitlich = r.seitlich;
+      return { bedarf: r.bedarf, kamera: null };
+    }
+    if (ziel.art !== "aenderung") return null;
+    const g = ziel.groesse;
+    const fn = g === "cabYaw" ? "cab" : g === "boom" || g === "stick" ? g : null;
+    if (!fn && g !== "zoom") return null; // Fahren, Kamera drehen …: der Geist bleibt bei der Spur
+    const b = this.basis!;
+    const d = aenderung(g, b, z, this.fahrt);
+    // Wie `erreicht`, ohne die Wendepunkte zu schreiben (hier vor dem ersten `erreicht` aus `du`)
+    const plus = d - Math.min(this.tief, d);
+    const minus = Math.max(this.hoch, d) - d;
+    const fest = ziel.richtung === "plus" || ziel.richtung === "minus" ? ziel.richtung : null;
+    const fehlt = ziel.richtung === "hinUndZurueck" ? (this.teilPlus ? "minus" : this.teilMinus ? "plus" : null) : null;
+    const v = BEIDE_VORSPRUNG * ziel.ab;
+    let soll: Richtung = fest ?? fehlt ?? (plus > minus + v ? "plus" : minus > plus + v ? "minus" : ersteRichtung(this.spur, g));
+    // Laege der Rest hinter dem Anschlag: erst die Gegenrichtung (Wendepunkt), wie `richteSpur` die Vorfuehrung dreht
+    if (!frei(g, soll, ziel.ab - (soll === "plus" ? plus : minus), z, b)) soll = gegen(soll);
+    if (fn) return { bedarf: [{ fn, richtung: soll }], kamera: null };
+    return { bedarf: [], kamera: soll === "minus" ? "auf" : "zu" }; // naeher = Finger auseinander (`ui/geisterdaumen.ts` kameraGeste)
   }
 
   private melde(phase: "zeigen" | "du"): void {
@@ -376,6 +535,7 @@ export class LektionLauf {
       marke: this.markeOrt, // E-196: Bodenmarke (Lektion 3), in beiden Phasen gleich
       symbol: s.symbol ?? null, // E-197: Bildzeichen statt Text
       wort: s.wort ?? null,
+      teile: s.ziel.art === "aenderung" && s.ziel.richtung === "hinUndZurueck" ? 2 : 1, // L5-B (40c)
     });
   }
 
@@ -402,6 +562,15 @@ export class LektionLauf {
         this.hoch = Math.max(this.hoch, d);
         const plus = d - this.tief;
         const minus = this.hoch - d;
+        if (ziel.richtung === "hinUndZurueck") {
+          const vorher = Number(this.teilPlus) + Number(this.teilMinus);
+          this.teilPlus ||= plus >= ziel.ab;
+          this.teilMinus ||= minus >= ziel.ab;
+          const n = Number(this.teilPlus) + Number(this.teilMinus);
+          if (n === 2) return true;
+          if (n > vorher) this.bus.emit("lehrgang:teilziel", { id: this.daten.id, nr: this.schritt + 1, teil: n, von: 2 });
+          return false;
+        }
         return (ziel.richtung === "minus" ? minus : ziel.richtung === "plus" ? plus : Math.max(plus, minus)) >= ziel.ab;
       }
     }

@@ -23,7 +23,6 @@ import type { AxisId, ControlConfig } from "../core/controlConfig";
 import type { Spur, SpurAbschnitt, SpurAchse } from "../core/spur";
 import { KAMERA_ZURUECK, SPUR_ACHSEN, type Wiedergabe } from "../core/wiedergabe";
 import { sprache, type Sprache } from "../challenges/texte";
-import { wort } from "./aufgabentexte";
 import { achseVon, stickRichtung } from "./challengekarte";
 
 export type Pfeil = "links" | "rechts" | "hoch" | "runter" | "quer" | "laengs";
@@ -153,6 +152,22 @@ export function daumenAusSpur(spur: Spur | null, zeige: GameEvents["challenge:sc
 }
 
 /**
+ * L5-B (Patrick 22.10. Punkt 40f): Der Lauf sagt in „du", welche Funktion
+ * gerade in welche Richtung zaehlt (`lehrgang:richtung`); hier wird daraus je
+ * Stickseite ein Einzelpfeil — ueber die Belegung des Spielers, nie fest
+ * verdrahtet. Liegen zwei Funktionen auf demselben Stick, zeigt er die erste;
+ * eine Funktion, die auf keinem Stick liegt, faellt weg.
+ */
+export function daumenAusBedarf(bedarf: GameEvents["lehrgang:richtung"]["bedarf"], c: ControlConfig): DaumenBild[] {
+  const bilder: DaumenBild[] = [];
+  for (const b of bedarf) {
+    const d = daumenBild(b, c);
+    if (d && !bilder.some((x) => x.seite === d.seite)) bilder.push(d);
+  }
+  return bilder;
+}
+
+/**
  * Rein: Die Kamera-Geste einer Spur fuer „du". Ein Doppeltipp hat Vorrang —
  * er ist das Neue des Schritts (Lektion 1 Schritt 6: drehen kennt der
  * Spieler aus Schritt 1). Sonst die erste Geste, sonst "".
@@ -196,9 +211,9 @@ export function pedaleLeuchten(spur: Spur | null, fahrenAn: boolean, c: ControlC
 export const TASTE_LEUCHTET_S = 1.5;
 
 /** Rein: Aufschrift fuer einen Tastendruck der Spur — `kranz` liest die Aufschrift des Kranzeintrags. */
-export function tastenText(code: string, kranz: (code: string) => string | null, s: Sprache = sprache()): string | null {
-  if (code === "KeyC") return wort("ansichtTipp", s);
-  if (code === KAMERA_ZURUECK) return null; // zeigt der Doppeltipp im Mittelstreifen
+export function tastenText(code: string, kranz: (code: string) => string | null, _s: Sprache = sprache()): string | null {
+  // L5-B (40b): Ansicht und Kamera-Start zeigt ein tippender Finger, kein Schild
+  if (code === "KeyC" || code === KAMERA_ZURUECK) return null;
   // L4 (Patrick: „kaum oder keinen Text"): Zeichen plus hoechstens EIN Wort — beim Kranz nur sein Name, wie er dort steht
   return kranz(code);
 }
@@ -243,7 +258,25 @@ export function installGeisterdaumen(m: {
   }
   const schild = document.createElement("div");
   schild.className = "tastengeist";
-  halter.append(kam, schild);
+  /*
+   * L5-B (Patrick 22.10. Punkte 40b, 40d): Tippen als Bewegung. Ein Finger
+   * senkt sich, je Tipp laeuft ein Ring nach aussen — doppelt fuer die
+   * Ansicht (rechte Zone) und den Kamera-Start (Mitte), einmal fuer die Pedale
+   * (der Finger kommt von oben angewandert). In „du" in Schleife, in der
+   * Vorfuehrung einmal je Druck. Bewegung im CSS (index.html `tipp-*`).
+   */
+  const tippgeist = (art: string): HTMLDivElement => {
+    const el = document.createElement("div");
+    el.className = `tippgeist ${art}`;
+    for (const k of ["welle", "welle zwei", "finger"]) {
+      const t = document.createElement("div");
+      t.className = k;
+      el.appendChild(t);
+    }
+    return el;
+  };
+  const tipp = { ansicht: tippgeist("ansicht"), mitte: tippgeist("mitte"), pedal: tippgeist("pedal einzel") };
+  halter.append(kam, schild, tipp.ansicht, tipp.mitte, tipp.pedal);
   document.body.appendChild(halter);
 
   let bilder: DaumenBild[] = [];
@@ -260,6 +293,31 @@ export function installGeisterdaumen(m: {
   let duSpur: Spur | null = null;
   /* L4b: Haekchen-Pause bis zum naechsten Schritt — die Seiten, die gruen leuchten */
   let gelungen: Set<"links" | "rechts"> | null = null;
+  /* L5-B (40f): letzte `lehrgang:richtung` dieses Schritts — ersetzt in „du" die Bilder aus der Spur */
+  let richtung: GameEvents["lehrgang:richtung"] | null = null;
+  let schrittVon: { id: string; nr: number } | null = null;
+  /* L5-B (40b/40d): Vorfuehrung — zaehlt jeden Tastendruck (neuer Finger-Tipp) und ob der Schritt erst die Pedale braucht */
+  let druckDa: object | null = null;
+  let druecke = 0;
+  let pedalVorab = false;
+  /* L5-B (40b): der laufende Lehrgangsschritt uebt die Ansicht (Bildzeichen „ansicht") */
+  let ansichtSchritt = false;
+  /** Mitte des ersten Pedals in Bildpunkten — gelesen nur, wenn der Finger dorthin muss (Lage verlegt L5-A, `#pedals`) */
+  const pedalOrt = (): { x: number; y: number } | null => {
+    const p = document.getElementById("pedals");
+    const ziel = (p?.querySelector(".pedal") ?? p) as HTMLElement | null;
+    const r = ziel?.getBoundingClientRect?.();
+    return r && r.width > 0 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
+  };
+  /** an/aus; `neu` = Bewegung von vorn (der naechste Druck der Vorfuehrung) */
+  const tippe = (el: HTMLElement, an: boolean, einmal: boolean, neu: boolean): void => {
+    if (an && neu) {
+      el.classList.remove("an");
+      void el.offsetWidth; // Bewegung neu starten (Stil neu rechnen)
+    }
+    el.classList.toggle("an", an);
+    el.classList.toggle("einmal", an && einmal);
+  };
 
   /** Liegt ein echter Daumen in dieser Zone? Der Stickkreis ist dann eingeblendet. */
   const daumenDrauf = (seite: "links" | "rechts"): boolean => {
@@ -276,16 +334,22 @@ export function installGeisterdaumen(m: {
     // In der Vorfuehrung: jede Seite, die sich bewegt, dazu die Seite des Schritts in Ruhe
     const folgt = (seite: "links" | "rechts"): Ausschlag | null =>
       a ? (a[seite] ?? (bilder.some((b) => b.seite === seite) ? { dx: 0, dy: 0 } : null)) : null;
+    // L5-B (40d): Passt der Fahrbetrieb nicht, zeigt der Finger erst aufs Pedal — der Stick-Geist kommt danach
+    const pedal = !w && pedaleLeuchten(duSpur, m.fahrenAn?.() ?? false, m.steuerung());
     // „du": je Seite das stehende Bild, solange dort kein echter Daumen liegt
     const steht = (seite: "links" | "rechts"): DaumenBild | null =>
-      w || daumenDrauf(seite) ? null : (bilder.find((b) => b.seite === seite) ?? null);
+      w || pedal || daumenDrauf(seite) ? null : (bilder.find((b) => b.seite === seite) ?? null);
     const gedrueckt = w ? m.vorfuehrung?.gedrueckt : null;
     const frisch = gedrueckt && gedrueckt.seitS < TASTE_LEUCHTET_S ? gedrueckt.codes : [];
+    if (gedrueckt && gedrueckt !== druckDa) druecke++;
+    druckDa = gedrueckt ?? null;
     const schildText = (w ? frisch : duTasten)
       .map((c) => tastenText(c, kranz))
       .filter((x): x is string => !!x)
       .join(" · ");
     const geste = w ? (frisch.includes(KAMERA_ZURUECK) ? "doppeltipp" : (kameraGeste(w.kamera) ?? "")) : duGeste;
+    // Schritt ohne Vorfuehrung, der die Ansicht will (Zurueck nach draussen): derselbe Finger
+    const ansichtTipp = w ? frisch.includes("KeyC") : duTasten.includes("KeyC") || ansichtSchritt;
     const fahren = !!w && (Math.abs(w.achsen.drive) >= RUHE || Math.abs(w.achsen.steer) >= RUHE);
     // Drehtasten leuchten nur, wenn der Rotator auf keinem Stick liegt
     const rot = w && !achseVon("rotator", m.steuerung()) && Math.abs(w.achsen.rotator) >= RUHE ? Math.sign(w.achsen.rotator) : 0;
@@ -314,13 +378,14 @@ export function installGeisterdaumen(m: {
       }
       return;
     }
-    const pedal = !w && pedaleLeuchten(duSpur, m.fahrenAn?.() ?? false, m.steuerung());
+    const pedalTipp = w ? pedalVorab : pedal;
     const soll = !sichtbar
       ? ""
       : w
-        ? `v|${runde(L)}|${runde(R)}|${geste}|${schildText}|${fahren}|${rot}`
-        : `d|${steht("links")?.pfeil ?? "-"}|${steht("rechts")?.pfeil ?? "-"}|${geste}|${schildText}|${pedal}`;
+        ? `v|${runde(L)}|${runde(R)}|${geste}|${schildText}|${fahren}|${rot}|${ansichtTipp}|${pedalTipp}|${druecke}`
+        : `d|${steht("links")?.pfeil ?? "-"}|${steht("rechts")?.pfeil ?? "-"}|${geste}|${schildText}|${pedal}|${ansichtTipp}`;
     if (soll === gezeigt) return;
+    const neuerDruck = !!w && !gezeigt.endsWith(`|${druecke}`);
     gezeigt = soll;
     for (const seite of ["links", "rechts"] as const) {
       const { el, pfeil } = g[seite];
@@ -342,8 +407,17 @@ export function installGeisterdaumen(m: {
         pfeil.textContent = ZEICHEN[b.pfeil];
       }
     }
-    kam.classList.toggle("an", sichtbar && geste !== "");
+    // Doppeltipp im Mittelstreifen: derselbe tippende Finger wie fuer die Ansicht (L5-B)
+    kam.classList.toggle("an", sichtbar && geste !== "" && geste !== "doppeltipp");
     kam.dataset["geste"] = geste;
+    tippe(tipp.mitte, sichtbar && geste === "doppeltipp", !!w, neuerDruck);
+    tippe(tipp.ansicht, sichtbar && ansichtTipp, !!w, neuerDruck);
+    const ort = sichtbar && pedalTipp ? pedalOrt() : null;
+    if (ort) {
+      tipp.pedal.style.setProperty("left", `${ort.x.toFixed(0)}px`);
+      tipp.pedal.style.setProperty("top", `${ort.y.toFixed(0)}px`);
+    }
+    tippe(tipp.pedal, !!ort, !!w, false);
     schild.classList.toggle("an", sichtbar && schildText !== "");
     schild.textContent = schildText;
     document.getElementById("pedals")?.classList.toggle("geist-zeigt", sichtbar && (fahren || pedal));
@@ -359,6 +433,9 @@ export function installGeisterdaumen(m: {
     spurDes = null;
     duSpur = null;
     gelungen = null;
+    richtung = null;
+    pedalVorab = false;
+    ansichtSchritt = false;
     aus = false;
     phase = "du";
     auffrischen();
@@ -371,6 +448,11 @@ export function installGeisterdaumen(m: {
     duSpur = p === "du" ? spur : null;
     bilder = daumenAusSpur(p === "du" ? spur : null, zeige, m.steuerung());
     duGeste = p === "du" ? kameraAusSpur(spur) : "";
+    // L5-B (40f): weiss der Lauf, was gerade zaehlt, zeigt der Geist genau das
+    if (p === "du" && richtung) {
+      bilder = daumenAusBedarf(richtung.bedarf, m.steuerung());
+      if (richtung.kamera) duGeste = richtung.kamera;
+    }
     duTasten = p === "du" ? [...new Set((spur ?? []).flatMap((a) => a.tasten ?? []))] : [];
     auffrischen();
   };
@@ -384,7 +466,7 @@ export function installGeisterdaumen(m: {
   const erfolg = (an: boolean): void => {
     const ziele = an
       ? [
-          ...Array.from(halter.querySelectorAll<HTMLElement>(".geist.an, .kamgeist.an, .tastengeist.an")),
+          ...Array.from(halter.querySelectorAll<HTMLElement>(".geist.an, .kamgeist.an, .tastengeist.an, .tippgeist.an")),
           ...["touch-left", "touch-right"].map((id) => document.getElementById(id)).filter((el): el is HTMLElement => !!el && !el.hidden),
         ]
       : Array.from(document.querySelectorAll<HTMLElement>(".erfolg"));
@@ -416,12 +498,25 @@ export function installGeisterdaumen(m: {
   });
   m.bus.on("lehrgang:schritt", (e) => {
     erfolg(false);
+    richtung = null; // die Richtung dieses Schritts kommt gleich nach seinem „du"
+    schrittVon = { id: e.id, nr: e.nr };
+    ansichtSchritt = e.symbol === "ansicht";
+    pedalVorab = false;
     if (e.phase === "zeigen") zeigtGerade = { id: e.id, nr: e.nr };
     const eigene = spurDes && spurDes.id === e.id && spurDes.nr === e.nr ? spurDes.spur : null;
     schritt(e.zeige, e.phase, e.phase === "du" ? eigene : null);
   });
   m.bus.on("lehrgang:vorfuehren", (e) => {
     spurDes = zeigtGerade ? { ...zeigtGerade, spur: e.spur } : null;
+    // L5-B (40d): Die Vorfuehrung schaltet die Pedale nicht (die Spur faehrt an ihnen vorbei) — der Finger zeigt einmal, dass es hier losgeht
+    pedalVorab = pedaleLeuchten(e.spur, m.fahrenAn?.() ?? false, m.steuerung());
+    auffrischen();
+  });
+  m.bus.on("lehrgang:richtung", (e) => {
+    if (aus || phase !== "du" || schrittVon?.id !== e.id || schrittVon.nr !== e.nr) return;
+    richtung = e;
+    const eigene = spurDes && spurDes.id === e.id && spurDes.nr === e.nr ? spurDes.spur : null;
+    schritt(null, "du", eigene); // die Bilder kommen ganz aus `bedarf`
   });
   m.bus.on("lehrgang:geschafft", ende);
 

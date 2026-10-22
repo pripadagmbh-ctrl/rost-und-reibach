@@ -3,12 +3,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fahrachse } from "../src/core/touch";
 import { FUNCTION_LABELS, AXIS_LABELS, defaultConfig } from "../src/core/controlConfig";
+import { FASSUNGEN, pedalKasten, px } from "./cssmass";
 
 /*
- * Gefahren wird mit dem linken Stick, eingeschaltet mit zwei Pedalen unten in
- * der linken unteren Ecke (Ansage Patrick 14.09.2026: "zwei Pedale nebeneinander
+ * Gefahren wird mit dem linken Stick, eingeschaltet mit zwei Pedalen unten
+ * mittig (Ansage Patrick 14.09.2026: "zwei Pedale nebeneinander
  * unten Mitte", Nachtrag: "die beiden Pedale sind nur visuell", nach dem
- * Geraetetest: "Pedale links unten anordnen, sonst verdeckt er zu viel Sicht").
+ * Geraetetest: "Pedale links unten anordnen, sonst verdeckt er zu viel Sicht";
+ * Befund 22.10.2026, 40e: "Pedale in die Mitte — sie werden beim Baggern
+ * versehentlich getroffen"). Lage und Abstaende: test/pedalmitte.test.ts.
  *
  * Diese Datei hiess bis heute fahrflaeche.test.ts und bewachte den Vorgaenger:
  * eine eigene Fahrflaeche unten links mit einem dritten schwebenden Stick.
@@ -95,7 +98,7 @@ describe("Fahrachse", () => {
 });
 
 describe("Zwei Pedale statt Fahrflaeche", () => {
-  it("hat zwei Pedale unten links", () => {
+  it("hat zwei Pedale unten mittig", () => {
     // Zwei, nebeneinander — so bestellt. Ein einzelnes Pedal saehe aus wie ein
     // Knopf; zwei sehen aus wie eine Maschine.
     expect(seite).toContain('id="pedals"');
@@ -103,30 +106,20 @@ describe("Zwei Pedale statt Fahrflaeche", () => {
     expect(seite).toContain('id="pedal-r"');
     const halter = bloecke("#pedals")[0] ?? "";
     /*
-     * Sie standen den halben Tag in der Bildmitte. Patrick am Gerät,
-     * 14.09.2026: "Pedale links unten anordnen, sonst verdeckt er zu viel
-     * Sicht." Unten links ist der Rand des Blicks; die Mitte ist genau die
-     * Stelle, auf die man beim Greifen schaut.
+     * GEAENDERT am 22.10.2026. Bis dahin verlangte der Test "unten links"
+     * (Patrick 14.09.2026: "Pedale links unten anordnen, sonst verdeckt er zu
+     * viel Sicht"). Am 22.10.2026 hat er die Mitte bestellt: Unten links lagen
+     * sie unter dem linken Stick-Daumen und wurden beim Baggern getroffen.
+     * Gegen die Sicht: kleiner als vorher (pedalmitte.test.ts).
      */
-    expect(halter).not.toContain("left: 50%");
-    expect(halter).not.toContain("translateX");
-    expect(css(halter, "left")).toBeLessThanOrEqual(16);
+    expect(halter).toContain("left: 50%");
+    expect(halter).toContain("translateX(-50%)");
     expect(halter).toContain("bottom:");
   });
 
-  it("bleibt mit allem in der linken Bildhaelfte", () => {
-    /*
-     * Die rechte Haelfte gehoert dem Greifstick und dem Doppeltipp fuer die
-     * Ansicht. Ragte der Pedalblock hinueber, faenge er Tipps ab, die der
-     * Kamera galten. Gerechnet in der schmalsten Fassung: iPhone mini quer,
-     * 812 px breit.
-     */
-    // Zweiter Block je Bezeichner = die flache Fassung in der Medienabfrage.
-    const halter = bloecke("#pedals")[1] ?? "";
-    const pedal = bloecke("#touch .pedal")[1] ?? "";
-    const breite = 2 * css(halter, "padding") + 2 * css(pedal, "width") + css(halter, "gap");
-    expect(css(halter, "left") + breite).toBeLessThan(812 / 2);
-  });
+  // "bleibt mit allem in der linken Bildhaelfte" ist am 22.10.2026 nach
+  // test/pedalmitte.test.ts gewandert: Dort steht jetzt "im Mittelstreifen,
+  // fern von beiden Stick-Zonen".
 
   it("hat die Fahrflaeche von heute frueh restlos abgeraeumt", () => {
     // Zone, Stick, CSS und Aufschrift der abgelehnten Flaeche unten links
@@ -191,9 +184,10 @@ describe("Zwei Pedale statt Fahrflaeche", () => {
     expect(sichtbar).not.toContain("Doppeltipp links");
     expect(sichtbar).not.toMatch(/Feld unten links/);
     // Dafuer steht ueberall dasselbe: Pedale antippen, dann faehrt der Stick.
-    // "unten links" muss mitwandern — ein Hilfetext, der auf die Mitte zeigt,
-    // schickt den Spieler an die falsche Stelle.
-    expect(sichtbar).toMatch(/Pedale unten links/);
+    // Die Lage muss mitwandern — ein Hilfetext, der nach links zeigt,
+    // schickt den Spieler an die falsche Stelle (seit 22.10.2026 Mitte).
+    expect(sichtbar).toMatch(/Pedale unten Mitte/);
+    expect(sichtbar).not.toMatch(/Pedale unten links/);
   });
 
   it("laesst den Doppeltipp fuer die Ansicht unangetastet", () => {
@@ -319,34 +313,19 @@ describe("Platz auf dem Glas", () => {
      * mit dem laengstmoeglichen Text und in allen DREI Fassungen — auch im
      * Hochformat, das hier nie geprueft wurde.
      */
-    const zahl = (block: string, feld: string): number | null => {
-      const m = new RegExp(`(?:^|[;{\\s])${feld}:\\s*([^;]+)`).exec(block);
-      if (!m) return null;
-      const p = /(\d+)px/.exec(m[1]);
-      return p ? Number(p[1]) : null;
-    };
-    const frei = (block: string, pHalter: string, pedal: string): boolean => {
-      const links = zahl(block, "left");
-      const unten = zahl(block, "bottom");
-      const pedalRechts =
-        css(pHalter, "left") +
-        2 * css(pHalter, "padding") +
-        2 * css(pedal, "width") +
-        css(pHalter, "gap");
-      const pedalOben = css(pHalter, "bottom") + 2 * css(pHalter, "padding") + css(pedal, "height");
-      return (links !== null && links >= pedalRechts) || (unten !== null && unten >= pedalOben);
-    };
-    // Reihenfolge im Dokument: [0] Grundregel fuer Touch (iPad, Telefon hoch),
-    // [1] Telefon hoch, [2] die flache Fassung.
-    const halter = bloecke("body.touch #hudunten");
-    expect(halter.length, "die drei Fassungen des Halters fehlen").toBe(3);
-    expect(frei(halter[0], tabletHalter, tabletPedal), "Tablet-Streifen liegt auf den Pedalen").toBe(
-      true
-    );
-    expect(frei(halter[1], tabletHalter, tabletPedal), "Hochformat liegt auf den Pedalen").toBe(true);
-    expect(frei(halter[2], handyHalter, handyPedal), "flache Fassung liegt auf den Pedalen").toBe(
-      true
-    );
+    /*
+     * GEAENDERT am 22.10.2026: Die Pedale stehen mittig (left 50 % +
+     * translateX), das rechnet nur noch cssmass.ts — mit sicheren Raendern und
+     * in allen drei Fassungen. Der Block muss links neben ODER ueber ihnen
+     * enden.
+     */
+    for (const f of FASSUNGEN) {
+      const p = pedalKasten(f);
+      const hu = ["#hudunten", "body.touch #hudunten"];
+      const rechts = f.w - px(hu, "right", f);
+      const unten = px(hu, "bottom", f);
+      expect(rechts <= p.x0 || unten >= p.y1, `${f.name}: Block liegt auf den Pedalen`).toBe(true);
+    }
   });
 
   it("laesst dem flachen Layout noch Bild uebrig", () => {

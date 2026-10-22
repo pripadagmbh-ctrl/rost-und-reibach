@@ -169,6 +169,8 @@ export function installLektionsKarte(m: LektionsKarteAnschluss): LektionsKarte {
 
   let schritt: Schritt | null = null;
   let haken = false;
+  /** L5-B (40c): erreichte Teilziele des laufenden Schritts */
+  let teil = 0;
   let gebaut = -1; // so viele Striche stehen im DOM
 
   const beschrifteKnoepfe = (s: Sprache): void => {
@@ -197,6 +199,17 @@ export function installLektionsKarte(m: LektionsKarteAnschluss): LektionsKarte {
       const el = n as HTMLElement;
       const ok = i < b.nr - 1 || (b.haken && i === b.nr - 1);
       el.className = ok ? (b.haken && i === b.nr - 1 ? "ok neu" : "ok") : i === b.nr - 1 ? "jetzt" : "";
+      /*
+       * L5-B (40c): Hat der Schritt Teilziele, ist sein Strich geteilt; die
+       * erreichten Teile sind gruen (neu erreicht: kurzes Aufploppen wie beim
+       * Haekchen). Das Haekchen fuellt dann den ganzen Strich.
+       */
+      const teile = !ok && i === b.nr - 1 ? (schritt?.teile ?? 1) : 1;
+      if (teile > 1) {
+        el.className = "jetzt geteilt";
+        if (el.childNodes.length !== teile) el.replaceChildren(...Array.from({ length: teile }, () => document.createElement("b")));
+        el.childNodes.forEach((t, j) => ((t as HTMLElement).className = j < teil ? (j === teil - 1 ? "ok neu" : "ok") : ""));
+      } else if (el.childNodes.length) el.replaceChildren();
     });
   };
 
@@ -219,18 +232,29 @@ export function installLektionsKarte(m: LektionsKarteAnschluss): LektionsKarte {
   m.bus.on("lehrgang:start", () => {
     schritt = null;
     haken = false;
+    teil = 0;
     frage(false);
     leiste.hidden = false;
     zeige();
   });
   m.bus.on("lehrgang:schritt", (e) => {
+    if (schritt?.nr !== e.nr || schritt.id !== e.id) teil = 0;
     schritt = e;
     haken = false;
+    leiste.classList.remove("teil");
     leiste.hidden = false;
     zeige();
   });
   m.bus.on("lehrgang:haekchen", () => {
     haken = true;
+    leiste.classList.remove("teil");
+    zeige();
+  });
+  // L5-B (40c): Teilziel — die Haelfte wird gruen, die Leiste leuchtet kurz, der Schritt laeuft weiter
+  m.bus.on("lehrgang:teilziel", (e) => {
+    if (!schritt || schritt.id !== e.id || schritt.nr !== e.nr) return;
+    teil = e.teil;
+    leiste.classList.add("teil");
     zeige();
   });
   m.bus.on("lehrgang:geschafft", () => {

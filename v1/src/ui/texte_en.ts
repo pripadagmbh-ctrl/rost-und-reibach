@@ -89,8 +89,8 @@ export const EN: Record<string, string> = {
   Support: "Support",
   "Linker Stick: Hauptarm & Oberwagen · Rechter Stick: Ausleger & Spinne":
     "Left stick: boom & slew · Right stick: arm & grapple",
-  "Pedale unten links: Fahren an/aus — dann fährt der linke Stick":
-    "Pedals bottom left: driving on/off — then the left stick drives",
+  "Pedale unten Mitte: Fahren an/aus — dann fährt der linke Stick":
+    "Pedals bottom centre: driving on/off — then the left stick drives",
   "↺ ↻ Spinne drehen · Doppeltipp rechts: Ansicht": "↺ ↻ rotate grapple · double-tap right: view",
   "Bildmitte ziehen: Kamera drehen · zwei Finger: Zoom": "Drag the middle: turn camera · two fingers: zoom",
   "Rechten Daumen stillhalten: Funktionskranz": "Hold right thumb still: function ring",
@@ -110,8 +110,8 @@ export const EN: Record<string, string> = {
   "Spinne öffnen/schließen": "Open/close grapple",
   "Spinne drehen": "Rotate grapple",
   "— nichts —": "— nothing —",
-  "Zum Fahren tippst du die Pedale unten links an: Dann gibt der linke Stick Gas (hoch und runter) und lenkt (seitlich). Noch ein Tipp, und er führt wieder Hauptarm und Oberwagen. Von selbst schaltet nichts zurück. Spinne drehen zusätzlich über ↺ ↻.":
-    "To drive, tap the pedals at the bottom left: the left stick then accelerates (up and down) and steers (sideways). Tap again and it works boom and slew once more. Nothing switches back by itself. You can also rotate the grapple with ↺ ↻.",
+  "Zum Fahren tippst du die Pedale unten in der Mitte an: Dann gibt der linke Stick Gas (hoch und runter) und lenkt (seitlich). Noch ein Tipp, und er führt wieder Hauptarm und Oberwagen. Von selbst schaltet nichts zurück. Spinne drehen zusätzlich über ↺ ↻.":
+    "To drive, tap the pedals at the bottom centre: the left stick then accelerates (up and down) and steers (sideways). Tap again and it works boom and slew once more. Nothing switches back by itself. You can also rotate the grapple with ↺ ↻.",
 
   // --- Lernkarte, Felder ---
   Pause: "Pause",

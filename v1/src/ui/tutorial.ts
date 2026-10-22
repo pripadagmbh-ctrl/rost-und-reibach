@@ -46,7 +46,7 @@ export const STEPS: TutorialStep[] = [
       "Du sitzt im Umschlagbagger. Linker Stick: Hauptarm und Oberwagen, " +
       "rechter Stick: Ausleger und Greifer. Am Tablet setzt du den Daumen " +
       "einfach irgendwo in der linken bzw. rechten Bildhälfte auf — der Stick " +
-      "erscheint dort. Zum Fahren tippst du die Pedale unten links an — " +
+      "erscheint dort. Zum Fahren tippst du die Pedale unten in der Mitte an — " +
       "dann fährt derselbe linke Stick. Sieh dich erst " +
       "einmal um — dreh den Oberwagen einmal herum.",
     done: () => true, // wird zeitgesteuert weitergeschaltet

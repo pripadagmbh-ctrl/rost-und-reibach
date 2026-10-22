@@ -71,13 +71,14 @@ export const LEKTIONEN: readonly LektionDaten[] = [
         symbol: "kamera",
         titel: { de: "Zoomen", en: "Zoom" },
         text: {
-          de: "Zwei Finger in der Bildmitte spreizen oder kneifen: näher ran, weiter weg.",
-          en: "Spread or pinch two fingers in the middle: closer or farther.",
+          de: "Zwei Finger in der Bildmitte spreizen und kneifen: näher ran und weiter weg.",
+          en: "Spread and pinch two fingers in the middle: closer and farther.",
         },
         zeige: null,
         // SW: Abstand halbieren (11 → 5,5 m, Grenze 3 m), dann verdoppeln — genau zurueck
         vorfuehrung: [{ dauerS: 1.0, kamera: { zoomProS: 0.5 } }, { dauerS: 0.4 }, { dauerS: 1.0, kamera: { zoomProS: 2 } }, { dauerS: 0.3 }],
-        ziel: { art: "aenderung", groesse: "zoom", richtung: "beide", ab: 0.25 }, // SW: ein Viertel naeher oder weiter
+        // SW: je ein Viertel naeher UND weiter (L5-B, Patrick 22.10. Punkt 40c: „sollte … das Rein- und Rauszoomen sein")
+        ziel: { art: "aenderung", groesse: "zoom", richtung: "hinUndZurueck", ab: 0.25 },
       },
       {
         symbol: "ansicht",

@@ -220,7 +220,6 @@ const woerter = (t: string): string[] => t.split(/\s+/).filter((w) => /[A-Za-zÄ
 describe("Lehrgang: höchstens ein Wort je sichtbarem Text", () => {
   const kranz = (code: string) => (code === "KeyO" ? KRANZ_LAENGSTER : null);
   const sichtbar = (s: "de" | "en"): string[] => [
-    tastenText("KeyC", kranz, s)!,
     tastenText("KeyO", kranz, s)!.replace(" ", ""), // Kranzname = ein Eintrag, egal ob mit Leerzeichen
     ...LEKTIONEN.flatMap((l) => l.schritte.flatMap((st) => (st.wort ? [st.wort[s]] : []))),
   ];
@@ -244,7 +243,13 @@ class El {
   parent: El | null = null;
   attrs: Record<string, string> = {};
   dataset: Record<string, string> = {};
-  style = { setProperty() {} };
+  stil: Record<string, string> = {};
+  style = { setProperty: (k: string, v: string) => void (this.stil[k] = v) };
+  /** L5-B: Lage im Bild (Pedal-Finger liest sie) */
+  rect = { left: 0, top: 0, width: 0, height: 0 };
+  getBoundingClientRect() {
+    return this.rect;
+  }
   hidden = false;
   textContent: string | null = "";
   innerHTML = "";
@@ -328,7 +333,11 @@ function seite(): { body: El; byId: (id: string) => El | null } {
   links.hidden = false; // der echte Daumen liegt noch auf dem linken Stick
   const rechts = new El("div", "touch-right", "pad");
   rechts.hidden = true;
-  body.append(leiste, links, rechts, new El("div", "pedals"));
+  const pedale = new El("div", "pedals");
+  const pedal = new El("div", "", "pedal");
+  pedal.rect = { left: 400, top: 300, width: 60, height: 68 }; // L5-B: Mitte 430, 334
+  pedale.append(pedal, new El("div", "", "pedal"));
+  body.append(leiste, links, rechts, pedale);
   body.classList.add("touch");
   const byId = (id: string): El | null => (body.id === id ? body : (body.alle().find((e) => e.id === id) ?? null));
   vi.stubGlobal("document", {
@@ -355,7 +364,8 @@ afterEach(() => vi.unstubAllGlobals());
 const L1 = LEKTIONEN[0]!;
 const schrittEv = (nr: number, phase: "zeigen" | "du"): GameEvents["lehrgang:schritt"] => {
   const st = L1.schritte[nr - 1]!;
-  return { id: L1.id, nr, von: L1.schritte.length, titel: st.titel, text: st.text, zeige: st.zeige, phase, marke: null };
+  const teile = st.ziel.art === "aenderung" && st.ziel.richtung === "hinUndZurueck" ? 2 : 1;
+  return { id: L1.id, nr, von: L1.schritte.length, titel: st.titel, text: st.text, zeige: st.zeige, phase, marke: null, symbol: st.symbol ?? null, teile };
 };
 const startEv: GameEvents["lehrgang:start"] = { id: L1.id, nr: 1, von: 1, name: L1.name, ziel: L1.ziel };
 
@@ -460,6 +470,140 @@ describe("Lehrgangsleiste auf einer Ersatz-Seite", async () => {
     fahren = false; // Pedal angetippt
     geist.takt();
     expect(pedale.classList.contains("geist-zeigt")).toBe(false);
+  });
+
+  /* --- L5-B (Patrick 22.10.2026, Punkte 40b, 40c, 40d, 40f) --- */
+  const nrVon = (f: (st: (typeof L1.schritte)[number]) => boolean): number => L1.schritte.findIndex(f) + 1;
+  /** Schritt mit Vorfuehrung bis „du" — wie der Lauf: schritt(zeigen), vorfuehren, schritt(du) */
+  const bisDu = (bus: EventBus, nr: number): void => {
+    bus.emit("lehrgang:schritt", schrittEv(nr, "zeigen"));
+    const spur = L1.schritte[nr - 1]!.vorfuehrung;
+    if (spur) bus.emit("lehrgang:vorfuehren", { spur });
+    bus.emit("lehrgang:schritt", schrittEv(nr, "du"));
+  };
+
+  it("40b: „Ansicht wechseln“ in „du“ — tippender Finger mit zwei Ringen in der rechten Zone, kein Text-Schild", () => {
+    speicher();
+    const { body, byId } = seite();
+    byId("touch-left")!.hidden = true;
+    const bus = new EventBus();
+    installGeisterdaumen({ bus, steuerung: defaultConfig });
+    bus.emit("lehrgang:start", startEv);
+    const nr = nrVon((st) => st.symbol === "ansicht");
+    bisDu(bus, nr);
+    const tipp = body.querySelector(".tippgeist.ansicht")!;
+    expect(tipp.classList.contains("an")).toBe(true);
+    expect(tipp.querySelectorAll(".welle").length, "zwei Ringe").toBe(2);
+    expect(tipp.querySelector(".finger")).not.toBeNull();
+    expect(tipp.classList.contains("einmal"), "in „du“ in Schleife").toBe(false);
+    const schild = body.querySelector(".tastengeist")!;
+    expect(schild.classList.contains("an")).toBe(false);
+    expect(schild.textContent).toBe("");
+    // „Zurück nach draußen“ hat keine Vorführung — derselbe Finger
+    bus.emit("lehrgang:schritt", schrittEv(nr + 1, "du"));
+    expect(tipp.classList.contains("an")).toBe(true);
+    // Gegenprobe: ein Stick-Schritt zeigt ihn nicht
+    bisDu(bus, nrVon((st) => st.symbol === "stiel"));
+    expect(tipp.classList.contains("an")).toBe(false);
+  });
+
+  it("40d: Fahren in „du“ bei Fahren aus — der Finger steht auf dem Pedal, kein Stick-Geist; Fahren an → Finger weg, Stick-Geist da", () => {
+    speicher();
+    const { body, byId } = seite();
+    byId("touch-left")!.hidden = true;
+    const bus = new EventBus();
+    let fahren = false;
+    const geist = installGeisterdaumen({ bus, steuerung: defaultConfig, fahrenAn: () => fahren });
+    bus.emit("lehrgang:start", startEv);
+    bisDu(bus, nrVon((st) => st.symbol === "fahren"));
+    const tipp = body.querySelector(".tippgeist.pedal")!;
+    const links = body.querySelector(".geist.links")!;
+    expect(tipp.classList.contains("an")).toBe(true);
+    expect(tipp.querySelectorAll(".welle").length).toBe(2); // die zweite blendet das CSS bei .einzel aus
+    expect(tipp.classList.contains("einzel")).toBe(true);
+    expect([tipp.stil["left"], tipp.stil["top"]], "Mitte des ersten Pedals").toEqual(["430px", "334px"]);
+    expect(links.classList.contains("an"), "Stick-Geist erst nach dem Pedal").toBe(false);
+    fahren = true; // Pedal angetippt
+    geist.takt();
+    expect(tipp.classList.contains("an")).toBe(false);
+    expect(links.classList.contains("an")).toBe(true);
+    expect(links.dataset["pfeil"]).toBe("hoch");
+  });
+
+  it("40d: In der Vorführung tippt der Finger einmal aufs Pedal, wenn der Fahrbetrieb nicht passt — sonst nicht", () => {
+    for (const [fahren, soll] of [[false, true], [true, false]] as const) {
+      speicher();
+      const { body, byId } = seite();
+      byId("touch-left")!.hidden = true;
+      const bus = new EventBus();
+      const spur = L1.schritte[nrVon((st) => st.symbol === "fahren") - 1]!.vorfuehrung!;
+      installGeisterdaumen({
+        bus,
+        steuerung: defaultConfig,
+        fahrenAn: () => fahren,
+        vorfuehrung: { werte: { achsen: { cab: 0, boom: 0, stick: 0, grapple: 0, rotator: 0, drive: 0.5, steer: 0 }, kamera: null, abschnitt: 0 }, gedrueckt: null },
+      });
+      bus.emit("lehrgang:start", startEv);
+      const nr = nrVon((st) => st.symbol === "fahren");
+      bus.emit("lehrgang:schritt", schrittEv(nr, "zeigen"));
+      bus.emit("lehrgang:vorfuehren", { spur });
+      const tipp = body.querySelector(".tippgeist.pedal")!;
+      expect(tipp.classList.contains("an"), `Fahren ${fahren ? "an" : "aus"}`).toBe(soll);
+      if (soll) expect(tipp.classList.contains("einmal")).toBe(true);
+    }
+  });
+
+  it("40f: lehrgang:richtung ersetzt in „du“ das Bild aus der Spur — Marke links: linker Stick nach links, rechts nichts", () => {
+    speicher();
+    const { body, byId } = seite();
+    byId("touch-left")!.hidden = true;
+    const bus = new EventBus();
+    installGeisterdaumen({ bus, steuerung: defaultConfig });
+    bus.emit("lehrgang:start", startEv);
+    const nr = nrVon((st) => st.symbol === "marke");
+    bisDu(bus, nr);
+    const links = body.querySelector(".geist.links")!;
+    const rechts = body.querySelector(".geist.rechts")!;
+    expect(links.dataset["pfeil"], "vorher aus der Spur: Hauptarm hoch").toBe("hoch");
+    bus.emit("lehrgang:richtung", { id: L1.id, nr, bedarf: [{ fn: "cab", richtung: "plus" }], kamera: null });
+    expect(links.dataset["pfeil"]).toBe("links");
+    expect(rechts.classList.contains("an")).toBe(false);
+    bus.emit("lehrgang:richtung", { id: L1.id, nr, bedarf: [{ fn: "boom", richtung: "plus" }, { fn: "stick", richtung: "minus" }], kamera: null });
+    expect(links.dataset["pfeil"]).toBe("hoch");
+    expect(rechts.dataset["pfeil"]).toBe("runter");
+    // Fremder Schritt: zählt nicht
+    bus.emit("lehrgang:richtung", { id: L1.id, nr: nr - 1, bedarf: [], kamera: null });
+    expect(links.classList.contains("an")).toBe(true);
+  });
+
+  it("40c: Zoom — Strich in zwei Hälften, Teilziel 1 macht eine grün und lässt die Leiste leuchten; Kamera-Geist zeigt die fehlende Geste", () => {
+    speicher();
+    const { body, byId } = seite();
+    const bus = new EventBus();
+    installLektionsKarte({ bus, steuerung: defaultConfig, audio: { playSchritt() {} } });
+    installGeisterdaumen({ bus, steuerung: defaultConfig });
+    bus.emit("lehrgang:start", startEv);
+    const nr = nrVon((st) => st.ziel.art === "aenderung" && st.ziel.groesse === "zoom");
+    bisDu(bus, nr);
+    const l = byId("lehrgangsleiste")!;
+    const strich = l.querySelector(".punkte")!.children[nr - 1]!;
+    expect(strich.className).toBe("jetzt geteilt");
+    expect(strich.children.map((b) => b.className)).toEqual(["", ""]);
+    const kam = body.querySelector(".kamgeist")!;
+    expect(kam.dataset["geste"], "erst spreizen wie die Vorführung").toBe("auf");
+    bus.emit("lehrgang:teilziel", { id: L1.id, nr, teil: 1, von: 2 });
+    bus.emit("lehrgang:richtung", { id: L1.id, nr, bedarf: [], kamera: "zu" });
+    expect(strich.children.map((b) => b.className)).toEqual(["ok neu", ""]);
+    expect(l.classList.contains("teil")).toBe(true);
+    expect(l.classList.contains("haken"), "der Schritt läuft weiter").toBe(false);
+    expect(kam.dataset["geste"]).toBe("zu");
+    bus.emit("lehrgang:haekchen", { id: L1.id, nr });
+    expect(strich.className).toBe("ok neu");
+    expect(strich.children).toEqual([]);
+    // Andere Schritte: ein ganzer Strich
+    bisDu(bus, nr + 1);
+    expect(l.querySelector(".punkte")!.children[nr]!.className).toBe("jetzt");
+    expect(l.classList.contains("teil")).toBe(false);
   });
 
   it("Überspringen: ⏭ fragt, ✕ bricht ab, ✓ merkt „übersprungen“ und lädt ins Menü", () => {

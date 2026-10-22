@@ -52,9 +52,10 @@
             max() auf den alten Wert zurück — die Fassung wird dort nicht
             schlechter, sondern bleibt Pixel für Pixel dieselbe.
          3. **Wer auf einem anderen aufsitzt, erbt dessen Rand.** Der untere
-            HUD-Block steht rechts neben den Pedalen; rücken die Pedale um den
-            linken Rand ein, rückt er mit. Darum steht dort `calc()` und nicht
-            `max()`.
+            HUD-Block steht im Hochformat ueber den Pedalen; steigen sie mit
+            dem Home-Indicator, steigt er mit. Darum steht dort `calc()` und
+            nicht `max()`. (Bis 22.10.2026 stand er rechts neben den Pedalen
+            unten links und erbte deren linken Rand.)
 
          NICHT gemacht: `#touch` selbst einrücken. Das wäre die kürzeste
          Fassung — alle Knöpfe darin sind absolut positioniert und würden
@@ -96,7 +97,9 @@
          3. Die Anhebung auf 118 px stammte aus der Zeit, als die Fahrpedale
             unten in der Bildmitte standen. Seit sie unten links sitzen
             (14.09.2026), war die Anhebung nur noch uebrig — und schob eine
-            Textzeile mitten ins Bild.
+            Textzeile mitten ins Bild. Seit 22.10.2026 stehen die Pedale
+            wieder unten mittig; der Block weicht nach links aus, nicht nach
+            oben.
 
          Ohne Touch (Maus/Tastatur) bleibt alles wie gehabt: mittig am unteren
          Rand, dort steht nichts im Weg. */
@@ -203,32 +206,35 @@
       @media (min-height: 431px) {
         body.touch #hudoben { right: max(68px, calc(var(--sa-r) + 8px)); }
       }
-      /* Touch: Der untere Block steht im freien Streifen zwischen den
-         Fahrpedalen (unten links) und den Drehtasten (rechts), linksbuendig.
+      /* Touch: Der untere Block steht unten links, vom Bildrand bis vor die
+         Fahrpedale (seit 22.10.2026 unten mittig, Befund 40e), linksbuendig.
          Linksbuendig, weil die Zeile staendig ihre Laenge aendert — eine
          zentrierte Zeile wandert bei jedem Wechsel hin und her.
+         Warum links und nicht rechts der Pedale: Rechts stehen auf dem iPhone
+         quer die Drehtasten unten neben dem rechten Stick — dort blieben
+         76 px. Links ist auf beiden Geraeten Platz, und es ist dieselbe
+         Stelle auf beiden. Der Block liegt unter der Ruhelage des linken
+         Daumens (Geisterdaumen-Ring ab 118 px ueber dem Rand), nimmt keine
+         Beruehrung an und schiebt keine Zeile in die Bildmitte (die Anhebung
+         118 px ist weg geblieben).
 
-         Links:  12 px Rand + 6 px Fassung + 72 px + 18 px Luecke + 72 px
-                 + 6 px Fassung = 186 px Pedalkante, plus 12 px Luft = 198 px.
-         Rechts: 12 px Rand + 54 px Taste + 2 x 2 px Rahmen = 70 px, plus
-                 12 px Luft = 82 px. Der Rahmen zaehlt mit: Die Tasten stehen
-                 auf content-box, ohne ihn faehlten genau 4 px (Lehre aus der
-                 Messung 14.09.2026). */
+         Links:  12 px Rand (max(): der Block klebt jetzt selbst am Rand).
+         Rechts: halbe Bildbreite + 73 px halber Pedalblock (146 / 2) + 12 px
+                 Luft = calc(50 % + 85 px). iPad 1024: x 12..427 (415 px),
+                 1180: x 12..505. */
       body.touch #hudunten {
-        /* Der Block sitzt rechts NEBEN den Pedalen — rueckt deren linke Kante
-           um den sicheren Rand ein, muss er mitrücken. Darum calc() statt
-           max(): Hier wird ein Rand geerbt, nicht einer eingehalten. */
-        left: calc(var(--sa-l) + 198px);
-        right: max(82px, calc(var(--sa-r) + 8px));
+        left: max(12px, calc(var(--sa-l) + 8px));
+        right: calc(50% + 85px);
         bottom: max(10px, calc(var(--sa-b) + 8px));
         align-items: flex-start;
       }
-      /* Telefon hoch (iPhone mini 375 x 812): Neben den Pedalen bleiben nur
-         189 px — zu wenig fuer eine Textzeile. Der Block geht darum ueber die
-         Pedale: 10 px Rand + 6 px Fassung + 84 px Pedal + 6 px Fassung
-         = 106 px Oberkante, plus 12 px Luft = 118 px. Die Breite endet
-         weiterhin links der Drehtasten, die im Hochformat bei 180 px ueber dem
-         Rand sitzen und sonst vom Block gestreift wuerden.
+      /* Telefon hoch (iPhone mini 375 x 812): Neben den Pedalen bleibt kein
+         Platz fuer eine Textzeile. Der Block geht darum ueber die
+         Pedale: 34 px Rand + 8 px Luft + 2 x 4 px Fassung + 54 px Pedal
+         = 104 px Oberkante; 118 px laesst 14 px Luft. Die Breite endet
+         weiterhin links der Drehtasten (12 + 54 + 4 Rahmen + 12 = 82 px),
+         die im Hochformat bei 180 px ueber dem Rand sitzen und sonst vom
+         Block gestreift wuerden.
 
          Eigene Abfrage, weil "max-height: 430px" nur das Querformat der
          Telefone fasst: Im Hochformat ist ein iPhone 812 px hoch und laeuft
@@ -236,10 +242,11 @@
       @media (max-width: 500px) and (min-height: 431px) {
         body.touch #hudunten {
           left: max(12px, calc(var(--sa-l) + 8px));
-          /* Oberkante der Pedale plus 12 px Luft. Die Pedale stehen selbst auf
+          right: max(82px, calc(var(--sa-r) + 8px));
+          /* Ueber den Pedalen. Die Pedale stehen selbst auf
              max(10px, Rand + 8px) — steigen sie wegen des Home-Indicators, muss
-             der Block mitsteigen, sonst liegt er auf ihnen. 34 px Balken + 8 px
-             Luft + 96 px Pedal + 12 px = 150; die Formel gibt 152. */
+             der Block mitsteigen, sonst liegt er auf ihnen. Darum calc() mit
+             dem Rand: 34 + 118 = 152 > 104 Pedal-Oberkante. */
           bottom: calc(var(--sa-b) + 118px);
         }
       }
@@ -343,8 +350,18 @@
         #touch .zone { width: 40%; }
         #touch #zone-mitte { left: 40%; width: 20%; }
       }
-      /* --- Fahrpedale (Ansage Patrick 14.09.2026) ---
-         Zwei Pedale nebeneinander, unten links. Sie sind der
+      /* --- Fahrpedale (Ansage Patrick 14.09.2026, Lage neu 22.10.2026) ---
+         Zwei Pedale nebeneinander, unten mittig im Kamera-Mittelstreifen.
+         Lage-Geschichte: 14.09. erst unten Mitte, am selben Tag nach links
+         („verdecken zu viel Sicht"). 22.10.2026 (Befund 40e): „Pedale in die
+         Mitte — sie werden beim Baggern versehentlich getroffen". Unten links
+         lagen sie genau unter dem linken Stick-Daumen. In der Mitte setzt kein
+         Stick-Daumen auf (die Zonen enden bei 35 %, E-136); dafuer sind sie
+         kleiner als vorher, damit sie die Sicht weniger verdecken.
+         Zentriert ueber left 50 % + translateX(-50 %): Die Breite steht nur
+         einmal da (Pedale + Fassung), und die sicheren Raender sind links und
+         rechts gleich (cssmass.ts) — die Mitte des Bildes ist auch die Mitte
+         des sicheren Bereichs. Gerechnet in test/pedalmitte.test.ts. Sie sind der
          Umschalter und die Anzeige, nicht die Steuerung: Ein Tipp macht den
          linken Stick zu Gas und Lenkung, der naechste gibt ihm Hauptarm und
          Oberwagen zurueck. Gefahren wird ausschliesslich mit dem Stick.
@@ -360,23 +377,27 @@
          abgelehnt. Davor war Fahren ein Modus mit Doppeltipp und Ablauf nach
          vier Sekunden — der Zustand wechselte von selbst. Beides ist weg.
 
-         Masse: 72 x 84 px je Pedal. Tippziele muessen mindestens 44 px messen
-         (Briefing Kap. 20); hier deutlich darueber, weil man zum Tippen
-         umgreift und dabei ungenauer zielt. 18 px Abstand dazwischen, damit
-         der Daumen nicht zwischen beide faellt. */
+         Masse (SW 22.10.2026, Geraetetest): 60 x 68 px je Pedal, vorher
+         72 x 84. Tippziele muessen mindestens 44 px messen (Briefing Kap. 20);
+         hier darueber, weil man zum Tippen umgreift und dabei ungenauer zielt.
+         14 px Abstand dazwischen (vorher 18; ab 12 verschmelzen zwei Ziele
+         nicht), damit der Daumen nicht zwischen beide faellt.
+         Block 2 x 6 + 2 x 60 + 14 = 146 x 80 px. iPad quer 1024: x 439..585
+         im Streifen 358..666 (80 px Luft je Seite); 1180: x 517..663 im
+         Streifen 413..767 (104 px). */
       #pedals {
         position: absolute;
-        left: max(12px, calc(var(--sa-l) + 8px));
+        left: 50%; transform: translateX(-50%);
         bottom: max(10px, calc(var(--sa-b) + 8px));
-        display: flex; gap: 18px; padding: 6px;
+        display: flex; gap: 14px; padding: 6px;
         pointer-events: auto; touch-action: none; z-index: 2;
       }
       #touch .pedal {
-        /* border-box, damit die 72 x 84 px wirklich das sind, was man sieht und
+        /* border-box, damit die 60 x 68 px wirklich das sind, was man sieht und
            trifft: Sonst zaehlt der 2-px-Rahmen obendrauf und alle Abstaende
            weiter unten stimmen um 4 px nicht (Befund Messung 14.09.2026). */
         box-sizing: border-box;
-        position: relative; width: 72px; height: 84px; border-radius: 10px;
+        position: relative; width: 60px; height: 68px; border-radius: 10px;
         background: rgba(20,22,24,0.6); border: 2px solid rgba(255,255,255,0.28);
         transition: background 0.12s, border-color 0.12s;
       }
@@ -386,7 +407,7 @@
          sein (Briefing Kap. 20). */
       #touch .pedal .platte {
         box-sizing: border-box;
-        position: absolute; left: 7px; right: 7px; top: 8px; height: 26px;
+        position: absolute; left: 6px; right: 6px; top: 7px; height: 22px;
         border-radius: 5px; background: rgba(255,255,255,0.22);
         border-top: 2px solid rgba(255,255,255,0.38);
         transition: transform 0.12s ease-out, background 0.12s;
@@ -398,15 +419,25 @@
           90deg, rgba(20,22,24,0.5) 0 3px, transparent 3px 7px);
       }
       /* Fahren an: Pedal leuchtet und die Platte ist durchgetreten.
-         38 px Weg = von 8 px oben auf 46 px unten (84 px Pedal - 2 x 2 px
-         Rahmen = 80 px innen, minus 26 px Platte, minus 8 px Luft unten). */
+         28 px Weg = von 7 px oben auf 35 px unten (68 px Pedal - 2 x 2 px
+         Rahmen = 64 px innen, minus 22 px Platte, minus 7 px Luft unten). */
       #touch.fahren .pedal {
         background: rgba(240,180,41,0.75); border-color: #f0d060;
         box-shadow: 0 0 16px rgba(240,180,41,0.45);
       }
       #touch.fahren .pedal .platte {
-        transform: translateY(38px); background: rgba(26,28,30,0.5);
+        transform: translateY(28px); background: rgba(26,28,30,0.5);
         border-top-color: rgba(26,28,30,0.65);
+      }
+      /* Telefon hoch (kein Spielformat): dieselben kleinen Pedale wie quer.
+         Der Streifen ist hier nur 75 px breit (40/20/40) — der 116-px-Block
+         ragt je 20 px in die Stick-Zonen und faengt dort Tipps ab (z 2). */
+      @media (max-width: 500px) and (min-height: 431px) {
+        #pedals { gap: 12px; padding: 4px; }
+        #touch .pedal { width: 48px; height: 54px; }
+        #touch .pedal .platte { top: 5px; height: 18px; left: 5px; right: 5px; }
+        #touch .pedal .platte::after { inset: 5px 7px; }
+        #touch.fahren .pedal .platte { transform: translateY(22px); }
       }
       /* Derselbe Zustand noch einmal dort, wo der Daumen wirklich liegt: Der
          linke Stick traegt beim Fahren einen warmen Rand statt eines weissen. */
@@ -527,17 +558,20 @@
         #touch .pad { width: 108px; height: 108px; margin: -54px 0 0 -54px; }
         #touch .knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
         /* iPhone mini quer ist nur 375 px hoch. Die Pedale eine Nummer
-           kleiner, aber mit 58 x 64 px immer noch klar ueber den 44 px, die
-           ein Tippziel mindestens messen muss. Plattenweg entsprechend:
-           64 - 2 x 2 - 20 - 6 Luft = 34 px unten, also 28 px Weg ab 6 px. */
+           kleiner (SW 22.10.2026, vorher 58 x 64): 48 x 54 px, noch ueber den
+           44 px, die ein Tippziel mindestens messen muss. Plattenweg:
+           54 - 2 x 2 - 18 - 5 Luft = 27 px unten, also 22 px Weg ab 5 px.
+           Block 2 x 4 + 2 x 48 + 12 = 116 x 62 px, Mitte x 406: 348..464 im
+           Streifen 284..528 (64 px Luft je Seite), unten 21 + 6 = 27 (ueber
+           dem Home-Indicator), Oberkante 89 ueber dem Rand. */
         #pedals {
-          left: max(8px, calc(var(--sa-l) + 8px));
           bottom: max(6px, calc(var(--sa-b) + 6px));
-          gap: 14px; padding: 5px;
+          gap: 12px; padding: 4px;
         }
-        #touch .pedal { width: 58px; height: 64px; }
-        #touch .pedal .platte { top: 6px; height: 20px; left: 6px; right: 6px; }
-        #touch.fahren .pedal .platte { transform: translateY(28px); }
+        #touch .pedal { width: 48px; height: 54px; }
+        #touch .pedal .platte { top: 5px; height: 18px; left: 5px; right: 5px; }
+        #touch .pedal .platte::after { inset: 5px 7px; }
+        #touch.fahren .pedal .platte { transform: translateY(22px); }
         #btn-menu {
           top: max(8px, calc(var(--sa-t) + 8px));
           right: max(8px, calc(var(--sa-r) + 8px));
@@ -584,18 +618,17 @@
            Ruhezustand steht dort jetzt gar nichts mehr. */
         #gripinfo, #load { font-size: 14px; }
         #hudunten .hud { padding: 4px 8px; }
-        /* Telefon quer: Hier ist das Bild flach, aber breit — neben den Pedalen
-           ist Platz genug, der Block muss nicht darueber.
-           Links:  8 px Rand + 5 px Fassung + 58 px + 14 px Luecke + 58 px
-                   + 5 px Fassung = 148 px Pedalkante, plus 8 px Luft = 156 px.
-           Rechts: 190 px (linke Drehtaste) + 46 px + 2 x 2 px Rahmen = 240 px,
-                   plus 12 px Luft = 252 px.
-           Damit sitzt der Block am unteren Rand statt wie bisher 90 px
-           darueber — er verdeckt genau das Stueck Boden vor der Maschine und
-           nicht mehr die Maschine selbst. */
+        /* Telefon quer: Hier ist das Bild flach, aber breit — links neben den
+           Pedalen ist Platz genug, der Block muss nicht darueber.
+           Links:  50 px Notch-Rand + 8 px = 58 px.
+           Rechts: halbe Breite + 58 px halber Pedalblock (116 / 2) + 8 px
+                   Luft = calc(50 % + 66 px): x 58..340 (282 px). Rechts der
+                   Pedale blieben bis zur linken Drehtaste (x 572) nur 76 px.
+           Damit sitzt der Block am unteren Rand — er verdeckt das Stueck
+           Boden vor der Maschine und nicht die Maschine selbst. */
         body.touch #hudunten {
-          left: calc(var(--sa-l) + 156px);
-          right: max(252px, calc(var(--sa-r) + 8px));
+          left: max(8px, calc(var(--sa-l) + 8px));
+          right: calc(50% + 66px);
           bottom: max(6px, calc(var(--sa-b) + 6px));
         }
         #toast { top: max(60px, calc(var(--sa-t) + 8px)); font-size: 12px; }
@@ -1001,16 +1034,73 @@
       #geisterdaumen .kamgeist[data-geste="auf"] .finger + .finger { animation-name: kam-auf-b; }
       #geisterdaumen .kamgeist[data-geste="zu"] .finger { animation-name: kam-zu-a; }
       #geisterdaumen .kamgeist[data-geste="zu"] .finger + .finger { animation-name: kam-zu-b; }
-      #geisterdaumen .kamgeist[data-geste="doppeltipp"] .finger { animation: kam-tipp 0.6s ease-out infinite; }
-      @keyframes kam-rechts { 0% { transform: translate(-40px,0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(40px,0); opacity: 0; } }
-      @keyframes kam-links { 0% { transform: translate(40px,0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(-40px,0); opacity: 0; } }
-      @keyframes kam-hoch { 0% { transform: translate(0,30px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(0,-30px); opacity: 0; } }
-      @keyframes kam-runter { 0% { transform: translate(0,-30px); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(0,30px); opacity: 0; } }
-      @keyframes kam-auf-a { 0% { transform: translate(-12px,12px); } 100% { transform: translate(-40px,40px); opacity: 0.2; } }
-      @keyframes kam-auf-b { 0% { transform: translate(12px,-12px); } 100% { transform: translate(40px,-40px); opacity: 0.2; } }
-      @keyframes kam-zu-a { 0% { transform: translate(-40px,40px); } 100% { transform: translate(-12px,12px); opacity: 0.2; } }
-      @keyframes kam-zu-b { 0% { transform: translate(40px,-40px); } 100% { transform: translate(12px,-12px); opacity: 0.2; } }
-      @keyframes kam-tipp { 0%, 50% { transform: scale(1); opacity: 1; } 25%, 75% { transform: scale(0.75); opacity: 0.6; } 100% { opacity: 1; } }
+      /* L5-B (Patrick 22.10. Punkt 40b: Geste als Bewegung, nicht nur ihr Ergebnis):
+         Unter dem Finger liegt seine Bahn (gestrichelt), hinter ihm ein
+         Schweif — man sieht, wohin er zieht, auch im Standbild. Zoomen: die
+         Bahn liegt schraeg, beide Finger auf ihr, sie halten am Ende kurz.
+         Masse SW: Bahn 100 px (Weg ±40 + Rand), schraeg 128; Schweif 56 px. */
+      #geisterdaumen .kamgeist::before {
+        content: ""; position: absolute; left: -50px; top: -1px; width: 100px; height: 0;
+        border-top: 2px dashed rgba(240,180,41,0.75);
+      }
+      #geisterdaumen .kamgeist[data-geste="hoch"]::before, #geisterdaumen .kamgeist[data-geste="runter"]::before { transform: rotate(90deg); }
+      #geisterdaumen .kamgeist[data-geste="auf"]::before, #geisterdaumen .kamgeist[data-geste="zu"]::before { left: -64px; width: 128px; transform: rotate(-45deg); }
+      #geisterdaumen .kamgeist .finger::after {
+        content: ""; position: absolute; top: 12px; height: 20px; width: 56px; border-radius: 10px; display: none;
+      }
+      #geisterdaumen .kamgeist[data-geste="rechts"] .finger::after { display: block; right: 22px; background: linear-gradient(to left, rgba(240,180,41,0.6), rgba(240,180,41,0)); }
+      #geisterdaumen .kamgeist[data-geste="links"] .finger::after { display: block; left: 22px; background: linear-gradient(to right, rgba(240,180,41,0.6), rgba(240,180,41,0)); }
+      #geisterdaumen .kamgeist[data-geste="hoch"] .finger::after,
+      #geisterdaumen .kamgeist[data-geste="runter"] .finger::after { display: block; left: 12px; width: 20px; height: 56px; }
+      #geisterdaumen .kamgeist[data-geste="hoch"] .finger::after { top: 22px; background: linear-gradient(to bottom, rgba(240,180,41,0.6), rgba(240,180,41,0)); }
+      #geisterdaumen .kamgeist[data-geste="runter"] .finger::after { top: auto; bottom: 22px; background: linear-gradient(to top, rgba(240,180,41,0.6), rgba(240,180,41,0)); }
+      @keyframes kam-rechts { 0% { transform: translate(-40px,0); opacity: 0; } 15% { opacity: 1; } 75% { transform: translate(40px,0); opacity: 1; } 100% { transform: translate(40px,0); opacity: 0; } }
+      @keyframes kam-links { 0% { transform: translate(40px,0); opacity: 0; } 15% { opacity: 1; } 75% { transform: translate(-40px,0); opacity: 1; } 100% { transform: translate(-40px,0); opacity: 0; } }
+      @keyframes kam-hoch { 0% { transform: translate(0,40px); opacity: 0; } 15% { opacity: 1; } 75% { transform: translate(0,-40px); opacity: 1; } 100% { transform: translate(0,-40px); opacity: 0; } }
+      @keyframes kam-runter { 0% { transform: translate(0,-40px); opacity: 0; } 15% { opacity: 1; } 75% { transform: translate(0,40px); opacity: 1; } 100% { transform: translate(0,40px); opacity: 0; } }
+      @keyframes kam-auf-a { 0% { transform: translate(-10px,10px); opacity: 0; } 12% { opacity: 1; } 65%, 85% { transform: translate(-40px,40px); opacity: 1; } 100% { transform: translate(-40px,40px); opacity: 0; } }
+      @keyframes kam-auf-b { 0% { transform: translate(10px,-10px); opacity: 0; } 12% { opacity: 1; } 65%, 85% { transform: translate(40px,-40px); opacity: 1; } 100% { transform: translate(40px,-40px); opacity: 0; } }
+      @keyframes kam-zu-a { 0% { transform: translate(-40px,40px); opacity: 0; } 12% { opacity: 1; } 65%, 85% { transform: translate(-10px,10px); opacity: 1; } 100% { transform: translate(-10px,10px); opacity: 0; } }
+      @keyframes kam-zu-b { 0% { transform: translate(40px,-40px); opacity: 0; } 12% { opacity: 1; } 65%, 85% { transform: translate(10px,-10px); opacity: 1; } 100% { transform: translate(10px,-10px); opacity: 0; } }
+      /* --- Tippender Finger (L5-B, Patrick 22.10. Punkte 40b und 40d) ---
+         „Doppeltippen zum Sichtwechsel nicht erkennbar", „nicht klar, dass
+         man die Pedale bedienen muss". Ein Finger senkt sich (wird kleiner),
+         je Tipp laeuft ein Ring nach aussen: doppelt = zwei Ringe kurz
+         hintereinander, dann Pause. In „du" in Schleife, in der Vorfuehrung
+         `.einmal` je Druck (ui/geisterdaumen.ts). SW: 1,6 s je Durchgang,
+         Tipps 0,26 s auseinander (16 % von 1,6 s) — unter den 320 ms eines
+         echten Doppeltipps (core/touch.ts DOUBLE_TAP_MS).
+         Lage: .ansicht in der rechten Stick-Zone ueber dem rechten Ring,
+         wo bisher das Schild „2× ANSICHT" stand: iPad Mitte
+         right 111 + 69 = 180, bottom 118 + 138 + 8 + 40 = 304; Telefon quer
+         right 38 + 40 = 78, bottom 84 + 80 + 8 + 30 = 202 (Mitte y 173,
+         unter der Leiste bis 74); Telefon hoch right 35 + 40 = 75, bottom
+         266 + 80 + 8 + 30 = 384. .mitte = Kamera-Start (Doppeltipp im
+         Mittelstreifen) wie .kamgeist; .pedal steht auf dem ersten Pedal, die
+         Lage liest ui/geisterdaumen.ts zur Laufzeit (#pedals). */
+      #geisterdaumen .tippgeist { display: none; position: absolute; width: 0; height: 0; }
+      body.touch #geisterdaumen .tippgeist.an { display: block; }
+      #geisterdaumen .tippgeist.mitte { left: 50%; top: 50%; }
+      #geisterdaumen .tippgeist.ansicht { right: calc(var(--sa-r) + 180px); bottom: calc(var(--sa-b) + 304px); }
+      #geisterdaumen .tippgeist .finger, #geisterdaumen .tippgeist .welle {
+        position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; box-sizing: border-box;
+        animation: 1.6s ease-out infinite;
+      }
+      #geisterdaumen .tippgeist .finger { background: rgba(240,240,236,0.6); box-shadow: 0 0 0 2px rgba(240,180,41,0.85), 0 3px 8px rgba(0,0,0,0.45); animation-name: tipp-finger; }
+      #geisterdaumen .tippgeist .welle { border: 3px solid rgba(240,180,41,0.95); opacity: 0; animation-name: tipp-welle-1; }
+      #geisterdaumen .tippgeist .welle.zwei { animation-name: tipp-welle-2; }
+      #geisterdaumen .tippgeist.einzel .finger { animation-name: tipp-anflug; }
+      #geisterdaumen .tippgeist.einzel .welle { animation-name: tipp-welle-einzel; }
+      #geisterdaumen .tippgeist.einzel .welle.zwei { display: none; }
+      #geisterdaumen .tippgeist.einmal .finger, #geisterdaumen .tippgeist.einmal .welle { animation-iteration-count: 1; animation-fill-mode: forwards; }
+      #geisterdaumen .tippgeist.erfolg .finger { background: rgba(79,208,106,0.75); box-shadow: 0 0 0 2px #4fd06a; }
+      #geisterdaumen .tippgeist.erfolg .welle { display: none; }
+      @keyframes tipp-finger { 0% { transform: scale(1.3); opacity: 0; } 10% { transform: scale(1.3); opacity: 0.95; } 18% { transform: scale(0.8); } 26% { transform: scale(1.15); } 34% { transform: scale(0.8); } 44% { transform: scale(1.15); } 82% { transform: scale(1.15); opacity: 0.95; } 100% { transform: scale(1.15); opacity: 0; } }
+      @keyframes tipp-welle-1 { 0%, 17% { transform: scale(0.7); opacity: 0; } 18% { transform: scale(0.7); opacity: 1; } 42% { transform: scale(1.9); opacity: 0.85; } 60%, 100% { transform: scale(2.4); opacity: 0; } }
+      @keyframes tipp-welle-2 { 0%, 33% { transform: scale(0.7); opacity: 0; } 34% { transform: scale(0.7); opacity: 1; } 58% { transform: scale(1.9); opacity: 0.85; } 76%, 100% { transform: scale(2.4); opacity: 0; } }
+      /* Pedal: der Finger kommt von oben angewandert (80 px), tippt einmal */
+      @keyframes tipp-anflug { 0% { transform: translate(0,-80px) scale(1.3); opacity: 0; } 12% { opacity: 0.95; } 40% { transform: translate(0,0) scale(1.3); } 50% { transform: scale(0.8); } 62% { transform: scale(1.15); opacity: 0.95; } 88% { transform: scale(1.15); opacity: 0.95; } 100% { transform: scale(1.15); opacity: 0; } }
+      @keyframes tipp-welle-einzel { 0%, 49% { transform: scale(0.7); opacity: 0; } 50% { transform: scale(0.7); opacity: 1; } 85%, 100% { transform: scale(2.4); opacity: 0; } }
       /* Knopf-Schild: welche Kranz-Funktion die Vorfuehrung gerade ausloest
          („STÜTZEN: halten, ziehen", „ANSICHT: 2× tippen"). Ueber dem rechten
          Geist-Ring, rechtsbuendig mit ihm (iPad: links der Drehtasten ab x 954):
@@ -1033,11 +1123,13 @@
       @keyframes pedal-puls { 0%, 100% { box-shadow: 0 0 0 3px rgba(240,180,41,0.9); } 50% { box-shadow: 0 0 0 9px rgba(240,180,41,0.15); } }
       @media (max-height: 430px) {
         #geisterdaumen .geist { --weg: 24px; }
+        #geisterdaumen .tippgeist.ansicht { right: calc(var(--sa-r) + 78px); bottom: calc(var(--sa-b) + 202px); }
         /* L4: 8 statt 20 px vom Rand — so steht auch der laengste Kranzname (9 Zeichen) neben dem Arbeitsfeld (test/lehrgangsleiste.test.ts) */
         #geisterdaumen .tastengeist { right: calc(var(--sa-r) + 8px); bottom: calc(var(--sa-b) + 172px); }
       }
       @media (max-width: 500px) and (min-height: 431px) {
         #geisterdaumen .geist { --weg: 24px; }
+        #geisterdaumen .tippgeist.ansicht { right: calc(var(--sa-r) + 75px); bottom: calc(var(--sa-b) + 384px); }
         #geisterdaumen .tastengeist { right: calc(var(--sa-r) + 12px); bottom: calc(var(--sa-b) + 354px); }
       }
       /* --- Lehrgangsleiste (L4, ersetzt die Lektionskarte) ---
@@ -1098,6 +1190,15 @@
       /* L4b (qa Q4: „✓ dünn" auf dem iPad): kraeftiger Haken */
       #lehrgangsleiste.haken .phase svg { stroke-width: 3.5; }
       #lehrgangsleiste .punkte i.neu { background: #4fd06a; animation: lg-pop 0.8s ease-out; }
+      /* L5-B (40c): Strich eines Schritts mit Teilzielen in Haelften; die
+         erreichte wird gruen, die Leiste leuchtet einmal kurz (ohne den
+         stehenden Schein des Haekchens — der Schritt laeuft weiter). */
+      #lehrgangsleiste .punkte i.geteilt { display: flex; gap: 2px; box-shadow: none; }
+      #lehrgangsleiste .punkte i.geteilt b { flex: 1; border-radius: 2px; box-shadow: inset 0 0 0 2px #f0d060; }
+      #lehrgangsleiste .punkte i.geteilt b.ok { background: #4fd06a; box-shadow: none; }
+      #lehrgangsleiste .punkte i.geteilt b.neu { animation: lg-pop 0.8s ease-out; }
+      #lehrgangsleiste.teil { animation: lg-teil 0.8s ease-out; }
+      @keyframes lg-teil { 0% { border-color: #4fd06a; box-shadow: 0 0 0 0 rgba(79,208,106,0.9), 0 0 16px 2px rgba(79,208,106,0.75); } 100% { box-shadow: 0 0 0 14px rgba(79,208,106,0), 0 0 16px 2px rgba(79,208,106,0); } }
       /* L4b: Der Ring laeuft einmal nach aussen, der Schein (zweiter Schatten,
          SW 16 px) bleibt bis zum naechsten Schritt stehen (forwards) — vorher
          war er nach 0,8 s weg und auf dem iPad kaum zu sehen (qa Q4). */
@@ -1562,7 +1663,7 @@
       <div class="zone" id="zone-mitte"></div>
       <div class="pad" id="touch-left" hidden><div class="knob"></div></div>
       <div class="pad" id="touch-right" hidden><div class="knob"></div></div>
-      <!-- Zwei Pedale unten links. Sie schalten das Fahren ein und
+      <!-- Zwei Pedale unten mittig (seit 22.10.2026, Befund 40e). Sie schalten das Fahren ein und
            aus und zeigen zugleich, welcher Zustand gilt; gefahren wird danach
            mit dem linken Stick. Beide tun dasselbe. Kein Wort steht darauf —
            der Zustand soll allein am Bild ablesbar sein. -->
@@ -1653,7 +1754,7 @@
         <button id="pause-support" data-seite="support.html">Support</button>
         <p class="hint">
           Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
-          Pedale unten links: Fahren an/aus — dann fährt der linke Stick<br />
+          Pedale unten Mitte: Fahren an/aus — dann fährt der linke Stick<br />
           ↺ ↻ Spinne drehen · Doppeltipp rechts: Ansicht<br />
           Bildmitte ziehen: Kamera drehen · zwei Finger: Zoom<br />
           Rechten Daumen stillhalten: Funktionskranz
@@ -1685,7 +1786,7 @@
         <button id="ctrl-reset">Werkseinstellung</button>
         <button id="ctrl-back">Zurück</button>
         <p class="hint">
-          Zum Fahren tippst du die Pedale unten links an: Dann gibt
+          Zum Fahren tippst du die Pedale unten in der Mitte an: Dann gibt
           der linke Stick Gas (hoch und runter) und lenkt (seitlich). Noch ein
           Tipp, und er führt wieder Hauptarm und Oberwagen. Von selbst
           schaltet nichts zurück. Spinne drehen zusätzlich über ↺ ↻.

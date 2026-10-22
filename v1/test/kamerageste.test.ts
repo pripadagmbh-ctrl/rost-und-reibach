@@ -122,6 +122,69 @@ describe("Kamera-Geste im Mittelstreifen (E-136)", () => {
   });
 });
 
+/*
+ * 40e (22.10.2026): Die Pedale stehen jetzt unten IM Mittelstreifen. Ein Tipp
+ * auf sie darf die Kamera nicht erreichen, und ein Kamera-Zug, der ueber sie
+ * laeuft, darf weder abreissen noch schalten. Im Browser traegt das die
+ * Bauform: #pedals ist Geschwister von #zone-mitte (nicht Kind), liegt darueber
+ * (z 2), und der Streifen faengt seine Finger per setPointerCapture ein. Die
+ * Attrappen hier lassen nichts durchsickern — geprueft wird darum, dass der
+ * echte Code an jeder Stelle das Richtige tut, plus die Bauform im Markup.
+ */
+describe("Pedale im Mittelstreifen (40e)", () => {
+  const PEDAL = { closest: () => ({}) }; // e.target liegt auf einem .pedal
+  const FASSUNG = { closest: () => null }; // Luecke zwischen den Pedalen
+
+  it("Tippen, Doppeltippen und Kneifen auf den Pedalen bewegen die Kamera nicht", () => {
+    const { touch, k } = bauen();
+    const p = seite.get("pedals")!;
+    p.fire("pointerdown", { pointerId: 1, clientX: 380, clientY: 330, target: PEDAL });
+    p.fire("pointerdown", { pointerId: 2, clientX: 430, clientY: 330, target: PEDAL }); // Kneifen beginnt hier
+    p.fire("pointermove", { pointerId: 2, clientX: 470, clientY: 300, target: PEDAL });
+    p.fire("pointerdown", { pointerId: 3, clientX: 406, clientY: 330, target: FASSUNG });
+    // Verirrt sich das pointerup in den Streifen, kennt der den Finger nicht:
+    const z = seite.get("zone-mitte")!;
+    for (const id of [1, 2, 3]) z.fire("pointerup", { pointerId: id, clientX: 406, clientY: 330 });
+    p.fire("pointerdown", { pointerId: 4, clientX: 406, clientY: 330, target: PEDAL });
+    z.fire("pointerup", { pointerId: 4, clientX: 406, clientY: 330 });
+    expect(k).toEqual({ orbitDX: 0, orbitDY: 0, zoomFactor: 1, camReset: false });
+    expect(touch.fahrenAktiv, "drei Tipps aufs Pedal = an").toBe(true);
+  });
+
+  it("ein Finger im Streifen und einer auf dem Pedal: kein Zoom", () => {
+    const { k } = bauen();
+    seite.get("zone-mitte")!.fire("pointerdown", { pointerId: 1, clientX: 406, clientY: 150 });
+    seite.get("pedals")!.fire("pointerdown", { pointerId: 2, clientX: 406, clientY: 330, target: PEDAL });
+    seite.get("zone-mitte")!.fire("pointermove", { pointerId: 2, clientX: 460, clientY: 300 });
+    expect(k.zoomFactor).toBe(1);
+  });
+
+  it("ein Kamera-Zug aus dem Streifen laeuft ueber die Pedale weiter und schaltet nicht", () => {
+    const { touch, k } = bauen();
+    const z = seite.get("zone-mitte")!;
+    const gefangen: number[] = [];
+    z.setPointerCapture = (id: number) => gefangen.push(id);
+    z.fire("pointerdown", { pointerId: 5, clientX: 406, clientY: 200 });
+    z.fire("pointermove", { pointerId: 5, clientX: 406, clientY: 320 }); // jetzt ueber den Pedalen
+    const halb = k.orbitDY;
+    z.fire("pointermove", { pointerId: 5, clientX: 440, clientY: 350 });
+    expect(gefangen, "Streifen faengt den Finger ein").toEqual([5]);
+    expect(halb).toBeGreaterThan(0);
+    expect(k.orbitDY).toBeGreaterThan(halb);
+    expect(k.orbitDX).toBeGreaterThan(0);
+    expect(touch.fahrenAktiv).toBe(false);
+  });
+
+  it("Bauform: Pedale neben, nicht in dem Streifen, darueber und mit eigenem Abfangen", () => {
+    const html = readFileSync(resolve(__dirname, "../index.html"), "utf8");
+    expect(html).toContain('<div class="zone" id="zone-mitte"></div>');
+    const block = /#pedals \{([^}]*)\}/.exec(html)![1];
+    expect(block).toContain("pointer-events: auto");
+    expect(block).toContain("touch-action: none");
+    expect(Number(/z-index:\s*(\d+)/.exec(block)![1])).toBeGreaterThan(0);
+  });
+});
+
 describe("Jede Ansicht ist drehbar (E-136)", () => {
   const eingabe = (dx: number, zoom = 1): Input =>
     ({ wasPressed: () => false, orbitDX: dx, orbitDY: 0, zoomFactor: zoom, camReset: false, shiftHeld: false, wheelDelta: 0 }) as unknown as Input;

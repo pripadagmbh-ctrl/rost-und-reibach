@@ -161,12 +161,19 @@ function spalte(s: string): string[] {
  * Waechter zwei Stunden gruen, weil seine Eingaben NaN waren; jeder Vergleich
  * mit NaN ist falsch, also faellt kein Test.
  */
-export function loese(v: string | null, sa: Rand): number | null {
+/*
+ * Prozent (seit 22.10.2026, Pedale in der Bildmitte): nur mit `basis`, und
+ * die Basis ist das BILD (Breite fuer waagrechte, Hoehe fuer senkrechte
+ * Eigenschaften). Das stimmt fuer `position: fixed` und fuer Elemente in
+ * `#touch` (inset 0) — fuer alles andere waere es falsch, darum ohne Basis
+ * weiter ein Wurf.
+ */
+export function loese(v: string | null, sa: Rand, basis?: number): number | null {
   if (v === null) return null;
   const s = v.trim();
   if (s === "auto") return null;
   if (s.startsWith("max(")) {
-    const teile = spalte(s.slice(4, s.lastIndexOf(")"))).map((t) => loese(t, sa));
+    const teile = spalte(s.slice(4, s.lastIndexOf(")"))).map((t) => loese(t, sa, basis));
     if (teile.some((t) => t === null)) throw new Error(`max() mit auto: ${v}`);
     return Math.max(...(teile as number[]));
   }
@@ -174,7 +181,7 @@ export function loese(v: string | null, sa: Rand): number | null {
     const teile = s
       .slice(5, s.lastIndexOf(")"))
       .split("+")
-      .map((t) => loese(t, sa));
+      .map((t) => loese(t, sa, basis));
     if (teile.some((t) => t === null)) throw new Error(`calc() mit auto: ${v}`);
     return (teile as number[]).reduce((a, b) => a + b, 0);
   }
@@ -182,15 +189,20 @@ export function loese(v: string | null, sa: Rand): number | null {
   if (mv) return sa[mv[1] as keyof Rand];
   const mp = /^(-?\d+(?:\.\d+)?)px$/.exec(s);
   if (mp) return Number(mp[1]);
+  const mpc = /^(-?\d+(?:\.\d+)?)%$/.exec(s);
+  if (mpc && basis !== undefined) return (Number(mpc[1]) / 100) * basis;
   if (s === "0") return 0;
   throw new Error(`Laengenwert nicht verstanden: ${v}`);
 }
+
+/** Bezugsgroesse fuer Prozent: senkrechte Eigenschaften die Bildhoehe, sonst die Breite. */
+const basis = (prop: string, f: Fassung): number => (/^(top|bottom|height|min-height|max-height)$/.test(prop) ? f.h : f.w);
 
 /** Pixelwert einer Eigenschaft; wirft, wenn sie fehlt. */
 export function px(selektoren: string[], prop: string, f: Fassung): number {
   const v = wert(selektoren, prop, f);
   if (v === null) throw new Error(`${prop} fehlt fuer ${selektoren[0]} bei ${f.name}`);
-  const z = loese(v, f.sa);
+  const z = loese(v, f.sa, basis(prop, f));
   if (z === null) throw new Error(`${prop} ist "auto" fuer ${selektoren[0]} bei ${f.name}`);
   return z;
 }
@@ -198,7 +210,7 @@ export function px(selektoren: string[], prop: string, f: Fassung): number {
 /** Pixelwert oder null, wenn die Eigenschaft fehlt oder `auto` ist. */
 export function pxOderNull(selektoren: string[], prop: string, f: Fassung): number | null {
   const v = wert(selektoren, prop, f);
-  return v === null ? null : loese(v, f.sa);
+  return v === null ? null : loese(v, f.sa, basis(prop, f));
 }
 
 /** Innenrand als [oben/unten, links/rechts]. */
@@ -293,7 +305,9 @@ export function pedalKasten(f: Fassung): Kasten {
   const breite = 2 * pad + 2 * px(pedal, "width", f) + px(halter, "gap", f);
   // .pedal steht auf border-box — width/height sind schon das Sichtbare.
   const hoehe = 2 * pad + px(pedal, "height", f);
-  const links = px(halter, "left", f);
+  // Seit 22.10.2026 mittig: left 50 % + translateX(-50 %) zieht die halbe Breite ab.
+  const mittig = /translateX\(-50%\)/.test(wert(halter, "transform", f) ?? "");
+  const links = px(halter, "left", f) - (mittig ? breite / 2 : 0);
   const unten = px(halter, "bottom", f);
   return { name: "Pedale", x0: links, x1: links + breite, y0: unten, y1: unten + hoehe };
 }

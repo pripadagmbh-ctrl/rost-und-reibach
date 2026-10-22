@@ -8,7 +8,7 @@
  *   und verschwinden beim Loslassen — kein Zielen auf feste Kreise (Vorbild
  *   Bagerana/v2). Maßgeblich ist die Zone, nicht der Ort.
  *   (die vier Stickachsen sind im Steuerungsmenü frei belegbar)
- *   Pedale         — zwei Stück unten links: antippen macht den
+ *   Pedale         — zwei Stück unten mittig: antippen macht den
  *                    linken Stick zu Gas und Lenkung, noch ein Tipp gibt ihm
  *                    Hauptarm und Oberwagen zurück. Gefahren wird nur mit dem
  *                    Stick; die Pedale selbst geben kein Gas. Gas und Lenken
@@ -30,7 +30,10 @@
  * Jetzt: umgeschaltet wird wieder, aber sichtbar und nur von Hand (Ansage
  * Patrick 14.09.2026, "zwei Pedale nebeneinander unten Mitte"; seit dem
  * Gerätetest desselben Tages unten links, weil sie in der Mitte zu viel Sicht
- * verdeckt haben).
+ * verdeckt haben). Seit 22.10.2026 wieder unten mittig, kleiner (Befund 40e:
+ * „sie werden beim Baggern versehentlich getroffen" — unten links lagen sie
+ * unter dem linken Stick-Daumen). Lage und Masse: index.html „Fahrpedale",
+ * gerechnet in test/pedalmitte.test.ts.
  */
 import { type ControlConfig, type AxisId, loadConfig } from "./controlConfig";
 import type { Input } from "./input";
@@ -533,7 +536,7 @@ export class TouchControls {
   }
 
   /**
-   * Die beiden Pedale unten links.
+   * Die beiden Pedale unten mittig (seit 22.10.2026, vorher unten links).
    *
    * Sie sind zusammen ein Umschalter und sonst nichts: Ein Tipp auf eines von
    * beiden macht den linken Stick zu Gas und Lenkung, der nächste gibt ihm
@@ -545,8 +548,14 @@ export class TouchControls {
    * Ausgelöst wird auf pointerdown: Der Tipp soll sofort sitzen, und es gibt
    * nichts, was man nach dem Aufsetzen noch abwählen könnte. Die Fassung um
    * die Pedale fängt Zeiger ab, ohne zu schalten — so landet ein Daumen, der
-   * die Lücke zwischen beiden trifft, nicht in der rechten Bildhälfte und
-   * zählt dort als Tipp für den Ansichtswechsel.
+   * die Lücke zwischen beiden trifft, nicht im Mittelstreifen darunter und
+   * zählt dort weder als Kamera-Zug noch als Doppeltipp (Ansicht zurück).
+   * Die Pedale sind Geschwister von #zone-mitte, nicht ihr Kind, und liegen
+   * darüber (z 2 gegen 0): Ein Finger, der hier aufsetzt, erreicht die
+   * Kamera nie — auch nicht als zweiter Finger eines Kneifens. Umgekehrt
+   * fängt der Streifen seine Finger ein (setPointerCapture), ein Kamera-Zug
+   * läuft also über die Pedale weiter, ohne zu schalten
+   * (test/kamerageste.test.ts, „Pedale im Mittelstreifen").
    */
   private bindPedale(): void {
     const el = document.getElementById("pedals");
