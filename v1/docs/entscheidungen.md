@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-215 | 22.10.2026 | Schlafhilfe misst gemittelte Bewegung: Zittern am Fleck gilt als still | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-214 | 22.10.2026 | ⏸ neben ☰ friert ein und macht still, ☰-Menü ebenfalls still | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-213 | 22.10.2026 | Prüfungen ohne Text: Zielzeile, Teil leuchtet in Sortenfarbe mit Weg, Kameraflug | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-212 | 22.10.2026 | Bildschild in Sortenfarbe an jeder Mulde, Ampel mit ✓ ! ✕ | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
@@ -218,6 +219,9 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-215 — Schlafhilfe gemittelt** (Sandkasten)
+- Kipper abschütten und warten: kommt der Haufen zur Ruhe, ohne dass ein Teil mitten im Rutschen stehen bleibt?
+- In einen ruhigen Haufen greifen: wachen die Teile wie bisher auf und fallen nach?
 **E-214 — ⏸ friert ein und macht still** (iPhone mini quer, dann iPad)
 - In einer Prüfung ⏸: Steht alles still, auch die Uhr, sofort leise, nur das ▶ in der Mitte, kein Menü?
 - Irgendwo aufs Bild tippen: Läuft es weiter, Ton in derselben Lautstärke zurück (auch mit leisem Musik-Regler)?

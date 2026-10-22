@@ -1355,6 +1355,8 @@ export class ItemManager {
   private nextId = 0;
   private schlafUhr = 0;
   private schlafZaehler = 0;
+  /** Lage bei der vorigen Schlafprüfung (Griff → Ort und Drehung), für die gemittelte Bewegung. */
+  private schlafLage = new Map<number, { x: number; y: number; z: number; qx: number; qy: number; qz: number; qw: number }>();
 
   constructor(
     private scene: THREE.Scene,
@@ -1430,7 +1432,26 @@ export class ItemManager {
         return;
       }
       kandidaten.push(b);
-      if (lin <= SCHLAF_LIN && ang <= SCHLAF_ANG) still++;
+      /*
+       * Still ist, wer sich über den Prüftakt nicht vom Fleck bewegt — nicht
+       * nur, wessen Augenblicks-Tempo klein ist. Ein leichtes Teil auf einem
+       * schweren zittert im Kontakt (gemessen Freitag Saat 5: Kabelring 18 kg
+       * auf Kabelbund, 0,3 m/s nach unten bei gleicher Höhe, 80 s lang); es
+       * zählte nie als still, und ein Grüppchen von elf hielt sich gegenseitig
+       * wach. Gemittelt aus dem Weg seit der letzten Prüfung ist es still.
+       */
+      const t = b.translation();
+      const q = b.rotation();
+      const vorher = this.schlafLage.get(b.handle);
+      this.schlafLage.set(b.handle, { x: t.x, y: t.y, z: t.z, qx: q.x, qy: q.y, qz: q.z, qw: q.w });
+      let linMittel = lin;
+      let angMittel = ang;
+      if (vorher) {
+        linMittel = Math.hypot(t.x - vorher.x, t.y - vorher.y, t.z - vorher.z) / SCHLAF_TAKT_S;
+        const dot = Math.min(1, Math.abs(q.x * vorher.qx + q.y * vorher.qy + q.z * vorher.qz + q.w * vorher.qw));
+        angMittel = (2 * Math.acos(dot)) / SCHLAF_TAKT_S;
+      }
+      if (Math.min(lin, linMittel) <= SCHLAF_LIN && Math.min(ang, angMittel) <= SCHLAF_ANG) still++;
     }
 
     if (kandidaten.length === 0) return;
