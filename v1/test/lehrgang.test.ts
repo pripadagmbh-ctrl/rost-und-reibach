@@ -398,9 +398,10 @@ describe("Der Lehrgang ist vom Wiedergabe-Fahrer schaffbar (echter Bagger, echte
     await RAPIER.init();
   });
 
-  const d = LEKTIONEN[0]!;
+  // L8: Der Wiedergabe-Fahrer faehrt Teil 1 (Grundsteuerung) — Teil 2 braucht Stationen, ihn faehrt der Lotse-Fahrer in test/lehrgang-teil2.test.ts
+  const d = { ...LEKTIONEN[0]!, schritte: LEKTIONEN[0]!.schritte.slice(0, LEKTIONEN[0]!.schritte.findIndex((s) => s.symbol === "zurueck")) };
   const n = d.schritte.length;
-  // Von vorn, mitten drin (ab „Fahren") und am letzten Schritt — jeweils aus der Startpose
+  // Von vorn, mitten drin (ab „Fahren") und am letzten Schritt von Teil 1 — jeweils aus der Startpose
   for (const ab of [0, d.schritte.findIndex((s) => s.symbol === "fahren"), n - 1]) {
     it(`${d.id} ab Schritt ${ab + 1} von ${n}`, () => {
       expect(ab).toBeGreaterThanOrEqual(0);
@@ -434,8 +435,11 @@ describe("Lehrgang: Daten und Texte", () => {
     expect(LEKTIONEN.map((l) => l.id)).toEqual(["lehrgang"]);
     expect(lektionNr("lehrgang")).toBe(1);
     const l = LEKTIONEN[0]!;
-    // Reihenfolge laut Patrick: Kamera, Fahren, Schwenken, Arm/Stiel
-    expect(l.schritte.map((s) => s.symbol)).toEqual(["kamera", "kamera", "ansicht", "ansicht", "fahren", "schwenken", "arm", "stiel", "marke"]);
+    // Reihenfolge laut Patrick: Kamera, Fahren, Schwenken, Arm/Stiel — dann Teil 2 (L8) in der Welt
+    expect(l.schritte.map((s) => s.symbol)).toEqual([
+      ...["kamera", "kamera", "ansicht", "ansicht", "fahren", "schwenken", "arm", "stiel", "marke"],
+      ...["zurueck", "greifen", "rotator", "ablegen", "kranz", "stuetzen", "last", "haemmern", "quetschen", "zerlegen", "presse", "pressen", "magnet", "sortieren", "hupe"],
+    ]);
     for (const s of l.schritte) {
       // L7-W (Patrick 22.10.2026): 1–3 Woerter je Schritt; Breite misst test/lehrgangsleiste.test.ts
       if (s.wort) for (const t of [s.wort.de, s.wort.en]) expect(t.trim(), s.titel.de).toMatch(/^\S+(?: \S+){0,2}$/);

@@ -264,7 +264,16 @@ export interface GameEvents {
     wort?: Zweisprachig | null;
     /** L5-B (40c): Teilziele des Schritts, 1 = ohne (Zoom: rein UND raus = 2) — die Leiste teilt den Strich */
     teile: number;
+    /** L8: Der Geist tippt auf den Kranz-Knopf, dann auf den Eintrag mit diesem Tastencode; `code: null` = nur aufklappen. null/fehlend = kein Kranz */
+    kranz?: { code: string | null } | null;
   };
+  /**
+   * L8 (Lehrgang Teil 2): Lauf → main.ts. Ab jetzt steht diese Station auf dem
+   * Platz — die Pruefung `id` aus `katalog.ts`, aufgebaut wie beim Start einer
+   * Pruefung, aber stumm gefahren (keine Zielzeile, keine Tafel). null = keine
+   * Station (Teil 1). Nur bei Wechsel, auch beim Wiedereinstieg.
+   */
+  "lehrgang:station": { id: string | null };
   /** L5-B (40c): ein Teilziel ist erreicht, der Schritt noch nicht (`teil` von `von`; das letzte meldet `lehrgang:haekchen`). */
   "lehrgang:teilziel": { id: string; nr: number; teil: number; von: number };
   /**
@@ -277,7 +286,8 @@ export interface GameEvents {
   "lehrgang:richtung": {
     id: string;
     nr: number;
-    bedarf: Array<{ fn: "cab" | "boom" | "stick"; richtung: "plus" | "minus" }>;
+    /** L8: dazu Spinne (plus = schliessen) und Rotator (Drehtasten) fuer die Schritte in der Welt */
+    bedarf: Array<{ fn: "cab" | "boom" | "stick" | "grapple" | "rotator"; richtung: "plus" | "minus" }>;
     kamera: "auf" | "zu" | null;
   };
   /** Lauf → Wiedergabe: diese Spur jetzt abspielen (über den Eingabeweg des Spielers). */

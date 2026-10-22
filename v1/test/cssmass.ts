@@ -319,7 +319,8 @@ export function pedalKasten(f: Fassung): Kasten {
  */
 export function knopfKasten(id: string, f: Fassung): Kasten {
   const sel = ["#touch .btn", `#touch #${id}`, `#${id}`];
-  const rahmen = 2;
+  // L8-B2: ☰ steht auf border-box ("#touch #btn-menu") — dort ist width schon das Sichtbare
+  const rahmen = wert(sel, "box-sizing", f) === "border-box" ? 0 : 2;
   const breite = px(sel, "width", f) + 2 * rahmen;
   const hoehe = px(sel, "height", f) + 2 * rahmen;
   const rechts = px(sel, "right", f);

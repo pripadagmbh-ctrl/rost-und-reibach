@@ -207,6 +207,46 @@ export function pedaleLeuchten(spur: Spur | null, fahrenAn: boolean, c: ControlC
   return fahrenAn && s.some((a) => links.some((fn) => bewegt(a, fn)));
 }
 
+/*
+ * --- L8-B2 (Lehrgang Teil 2): Drehtasten und Funktionskranz ---
+ * Der Rotator liegt in der Grundbelegung auf keinem Stick, sondern auf den
+ * Drehtasten ↺/↻ (`core/touch.ts`: rotR = +1, rotL = −1). Dann zeigt ein
+ * Finger, der die Taste HAELT. Liegt er auf einem Stick, zeigt das der
+ * Stick-Geist wie jede andere Funktion (`daumenBild`).
+ */
+
+/**
+ * Rein: Welche Drehtaste muss gehalten werden? +1 = ↻ (#btn-rot-r), −1 = ↺
+ * (#btn-rot-l), 0 = keine (oder der Rotator liegt auf einem Stick).
+ * Vorrang hat, was der Lauf meldet (`lehrgang:richtung`); sonst der erste
+ * Rotator-Ausschlag der Spur.
+ */
+export function drehtasteAus(
+  bedarf: GameEvents["lehrgang:richtung"]["bedarf"] | null,
+  spur: Spur | null,
+  c: ControlConfig
+): -1 | 0 | 1 {
+  if (achseVon("rotator", c)) return 0;
+  if (bedarf) {
+    const b = bedarf.find((x) => x.fn === "rotator");
+    return b ? (b.richtung === "plus" ? 1 : -1) : 0;
+  }
+  const a = (spur ?? []).find((x) => Math.abs(x.achsen?.rotator ?? 0) >= RUHE);
+  return a ? (Math.sign(a.achsen!.rotator!) as -1 | 1) : 0;
+}
+
+/**
+ * Rein: Wohin tippt der Kranz-Finger? Ist der Kranz zu, auf den Knopf
+ * (#btn-kranz); ist er offen, auf den Eintrag mit diesem Tastencode
+ * (`data-code` des Sektors) — bei `code: null` nirgends (das Aufklappen war
+ * das Ziel). `null` = der Schritt hat keinen Kranz.
+ */
+export function kranzZiel(kranz: { code: string | null } | null | undefined, offen: boolean): "knopf" | { code: string } | null {
+  if (!kranz) return null;
+  if (!offen) return "knopf";
+  return kranz.code ? { code: kranz.code } : null;
+}
+
 /** SW: so lange leuchtet ein gedrueckter Knopf nach (s) */
 export const TASTE_LEUCHTET_S = 1.5;
 
@@ -230,6 +270,8 @@ export function installGeisterdaumen(m: {
   vorfuehrung?: Pick<Wiedergabe, "werte" | "gedrueckt">;
   /** L4b: Fahrbetrieb an? (`TouchControls.fahrenAktiv`, nur gelesen) — fehlt am Rechner, dann leuchtet nichts */
   fahrenAn?: () => boolean;
+  /** L8-B2: Funktionskranz offen? (`TouchControls.kranzOffen`, nur gelesen) — fehlt am Rechner, dann gilt „zu" */
+  kranzOffen?: () => boolean;
 }): Geisterdaumen {
   const halter = document.createElement("div");
   halter.id = "geisterdaumen";
@@ -275,8 +317,19 @@ export function installGeisterdaumen(m: {
     }
     return el;
   };
-  const tipp = { ansicht: tippgeist("ansicht"), mitte: tippgeist("mitte"), pedal: tippgeist("pedal einzel") };
-  halter.append(kam, schild, tipp.ansicht, tipp.mitte, tipp.pedal);
+  /*
+   * L8-B2: `kranz` tippt einmal je Durchgang auf Knopf bzw. Eintrag (wie das
+   * Pedal, der Finger kommt angewandert); `halten` setzt auf die Drehtaste und
+   * bleibt gedrueckt (index.html `tipp-halten`).
+   */
+  const tipp = {
+    ansicht: tippgeist("ansicht"),
+    mitte: tippgeist("mitte"),
+    pedal: tippgeist("pedal einzel"),
+    kranz: tippgeist("kranz einzel"),
+    halten: tippgeist("halten"),
+  };
+  halter.append(kam, schild, tipp.ansicht, tipp.mitte, tipp.pedal, tipp.kranz, tipp.halten);
   document.body.appendChild(halter);
 
   let bilder: DaumenBild[] = [];
@@ -302,12 +355,33 @@ export function installGeisterdaumen(m: {
   let pedalVorab = false;
   /* L5-B (40b): der laufende Lehrgangsschritt uebt die Ansicht (Bildzeichen „ansicht") */
   let ansichtSchritt = false;
+  /* L8-B2: Kranz des laufenden Lehrgangsschritts (`lehrgang:schritt.kranz`) */
+  let kranzSchritt: { code: string | null } | null = null;
+  /* Wo der Kranz-Finger zuletzt stand ("-", "knopf" oder Tastencode) — ein neuer Ort startet seine Bewegung von vorn */
+  let kranzGezeigt = "-";
+  /** Mitte eines Elements in Bildpunkten — null, wenn es nicht zu sehen ist (Breite 0) */
+  const mitteVon = (el: Element | null | undefined): { x: number; y: number } | null => {
+    const r = (el as HTMLElement | null)?.getBoundingClientRect?.();
+    return r && r.width > 0 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
+  };
   /** Mitte des ersten Pedals in Bildpunkten — gelesen nur, wenn der Finger dorthin muss (Lage verlegt L5-A, `#pedals`) */
   const pedalOrt = (): { x: number; y: number } | null => {
     const p = document.getElementById("pedals");
-    const ziel = (p?.querySelector(".pedal") ?? p) as HTMLElement | null;
-    const r = ziel?.getBoundingClientRect?.();
-    return r && r.width > 0 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
+    return mitteVon(p?.querySelector(".pedal") ?? p);
+  };
+  /** L8-B2: Knopf oder Kranz-Eintrag (`data-code`, core/touch.ts) — Lage zur Laufzeit wie beim Pedal */
+  const kranzOrt = (z: "knopf" | { code: string }): { x: number; y: number } | null => {
+    if (z === "knopf") return mitteVon(document.getElementById("btn-kranz"));
+    const sektoren = document.getElementById("radial")?.querySelectorAll(".sektor") ?? [];
+    return mitteVon(Array.from(sektoren).find((s) => (s as HTMLElement).dataset["code"] === z.code));
+  };
+  /** Setzt einen Finger auf einen Ort (oder blendet ihn aus); `neu` startet die Bewegung von vorn */
+  const fingerAuf = (el: HTMLElement, ort: { x: number; y: number } | null, einmal: boolean, neu: boolean): void => {
+    if (ort) {
+      el.style.setProperty("left", `${ort.x.toFixed(0)}px`);
+      el.style.setProperty("top", `${ort.y.toFixed(0)}px`);
+    }
+    tippe(el, !!ort, einmal, neu);
   };
   /** an/aus; `neu` = Bewegung von vorn (der naechste Druck der Vorfuehrung) */
   const tippe = (el: HTMLElement, an: boolean, einmal: boolean, neu: boolean): void => {
@@ -343,7 +417,15 @@ export function installGeisterdaumen(m: {
     const frisch = gedrueckt && gedrueckt.seitS < TASTE_LEUCHTET_S ? gedrueckt.codes : [];
     if (gedrueckt && gedrueckt !== druckDa) druecke++;
     druckDa = gedrueckt ?? null;
+    // L8-B2: Kranz-Schritt — auf Touch zeigt der Finger den Eintrag, ein Schild mit demselben Namen waere doppelter Text
+    const kz = touch ? kranzZiel(kranzSchritt, m.kranzOffen?.() ?? false) : null;
+    const kzText = kz === null ? "-" : kz === "knopf" ? "knopf" : kz.code;
+    const ohneKranz = (c: string): boolean => !(touch && kranzSchritt?.code && c === kranzSchritt.code);
+    // L8-B2: Drehtaste halten — Vorfuehrung: solange die Spur dreht; „du": was der Lauf meldet, sonst die Spur
+    const st = m.steuerung();
+    const rotDu = !w && !pedal ? drehtasteAus(richtung?.bedarf ?? null, duSpur, st) : 0;
     const schildText = (w ? frisch : duTasten)
+      .filter(ohneKranz)
       .map((c) => tastenText(c, kranz))
       .filter((x): x is string => !!x)
       .join(" · ");
@@ -352,7 +434,10 @@ export function installGeisterdaumen(m: {
     const ansichtTipp = w ? frisch.includes("KeyC") : duTasten.includes("KeyC") || ansichtSchritt;
     const fahren = !!w && (Math.abs(w.achsen.drive) >= RUHE || Math.abs(w.achsen.steer) >= RUHE);
     // Drehtasten leuchten nur, wenn der Rotator auf keinem Stick liegt
-    const rot = w && !achseVon("rotator", m.steuerung()) && Math.abs(w.achsen.rotator) >= RUHE ? Math.sign(w.achsen.rotator) : 0;
+    const rot = w ? (!achseVon("rotator", st) && Math.abs(w.achsen.rotator) >= RUHE ? Math.sign(w.achsen.rotator) : 0) : rotDu;
+    // Haelt der Spieler die Taste selbst, tritt der Finger zurueck (wie der Stick-Geist beim echten Daumen)
+    const rotTaste = rot > 0 ? "btn-rot-r" : rot < 0 ? "btn-rot-l" : null;
+    const rotFinger = rotTaste && !(!w && document.getElementById(rotTaste)?.classList.contains("down")) ? rotTaste : null;
     const L = folgt("links");
     const R = folgt("rechts");
     const runde = (x: Ausschlag | null): string => (x ? `${x.dx.toFixed(2)},${x.dy.toFixed(2)}` : "-");
@@ -382,8 +467,8 @@ export function installGeisterdaumen(m: {
     const soll = !sichtbar
       ? ""
       : w
-        ? `v|${runde(L)}|${runde(R)}|${geste}|${schildText}|${fahren}|${rot}|${ansichtTipp}|${pedalTipp}|${druecke}`
-        : `d|${steht("links")?.pfeil ?? "-"}|${steht("rechts")?.pfeil ?? "-"}|${geste}|${schildText}|${pedal}|${ansichtTipp}`;
+        ? `v|${runde(L)}|${runde(R)}|${geste}|${schildText}|${fahren}|${rot}|${ansichtTipp}|${pedalTipp}|${kzText}|${rotFinger}|${druecke}`
+        : `d|${steht("links")?.pfeil ?? "-"}|${steht("rechts")?.pfeil ?? "-"}|${geste}|${schildText}|${pedal}|${ansichtTipp}|${kzText}|${rot}|${rotFinger}`;
     if (soll === gezeigt) return;
     const neuerDruck = !!w && !gezeigt.endsWith(`|${druecke}`);
     gezeigt = soll;
@@ -418,6 +503,11 @@ export function installGeisterdaumen(m: {
       tipp.pedal.style.setProperty("top", `${ort.y.toFixed(0)}px`);
     }
     tippe(tipp.pedal, !!ort, !!w, false);
+    // L8-B2: Kranz-Finger (Knopf, dann Eintrag) und Halte-Finger auf der Drehtaste
+    const kranzNeu = kzText !== kranzGezeigt;
+    kranzGezeigt = kzText;
+    fingerAuf(tipp.kranz, sichtbar && kz ? kranzOrt(kz) : null, false, kranzNeu);
+    fingerAuf(tipp.halten, sichtbar && rotFinger ? mitteVon(document.getElementById(rotFinger)) : null, false, false);
     schild.classList.toggle("an", sichtbar && schildText !== "");
     schild.textContent = schildText;
     document.getElementById("pedals")?.classList.toggle("geist-zeigt", sichtbar && (fahren || pedal));
@@ -436,6 +526,7 @@ export function installGeisterdaumen(m: {
     richtung = null;
     pedalVorab = false;
     ansichtSchritt = false;
+    kranzSchritt = null;
     aus = false;
     phase = "du";
     auffrischen();
@@ -474,6 +565,7 @@ export function installGeisterdaumen(m: {
   };
   const ende = (): void => {
     aus = true;
+    kranzSchritt = null;
     bilder = [];
     duSpur = null;
     gelungen = null;
@@ -501,6 +593,7 @@ export function installGeisterdaumen(m: {
     richtung = null; // die Richtung dieses Schritts kommt gleich nach seinem „du"
     schrittVon = { id: e.id, nr: e.nr };
     ansichtSchritt = e.symbol === "ansicht";
+    kranzSchritt = e.kranz ?? null;
     pedalVorab = false;
     if (e.phase === "zeigen") zeigtGerade = { id: e.id, nr: e.nr };
     const eigene = spurDes && spurDes.id === e.id && spurDes.nr === e.nr ? spurDes.spur : null;

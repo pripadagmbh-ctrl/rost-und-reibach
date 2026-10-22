@@ -472,6 +472,15 @@
         width: 46px; height: 46px; padding: 0;
         line-height: 46px; font-size: 20px; z-index: 3;
       }
+      /* L8-B2 (Nebenbefund E-206/E-208): "#touch .btn" (Gewicht 110) schlug
+         "#btn-menu" (100) — sein Innenrand 11/6 px, Schrift 12 px/1 und z 2
+         setzten sich durch, ☰ mass 62 x 72 (flach 56 x 66). Mit "#touch"
+         davor und border-box ist 46 x 46 (flach 44 x 44, Briefing Kap. 20)
+         das Sichtbare; Zeile = Hoehe - 2 x 2 px Rahmen = 42 (flach 40). */
+      #touch #btn-menu {
+        box-sizing: border-box; padding: 0; z-index: 3;
+        font-size: 20px; line-height: 42px;
+      }
       /* Rotator: zwei Tasten am rechten Bildrand in Daumenhoehe.
          Sie hatten ihre Position nur in der Handy-Regel weiter unten; auf dem
          Tablet fehlte jede Angabe. Ein absolut positioniertes Element ohne
@@ -505,29 +514,31 @@
          Knopf: senkrecht unter ☰, rechtsbuendig mit ihm am Bildrand (mittig
          unter ☰ laege er auf dem iPad 1 px neben dem HUD-Stapel, der bei
          68 px endet); links neben ☰ bleibt frei (dort kommt ⏸, Punkt 43a).
-         ☰ misst wirklich 62 x 72 (iPad) bzw. 56 x 66 (flach), weil
-         "#touch .btn" seinen Innenrand 11/6 px durchsetzt (Nebenbefund E-206)
-         — darum hier "#touch #btn-kranz" mit border-box und padding 0, dann
-         ist 48 bzw. 44 das Sichtbare.
+         ☰ und Knopf stehen beide auf border-box mit padding 0 ("#touch
+         #btn-menu" / "#touch #btn-kranz"; bis L8-B2 mass ☰ 62 x 72, weil
+         "#touch .btn" seinen Innenrand durchsetzte) — 46 bzw. 48 ist das
+         Sichtbare (flach 44 und 44).
          iPad:  rechts wie ☰ (12; Stapel-Luft 68 - 12 - 48 = 8); oben
-                ☰-Oberkante + 72 + 8 Luft = 92 (mit Statusleiste: Rand + 8 + 72 + 8).
+                ☰-Oberkante 12 + 46 + 8 Luft = 66 (mit Statusleiste: Rand + 8 + 46 + 8 = Rand + 62).
          Kranz: Mittelpunkt links der ☰-Spalte, damit kein Sektor ☰ oder den
-                Knopf deckt: ☰-Rand 12 + 62 Spalte + 8 Luft + 146,1 halber Ring
-                (112 + 62 x 1,10 / 2) = 228,1 -> 230 vom rechten Rand;
+                Knopf deckt: Rand 12 + 48 Spalte (Knopf, breiter als ☰) + 8 Luft
+                + 146,1 halber Ring (112 + 62 x 1,10 / 2) = 214,1 -> 216 vom
+                rechten Rand (bis L8-B2 mit der falschen ☰-Breite 62: 230);
                 senkrecht in der Bildmitte (Ring 130,7 nach oben und unten).
-                iPad 1024: Ring x 648..940, y 253..515 — rechts der
-                Lehrgangsleiste und der Zielzeile, links der Drehtasten.
+                iPad 1024: Ring x 662..954, y 253..515 — rechts der
+                Lehrgangsleiste und der Zielzeile; die Drehtasten treten
+                zurueck, solange er offen ist (unten).
          Gerechnet in test/kranzknopf.test.ts. */
       #touch #btn-kranz {
         box-sizing: border-box; width: 48px; height: 48px; padding: 0;
         border-radius: 50%; z-index: 3;
         right: max(12px, calc(var(--sa-r) + 8px));
-        top: max(92px, calc(var(--sa-t) + 88px));
+        top: max(66px, calc(var(--sa-t) + 62px));
       }
       #touch #btn-kranz svg { display: block; width: 28px; height: 28px; margin: 8px auto; pointer-events: none; }
       #radial {
         position: absolute; pointer-events: none; z-index: 4; width: 0; height: 0;
-        right: max(230px, calc(var(--sa-r) + 226px)); top: 50%;
+        right: max(216px, calc(var(--sa-r) + 212px)); top: 50%;
       }
       #radial[hidden] { display: none; }
       /* Solange der Kranz offen ist, nehmen Drehtasten und Pedale ohnehin
@@ -535,7 +546,7 @@
          laege der untere Ringteil auf ihnen — darum treten sie kurz zurueck. */
       #touch.kranz-offen #btn-rot-l, #touch.kranz-offen #btn-rot-r, #touch.kranz-offen #pedals { visibility: hidden; }
       /* Telefon hoch (kein Spielformat): Ring mittig, unter dem Knopf
-         (Knopf-Unterkante 186 + 8 + 130,7 = 325 < 406 Bildmitte). */
+         (Knopf-Unterkante 50 + 62 + 48 = 160, + 8 + 130,7 = 299 < 406 Bildmitte). */
       @media (max-width: 500px) and (min-height: 431px) {
         #radial { right: 50%; }
       }
@@ -611,19 +622,22 @@
         #touch .pedal .platte { top: 5px; height: 18px; left: 5px; right: 5px; }
         #touch .pedal .platte::after { inset: 5px 7px; }
         #touch.fahren .pedal .platte { transform: translateY(22px); }
+        /* L8-B2: 44 statt 40 — Tippziel nach Briefing Kap. 20 (border-box, s. o.) */
         #btn-menu {
           top: max(8px, calc(var(--sa-t) + 8px));
           right: max(8px, calc(var(--sa-r) + 8px));
-          width: 40px; height: 40px; line-height: 40px; font-size: 18px;
+          width: 44px; height: 44px;
         }
+        #touch #btn-menu { line-height: 40px; font-size: 18px; }
         /* Eine Nummer kleiner, dieselbe Rechnung: 9 Zeichen Consolas 10 px =
            49,5 px, Rahmen 4 px, 4,5 px Luft. 30 px Hoehe = 22 px Zeile + 4 px
            Balken. Der Halbmesser bleibt bei beiden Fassungen gleich (112 px,
            `RADIAL_R` in touch.ts) — seit L7-A steht er fest neben dem Kranz-Knopf. */
         #radial .sektor { width: 58px; height: 30px; margin: -15px 0 0 -29px; font-size: 10px; line-height: 22px; }
-        /* L7-A flach: Knopf 44 (Kap. 20), rechtsbuendig unter ☰ (56 x 66 ab
-           8 px): rechts wie ☰, oben 8 + 66 + 8 = 82. Kranz: ☰-Rand + 56 + 8
-           + 143,9 halber Ring (112 + 58 x 1,10 / 2) = 216 vom rechten Rand.
+        /* L7-A flach: Knopf 44 (Kap. 20), rechtsbuendig unter ☰ (seit L8-B2
+           44 x 44 ab 8 px, vorher wirklich 56 x 66): rechts wie ☰, oben
+           8 + 44 + 8 = 60 (vorher 82). Kranz: Rand + 44 + 8 + 143,9 halber
+           Ring (112 + 58 x 1,10 / 2) = 203,9 -> 204 vom rechten Rand (vorher 216).
            Senkrecht so tief wie es geht: 136 + 128,5 halber Ring ueber dem
            Home-Indicator -> iPhone mini quer Ring y 89,5..346,5 — unter
            Lehrgangsleiste (bis 74) und Pruefungssatz (bis 81), mit 7,5 px
@@ -631,10 +645,10 @@
         #touch #btn-kranz {
           width: 44px; height: 44px;
           right: max(8px, calc(var(--sa-r) + 8px));
-          top: max(82px, calc(var(--sa-t) + 82px));
+          top: max(60px, calc(var(--sa-t) + 60px));
         }
         #touch #btn-kranz svg { width: 26px; height: 26px; margin: 7px auto; }
-        #radial { right: max(216px, calc(var(--sa-r) + 216px)); top: auto; bottom: calc(var(--sa-b) + 136px); }
+        #radial { right: max(204px, calc(var(--sa-r) + 204px)); top: auto; bottom: calc(var(--sa-b) + 136px); }
         /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
         #touch #btn-rot-l, #touch #btn-rot-r {
           bottom: max(14px, calc(var(--sa-b) + 8px));
@@ -1161,6 +1175,17 @@
       /* Pedal: der Finger kommt von oben angewandert (80 px), tippt einmal */
       @keyframes tipp-anflug { 0% { transform: translate(0,-80px) scale(1.3); opacity: 0; } 12% { opacity: 0.95; } 40% { transform: translate(0,0) scale(1.3); } 50% { transform: scale(0.8); } 62% { transform: scale(1.15); opacity: 0.95; } 88% { transform: scale(1.15); opacity: 0.95; } 100% { transform: scale(1.15); opacity: 0; } }
       @keyframes tipp-welle-einzel { 0%, 49% { transform: scale(0.7); opacity: 0; } 50% { transform: scale(0.7); opacity: 1; } 85%, 100% { transform: scale(2.4); opacity: 0; } }
+      /* L8-B2 (Lehrgang Teil 2): .kranz tippt wie das Pedal (.einzel) auf den
+         Kranz-Knopf, ist der Kranz offen, auf den Eintrag — Lage liest
+         ui/geisterdaumen.ts zur Laufzeit (#btn-kranz, #radial .sektor[data-code]).
+         .halten setzt auf die Drehtaste (#btn-rot-l/-r) und BLEIBT gedrueckt:
+         kleiner Finger, ein Ring liegt still um ihn und atmet — „halten",
+         nicht „tippen". SW: 1,6 s je Durchgang wie oben, Anflug 60 px. */
+      #geisterdaumen .tippgeist.halten .finger { animation-name: tipp-halten; }
+      #geisterdaumen .tippgeist.halten .welle { animation-name: tipp-halten-ring; }
+      #geisterdaumen .tippgeist.halten .welle.zwei { display: none; }
+      @keyframes tipp-halten { 0% { transform: translate(0,-60px) scale(1.3); opacity: 0; } 12% { opacity: 0.95; } 30% { transform: translate(0,0) scale(1.3); } 40%, 88% { transform: scale(0.85); opacity: 0.95; } 100% { transform: scale(0.85); opacity: 0; } }
+      @keyframes tipp-halten-ring { 0%, 39% { transform: scale(1); opacity: 0; } 40% { transform: scale(1); opacity: 1; } 64% { transform: scale(1.35); opacity: 0.9; } 88% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(1); opacity: 0; } }
       /* Knopf-Schild: welche Kranz-Funktion die Vorfuehrung gerade ausloest
          („STÜTZEN: halten, ziehen", „ANSICHT: 2× tippen"). Ueber dem rechten
          Geist-Ring, rechtsbuendig mit ihm (iPad: links der Drehtasten ab x 954):
@@ -1263,7 +1288,10 @@
       /* L5-B (40c): Strich eines Schritts mit Teilzielen in Haelften; die
          erreichte wird gruen, die Leiste leuchtet einmal kurz (ohne den
          stehenden Schein des Haekchens — der Schritt laeuft weiter). */
-      #lehrgangsleiste .punkte i.geteilt { display: flex; gap: 2px; box-shadow: none; }
+      /* L8-B2: Mit 23 Schritten (Teil 2) bliebe je Haelfte 2,2 px (iPhone mini,
+         schmalste Leiste 214 px innen) — der geteilte Strich ist darum doppelt
+         breit: 6,2 px je Strich, 5,2 px je Haelfte (test/lehrgang-teil2.test.ts). */
+      #lehrgangsleiste .punkte i.geteilt { display: flex; gap: 2px; box-shadow: none; flex: 2; }
       #lehrgangsleiste .punkte i.geteilt b { flex: 1; border-radius: 2px; box-shadow: inset 0 0 0 2px #f0d060; }
       #lehrgangsleiste .punkte i.geteilt b.ok { background: #4fd06a; box-shadow: none; }
       #lehrgangsleiste .punkte i.geteilt b.neu { animation: lg-pop 0.8s ease-out; }

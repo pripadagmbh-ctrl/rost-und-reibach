@@ -10,6 +10,9 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-218 | 22.10.2026 | Nach dem Lehrgang zum Montag; Leistenwörter ohne Fachwort | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
+| E-217 | 22.10.2026 | Kranz- und Halte-Finger, elf Bildzeichen, ☰ wirklich 46/44 px | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
+| E-216 | 22.10.2026 | Lehrgang Teil 2: 15 Schritte an Prüfungs-Stationen, Lotse zeigt den Weg | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-215 | 22.10.2026 | Schlafhilfe misst gemittelte Bewegung: Zittern am Fleck gilt als still | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-214 | 22.10.2026 | ⏸ neben ☰ friert ein und macht still, ☰-Menü ebenfalls still | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-213 | 22.10.2026 | Prüfungen ohne Text: Zielzeile, Teil leuchtet in Sortenfarbe mit Weg, Kameraflug | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
@@ -219,6 +222,18 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-218 — Ende → Montag, Leistenwörter** (iPhone mini quer)
+- Lehrgang zu Ende: Knopf heißt MONTAG und startet die Montag-Schicht?
+- „Fahrersicht“, „Außensicht“, „Ausleger heben“, „Arm strecken“, „Greifer aufs Ziel“ ohne Erklärung verständlich?
+**E-217 — Kranz-/Halte-Finger, ☰ 46/44** (iPhone mini quer, dann iPad)
+- ☰ und Punkte-Knopf darunter je einmal mit dem rechten Daumen: auf Anhieb getroffen? ☰ gut lesbar?
+- Schritt 15 Stützen: Finger erst auf dem Knopf, nach deinem Tipp auf STÜTZEN?
+- Schritt 12 Drehen: Finger hält sichtbar ↻ und verschwindet, sobald du selbst drückst?
+**E-216 — Lehrgang Teil 2 an Stationen** (iPad, dann iPhone mini quer)
+- Ab Schritt 10: jede Station baut sich ruhig auf, nichts fliegt? Wechsel auf Magnet (22) und zurück (23) bemerkt?
+- Schritt 11: Pfeil erst Schwenken, dann Senken, „Schließen“ erst, wenn die Spinne aufsitzt? Schritt 23: über der Mulde erst senken, dann öffnen — Teil bleibt drin?
+- Schritt 16 (LKW): erst Ausleger hoch, dann hinüber — LKW bleibt stehen?
+- Schritt 19 Zerlegen: ohne Pfeil verständlich? Wie lange dauert Teil 2 insgesamt (Ziel ≤ 8 min)?
 **E-215 — Schlafhilfe gemittelt** (Sandkasten)
 - Kipper abschütten und warten: kommt der Haufen zur Ruhe, ohne dass ein Teil mitten im Rutschen stehen bleibt?
 - In einen ruhigen Haufen greifen: wachen die Teile wie bisher auf und fallen nach?

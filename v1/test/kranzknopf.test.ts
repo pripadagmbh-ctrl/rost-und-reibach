@@ -322,14 +322,16 @@ function kranzKnopf(f: Fassung, dx = 0, dy = 0): Kasten {
 }
 
 /**
- * ☰, wie es wirklich gezeichnet wird: content-box, und "#touch .btn" setzt
- * seinen Innenrand 11/6 px durch (Nebenbefund E-206; knopfKasten() rechnet
- * ohne ihn) — iPad 62 x 72, flach 56 x 66.
+ * ☰, wie es wirklich gezeichnet wird. Bis L8-B2 content-box, und "#touch
+ * .btn" setzte seinen Innenrand 11/6 px durch (Nebenbefund E-206) — 62 x 72,
+ * flach 56 x 66. Seit L8-B2 border-box mit padding 0: 46 x 46, flach 44 x 44.
+ * Die Rechnung nimmt beides, damit ein Rueckfall wieder auffaellt.
  */
 function menue(f: Fassung): Kasten {
-  const [py, pxx] = fassungInnen(MENUE, f);
-  const w = px(MENUE, "width", f) + 2 * pxx + 4;
-  const h = px(MENUE, "height", f) + 2 * py + 4;
+  const box = wert(MENUE, "box-sizing", f) === "border-box";
+  const [py, pxx] = box ? [0, 0] : fassungInnen(MENUE, f);
+  const w = px(MENUE, "width", f) + (box ? 0 : 2 * pxx + 4);
+  const h = px(MENUE, "height", f) + (box ? 0 : 2 * py + 4);
   const x1 = f.w - px(MENUE, "right", f);
   const oben = px(MENUE, "top", f);
   return vonOben("☰", f, x1 - w, x1, oben, oben + h);
@@ -456,7 +458,8 @@ describe("Kranz-Knopf und Kranz: Lage (L7-A)", () => {
       it("senkrecht unter ☰, rechtsbuendig in dessen Spalte — links neben ☰ bleibt frei", () => {
         expect(k.y1).toBeLessThan(m.y0);
         expect(k.x1).toBe(m.x1);
-        expect(k.x0).toBeGreaterThanOrEqual(m.x0);
+        // L8-B2: Seit ☰ wirklich 46 misst, ist der iPad-Knopf (48) 2 px breiter als ☰ — er steht darunter, nicht daneben
+        expect(k.x0).toBeGreaterThanOrEqual(m.x0 - 2);
       });
 
       it("offener Kranz ganz im sicheren Bild, kein Sektor auf ☰ oder dem Knopf (4 bis 9 Eintraege)", () => {
@@ -478,12 +481,29 @@ describe("Kranz-Knopf und Kranz: Lage (L7-A)", () => {
       });
 
       if (f.w === 812)
-        it("GEGENPROBE iPhone: 50 px weiter rechts liegt ein Sektor am Kranz-Knopf", () => {
-          // Bei sieben Eintraegen liegt der obere rechte Sektor dem Knopf am naechsten
-          expect(kranzFehler(f, 50).some((t) => t.includes("auf Kranz-Knopf"))).toBe(true);
+        it("GEGENPROBE iPhone: 130 px weiter rechts liegt der obere Sektor am Kranz-Knopf", () => {
+          // L8-B2: Der Knopf sitzt seit dem echten 44er-☰ 22 px hoeher (60 statt 82) — nur noch der obere Sektor reicht an ihn heran
+          expect(kranzFehler(f, 50).some((t) => t.includes("auf Kranz-Knopf"))).toBe(false);
+          expect(kranzFehler(f, 130).some((t) => t.includes("auf Kranz-Knopf"))).toBe(true);
         });
     });
   }
+
+  it("L8-B2: ☰ misst 46 x 46 (iPad) bzw. 44 x 44 (Telefon quer), Knopf 8 px darunter, Zahlen wie im CSS-Kommentar", () => {
+    for (const f of QUER) {
+      const m = menue(f);
+      const k = kranzKnopf(f);
+      const soll = f.h <= 430 ? 44 : 46;
+      expect([m.x1 - m.x0, m.y1 - m.y0], f.name).toEqual([soll, soll]);
+      expect(m.y0 - k.y1, `${f.name}: Luft ☰ → Knopf`).toBe(LUFT);
+      expect(f.h - k.y1, `${f.name}: Knopf oben`).toBe(f.h <= 430 ? 60 : 66);
+      expect(f.w - px(["#radial"], "right", f), `${f.name}: Kranz-Mitte`).toBe(f.h <= 430 ? 812 - 50 - 204 : f.w - 216);
+    }
+    // Die alte Fassung: content-box mit dem Innenrand von "#touch .btn" — 62 x 72 (Gegenprobe der Rechnung)
+    expect(46 + 2 * 6 + 4).toBe(62);
+    expect(46 + 2 * 11 + 4).toBe(72);
+    expect(wert(MENUE, "padding", FASSUNGEN[0]!)).toBe("0");
+  });
 
   it("Telefon hoch (kein Spielformat): Knopf und Kranz bleiben trotzdem im Bild und frei", () => {
     const f = FASSUNGEN.find((x) => x.name === "iPhone mini hoch")!;

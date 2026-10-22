@@ -34,6 +34,8 @@ import { leseChallenges } from "../core/save";
 import { naechsteFreieAufgabe, nochmal, zumMenue, zurLektion } from "./hauptmenue";
 import { KRITERIEN, MESSGROESSEN, sterneText, wort } from "./aufgabentexte";
 import { laufAus, merkeLauf } from "../core/bestenliste";
+import { nachDemLehrgang, tagNachDemLehrgang } from "./schichtmenue";
+import { stufenName } from "./schichttexte";
 
 /** Eine Zeile der Abrechnung: links das Wort, rechts die Zahl. */
 export interface Abrechnungszeile {
@@ -236,7 +238,7 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
    * Das Ende einer Lektion (E-196) — dieselbe Tafel, ohne Sterne: Kopf
    * „LEKTION GESCHAFFT · Name", statt der Sternzeile „✓ Lektion 3 von 12",
    * eine Zeile Zeit. Knoepfe in der Reihenfolge WEITER (naechste Lektion;
-   * nach der letzten: Pruefung 1), NOCHMAL, ZUM MENÜ. NOCHMAL sitzt dafuer
+   * nach der letzten seit L8-B2: MONTAG, `nachDemLehrgang`), NOCHMAL, ZUM MENÜ. NOCHMAL sitzt dafuer
    * auf dem zweiten Knopf (`abr-naechste`). Beides laedt neu mit
    * `#lektion=<id>` — eine Lektion ist kurz, der Platz wird frisch gebaut.
    */
@@ -247,10 +249,10 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
     const ids = (m.lektionen ?? []).map((l) => l.id);
     const i = ids.indexOf(e.id);
     const naechsteLektion = i >= 0 ? ids[i + 1] : undefined;
-    const ersteP = CHALLENGES[0]?.id;
+    // L8-B2 (Konzept Fassung 3): nach dem Lehrgang zur WOCHE, Montag — bis W1 der Platzhalter in ui/schichtmenue.ts
     lektion = {
       id: e.id,
-      weiter: () => (naechsteLektion ? zurLektion(naechsteLektion) : ersteP ? nochmal(ersteP) : zumMenue()),
+      weiter: () => (naechsteLektion ? zurLektion(naechsteLektion) : nachDemLehrgang()),
     };
     const zeit = { name: waehle(KRITERIEN.zeitS.name, s), wert: KRITERIEN.zeitS.zahl(e.zeitS) };
     // L4: EIN Lehrgang heisst LEHRGANG — der Name hinter „LEHRGANG GESCHAFFT" waere doppelt
@@ -265,7 +267,8 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
       sterneEl.textContent =
         ids.length > 1 ? wort("lektionVon", s).replace("{n}", String(e.nr)).replace("{m}", String(ids.length)) : "✓";
     }
-    if (weiter) weiter.textContent = naechsteLektion || !ersteP ? wort("weiterGross", s) : wort("zurPruefung", s);
+    // Knopf = der Tag, kein „Pruefung" mehr: MONTAG / MONDAY (Wortliste ui/schichttexte.ts)
+    if (weiter) weiter.textContent = naechsteLektion ? wort("weiterGross", s) : stufenName(tagNachDemLehrgang(), s).toUpperCase();
     if (naechste) {
       naechste.textContent = wort("nochmal", s);
       naechste.hidden = false;

@@ -78,6 +78,7 @@ import { baueAufgabe, grundbestandVon, raeumeAuf, type Grundbestand } from "./ch
 import { lektionQuellen, weltQuellen } from "./challenges/quellen";
 import { LEKTIONEN, lektionNr } from "./challenges/lehrgang";
 import { LektionLauf } from "./challenges/lektion";
+import { StationLauf } from "./challenges/station";
 import { Wiedergabe } from "./core/wiedergabe";
 import { lehrgangEinstieg } from "./core/save";
 import { installLektionsKarte } from "./ui/lektionskarte";
@@ -206,7 +207,7 @@ async function main(): Promise<void> {
     : schichtStufe
       ? [...NUR_IM_BETRIEB, ...NUR_AUSSER_SCHICHT] // E-205: eigene Anzeige statt Konto/Uhr/Ladeanzeige, kein NACHSCHUB, kein Speichern
       : aufgabenPlatz
-      ? [...NUR_IM_BETRIEB, ...NUR_IM_SANDKASTEN]
+      ? [...NUR_IM_BETRIEB, ...NUR_IM_SANDKASTEN].filter((id) => !(lektionDaten && id === "btn-hupe")) // L8: der Lehrgang uebt HUPE im Kranz
       : NUR_IM_BETRIEB;
   for (const id of new Set(ausblenden)) {
     const el = document.getElementById(id)!;
@@ -512,6 +513,8 @@ async function main(): Promise<void> {
   let wiedergabe: Wiedergabe | null = null;
   let lektionsKarte: ReturnType<typeof installLektionsKarte> | null = null;
   let lektionsGeist: ReturnType<typeof installGeisterdaumen> | null = null;
+  /** L8: die Station des Lehrgangs Teil 2 (Pruefungsaufbau, stumm gefahren, challenges/station.ts) */
+  let station: StationLauf | null = null;
   if (lektionDaten) {
     wiedergabe = new Wiedergabe(bus, {
       achsen: touch.axes,
@@ -522,10 +525,52 @@ async function main(): Promise<void> {
     const karte = installLektionsKarte({ bus, steuerung: () => touch.config, audio });
     lektionsKarte = karte;
     onSprache(() => karte.neuBeschriften());
-    lektionsGeist = installGeisterdaumen({ bus, steuerung: () => touch.config, vorfuehrung: wiedergabe, fahrenAn: () => touch.fahrenAktiv }); // E-197: Pedale leuchten, wenn der Fahrbetrieb nicht zum Schritt passt
+    lektionsGeist = installGeisterdaumen({
+      bus,
+      steuerung: () => touch.config,
+      vorfuehrung: wiedergabe,
+      fahrenAn: () => touch.fahrenAktiv, // E-197: Pedale leuchten, wenn der Fahrbetrieb nicht zum Schritt passt
+      kranzOffen: () => touch.kranzOffen, // L8: Finger erst auf den Kranz-Knopf, dann auf den Eintrag
+    });
     installZielmarke(scene, bus);
     vehicles.acceptDeliveries = false;
-    lektion = new LektionLauf(lektionDaten, lektionNr(lektionDaten.id), LEKTIONEN.length, lektionQuellen({ bagger: excavator, kamera: orbit }), bus);
+    /*
+     * L8: Stationen von Teil 2 — wie `starteAufgabe` bei den Pruefungen:
+     * Platz auf den Grundbestand, Aufbau der Pruefung, Greifer, stummer Lauf.
+     * Der Bagger wird nicht versetzt (Regel 2); `ort` (Schritt „Zurueck")
+     * holt ihn vorher an den Startplatz. Kommt synchron aus lektion.start/takt
+     * im Bildtakt, nie aus einem Rapier-Callback (v2 E-044).
+     */
+    let grund: Grundbestand | null = null;
+    bus.on("lehrgang:station", ({ id }) => {
+      station?.beenden();
+      station = null;
+      grip.releaseAll();
+      if (grund) raeumeAuf(grund, { items, composites });
+      grund ??= grundbestandVon({ items, composites });
+      const d = id ? challengeNach(id) : null;
+      if (!d) return;
+      const objekte = baueAufgabe(d, { items, composites });
+      items.settle(physics.world);
+      if (d.aufbau.greifer) setzeGreifer(excavator, grip, formZu(d.aufbau.greifer)); // wie starteAufgabe: Magnet-Station wechselt, Sortieren zurueck
+      station = new StationLauf(d, weltQuellen({ bagger: excavator, grip, containers, items, press }), bus, objekte);
+      station.start();
+    });
+    bus.on("lehrgang:geschafft", () => {
+      station?.beenden();
+      station = null;
+    });
+    lektion = new LektionLauf(
+      lektionDaten,
+      lektionNr(lektionDaten.id),
+      LEKTIONEN.length,
+      {
+        ...lektionQuellen({ bagger: excavator, kamera: orbit }),
+        stationGesehen: (b) => station?.gesehen(b) ?? false,
+        kranzOffen: () => (touch.active ? touch.kranzOffen : null), // am PC kein Kranz: gilt als erfuellt
+      },
+      bus
+    );
   }
 
   // --- Pausenmenü ---
@@ -1068,6 +1113,7 @@ async function main(): Promise<void> {
   press.onStamp = (count, pos) => {
     if (count > 0) tutGepresst = true;
     challenge?.presseHatGestempelt();
+    station?.presseHatGestempelt(); // L8
     audio.playCrash(1);
     audio.playTear();
     particles.spawn(pos, 16, 0x9a8b74, 2.5, 1.8, 0.7);
@@ -1816,7 +1862,8 @@ async function main(): Promise<void> {
     }
     if (input.wasPressed("KeyB") || touch.consumePress("KeyB")) {
       // Challenge: erst pressen, wenn das Wrack losgelassen in der Kammer ist (E-125)
-      if (challenge && !challenge.pressenErlaubt()) {
+      const lauf = challenge ?? station; // L8: im Lehrgang fragt die Station
+      if (lauf && !lauf.pressenErlaubt()) {
         hud.toast("Erst das Wrack in die Kammer legen und loslassen — dann PRESSE.");
       } else if (!press.start()) hud.toast(press.sperrgrund ?? "Presse läuft bereits …");
     }
@@ -2093,6 +2140,7 @@ async function main(): Promise<void> {
       // Challenge (E-125): keine Anlieferer, die Uhr der Aufgabe laeuft
       challenge.takt(frameDt);
     } else if (lektion) {
+      station?.takt(frameDt); // L8: erst die Station (Marken, gesehen), dann der Lauf, der sie liest
       lektion.takt(frameDt); // E-196: Lektion, Uhr steht in der Pause
     } else if (schicht && kasse) {
       // SCHICHT (E-202 … E-205): Anzeige, Tafel und Ton hängen an schicht:stand/buchung/ende

@@ -1,8 +1,9 @@
 import type { EventBus, GameEvents } from "../core/events";
 import type { Spur, SpurAchse } from "../core/spur";
 import type { ViewMode } from "../excavator/orbitCamera";
-import type { ChallengeAufbau } from "./challenge";
+import { SPINNE_HOEHE_M, SPINNE_WAAGRECHT_M, type Beobachtung, type ChallengeAufbau } from "./challenge";
 import type { Zweisprachig } from "./texte";
+import { SCHWENK_AUSSEN } from "../world/baggerstand";
 
 /**
  * DER LEHRGANG — EINE LEKTION UND IHR LAUF (E-196, Patrick 21.10.2026:
@@ -40,6 +41,14 @@ export interface LektionZustand {
   z: number;
   heading: number;
   abgestuetzt: boolean;
+  /**
+   * L8: Die Spinne sitzt auf — der Arm drueckt gegen ein Fahrzeug
+   * (`excavator.armBlocked`) oder die Spitze liegt auf (`groundContact`).
+   * Der Lotse packt am Wrack erst dann zu: Dessen Marke steht auf dem
+   * hoechsten Punkt (Fahrerhaus), gegriffen wird oft tiefer (Rahmen). Fehlt
+   * (Attrappen) = nein.
+   */
+  aufgesessen?: boolean;
   /** Sensorpunkt der Spinne (m) */
   spinne: { x: number; y: number; z: number };
   kamera: { modus: ViewMode; gier: number; nick: number; abstand: number };
@@ -47,6 +56,13 @@ export interface LektionZustand {
 
 export interface LektionQuellen {
   zustand(): LektionZustand;
+  /**
+   * L8: Hat die Station (`StationLauf.gesehen`, verdrahtet in main.ts) diese
+   * Beobachtung schon gesehen? Ohne Quelle (Attrappen) nie.
+   */
+  stationGesehen?(b: Beobachtung): boolean;
+  /** L8: Ist der Funktionskranz offen? null = kein Touch (am PC gibt es keinen Kranz) — das Ziel gilt dann als erfuellt; ohne Quelle ebenso. */
+  kranzOffen?(): boolean | null;
 }
 
 /**
@@ -61,9 +77,9 @@ export type Groesse = "cabYaw" | "boom" | "stick" | "rotator" | "closure" | "kam
 /**
  * Was der Spieler in Phase "du" zeigen muss.
  *
- * Etappe 2 (weltbezogen: gegriffen, gepresst …) kommt als weitere Zeile
- * `{ art: "welt"; beobachtet: Beobachtung }` dazu und liest die Beobachtungen
- * aus `challenge.ts` — die Quellen dann wie `ChallengeQuellen`.
+ * Teil 2 (L8, weltbezogen) liest die Beobachtungen nicht selbst: Die Station
+ * (`station.ts`, eine stumm gefahrene Pruefung) sieht sie, der Lauf fragt
+ * `LektionQuellen.stationGesehen`.
  */
 export type LektionZiel =
   /**
@@ -86,7 +102,24 @@ export type LektionZiel =
    * Ohne `radialM` (L3b): so weit, wie die Vorfuehrung die Spinne bis zum
    * ersten Halt traegt — auch wenn `richteSpur` den Arm umgedreht hat.
    */
-  | { art: "marke"; radialM?: number; schwenkRad?: number; radiusM: number };
+  | { art: "marke"; radialM?: number; schwenkRad?: number; radiusM: number }
+  /*
+   * --- Teil 2 (Etappe 2b, L8) — Ziele in der Welt ---
+   * "ort": Die Drehmitte steht wieder hoechstens `radiusM` neben der Lage bei
+   * `start()` und der Unterwagen hoechstens `gierTolRad` verdreht — die
+   * Stationen liegen fest auf dem Platz wie in den Pruefungen. Wer schon dort
+   * steht, hat das Haekchen sofort.
+   */
+  | { art: "ort"; radiusM: number; gierTolRad: number }
+  /** Die Station dieses Schritts (Pruefung aus `katalog.ts`, stumm gefahren) hat `beobachtet` gesehen — auch spaeter im Ablauf der Pruefung. */
+  | { art: "station"; beobachtet: Beobachtung }
+  /**
+   * So viele Ereignisse seit Beginn von "du": "abriss" = `wrack:abriss`,
+   * "einwurf" = `itemEntered` mit `correct`, "hupe" = `bagger:hupe`.
+   */
+  | { art: "ereignis"; ereignis: "abriss" | "einwurf" | "hupe"; anzahl: number }
+  /** Ein Zustand ist an: Pratzen unten, Funktionskranz offen (ohne Touch gilt er als erfuellt — am PC gibt es keinen Kranz). */
+  | { art: "zustand"; was: "abgestuetzt" | "kranzOffen" };
 
 /**
  * Bildzeichen am Rand je Schritt (L3, Patrick 21.10.2026: „kaum oder keinen
@@ -103,7 +136,19 @@ export type LehrgangSymbol =
   | "stuetzen"
   | "presse"
   | "magnet"
-  | "hupe";
+  | "hupe"
+  // Teil 2 (L8)
+  | "zurueck"
+  | "greifen"
+  | "rotator"
+  | "ablegen"
+  | "kranz"
+  | "last"
+  | "haemmern"
+  | "quetschen"
+  | "zerlegen"
+  | "pressen"
+  | "sortieren";
 
 export interface LektionSchritt {
   /** Bildzeichen am Rand (ui) */
@@ -118,6 +163,14 @@ export interface LektionSchritt {
   /** null = ohne Vorfuehrung, gleich "du" */
   vorfuehrung: Spur | null;
   ziel: LektionZiel;
+  /**
+   * L8: Ab diesem Schritt steht diese Station auf dem Platz (Pruefungs-ID aus
+   * `katalog.ts`); sie gilt bis zum naechsten Schritt mit `station`. Ohne =
+   * die Station des Schritts davor (Teil 1: keine).
+   */
+  station?: string;
+  /** L8: Der Geist tippt auf den Kranz-Knopf und dann auf diesen Eintrag (Tastencode, z. B. "KeyO"); `code: null` = nur aufklappen. */
+  kranz?: { code: string | null };
 }
 
 export interface LektionDaten {
@@ -202,13 +255,119 @@ const WIRKUNG_MIN = 0.5;
 /** „beide": die andere Richtung gilt erst, wenn sie um so viel (Anteil von `ab`) vorn liegt. // SW: 10 % — Zittern am Stick dreht den Pfeil nicht */
 const BEIDE_VORSPRUNG = 0.1;
 
+/*
+ * --- L8: DER LOTSE FUER DIE SCHRITTE IN DER WELT ---
+ * Die Station meldet ihre Marken (`challenge:stand`, wie fuer die Zielmarke):
+ * "teil" = was zu holen ist, "ziel" = wohin, solange etwas haengt. Daraus
+ * dieselbe Sprache wie bei der Bodenmarke (`markeBedarf`): erst schwenken,
+ * dann Ausladung, dann senken und zupacken — bzw. mit Last hoch, hinueber,
+ * oeffnen. Jede Schwelle mit Ruecklauf (Hysterese), sonst kippt der Pfeil
+ * beim Pendeln der Spinne.
+ */
+/** „Nah am Teil" ab `SPINNE_WAAGRECHT_M` (dieselbe Zahl wie `spinne_am_teil`), weg erst ab dem 1,25-fachen. // SW: 0,8 → 1,0 m, mehr als das Pendeln der Spinne beim Anhalten */
+const NAH_RAUS = 1.25;
+/**
+ * „Ueber dem Ziel" ab diesem waagrechten Abstand Spinne – Zielmitte. // SW: 1,0 m —
+ * die kleinste Zielflaeche, der Ablagekreis der schweren Last, hat 0,85 m
+ * Halbmesser (`katalog.ts`); Mulden und Presskammer sind 4–6 m breit.
+ */
+const UEBER_ZIEL_M = 1.0;
+/**
+ * Wrack: Hoehe Sensor ueber der Marke (Dach), ab der erst gesenkt wird.
+ * // SW: 1,5 m — offen aufgesetzt steht der Sensor 1,25 m ueber der Auflage
+ * (`katalog.ts` Kopf, gemessen), dazu 0,25 m Luft. Teile rechnen wie
+ * `spinne_am_teil` mit `SPINNE_HOEHE_M` ueber der Mitte.
+ */
+const WRACK_GREIF_HOEHE_M = 1.5;
+/** Wrack: erst ab so viel Abstand wieder ueber das Dach heben. // SW: 2,0 m — naeher ist es Nachfuehren, kein Anschwenken */
+const WRACK_ANFAHRT_M = 2.0;
+/** Haemmern: nach weichem Aufsetzen so hoch ueber `WRACK_GREIF_HOEHE_M` ausholen. // SW: 1,0 m — mit vollem Senktempo (3,15 m/s, E-134) ist `HAU_AB` (1,9 m/s) nach der Anlauframpe weit vorher erreicht */
+const HAU_HUB_M = 1.0;
+/** Spinne gilt als zu bzw. wieder offen. // SW: 0,95 / 0,1 — ein gefasstes Teil haelt sie gemessen bei 0,5–0,65 (kopflos), leer laeuft sie bis 1 */
+const ZU_AB = 0.95;
+const OFFEN_BIS = 0.1;
+/** Ruecklauf aller Hoehenschwellen. // SW: 0,3 m — eine Handbreit, mehr als das Wippen beim Anhalten des Arms */
+const HOEHE_HYST_M = 0.3;
+/**
+ * Mit Last zuerst so hoch (Sensor ueber der Oberkante des Ziels), dann
+ * hinueber. // SW: Teil 2,0 m — es haengt bis zum Sensorradius (1,24 m)
+ * unter dem Sensor, dazu `HUB_LUFT_M` 0,3 m und Reserve. Wrack 3,2 m — ein
+ * Pkw ist 1,5 m hoch, der Sensor steht 1,25 m ueber dem Dach, dazu 0,3 m Luft
+ * und Reserve.
+ */
+const HUB_TEIL_M = 2.0;
+const HUB_WRACK_M = 3.2;
+/** Ueber dem Ziel ein Teil erst bis so hoch (Sensor ueber Oberkante) absenken, dann oeffnen. // SW: 1,6 m — das Teil haengt bis 1,24 m unter dem Sensor, die Unterkante bleibt also eine Handbreit ueber der Wand */
+const ABLEGEN_TEIL_M = 1.6;
+/**
+ * Hoechstens so hoch (Sensor) — die Halden sind 5 m hoch, aber nach Norden,
+ * zum Bagger hin, offen (`containers.ts` halde); ueber ihre Oberkante muss
+ * keiner. // SW: 4,5 m — in `ABWURF_MAX_M` (8,5 m) Ausladung reicht der
+ * Sensor mit waagrechtem Stiel nur gut 5 m hoch (Hauptarm 45°: Spitze 6,6 m,
+ * Sensor 1,5 m darunter; `GRENZEN`, `katalog.ts` Kopf). Mit 6,0 m stand der
+ * Pfeil kopflos am 70°-Anschlag fest auf „hoch".
+ */
+const HUB_MAX_M = 4.5;
+/**
+ * Ziele ausser Reichweite (die Halden-Mitten liegen 9,8 und 10,5 m vom
+ * Standplatz): Abwurf auf der Linie zur Mitte, hoechstens so weit draussen.
+ * // SW: `SCHWENK_AUSSEN` − 0,7 m — der Stiel hat noch Weg; nachgerechnet
+ * liegt der Punkt in STAHL und MISCH 1,2 bzw. 1,7 m innerhalb der Zone
+ * (Waechter `test/lehrgang-teil2.test.ts`).
+ */
+export const ABWURF_MAX_M = SCHWENK_AUSSEN - 0.7;
+
+/** Rein: wohin der Lotse eine Last bringt — die Zielmitte, liegt sie weiter als `ABWURF_MAX_M`, der Punkt auf der Linie dorthin. */
+export function abwurfPunkt(mitte: { x: number; z: number }, ziel: { x: number; z: number }): { x: number; z: number } {
+  const dx = ziel.x - mitte.x;
+  const dz = ziel.z - mitte.z;
+  const r = Math.hypot(dx, dz);
+  if (r <= ABWURF_MAX_M) return { x: ziel.x, z: ziel.z };
+  return { x: mitte.x + (dx / r) * ABWURF_MAX_M, z: mitte.z + (dz / r) * ABWURF_MAX_M };
+}
+
+/** Was der Lotse je Beobachtung tut. Fehlt eine (z. B. `wrack_gepresst`: Knopf), schweigt er (leerer Bedarf). */
+type Modus = "greifen" | "ablegen" | "heben" | "hauen";
+const MODUS: Partial<Record<Beobachtung, Modus>> = {
+  blick_auf_teil: "greifen",
+  spinne_am_teil: "greifen",
+  teil_gefasst: "greifen",
+  wrack_gefasst: "greifen",
+  teil_gehoben: "heben",
+  wrack_gehoben: "heben",
+  teil_ueber_ziel: "ablegen",
+  teil_im_ziel: "ablegen",
+  wrack_ueber_kammer: "ablegen",
+  wrack_in_kammer: "ablegen",
+  wrack_abgelegt: "ablegen",
+  wrack_gehauen: "hauen",
+  // Zubeissen = zupacken wie Greifen
+  wrack_geknautscht: "greifen",
+  wrack_beides: "greifen",
+  wrack_platt: "greifen",
+};
+type StandMarke = GameEvents["challenge:stand"]["marken"][number];
+/** Schwellen des Lotsen mit Ruecklauf — je Schritt neu (Beginn von „du") */
+function neuerLotse(): { nah: boolean; hoch: boolean; ueber: boolean; niedrig: boolean; tiefGenug: boolean; sitzY: number | null; oeffnen: boolean; ausholen: boolean } {
+  return { nah: false, hoch: true, ueber: false, niedrig: true, tiefGenug: false, sitzY: null, oeffnen: false, ausholen: false };
+}
+
+/** L8: Station des Schritts `i` — die letzte `station` bei oder vor `i`; null = keine (Teil 1). */
+export function stationVon(schritte: readonly LektionSchritt[], i: number): string | null {
+  for (let j = Math.min(i, schritte.length - 1); j >= 0; j--) {
+    const s = schritte[j]!.station;
+    if (s !== undefined) return s;
+  }
+  return null;
+}
+
 /** Erste Richtung, in die die (gerichtete) Spur diese Groesse bewegt — sonst plus. */
 function ersteRichtung(spur: Spur | null, g: Groesse): Richtung {
   for (const a of spur ?? []) {
     if (g === "zoom") {
       const f = a.kamera?.zoomProS ?? 1;
       if (Math.abs(f - 1) > 1e-3) return f > 1 ? "plus" : "minus"; // zoom plus = weiter weg
-    } else if (g === "cabYaw" || g === "boom" || g === "stick") {
+    } else if (g === "cabYaw" || g === "boom" || g === "stick" || g === "rotator") {
       const v = a.achsen?.[g === "cabYaw" ? "cab" : g] ?? 0;
       if (Math.abs(v) > 1e-3) return v > 0 ? "plus" : "minus";
     }
@@ -216,16 +375,22 @@ function ersteRichtung(spur: Spur | null, g: Groesse): Richtung {
   return "plus";
 }
 
-/** Liegt `rest` in Richtung `r` noch vor dem Anschlag (mit Luft wie `richteSpur`)? Der Drehkranz hat keinen. */
+/**
+ * Liegt `rest` in Richtung `r` noch vor dem Anschlag (mit Luft wie
+ * `richteSpur`)? Geprueft wird nur der Anschlag, auf den es zugeht — weg vom
+ * Anschlag ist immer frei (L8, kopflos gefunden: Am 70°-Anschlag galt sonst
+ * auch Senken als gesperrt, der Lotse kam mit Last nicht mehr hinaus). Der
+ * Drehkranz hat keinen.
+ */
 function frei(g: Groesse, r: Richtung, rest: number, z: LektionZustand, b: LektionZustand): boolean {
   const s = r === "plus" ? 1 : -1;
   if (g === "boom" || g === "stick") {
     const ziel = z[g] + s * rest;
-    return ziel >= GRENZEN[g].min + RAND_RAD && ziel <= GRENZEN[g].max - RAND_RAD;
+    return r === "plus" ? ziel <= GRENZEN[g].max - RAND_RAD : ziel >= GRENZEN[g].min + RAND_RAD;
   }
   if (g === "zoom") {
     const ziel = z.kamera.abstand + s * rest * b.kamera.abstand; // `zoom` ist relativ zum Abstand bei Beginn
-    return ziel >= GRENZEN.abstand.min * (1 + RAND_REL) && ziel <= GRENZEN.abstand.max * (1 - RAND_REL);
+    return r === "plus" ? ziel <= GRENZEN.abstand.max * (1 - RAND_REL) : ziel >= GRENZEN.abstand.min * (1 + RAND_REL);
   }
   return true;
 }
@@ -290,6 +455,23 @@ function lagen(spur: Spur, z: Pick<LektionZustand, Arm>): Array<Record<Arm, numb
 /** Hoehe bzw. Ausladung der Stielspitze gegen den Hauptarm-Drehpunkt (m) */
 const spitzeY = (l: Record<Arm, number>): number => GRENZEN.boom.m * Math.sin(l.boom) + GRENZEN.stick.m * Math.sin(l.boom + l.stick);
 const spitzeR = (l: Record<Arm, number>): number => GRENZEN.boom.m * Math.cos(l.boom) + GRENZEN.stick.m * Math.cos(l.boom + l.stick);
+
+/**
+ * L8: Drehpunkt des Hauptarms vor der Drehmitte (m) — abgeschrieben aus
+ * `excavator.ts` BOOM_PIVOT z; der Ausleger sitzt mittig (x 0). Waechter:
+ * `test/lehrgang-teil2-fahrer.test.ts` (Ruhelage = Sensor des echten Baggers).
+ */
+export const PIVOT_VOR_M = 0.55;
+/**
+ * Rein: wohin die Spinne auspendelt — lotrecht unter der Stielspitze, in
+ * Blickrichtung `heading + cabYaw`. Startpose: 0,55 + 7,54 = 8,09 m, wie
+ * gemessen (`katalog.ts` Kopf).
+ */
+export function ruhePunkt(z: Pick<LektionZustand, "x" | "z" | "heading" | "cabYaw" | Arm>): { x: number; z: number } {
+  const a = z.heading + z.cabYaw;
+  const r = PIVOT_VOR_M + spitzeR(z);
+  return { x: z.x + r * Math.sin(a), z: z.z + r * Math.cos(a) };
+}
 
 /** Die Spur mit umgekehrten `achsen`, bei `zoom` auch umgekehrtem Zoom */
 function umgekehrt(spur: Spur, achsen: readonly SpurAchse[], zoom: boolean): Spur {
@@ -361,6 +543,15 @@ export class LektionLauf {
   /** L5-B (40f): zuletzt gesendete Richtung (gesendet wird nur bei Aenderung), Hysterese der Marke */
   private richtungKey = "";
   private seitlich = true;
+  /** L8: zuletzt gemeldete Station; undefined = noch nie gemeldet (der erste Schritt meldet immer) */
+  private station: string | null | undefined = undefined;
+  /** L8: Lage bei `start()` — Ziel `ort` */
+  private startLage = { x: 0, z: 0, heading: 0 };
+  /** L8: Ereignisse seit Beginn von „du" */
+  private zahl = { abriss: 0, einwurf: 0, hupe: 0 };
+  /** L8: letzte Marken der Station (`challenge:stand`) und die Schwellen des Lotsen (Hysterese) */
+  private marken: readonly StandMarke[] = [];
+  private lotse = neuerLotse();
 
   constructor(
     readonly daten: LektionDaten,
@@ -374,6 +565,17 @@ export class LektionLauf {
     bus.on("lehrgang:vorfuehrungEnde", () => {
       if (!this.aus && this.phase === "zeigen") this.du();
     });
+    // L8: gezaehlt wird nur in „du" — was vorher geschah (Vorfuehrung, voriger Schritt), zaehlt nicht
+    const zaehle = (k: Extract<LektionZiel, { art: "ereignis" }>["ereignis"]): void => {
+      if (!this.aus && this.phase === "du") this.zahl[k]++;
+    };
+    // Aufgesprungen ist nicht ab (`composites.ts` haubeAuf): nur "ab" ist zerlegt
+    bus.on("wrack:abriss", (e) => e.art === "ab" && zaehle("abriss"));
+    bus.on("itemEntered", (e) => e.correct && zaehle("einwurf"));
+    bus.on("bagger:hupe", () => zaehle("hupe"));
+    bus.on("challenge:stand", (e) => {
+      if (!this.aus && this.station && e.id === this.station) this.marken = e.marken;
+    });
   }
 
   /**
@@ -384,6 +586,8 @@ export class LektionLauf {
   start(ab = 0): void {
     if (this.phase !== null || this.aus) return;
     const d = this.daten;
+    const z = this.q.zustand();
+    this.startLage = { x: z.x, z: z.z, heading: z.heading };
     this.bus.emit("lehrgang:start", { id: d.id, nr: this.nr, von: this.von, name: d.name, ziel: d.ziel });
     this.beginne(Number.isFinite(ab) ? Math.max(0, Math.floor(ab)) : 0);
   }
@@ -437,6 +641,13 @@ export class LektionLauf {
       return;
     }
     const s = d.schritte[i]!;
+    // L8: Station vor allem anderen — main.ts baut sie im Zuhoerer auf, der Schritt sieht sie schon
+    const st = stationVon(d.schritte, i);
+    if (this.station === undefined || st !== this.station) {
+      this.station = st;
+      this.marken = [];
+      this.bus.emit("lehrgang:station", { id: st });
+    }
     const z = this.q.zustand();
     const g = s.vorfuehrung ? richteSpur(s.vorfuehrung, z) : null;
     this.spur = g?.spur ?? null;
@@ -458,6 +669,8 @@ export class LektionLauf {
         radiusM: s.ziel.radiusM,
       };
     }
+    // L8: Zurueck an den Startplatz — die Marke liegt unter der Drehmitte bei `start()`
+    if (s.ziel.art === "ort") this.markeOrt = { x: this.startLage.x, y: 0, z: this.startLage.z, radiusM: s.ziel.radiusM };
     if (!g) {
       this.du();
       return;
@@ -480,6 +693,8 @@ export class LektionLauf {
     this.teilMinus = false;
     this.richtungKey = "";
     this.seitlich = true;
+    this.zahl = { abriss: 0, einwurf: 0, hupe: 0 };
+    this.lotse = neuerLotse();
     this.phase = "du";
     this.melde("du");
     this.richtung(z);
@@ -502,9 +717,16 @@ export class LektionLauf {
       this.seitlich = r.seitlich;
       return { bedarf: r.bedarf, kamera: null };
     }
+    // L8: Welt-Schritte — der Lotse an den Marken der Station; ohne sinnvollen Lotsen (Hupe, Kranz, Stuetzen, Zerlegen, Zurueck) ein leerer Bedarf
+    if (ziel.art === "station") {
+      const m = MODUS[ziel.beobachtet];
+      return { bedarf: m ? this.welt(z, m, ziel.beobachtet.startsWith("wrack_")) : [], kamera: null };
+    }
+    if (ziel.art === "ereignis") return { bedarf: ziel.ereignis === "einwurf" ? this.welt(z, "ablegen", false) : [], kamera: null };
+    if (ziel.art === "ort" || ziel.art === "zustand") return { bedarf: [], kamera: null };
     if (ziel.art !== "aenderung") return null;
     const g = ziel.groesse;
-    const fn = g === "cabYaw" ? "cab" : g === "boom" || g === "stick" ? g : null;
+    const fn = g === "cabYaw" ? "cab" : g === "boom" || g === "stick" || g === "rotator" ? g : null;
     if (!fn && g !== "zoom") return null; // Fahren, Kamera drehen …: der Geist bleibt bei der Spur
     const b = this.basis!;
     const d = aenderung(g, b, z, this.fahrt);
@@ -519,6 +741,90 @@ export class LektionLauf {
     if (!frei(g, soll, ziel.ab - (soll === "plus" ? plus : minus), z, b)) soll = gegen(soll);
     if (fn) return { bedarf: [{ fn, richtung: soll }], kamera: null };
     return { bedarf: [], kamera: soll === "minus" ? "auf" : "zu" }; // naeher = Finger auseinander (`ui/geisterdaumen.ts` kameraGeste)
+  }
+
+  /**
+   * L8: Was in der Welt gerade zum Ziel fuehrt, aus den Marken der Station.
+   * Haengt etwas (Ziel-Marke da; beim Wrack ausserdem keine Teil-Marke mehr —
+   * die schwere Last zeigt ihren Kreis schon vor dem Greifen): heben, bzw.
+   * hoch genug, hinueber, oeffnen. Sonst zum ersten Teil, senken, zupacken
+   * (Haemmern: nur senken — mit Schwung).
+   */
+  private welt(echt: LektionZustand, modus: Modus, wrack: boolean): Bedarf {
+    const L = this.lotse;
+    // Waagrecht zaehlt die Ruhelage unter der Stielspitze, nicht der pendelnde Sensor (sonst kippt der Pfeil mit jedem Ausschlag); die Hoehe ist die echte
+    const z: LektionZustand = { ...echt, spinne: { ...echt.spinne, ...ruhePunkt(echt) } };
+    const s = z.spinne;
+    const teile = this.marken.filter((m) => m.art === "teil");
+    const ziel = this.marken.find((m) => m.art === "ziel") ?? null;
+    const haengt = !!ziel && (!wrack || teile.length === 0);
+    if (haengt) {
+      if (modus === "heben") return [{ fn: "boom", richtung: "plus" }];
+      if (modus !== "ablegen") return [];
+      const ab = abwurfPunkt(z, ziel);
+      const d = Math.hypot(s.x - ab.x, s.z - ab.z);
+      L.ueber = L.ueber ? d <= UEBER_ZIEL_M * NAH_RAUS : d <= UEBER_ZIEL_M;
+      if (L.ueber) {
+        // Teil: erst absenken bis knapp ueber die Wand — aus 4,6 m Sensorhoehe prallte der Boiler kopflos ueber die 2-m-Wand der Box wieder hinaus
+        if (!wrack) L.tiefGenug = L.tiefGenug ? s.y <= ziel.y + ABLEGEN_TEIL_M + HOEHE_HYST_M : s.y <= ziel.y + ABLEGEN_TEIL_M;
+        return [!wrack && !L.tiefGenug ? { fn: "boom", richtung: "minus" } : { fn: "grapple", richtung: "minus" }];
+      }
+      const hub = Math.min(ziel.y + (wrack ? HUB_WRACK_M : HUB_TEIL_M), HUB_MAX_M);
+      // Am Anschlag des Hauptarms ist hoeher nicht drin — dann gilt die Hoehe als genug (sonst stuende der Pfeil fuer immer auf „hoch")
+      L.niedrig = frei("boom", "plus", 0, z, z) && (L.niedrig ? s.y < hub + HOEHE_HYST_M : s.y < hub);
+      const r = markeBedarf(z, { x: ab.x, z: ab.z, radiusM: UEBER_ZIEL_M }, this.seitlich);
+      this.seitlich = r.seitlich;
+      // Mit Last nie senken, solange es hinueber geht (die Wand) — hinaus dann mit dem Stiel
+      const ohneSenken = r.bedarf.filter((b) => !(b.fn === "boom" && b.richtung === "minus"));
+      if (L.niedrig) return [{ fn: "boom", richtung: "plus" }, ...ohneSenken.filter((b) => b.fn !== "boom")];
+      return ohneSenken.length > 0 ? ohneSenken : r.bedarf;
+    }
+    const t = teile[0];
+    if (!t) return [];
+    const d = Math.hypot(s.x - t.x, s.z - t.z);
+    L.nah = L.nah ? d <= SPINNE_WAAGRECHT_M * NAH_RAUS : d <= SPINNE_WAAGRECHT_M;
+    if (!L.nah) {
+      L.sitzY = null;
+      const r = markeBedarf(z, { x: t.x, z: t.z, radiusM: SPINNE_WAAGRECHT_M }, this.seitlich);
+      this.seitlich = r.seitlich;
+      if (!wrack) return r.bedarf;
+      /*
+       * Zum Wrack ueber sein Dach hinweg: Die offenen Schalen haengen gut 1 m
+       * unter dem Sensor — wer tiefer anschwenkt, schiebt das Wrack weg
+       * (kopflos gemessen: der LKW der schweren Last 1,4 m verschoben).
+       */
+      // Nah dran (eben vom Senken ausgependelt) nur seitlich nachfuehren, nicht wieder heben
+      L.niedrig = d > WRACK_ANFAHRT_M && (L.niedrig ? s.y < t.y + WRACK_GREIF_HOEHE_M + HOEHE_HYST_M : s.y < t.y + WRACK_GREIF_HOEHE_M);
+      const ohneSenken = r.bedarf.filter((b) => !(b.fn === "boom" && b.richtung === "minus"));
+      if (L.niedrig) return [{ fn: "boom", richtung: "plus" }, ...ohneSenken.filter((b) => b.fn !== "boom")];
+      return ohneSenken.length > 0 ? ohneSenken : r.bedarf;
+    }
+    // Aufgesessen bleibt „aufgesessen", bis die Spinne wieder eine Handbreit hoeher steht (beim Schliessen hebt sie sich, der Arm drueckt nicht mehr)
+    if (z.aufgesessen) L.sitzY = s.y;
+    const sitzt = L.sitzY !== null && s.y <= L.sitzY + HOEHE_HYST_M;
+    if (modus === "hauen") {
+      // Hau drauf: senken mit Schwung; sass sie nur weich auf (kein Schlag gezaehlt), erst wieder ausholen
+      if (z.aufgesessen) L.ausholen = true;
+      if (L.ausholen && s.y >= t.y + WRACK_GREIF_HOEHE_M + HAU_HUB_M) L.ausholen = false;
+      return [{ fn: "boom", richtung: L.ausholen ? "plus" : "minus" }];
+    }
+    // Leer zu (sonst haette das Ziel gezaehlt bzw. etwas hinge): erst ganz auf, dann neu ansetzen — auch nach einem Biss
+    if (L.oeffnen && z.closure <= OFFEN_BIS) L.oeffnen = false;
+    if (!L.oeffnen && z.closure >= ZU_AB) L.oeffnen = true;
+    if (L.oeffnen) return [{ fn: "grapple", richtung: "minus" }];
+    /*
+     * Wann zupacken? Am Spiel: sobald die Spinne aufsitzt (Boden, Teil oder
+     * Wrack) — wie die Pruefungs-Fahrer (`test/aufgabenwerkbank.ts` greife).
+     * Eine Hoehe ueber der Marke taugt nicht: Am Wrack steht sie auf dem
+     * hoechsten Punkt (Fahrerhaus), gegriffen wird am Rahmen; der Sensor des
+     * Magneten sitzt unter der Scheibe. Ohne Quelle (Attrappen) die Hoehe wie
+     * `spinne_am_teil` (Teil: Marke = 2 × Mitte, `challenge.ts` beobachte).
+     */
+    const ueber = wrack ? s.y - t.y : s.y - t.y / 2;
+    const grenze = wrack ? WRACK_GREIF_HOEHE_M : SPINNE_HOEHE_M;
+    L.hoch = L.hoch ? ueber > grenze : ueber > grenze + HOEHE_HYST_M;
+    const zupacken = z.aufgesessen === undefined ? !L.hoch : sitzt;
+    return [zupacken ? { fn: "grapple", richtung: "plus" } : { fn: "boom", richtung: "minus" }];
   }
 
   private melde(phase: "zeigen" | "du"): void {
@@ -536,6 +842,7 @@ export class LektionLauf {
       symbol: s.symbol ?? null, // E-197: Bildzeichen statt Text
       wort: s.wort ?? null,
       teile: s.ziel.art === "aenderung" && s.ziel.richtung === "hinUndZurueck" ? 2 : 1, // L5-B (40c)
+      kranz: s.kranz ?? null, // L8: der Geist tippt auf den Kranz
     });
   }
 
@@ -573,8 +880,26 @@ export class LektionLauf {
         }
         return (ziel.richtung === "minus" ? minus : ziel.richtung === "plus" ? plus : Math.max(plus, minus)) >= ziel.ab;
       }
+      // --- L8, Teil 2 ---
+      case "ort": {
+        const a = this.startLage;
+        return Math.hypot(z.x - a.x, z.z - a.z) <= ziel.radiusM && Math.abs(winkelDiff(z.heading, a.heading)) <= ziel.gierTolRad;
+      }
+      case "station":
+        return this.q.stationGesehen?.(ziel.beobachtet) ?? false;
+      case "ereignis":
+        return this.zahl[ziel.ereignis] >= ziel.anzahl;
+      case "zustand":
+        if (ziel.was === "abgestuetzt") return z.abgestuetzt;
+        return this.q.kranzOffen?.() ?? true; // null/ohne Quelle: kein Kranz, nichts zu zeigen
     }
   }
+}
+
+/** Kleinster Winkel von b nach a, −π … π. */
+function winkelDiff(a: number, b: number): number {
+  const d = (a - b) % (2 * Math.PI);
+  return d > Math.PI ? d - 2 * Math.PI : d < -Math.PI ? d + 2 * Math.PI : d;
 }
 
 function aenderung(g: Groesse, b: LektionZustand, z: LektionZustand, fahrt: number): number {

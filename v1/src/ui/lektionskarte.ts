@@ -78,6 +78,29 @@ export const BILD: Record<LehrgangSymbol | "auge" | "hand" | "haken" | "kreuz" |
   presse: SVG('<path d="M4 4h16M12 4v6M9 7.5l3 3 3-3"/><rect x="5" y="14" width="14" height="6"/>'),
   magnet: SVG('<path d="M6 4h3v8a3 3 0 0 0 6 0V4h3v8a6 6 0 0 1-12 0z"/><path d="M6 8h3M15 8h3"/>'),
   hupe: SVG('<path d="M3 10v4h4l6 4V6L7 10z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/>'),
+  /*
+   * L8-B2 — Teil 2. Jedes Zeichen unterscheidet sich in der FORM von allen
+   * anderen (nicht nur in der Farbe, die ist fuer alle gleich): Spinne mit
+   * Klotz (greifen), Spinne mit Drehbogen (rotator), offene Spinne ueber
+   * Klotz am Boden (ablegen), Punkte-Ring wie #btn-kranz (kranz), Gewicht
+   * (last), Hammer mit Schlaglinien (haemmern), zwei Pfeile gegen ein
+   * Knautschstueck (quetschen), Wagen mit abgehobener Haube (zerlegen),
+   * verschnuertes Paket (pressen — das Ergebnis; „presse" bleibt die
+   * Maschine), Gabelpfeil in zwei Kaesten (sortieren), Wendepfeil (zurueck,
+   * eckig statt Kreis, damit er nicht wie ↻ Neustart aussieht).
+   */
+  zurueck: SVG('<path d="M9 4L4 9l5 5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H10"/>'),
+  greifen: SVG('<path d="M12 2v4"/><path d="M12 6L5.5 9.5V15l3.5 3.5"/><path d="M12 6l6.5 3.5V15L15 18.5"/><rect x="9.5" y="12" width="5" height="5" rx="0.5"/>'),
+  rotator: SVG('<path d="M12 2v4"/><path d="M7.5 12L12 6l4.5 6"/><path d="M3.5 14.5a8.5 4.5 0 0 0 17 0"/><path d="M18.2 16.2l2.3-2.3 2.3 2.3"/>'),
+  ablegen: SVG('<path d="M12 2v3M6 9.5L12 5l6 4.5"/><path d="M12 9v4M10 11.5l2 2 2-2"/><rect x="8" y="15.5" width="8" height="4.5" rx="0.5"/><path d="M3 21h18"/>'),
+  kranz:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="3.4"/><circle cx="12" cy="3.4" r="2"/><circle cx="18.1" cy="5.9" r="2"/><circle cx="20.6" cy="12" r="2"/><circle cx="18.1" cy="18.1" r="2"/><circle cx="12" cy="20.6" r="2"/><circle cx="5.9" cy="18.1" r="2"/><circle cx="3.4" cy="12" r="2"/><circle cx="5.9" cy="5.9" r="2"/></svg>',
+  last: SVG('<path d="M9 8.5a3 3 0 1 1 6 0"/><path d="M6.5 8.5h11L21 21H3z"/>'),
+  haemmern: SVG('<path d="M13.5 3l5.5 5.5-3.5 3.5L10 6.5z"/><path d="M15 10.5l6 6"/><path d="M3 21h9"/><path d="M5.5 17.5L3 15.5M8.5 16.5l.5-3M11 18.5l2.5-1"/>'),
+  quetschen: SVG('<path d="M2 12h4.5M4.5 9.5L7 12l-2.5 2.5"/><path d="M22 12h-4.5M19.5 9.5L17 12l2.5 2.5"/><path d="M9.5 5h5l-1.5 3.5 1.5 3.5-1.5 3.5 1.5 3.5h-5l1.5-3.5-1.5-3.5 1.5-3.5z"/>'),
+  zerlegen: SVG('<path d="M2 19v-4l3-1h14l3 1v4z"/><circle cx="7" cy="20" r="1.8"/><circle cx="17" cy="20" r="1.8"/><path d="M5 10l8-2.2.9 2.6-8 2.2z"/><path d="M9.5 7V2M7.5 4l2-2 2 2"/>'),
+  pressen: SVG('<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/><path d="M8 6v8M16 6v8"/>'),
+  sortieren: SVG('<path d="M12 2v5M12 7l-5 5M12 7l5 5"/><path d="M7 9.5V12h2.5M17 9.5V12h-2.5"/><path d="M3 15h7v6H3zM14 15h7v6h-7z"/>'),
 };
 
 /** Was das Ereignis später mitbringen soll (Signatur an den Orchestrator) — bis dahin aus den Lektionsdaten. */

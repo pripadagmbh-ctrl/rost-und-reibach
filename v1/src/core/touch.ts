@@ -659,6 +659,8 @@ export class TouchControls {
       const sektor = document.createElement("div");
       sektor.className = "sektor";
       sektor.textContent = t.textContent ?? "";
+      // L8-B2: der Geisterfinger des Lehrgangs findet den Eintrag ueber seinen Tastencode (nur gelesen)
+      sektor.dataset["code"] = code;
       el.appendChild(sektor);
       this.radialItems.push({ el: sektor, code });
     }

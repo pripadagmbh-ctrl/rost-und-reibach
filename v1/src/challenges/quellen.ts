@@ -123,6 +123,8 @@ export function lektionQuellen(w: { bagger: Excavator; kamera: { readonly blick:
         z: b.position.z,
         heading: b.heading,
         abgestuetzt: b.abgestuetzt,
+        // L8 (Lotse): Arm drueckt gegen ein Fahrzeug, oder die Spitze liegt auf (Bodenanschlag, `excavator.ts` groundContact)
+        aufgesessen: b.armBlocked || b.groundContact.active,
         spinne: { x: s.x, y: s.y, z: s.z },
         kamera: w.kamera.blick,
       };

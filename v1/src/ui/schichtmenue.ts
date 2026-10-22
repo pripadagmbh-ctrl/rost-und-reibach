@@ -35,6 +35,22 @@ export function zurSchicht(st: Schichtstufe): void {
   location.reload();
 }
 
+/*
+ * NACH DEM LEHRGANG (L8-B2, Konzept Fassung 3: „nach dem Lehrgang geht es zur
+ * WOCHE, Montag"). PLATZHALTER — W1 ersetzt das: Das Menue WOCHE gibt es noch
+ * nicht. Bis dahin zeigt diese EINE Stelle auf den ersten freien Tag und
+ * startet ihn als Schicht-Stufe, auf demselben Weg wie das Hauptmenue
+ * (`#schicht=<stufe>` → `waehleSpielart` → Spielwahl „schicht"). Montag ist
+ * immer frei (`stufeFrei`), also heute immer Montag.
+ */
+export function tagNachDemLehrgang(): Schichtstufe {
+  return SCHICHTSTUFEN[0]!; // "montag"
+}
+/** WEITER auf der Tafel LEHRGANG GESCHAFFT (ui/abrechnung.ts). W1 ersetzt das. */
+export function nachDemLehrgang(): void {
+  zurSchicht(tagNachDemLehrgang());
+}
+
 /** Was ein Stufenknopf zeigt — ohne DOM, pruefbar. `beschr` blendet das Telefon quer aus. */
 export interface StufenKnopf {
   stufe: Schichtstufe;
