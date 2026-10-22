@@ -495,12 +495,50 @@
          davon nichts. Der Kranz zeichnet sich selbst. */
       .hidden-actions { display: none; }
 
-      /* --- Funktionskranz am rechten Joystickkopf ---
-         Rechten Daumen kurz stillhalten, der Kranz klappt um ihn auf. Kein
-         festes Ziel, das man streifen kann: Er erscheint dort, wo der Daumen
-         schon liegt — wie die schwebenden Sticks selbst. */
-      #radial { position: absolute; pointer-events: none; z-index: 4; width: 0; height: 0; }
+      /* --- Kranz-Knopf und Funktionskranz (L7-A, 22.10.2026) ---
+         Bis heute klappte der Kranz auf, wenn der rechte Daumen 0,4 s
+         stillhielt — das stand nirgends und ging beim Greifen versehentlich
+         auf (Punkte 42a/42b). Jetzt oeffnet ihn nur der runde Knopf unter ☰
+         (Ansage Patrick: „nur ein Knopf, Stillhalten oeffnet nichts mehr").
+         Antippen oeffnet, Eintrag antippen loest aus, daneben schliesst.
+
+         Knopf: senkrecht unter ☰, rechtsbuendig mit ihm am Bildrand (mittig
+         unter ☰ laege er auf dem iPad 1 px neben dem HUD-Stapel, der bei
+         68 px endet); links neben ☰ bleibt frei (dort kommt ⏸, Punkt 43a).
+         ☰ misst wirklich 62 x 72 (iPad) bzw. 56 x 66 (flach), weil
+         "#touch .btn" seinen Innenrand 11/6 px durchsetzt (Nebenbefund E-206)
+         — darum hier "#touch #btn-kranz" mit border-box und padding 0, dann
+         ist 48 bzw. 44 das Sichtbare.
+         iPad:  rechts wie ☰ (12; Stapel-Luft 68 - 12 - 48 = 8); oben
+                ☰-Oberkante + 72 + 8 Luft = 92 (mit Statusleiste: Rand + 8 + 72 + 8).
+         Kranz: Mittelpunkt links der ☰-Spalte, damit kein Sektor ☰ oder den
+                Knopf deckt: ☰-Rand 12 + 62 Spalte + 8 Luft + 146,1 halber Ring
+                (112 + 62 x 1,10 / 2) = 228,1 -> 230 vom rechten Rand;
+                senkrecht in der Bildmitte (Ring 130,7 nach oben und unten).
+                iPad 1024: Ring x 648..940, y 253..515 — rechts der
+                Lehrgangsleiste und der Zielzeile, links der Drehtasten.
+         Gerechnet in test/kranzknopf.test.ts. */
+      #touch #btn-kranz {
+        box-sizing: border-box; width: 48px; height: 48px; padding: 0;
+        border-radius: 50%; z-index: 3;
+        right: max(12px, calc(var(--sa-r) + 8px));
+        top: max(92px, calc(var(--sa-t) + 88px));
+      }
+      #touch #btn-kranz svg { display: block; width: 28px; height: 28px; margin: 8px auto; pointer-events: none; }
+      #radial {
+        position: absolute; pointer-events: none; z-index: 4; width: 0; height: 0;
+        right: max(230px, calc(var(--sa-r) + 226px)); top: 50%;
+      }
       #radial[hidden] { display: none; }
+      /* Solange der Kranz offen ist, nehmen Drehtasten und Pedale ohnehin
+         keinen Tipp an (core/touch.ts verschluckt ihn). Auf dem iPhone quer
+         laege der untere Ringteil auf ihnen — darum treten sie kurz zurueck. */
+      #touch.kranz-offen #btn-rot-l, #touch.kranz-offen #btn-rot-r, #touch.kranz-offen #pedals { visibility: hidden; }
+      /* Telefon hoch (kein Spielformat): Ring mittig, unter dem Knopf
+         (Knopf-Unterkante 186 + 8 + 130,7 = 325 < 406 Bildmitte). */
+      @media (max-width: 500px) and (min-height: 431px) {
+        #radial { right: 50%; }
+      }
       /*
          Kastenmass des Sektors — nachgerechnet, nicht geschaetzt (E-088).
          `box-sizing: border-box` ist der Grund, warum die Zahlen sich am
@@ -519,6 +557,7 @@
         border: 2px solid rgba(255,255,255,0.28); color: #e8e8e4;
         font: 600 11px/26px "Consolas", monospace; text-align: center;
         transition: transform 0.09s ease-out;
+        pointer-events: auto; touch-action: none; /* L7-A: Eintrag wird angetippt */
       }
       /* Scharfgestellt: 1,10 statt 1,15. Der gewachsene Kasten frisst die Luft
          zum Nachbarn auf — bei neun Eintraegen bleiben so 6,9 px statt 2,8. */
@@ -580,8 +619,22 @@
         /* Eine Nummer kleiner, dieselbe Rechnung: 9 Zeichen Consolas 10 px =
            49,5 px, Rahmen 4 px, 4,5 px Luft. 30 px Hoehe = 22 px Zeile + 4 px
            Balken. Der Halbmesser bleibt bei beiden Fassungen gleich (112 px,
-           `RADIAL_R` in touch.ts) — der Kranz sitzt am Daumen, nicht am Rand. */
+           `RADIAL_R` in touch.ts) — seit L7-A steht er fest neben dem Kranz-Knopf. */
         #radial .sektor { width: 58px; height: 30px; margin: -15px 0 0 -29px; font-size: 10px; line-height: 22px; }
+        /* L7-A flach: Knopf 44 (Kap. 20), rechtsbuendig unter ☰ (56 x 66 ab
+           8 px): rechts wie ☰, oben 8 + 66 + 8 = 82. Kranz: ☰-Rand + 56 + 8
+           + 143,9 halber Ring (112 + 58 x 1,10 / 2) = 216 vom rechten Rand.
+           Senkrecht so tief wie es geht: 136 + 128,5 halber Ring ueber dem
+           Home-Indicator -> iPhone mini quer Ring y 89,5..346,5 — unter
+           Lehrgangsleiste (bis 74) und Pruefungssatz (bis 81), mit 7,5 px
+           ueber dem Home-Indicator. In der Bildmitte laege er darauf. */
+        #touch #btn-kranz {
+          width: 44px; height: 44px;
+          right: max(8px, calc(var(--sa-r) + 8px));
+          top: max(82px, calc(var(--sa-t) + 82px));
+        }
+        #touch #btn-kranz svg { width: 26px; height: 26px; margin: 7px auto; }
+        #radial { right: max(216px, calc(var(--sa-r) + 216px)); top: auto; bottom: calc(var(--sa-b) + 136px); }
         /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
         #touch #btn-rot-l, #touch #btn-rot-r {
           bottom: max(14px, calc(var(--sa-b) + 8px));
@@ -1136,7 +1189,7 @@
          Patrick 21.10.2026: „kaum oder keinen text, weil der text die ganze
          sicht verdeckt". Im Lehrgang bleibt #tutorial zu; oben in der Mitte
          steht nur diese Leiste (ui/lektionskarte.ts):
-           Zeile 44 px: [Auge|Hand 30] [Bildzeichen 30] [ein Wort] … [⏭ 44]
+           Zeile 44 px: [Auge|Hand 30] [Bildzeichen 30] [kurzes Wort] … [⏭ 44]
            darunter je Schritt ein Strich (fertig gefuellt, jetzt umrandet + hoeher).
          Rueckfrage an derselben Stelle: [⏭? ] [✓ 44] 14 px [✕ 44] — ✕ liegt
          genau unter ⏭: ein versehentlicher Doppeltipp bricht ab.
@@ -1148,10 +1201,20 @@
          Nimmt ausser den Knoepfen keine Beruehrung an — ein Finger daneben
          dreht wie immer die Kamera. Gerechnet in test/lehrgangsleiste.test.ts.
          Telefon hoch: Der Streifen ist nur 75 px breit — die Leiste steht
-         oben ueber den Zonen (offen, siehe Lieferung L4). */
+         oben ueber den Zonen (offen, siehe Lieferung L4).
+         L7-W (Patrick 22.10.2026: ein kurzes Wort je Schritt, 1–3 Woerter):
+         Die RECHTE Kante bleibt fest (Mitte + 114), ⏭/✓/✕ ruecken nie; ein
+         langes Wort laesst die Leiste nach LINKS wachsen (Breite nach Inhalt,
+         228 bis 313). 313 = 2 x 1 + 2 x 6 + 30 + 6 + 30 + 6 + 177 + 6 + 44:
+         177 px fuer WORT_MAX_ZEICHEN = 21 Zeichen („Hauptarm heben/senken")
+         bei 14 px in Courier (iOS-Ersatz fuer Consolas, 0,6 em = 8,4 px je
+         Zeichen; Consolas 7,7). Am breitesten links 207 (mini) bzw. 313
+         (iPad 1024) — ueber dem Himmel der Stick-Zone; die Leiste nimmt dort
+         keine Beruehrung an (pointer-events: none), die Knoepfe bleiben im
+         Streifen. */
       #lehrgangsleiste {
         position: fixed; z-index: 12;
-        left: 50%; width: 228px; margin-left: -114px;
+        right: 50%; margin-right: -114px; min-width: 228px; max-width: 313px;
         top: max(8px, calc(var(--sa-t) + 8px));
         box-sizing: border-box; padding: 4px 6px 5px;
         border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
@@ -1673,10 +1736,21 @@
       </div>
       <div class="btn" id="btn-rot-l">↺</div>
       <div class="btn" id="btn-rot-r">↻</div>
-      <!-- Funktionskranz: zeichnet sich selbst um den rechten Daumen -->
+      <!-- Funktionskranz: zeichnet sich selbst, links der ☰-Spalte (L7-A) -->
       <div id="radial" hidden></div>
       <!-- Menue oben rechts, weit weg von beiden Daumen -->
       <div class="btn" id="btn-menu">☰</div>
+      <!-- L7-A: oeffnet und schliesst den Funktionskranz. Symbol statt Wort:
+           ein Ring aus acht Punkten um eine Nabe, wie der Kranz selbst. -->
+      <div class="btn" id="btn-kranz" role="button" aria-label="Funktionen" aria-expanded="false">
+        <svg viewBox="0 0 28 28" aria-hidden="true" fill="currentColor">
+          <circle cx="14" cy="14" r="4" />
+          <circle cx="14" cy="4" r="2.3" /><circle cx="21.07" cy="6.93" r="2.3" />
+          <circle cx="24" cy="14" r="2.3" /><circle cx="21.07" cy="21.07" r="2.3" />
+          <circle cx="14" cy="24" r="2.3" /><circle cx="6.93" cy="21.07" r="2.3" />
+          <circle cx="4" cy="14" r="2.3" /><circle cx="6.93" cy="6.93" r="2.3" />
+        </svg>
+      </div>
       <!-- Traeger der Tastencodes; unsichtbar, der Kranz liest Beschriftung
            und Reihenfolge daraus. So bleibt die Zuordnung an einer Stelle. -->
       <div class="hidden-actions">
@@ -1757,7 +1831,7 @@
           Pedale unten Mitte: Fahren an/aus — dann fährt der linke Stick<br />
           ↺ ↻ Spinne drehen · Doppeltipp rechts: Ansicht<br />
           Bildmitte ziehen: Kamera drehen · zwei Finger: Zoom<br />
-          Rechten Daumen stillhalten: Funktionskranz
+          Knopf rechts oben: Funktionskranz
         </p>
       </div>
       <div id="controls-menu">

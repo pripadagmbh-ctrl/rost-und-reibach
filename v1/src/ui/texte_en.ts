@@ -93,7 +93,8 @@ export const EN: Record<string, string> = {
     "Pedals bottom centre: driving on/off — then the left stick drives",
   "↺ ↻ Spinne drehen · Doppeltipp rechts: Ansicht": "↺ ↻ rotate grapple · double-tap right: view",
   "Bildmitte ziehen: Kamera drehen · zwei Finger: Zoom": "Drag the middle: turn camera · two fingers: zoom",
-  "Rechten Daumen stillhalten: Funktionskranz": "Hold right thumb still: function ring",
+  "Knopf rechts oben: Funktionskranz": "Button top right: function ring",
+  Funktionen: "Functions", // L7-A: aria-label des Kranz-Knopfs
   Zurück: "Back",
 
   // --- Steuerungsmenü ---

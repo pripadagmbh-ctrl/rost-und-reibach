@@ -23,6 +23,11 @@ import type { LektionDaten } from "./lektion";
  *     linke Stick das Fahrwerk, schwenken geht erst nach dem Ausschalten.
  *   - Hauptarm heben/senken → ein Schritt; Stiel aus/ein → ein Schritt.
  *
+ * `wort` (L7-W, Patrick 22.10.2026, Punkt 44a): 1–3 Woerter neben dem
+ * Bildzeichen der Leiste, hoechstens `WORT_MAX_ZEICHEN` Zeichen
+ * (`ui/lektionskarte.ts`, Waechter `test/lehrgangsleiste.test.ts`).
+ * Doppelwege in der Reihenfolge der Vorfuehrung (Stiel erst aus, dann ein).
+ *
  * Jeder Schritt: Symbol am Rand (Bildsprache, ui), Vorfuehrung 2–5 s,
  * `titel`/`text` nur noch fuer aria-label und Rueckfall
  * (`test/lehrgang.test.ts`: zweisprachig, iPhone mini quer). Jede
@@ -58,6 +63,7 @@ export const LEKTIONEN: readonly LektionDaten[] = [
       {
         symbol: "kamera",
         titel: { de: "Kamera drehen", en: "Turn the camera" },
+        wort: { de: "Kamera drehen", en: "Turn camera" },
         text: {
           de: "Einen Finger in der Bildmitte quer ziehen: Die Kamera kreist um den Bagger.",
           en: "Drag one finger sideways in the middle: the camera circles the machine.",
@@ -70,6 +76,7 @@ export const LEKTIONEN: readonly LektionDaten[] = [
       {
         symbol: "kamera",
         titel: { de: "Zoomen", en: "Zoom" },
+        wort: { de: "Zoom", en: "Zoom" },
         text: {
           de: "Zwei Finger in der Bildmitte spreizen und kneifen: näher ran und weiter weg.",
           en: "Spread and pinch two fingers in the middle: closer and farther.",
@@ -83,6 +90,7 @@ export const LEKTIONEN: readonly LektionDaten[] = [
       {
         symbol: "ansicht",
         titel: { de: "Ansicht wechseln", en: "Switch view" },
+        wort: { de: "Perspektive", en: "View" },
         text: {
           de: "Rechts doppelt tippen: von oben, aus der Kabine, von der Seite.",
           en: "Double-tap on the right: from above, from the cab, from the side.",
@@ -100,6 +108,7 @@ export const LEKTIONEN: readonly LektionDaten[] = [
       {
         symbol: "ansicht",
         titel: { de: "Zurück nach draußen", en: "Back outside" },
+        wort: { de: "Nach draußen", en: "Outside" },
         text: {
           de: "Weiter doppelt tippen, bis du wieder hinter dem Bagger stehst.",
           en: "Keep double-tapping until you're behind the machine again.",
@@ -113,6 +122,7 @@ export const LEKTIONEN: readonly LektionDaten[] = [
       {
         symbol: "fahren",
         titel: { de: "Fahren", en: "Drive" },
+        wort: { de: "Fahren", en: "Drive" },
         text: {
           de: "Pedale antippen: Fahren an. Linker Stick hoch und runter: vor und zurück.",
           en: "Tap the pedals: driving on. Left stick up and down: forward and back.",
@@ -130,6 +140,7 @@ export const LEKTIONEN: readonly LektionDaten[] = [
          */
         symbol: "schwenken",
         titel: { de: "Schwenken", en: "Swing" },
+        wort: { de: "Schwenken", en: "Swing" },
         text: {
           de: "Pedale antippen: Fahren aus. Dann {cab}: nach links und rechts schwenken.",
           en: "Tap the pedals: driving off. Then {cab}: swing left and right.",
@@ -155,6 +166,7 @@ export const LEKTIONEN: readonly LektionDaten[] = [
          */
         symbol: "arm",
         titel: { de: "Hauptarm", en: "Boom" },
+        wort: { de: "Hauptarm heben/senken", en: "Boom up/down" },
         text: { de: "{boom+}: Der Hauptarm geht hoch, {boom-}: wieder runter.", en: "{boom+}: the boom goes up, {boom-}: down again." },
         zeige: { fn: "boom", richtung: "plus" },
         // SW: 0,8 s voll = 15° hoch, zurueck (L3b: vorher 19°; kleiner, damit aus mehr Lagen eine Richtung frei ist — erst heben bis 54°, darueber erst senken)
@@ -164,6 +176,7 @@ export const LEKTIONEN: readonly LektionDaten[] = [
       {
         symbol: "stiel",
         titel: { de: "Stiel", en: "Stick" },
+        wort: { de: "Stiel aus/ein", en: "Stick out/in" },
         text: { de: "{stick+}: Der Stiel schiebt die Spinne vor, {stick-}: holt sie heran.", en: "{stick+}: the stick pushes the grapple out, {stick-}: pulls it in." },
         zeige: { fn: "stick", richtung: "beide" },
         // SW: 0,8 s voll = 19° (Start −70°, Grenze −25°), zurueck
@@ -188,6 +201,7 @@ export const LEKTIONEN: readonly LektionDaten[] = [
          */
         symbol: "marke",
         titel: { de: "Auf die Marke", en: "Onto the mark" },
+        wort: { de: "Zur Marke", en: "To the mark" },
         text: {
           de: "{cab+}, dann {boom+} und {stick-}: Spinne über die Marke.",
           en: "{cab+}, then {boom+} and {stick-}: grapple over the mark.",

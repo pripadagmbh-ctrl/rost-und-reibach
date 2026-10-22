@@ -401,9 +401,10 @@ describe("Lehrgangsleiste: Phase, Zeichen, Vorlesetext", () => {
     expect(ohne({ fn: "stick", richtung: "minus" }, true)).toBe("marke");
     expect(ohne(null)).toBeNull();
   });
-  it("höchstens EIN Wort neben dem Zeichen (Daten, beide Sprachen)", () => {
+  // L7-W (Patrick 22.10.2026): „ein kurzes Wort je Schritt (1–3 Wörter)"; die Breite misst test/lehrgangsleiste.test.ts
+  it("höchstens drei Wörter neben dem Zeichen (Daten, beide Sprachen)", () => {
     for (const st of LEKTIONEN.flatMap((l) => l.schritte)) {
-      for (const s of ["de", "en"] as const) if (st.wort) expect(st.wort[s], st.wort[s]).toMatch(/^\S+$/);
+      for (const s of ["de", "en"] as const) if (st.wort) expect(st.wort[s], st.wort[s]).toMatch(/^\S+(?: \S+){0,2}$/);
     }
   });
 });

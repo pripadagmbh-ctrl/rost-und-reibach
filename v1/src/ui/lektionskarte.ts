@@ -14,8 +14,8 @@
  *   ▬ ▬ ▬ ▭ · · · · · · · · · · · ·      Schritt n von m als Striche
  *
  * Auge = „Schau zu" (Vorführung), Hand = „Jetzt du". Das Bildzeichen sagt,
- * welche Funktion der Schritt übt (Kamera, Fahren, Schwenken …); höchstens
- * ein Wort daneben, und nur, wenn der Schritt eins liefert. Die Hauptsprache
+ * welche Funktion der Schritt übt (Kamera, Fahren, Schwenken …); daneben ein
+ * kurzes Wort (1–3 Wörter, L7-W), wenn der Schritt eins liefert. Die Hauptsprache
  * bleiben Geisterdaumen, Finger-Geist, Knopf-Schild und Zielmarke.
  *
  * Erfolg (`lehrgang:haekchen`): Das Auge/die Hand wird ein grünes ✓, der
@@ -42,6 +42,14 @@ import { bedientext } from "./challengekarte";
 import { zumMenue } from "./hauptmenue";
 
 type Schritt = GameEvents["lehrgang:schritt"];
+
+/**
+ * Längstes zulässiges `wort` eines Schritts in Zeichen (L7-W): „Hauptarm
+ * heben/senken", Patricks Beispiel vom 22.10.2026. Danach ist die Leiste
+ * bemessen (index.html `#lehrgangsleiste` max-width); jedes Wort aller
+ * Schritte wird in test/lehrgangsleiste.test.ts dagegen gemessen.
+ */
+export const WORT_MAX_ZEICHEN = 21;
 
 /*
  * Zeichnungen als SVG (24er-Raster, Strich in der Schriftfarbe): auf jedem
@@ -105,7 +113,7 @@ export interface LeistenBild {
   phase: "zeigen" | "du";
   haken: boolean;
   symbol: LehrgangSymbol | null;
-  /** höchstens ein Wort, "" = keins */
+  /** 1–3 Wörter, höchstens WORT_MAX_ZEICHEN Zeichen, "" = keins */
   wort: string;
   /** Vorlesetext: „Schritt 3 von 16 · Schau zu: Kamera neigen. Den Finger …" */
   aria: string;

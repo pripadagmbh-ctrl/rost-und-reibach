@@ -25,8 +25,10 @@
  *  - Leiste, ⏭ und Rückfrage ✓/✕ liegen im Kamera-Mittelstreifen (dort setzt
  *    nie ein Stick auf), Knöpfe ≥ 44 px, frei vom Menüknopf, über der Zone.
  *  - Gegenprobe: Die alte Lektionskarte (E-196) reißt den Wächter.
- * Teil 2 — „kaum Text": Alles, was im Lehrgang sichtbar Buchstaben trägt, ist
- * höchstens EIN Wort. Gegenprobe: die alten Kartentexte.
+ * L7-W — das Wort je Schritt: eine Zeile, nichts abgeschnitten, in jeder
+ * Fassung und Sprache; die Leiste wächst dafür nach links.
+ * Teil 2 — „kaum Text": Kranzname EIN Wort, Schritt-Wort höchstens drei
+ * (L7-W). Gegenprobe: die alten Kartentexte.
  * Teil 3 — eine kleine Ersatz-Seite (kein Browser): Erfolgs-Signal bei
  * `lehrgang:haekchen`, Überspringen merkt sich und führt ins Menü.
  */
@@ -60,10 +62,32 @@ const vonOben = (name: string, f: Fassung, x0: number, x1: number, oben: number,
   name, x0, x1, y0: f.h - unten, y1: f.h - oben,
 });
 
-function leiste(f: Fassung): { kasten: Kasten; skip: Kasten; ja: Kasten; nein: Kasten; wort: Kasten } {
-  expect(wert(L, "left", f)).toBe("50%");
-  const breite = px(L, "width", f);
-  const x0 = f.w / 2 + px(L, "margin-left", f);
+/*
+ * L7-W: Auf iPhone und iPad gibt es kein Consolas — Safari nimmt fuer
+ * `monospace` Courier, 1229/2048 = 0,6 em je Zeichen (Consolas 0,55,
+ * `cssmass.ts` EM_BREITE). Das Wort wird mit beiden gemessen.
+ */
+const EM_IOS = 0.6;
+const WORT_SCHRIFT = 14; // `font: 700 14px` (unten geprueft)
+const PHASE_FN = ["#lehrgangsleiste .phase", "#lehrgangsleiste .fn"];
+
+/** Was die Zeile ausser dem Wort braucht: Rahmen, Polster, Auge/Hand, Bildzeichen, ⏭, drei Luecken. */
+function zeileFest(f: Fassung): number {
+  const pl = viererWert(L, "padding", f, 3);
+  const pr = viererWert(L, "padding", f, 1);
+  return 2 * rahmen(f) + pl + pr + 2 * px(PHASE_FN, "width", f) + 3 * px(ZEILE, "gap", f) + px(KNOPF, "width", f);
+}
+const wortPx = (text: string, em: number): number => text.length * WORT_SCHRIFT * em;
+
+/**
+ * Die Leiste mit diesem Wort. Breite nach Inhalt (`min-width` .. `max-width`),
+ * rechte Kante fest: `right: 50%` mit negativem `margin-right`.
+ */
+function leiste(f: Fassung, text = "", em = EM_BREITE): { kasten: Kasten; skip: Kasten; ja: Kasten; nein: Kasten; wort: Kasten } {
+  expect(wert(L, "right", f)).toBe("50%");
+  expect(wert(L, "font", f)).toMatch(new RegExp(`\\b${WORT_SCHRIFT}px\\b`));
+  const breite = Math.min(px(L, "max-width", f), Math.max(px(L, "min-width", f), zeileFest(f) + wortPx(text, em)));
+  const x0 = f.w / 2 - px(L, "margin-right", f) - breite;
   const b = rahmen(f);
   const [pt, pr, pb, pl] = ([0, 1, 2, 3] as const).map((i) => viererWert(L, "padding", f, i));
   const zeile = px(ZEILE, "height", f);
@@ -213,25 +237,112 @@ describe("Lehrgang: kein Text im Blickfeld (aus dem CSS)", () => {
   }
 });
 
+/*
+ * L7-W (Patrick 22.10.2026, Punkt 44a): „ein kurzes Wort je Schritt (1–3
+ * Wörter)" neben dem Bildzeichen — in EINER Zeile, nichts abgeschnitten.
+ * Die Leiste wächst dafür nach links (index.html, Begründung dort); ⏭/✓/✕
+ * rücken nie. Gemessen wird JEDES Wort aller Schritte (auch künftiger Teile)
+ * in DE und EN, mit Consolas (Windows/headless) und Courier (iOS), in den
+ * Fassungen iPhone mini quer, iPad 1024 × 768 und iPad 1180 × 820.
+ */
+describe("L7-W: ein kurzes Wort je Schritt — eine Zeile, nichts abgeschnitten", async () => {
+  const { WORT_MAX_ZEICHEN } = await import("../src/ui/lektionskarte");
+  const SCHRITTE = LEKTIONEN.flatMap((l) => l.schritte);
+  const IPAD_1180: Fassung = { name: "iPad quer 1180", w: 1180, h: 820, sa: { l: 0, r: 0, t: 0, b: 0 } };
+  const ALLE = [...QUER, IPAD_1180];
+  /** Platz fürs Wort bei voller Breite der Leiste */
+  const platz = (f: Fassung): number => px(L, "max-width", f) - zeileFest(f);
+
+  it("jeder Schritt hat ein Wort in DE und EN, höchstens WORT_MAX_ZEICHEN Zeichen", () => {
+    for (const st of SCHRITTE) {
+      expect(st.wort, st.titel.de).toBeDefined();
+      for (const s of ["de", "en"] as const) {
+        expect(st.wort![s].trim().length, st.titel.de).toBeGreaterThan(0);
+        expect(st.wort![s].length, st.wort![s]).toBeLessThanOrEqual(WORT_MAX_ZEICHEN);
+      }
+    }
+  });
+
+  it("die Leiste ist für WORT_MAX_ZEICHEN bemessen: 21 Zeichen Courier passen, 22 nicht (Gegenprobe)", () => {
+    for (const f of ALLE) {
+      expect(wortPx("x".repeat(WORT_MAX_ZEICHEN), EM_IOS), f.name).toBeLessThanOrEqual(platz(f));
+      expect(wortPx("x".repeat(WORT_MAX_ZEICHEN + 1), EM_IOS), f.name).toBeGreaterThan(platz(f));
+    }
+  });
+
+  it("nur die Knöpfe nehmen Berührung an — die gewachsene Leiste über der Stick-Zone fängt keinen Finger", () => {
+    const f = QUER[0]!;
+    expect(wert(L, "pointer-events", f)).toBe("none");
+    expect(wert(KNOPF, "pointer-events", f)).toBe("auto");
+  });
+
+  for (const f of ALLE) {
+    for (const s of ["de", "en"] as const) {
+      it(`${f.name}, ${s}: jedes Wort ganz zu sehen; Leiste im Bild, frei von ☰ und Mittelzone; ⏭/✓/✕ fest im Streifen`, () => {
+        const zone = mittelzone(f);
+        const streifen = { x0: f.w * 0.35, x1: f.w * 0.65 };
+        const ohne = leiste(f);
+        for (const st of SCHRITTE) {
+          for (const em of [EM_BREITE, EM_IOS]) {
+            const t = st.wort![s];
+            const l = leiste(f, t, em);
+            const was = `„${t}" (${em} em)`;
+            expect(wortPx(t, em), `${was} abgeschnitten`).toBeLessThanOrEqual(l.wort.x1 - l.wort.x0 + 1e-9); // Rundung der Gleitkommazahl
+            expect(l.kasten.x0, `${was}: Leiste links aus dem Bild`).toBeGreaterThanOrEqual(f.sa.l + 8);
+            expect(luft(l.kasten, knopfKasten("btn-menu", f)), `${was}: ☰`).toBeGreaterThanOrEqual(4);
+            for (const k of [l.kasten, l.wort]) expect(ueberlappt(k, zone), `${was}: ${k.name} in der Mittelzone`).toBe(false);
+            expect([l.skip, l.ja, l.nein], `${was}: Knöpfe gerückt`).toEqual([ohne.skip, ohne.ja, ohne.nein]);
+            for (const k of [l.skip, l.ja, l.nein]) {
+              expect(k.x0).toBeGreaterThan(streifen.x0);
+              expect(k.x1).toBeLessThan(streifen.x1);
+            }
+          }
+        }
+      });
+    }
+  }
+
+  it("Gegenprobe: ein Wort über WORT_MAX_ZEICHEN würde abgeschnitten — der Wächter wird rot", () => {
+    const f = QUER.find((q) => q.name === "iPhone mini quer")!;
+    const t = "Hauptarm heben/senken!"; // 22 Zeichen
+    const l = leiste(f, t, EM_IOS);
+    expect(wortPx(t, EM_IOS)).toBeGreaterThan(l.wort.x1 - l.wort.x0);
+  });
+
+  it("die Zahlen im CSS-Kommentar (L7-W) stimmen: volle Breite 313, links 207 (mini) und 313 (iPad 1024)", () => {
+    for (const f of QUER) {
+      const l = leiste(f, "x".repeat(2 * WORT_MAX_ZEICHEN), EM_IOS); // gedeckelt: volle Breite
+      expect(px(L, "max-width", f)).toBe(313);
+      expect(l.kasten.x0).toBe(f.name === "iPad quer" ? 313 : 207);
+    }
+  });
+});
+
 // --- Teil 2: kaum Text
 /** Buchstaben-Wörter (ein „2×" oder „✓" zählt nicht als Wort). */
 const woerter = (t: string): string[] => t.split(/\s+/).filter((w) => /[A-Za-zÄÖÜäöüß]{2,}/.test(w));
 
-describe("Lehrgang: höchstens ein Wort je sichtbarem Text", () => {
+/*
+ * Kranzname: EIN Wort. Schritt-Wort der Leiste: höchstens DREI (L7-W, Patrick
+ * 22.10.2026: „ein kurzes Wort je Schritt (1–3 Wörter)", z. B. „Hauptarm
+ * heben/senken"). Ein Satz bleibt draußen — die Gegenprobe zeigt, dass jede
+ * alte Kartenzeile beide Grenzen reißt.
+ */
+const SCHRITTWORT_MAX_WOERTER = 3;
+describe("Lehrgang: kaum Text — Kranzname ein Wort, Schritt-Wort höchstens drei", () => {
   const kranz = (code: string) => (code === "KeyO" ? KRANZ_LAENGSTER : null);
-  const sichtbar = (s: "de" | "en"): string[] => [
-    tastenText("KeyO", kranz, s)!.replace(" ", ""), // Kranzname = ein Eintrag, egal ob mit Leerzeichen
-    ...LEKTIONEN.flatMap((l) => l.schritte.flatMap((st) => (st.wort ? [st.wort[s]] : []))),
-  ];
+  const schrittWoerter = (s: "de" | "en"): string[] => LEKTIONEN.flatMap((l) => l.schritte.flatMap((st) => (st.wort ? [st.wort[s]] : [])));
   for (const s of ["de", "en"] as const) {
     it(s, () => {
-      for (const t of sichtbar(s)) expect(woerter(t).length, t).toBeLessThanOrEqual(1);
+      const k = tastenText("KeyO", kranz, s)!.replace(" ", ""); // Kranzname = ein Eintrag, egal ob mit Leerzeichen
+      expect(woerter(k).length, k).toBeLessThanOrEqual(1);
+      for (const t of schrittWoerter(s)) expect(woerter(t).length, t).toBeLessThanOrEqual(SCHRITTWORT_MAX_WOERTER);
     });
   }
   it("Gegenprobe: die alten Kartenzeilen (Titel, Bedientext) hätten den Wächter gerissen", () => {
     const st = LEKTIONEN[0]!.schritte[0]!;
-    expect(woerter(`Schau zu: ${st.titel.de}`).length).toBeGreaterThan(1);
-    expect(woerter(st.text.de).length).toBeGreaterThan(1);
+    expect(woerter(`Schau zu: ${st.titel.de}`).length).toBeGreaterThan(SCHRITTWORT_MAX_WOERTER);
+    expect(woerter(st.text.de).length).toBeGreaterThan(SCHRITTWORT_MAX_WOERTER);
     expect(woerter("ANSICHT: 2× tippen").length).toBeGreaterThan(1);
   });
 });
@@ -391,6 +502,9 @@ describe("Lehrgangsleiste auf einer Ersatz-Seite", async () => {
     bus.emit("lehrgang:schritt", schrittEv(3, "du"));
     expect(l.querySelector(".phase")!.innerHTML).toBe(BILD.hand);
     expect(byId("tutorial")).toBeNull(); // die Leiste fragt nie nach der Karte
+    // L7-W: das Wort des Schritts steht neben dem Bildzeichen, das aria-label behält den Titel
+    expect(l.querySelector(".wort")!.textContent).toBe(L1.schritte[2]!.wort!.de);
+    expect(l.getAttribute("aria-label")).toContain(L1.schritte[2]!.titel.de);
   });
 
   it("Erfolgs-Signal bei lehrgang:haekchen: ✓, gruener Strich, Klack, Geist und echter Stick leuchten, Fortschritt gespeichert", () => {

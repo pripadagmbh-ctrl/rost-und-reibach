@@ -10,6 +10,8 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-209 | 22.10.2026 | Lehrgangsleiste zeigt kurzes Wort je Schritt, wächst nach links | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
+| E-208 | 22.10.2026 | Funktionskranz nur per Knopf unter ☰, Stillhalten öffnet nichts | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-207 | 22.10.2026 | Lehrgang zeigt Gesten als Bewegung, Zoom rein und raus, Pfeil zum Ziel | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-206 | 22.10.2026 | Fahrpedale unten mittig, kleiner; Griff-Zeile unten links | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-205 | 21.10.2026 | SCHICHT im Hauptmenü, Schicht-Anzeige, Feierabend-Tafel, Bestenliste SCHICHTEN | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
@@ -211,6 +213,16 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-209 — Wort je Schritt in der Lehrgangsleiste** (iPhone mini quer, dann iPad)
+- Schritt 7: „Hauptarm heben/senken“ ganz da, ohne „…“? ⏭ an derselben Stelle wie in Schritt 6?
+- Linker Daumen oben links unter der verbreiterten Leiste: Stick reagiert wie sonst?
+- Schritt 7: ⏭ und sofort noch einmal dort — bricht ✕ ab?
+- iPad Englisch: „Boom up/down“, „Stick out/in“, „To the mark“ verständlich, Sicht frei?
+**E-208 — Funktionskranz per Knopf** (iPhone mini quer, dann iPad)
+- Rechten Stick lange stillhalten und greifen: geht der Kranz nie mehr auf?
+- Knopf (Punkte-Ring unter ☰) mit dem rechten Daumen ohne Umgreifen erreichbar? iPad: linker Ringteil (HUPE, NACHSCHUB) erreichbar?
+- Kranz offen, daneben tippen: schließt, ohne dass Arm, Kamera oder Ansicht springen? Eintrag antippen löst aus und schließt?
+- iPhone mini: Drehtasten und Pedale kurz weg, solange offen — stört das?
 **E-207 — Lehrgang: Gesten, Zoom, Pedal-Finger, Richtung** (iPhone mini quer, dann iPad)
 - „Ansicht wechseln“: Tippt rechts ein Finger sichtbar zweimal (zwei Ringe)? Doppeltipp genau dort wechselt die Ansicht?
 - „Zoomen“: nur rein → halber Strich grün, Leiste leuchtet, Finger zeigen danach Kneifen? Häkchen erst nach dem Rauszoomen?

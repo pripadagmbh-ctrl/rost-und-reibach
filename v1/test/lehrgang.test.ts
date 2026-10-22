@@ -439,14 +439,15 @@ function platzhalter(t: string): string[] {
 const BEKANNT = ["boom", "stick", "cab", "grapple", "rotator"].flatMap((f) => [`{${f}}`, `{${f}+}`, `{${f}-}`]);
 
 describe("Lehrgang: Daten und Texte", () => {
-  it("ein Lehrgang am Stueck (L3): jeder Schritt mit Symbol, hoechstens ein Wort, Spuren 2–5 s", () => {
+  it("ein Lehrgang am Stueck (L3): jeder Schritt mit Symbol, hoechstens drei Woerter, Spuren 2–5 s", () => {
     expect(LEKTIONEN.map((l) => l.id)).toEqual(["lehrgang"]);
     expect(lektionNr("lehrgang")).toBe(1);
     const l = LEKTIONEN[0]!;
     // Reihenfolge laut Patrick: Kamera, Fahren, Schwenken, Arm/Stiel
     expect(l.schritte.map((s) => s.symbol)).toEqual(["kamera", "kamera", "ansicht", "ansicht", "fahren", "schwenken", "arm", "stiel", "marke"]);
     for (const s of l.schritte) {
-      if (s.wort) for (const t of [s.wort.de, s.wort.en]) expect(t.trim(), s.titel.de).toMatch(/^\S+$/);
+      // L7-W (Patrick 22.10.2026): 1–3 Woerter je Schritt; Breite misst test/lehrgangsleiste.test.ts
+      if (s.wort) for (const t of [s.wort.de, s.wort.en]) expect(t.trim(), s.titel.de).toMatch(/^\S+(?: \S+){0,2}$/);
       if (!s.vorfuehrung) continue;
       expect(spurDauer(s.vorfuehrung), s.titel.de).toBeGreaterThanOrEqual(2);
       expect(spurDauer(s.vorfuehrung), s.titel.de).toBeLessThanOrEqual(5);

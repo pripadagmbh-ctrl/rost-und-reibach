@@ -18,7 +18,8 @@
  *   Extras         — Doppeltipp rechts wechselt die Ansicht
  *   Mittelstreifen — zwischen den Sticks (E-136): ein Finger dreht die Kamera,
  *                    zwei Finger kneifen = Zoom, Doppeltipp = Ansicht zurück
- *   Rädchen        — die übrigen Funktionen, endlos drehbar
+ *   Kranz-Knopf    — rechts oben unter ☰: Antippen klappt den Funktionskranz
+ *                    auf, Antippen eines Eintrags löst ihn aus (L7-A)
  *   Fünf Finger    — Debug-Overlay ein/aus (auf dem Tablet gibt es keine F3-Taste)
  *
  * Zwei verworfene Vorläufer, damit sie niemand wiedererfindet:
@@ -79,9 +80,6 @@ const GRAPPLE_DEADZONE = 0.38;
  * // SW: Startwert zum Austesten, auf dem Gerät nachzujustieren
  */
 const DRIVE_DEADZONE = 0.15;
-/** Bis hierhin gilt eine Berührung des Rädchens als Tipp, darüber als Blättern (px) */
-/** So lange muss der rechte Daumen stillhalten, bis der Kranz aufklappt */
-const RADIAL_HOLD_S = 0.4;
 /**
  * Halbmesser des Kranzes in px.
  *
@@ -96,16 +94,17 @@ const RADIAL_HOLD_S = 0.4;
  * und nur noch ACHT Eintraege auf dem Ring stehen. Nachgemessen: Acht haben
  * bei R = 112 satte 14,1 px Luft (iPad) bzw. 18,3 px (iPhone mini quer); die
  * 6-px-Schranke liesse R bis 101 herunter. Kleiner gemacht wird trotzdem
- * nichts — der Halbmesser ist reine Ansicht (gewaehlt wird ueber die
- * RICHTUNG des Daumenzugs, nicht ueber den Weg, siehe RADIAL_MIN_PX), und
- * die 112 halten den Platz fuer den neunten Eintrag frei, den Patrick
+ * nichts — der Halbmesser ist reine Ansicht (gewaehlt wird seit L7-A durch
+ * Antippen des Eintrags), und die 112 halten den Platz fuer den neunten Eintrag frei, den Patrick
  * vergeben kann. Was in den Kranz kommt, entscheidet er.
  */
 const RADIAL_R = 112;
-/** Ab diesem Zugweg gilt eine Richtung als gewaehlt */
-const RADIAL_MIN_PX = 34;
-/** Bis hierhin gilt der Daumen als stillgehalten (Anteil des Vollausschlags) */
-const RADIAL_STILL = 0.14;
+/**
+ * So lange nach einem verschluckten Tipp (Kranz offen, daneben getippt) wird
+ * auch dessen `click` verschluckt — Karten und Leisten hoeren auf `click`, und
+ * der kommt erst nach dem pointerup. // SW: ein click folgt binnen Millisekunden
+ */
+const KLICK_SCHLUCKEN_MS = 400;
 /** Ein Aufsetzen zählt nur als Tipp, wenn es kürzer dauert und der Finger kaum wandert */
 const TAP_MAX_MS = 250;
 const TAP_MAX_MOVE = 12;
@@ -166,9 +165,12 @@ export class TouchControls {
   private lastTap = 0;
   private radialEl: HTMLElement | null = null;
   private radialItems: Array<{ el: HTMLElement; code: string }> = [];
-  private radialSel = -1;
   private radialOpen = false;
-  private radialHoldS = 0;
+  /** Der Knopf rechts oben, der den Kranz oeffnet und schliesst (L7-A) */
+  private kranzKnopf: HTMLElement | null = null;
+  /** Finger, die bei offenem Kranz aufsetzten: Zeiger-ID → Eintrag (-1 = daneben, verschluckt) */
+  private kranzZeiger = new Map<number, number>();
+  private klickSchluckenBis = 0;
   private lastTapX = 0;
   private lastTapY = 0;
   /** Finger im Mittelstreifen: Zeiger-ID → letzte Lage (höchstens zwei) */
@@ -215,6 +217,7 @@ export class TouchControls {
     this.bindTap("btn-pause", "Escape");
     this.bindMenu();
     this.buildRadial();
+    this.bindKranz();
     this.bindCanvas(canvas);
     TouchControls.blockBrowserZoom();
   }
@@ -331,19 +334,10 @@ export class TouchControls {
     );
     zone.addEventListener("pointerup", (e) => {
       if (st.id !== e.pointerId) return;
-      if (st === this.right && this.radialOpen) {
-        // Gezogen und losgelassen waehlt; nur losgelassen schliesst folgenlos
-        const gewaehlt = this.radialItems[this.radialSel];
-        if (gewaehlt) this.fire(gewaehlt.code);
-        this.radialOpen = false;
-        this.radialHoldS = 0;
-        this.closeRadial();
-      } else {
-        const dauer = performance.now() - st.downT;
-        const weg = Math.hypot(e.clientX - st.baseX, e.clientY - st.baseY);
-        if (dauer < TAP_MAX_MS && weg < TAP_MAX_MOVE) {
-          this.registerTap(e.clientX, e.clientY, rolle === "rechts");
-        }
+      const dauer = performance.now() - st.downT;
+      const weg = Math.hypot(e.clientX - st.baseX, e.clientY - st.baseY);
+      if (dauer < TAP_MAX_MS && weg < TAP_MAX_MOVE) {
+        this.registerTap(e.clientX, e.clientY, rolle === "rechts");
       }
       TouchControls.resetStick(st);
       this.pressureGrab = false;
@@ -486,6 +480,7 @@ export class TouchControls {
           this.pressed.add("F3");
           TouchControls.vibrate(30);
           this.releaseAll(); // die fuenf Finger sollen nichts am Bagger verstellen
+          this.closeRadial();
         }
       },
       { passive: true }
@@ -505,7 +500,9 @@ export class TouchControls {
     document.addEventListener("touchend", allesLos, { passive: true });
     document.addEventListener("touchcancel", allesLos, { passive: true });
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) this.releaseAll();
+      if (!document.hidden) return;
+      this.releaseAll();
+      this.closeRadial();
     });
   }
 
@@ -516,6 +513,11 @@ export class TouchControls {
    * kein Tipp auf die Pedale, und der Zustand darf sich nur ändern, wenn der
    * Spieler ihn ändert — sonst käme der Zeitablauf von heute früh durch die
    * Hintertür zurück.
+   *
+   * Der Funktionskranz bleibt ebenfalls offen (L7-A): Er wird per Tipp
+   * geöffnet, und nach jedem Tipp ist kein Finger mehr auf dem Glas — hier zu
+   * schliessen hiesse, ihn sofort wieder zuzuklappen. Losgelassen werden nur
+   * die Finger, die gerade einen Eintrag drücken.
    */
   releaseAll(): void {
     for (const st of [this.left, this.right]) {
@@ -525,11 +527,8 @@ export class TouchControls {
     this.camZeiger.clear();
     this.camTipp = null;
     this.pressureGrab = false;
-    if (this.radialOpen) {
-      this.radialOpen = false;
-      this.closeRadial();
-    }
-    this.radialHoldS = 0;
+    this.kranzZeiger.clear();
+    for (const it of this.radialItems) it.el.classList.remove("sel");
     for (const id of ["btn-rot-l", "btn-rot-r"]) {
       document.getElementById(id)?.classList.remove("down");
     }
@@ -636,14 +635,14 @@ export class TouchControls {
   }
 
   /**
-   * Funktionskranz am rechten Joystickkopf.
+   * Funktionskranz: die Maschinenfunktionen auf einem Ring.
    *
-   * Feste Knöpfe auf dem Glas werden versehentlich bedient — sie liegen dort,
-   * wo die Daumen ohnehin sind. In einer echten Maschine liegt nichts im Weg:
-   * Die Funktionen sitzen auf der Konsole und auf den Joystickköpfen. Hier
-   * genauso: Rechten Daumen kurz stillhalten, der Kranz klappt um ihn auf. In
-   * eine Richtung ziehen und loslassen wählt; loslassen ohne zu ziehen
-   * schliesst folgenlos.
+   * Bis zum 22.10.2026 klappte er auf, wenn der rechte Daumen 0,4 s stillhielt,
+   * und gewählt wurde per Zugrichtung. Das stand nirgends und ging beim
+   * Greifen versehentlich auf (Punkte 42a/42b). Seit L7-A öffnet ihn nur der
+   * Knopf rechts oben unter ☰ (Ansage Patrick: „nur ein Knopf, Stillhalten
+   * öffnet nichts mehr"); Lage und Ring: index.html „Funktionskranz",
+   * gerechnet in test/kranzknopf.test.ts.
    */
   private buildRadial(): void {
     const el = document.getElementById("radial");
@@ -689,30 +688,103 @@ export class TouchControls {
     );
   }
 
-  private openRadial(x: number, y: number): void {
+  /**
+   * Knopf und Bedienung des Kranzes (L7-A).
+   *
+   * Knopf antippen öffnet, noch einmal antippen schliesst. Ein Eintrag löst
+   * beim Loslassen aus, wenn der Finger noch auf DEMSELBEN Eintrag liegt, und
+   * schliesst. Ein Tipp daneben (auch auf die Nabe) schliesst folgenlos.
+   *
+   * Solange der Kranz offen ist, gehört jeder NEUE Finger ihm: Ein Hörer am
+   * Dokument in der Fangphase sieht das pointerdown vor jeder Zone, jedem
+   * Knopf und jeder Karte und hält es dort an. So startet ein Tipp daneben
+   * weder einen Stick noch die Kamera und zählt nicht als (Doppel-)Tipp. Sein
+   * pointerup und sein click werden ebenso verschluckt (☰ löst auf pointerup
+   * aus, Karten auf click). Finger, die schon vorher lagen und von ihrer Zone
+   * gefangen sind, laufen weiter — der Stick unter dem Daumen bleibt, was er ist.
+   */
+  private bindKranz(): void {
+    const knopf = document.getElementById("btn-kranz");
+    if (!knopf) return;
+    this.kranzKnopf = knopf;
+    // Leerer Kranz (alles per core/spielart.ts entfernt): kein Knopf
+    knopf.hidden = this.radialItems.length === 0;
+    knopf.addEventListener(
+      "pointerdown",
+      (e) => {
+        e.preventDefault();
+        if (this.radialOpen) this.closeRadial();
+        else this.openRadial();
+      },
+      { passive: false }
+    );
+    const eintrag = (ziel: EventTarget | null): number => this.radialItems.findIndex((it) => it.el === ziel);
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (!this.radialOpen || knopf.contains(e.target as Node | null)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const i = eintrag(e.target);
+        this.kranzZeiger.set(e.pointerId, i);
+        if (i < 0) {
+          this.closeRadial();
+          return;
+        }
+        this.radialItems[i].el.classList.add("sel");
+        // Touch fängt den Zeiger am Eintrag ein; ohne Freigabe meldete pointerup
+        // immer diesen Eintrag, auch wenn der Finger längst daneben liegt.
+        (e.target as Element).releasePointerCapture?.(e.pointerId);
+      },
+      { capture: true, passive: false }
+    );
+    const los = (e: PointerEvent): void => {
+      const i = this.kranzZeiger.get(e.pointerId);
+      if (i === undefined) return;
+      this.kranzZeiger.delete(e.pointerId);
+      e.stopPropagation();
+      this.klickSchluckenBis = performance.now() + KLICK_SCHLUCKEN_MS;
+      const it = this.radialItems[i];
+      if (!it) return;
+      it.el.classList.remove("sel");
+      if (e.type === "pointerup" && this.radialOpen && eintrag(e.target) === i) {
+        this.fire(it.code);
+        this.closeRadial();
+      }
+    };
+    document.addEventListener("pointerup", los, { capture: true });
+    document.addEventListener("pointercancel", los, { capture: true });
+    document.addEventListener(
+      "click",
+      (e) => {
+        if (performance.now() >= this.klickSchluckenBis) return;
+        e.preventDefault();
+        e.stopPropagation();
+      },
+      { capture: true }
+    );
+  }
+
+  private openRadial(): void {
     if (!this.radialEl) return;
-    this.radialEl.style.left = `${x}px`;
-    this.radialEl.style.top = `${y}px`;
     this.radialEl.hidden = false;
-    this.radialSel = -1;
+    this.radialOpen = true;
     for (const it of this.radialItems) it.el.classList.remove("sel");
+    this.kranzKnopf?.classList.add("down");
+    document.getElementById("touch")?.classList.add("kranz-offen");
+    this.kranzKnopf?.setAttribute("aria-expanded", "true");
     TouchControls.vibrate(14);
     this.onTap?.();
   }
 
   private closeRadial(): void {
+    if (!this.radialOpen) return;
+    this.radialOpen = false;
     if (this.radialEl) this.radialEl.hidden = true;
-    this.radialSel = -1;
-  }
-
-  /** Auswahl aus der Zugrichtung des Daumens. -1 = nichts gewählt. */
-  private radialPick(dx: number, dy: number): number {
-    const weg = Math.hypot(dx, dy) * RADIUS;
-    if (weg < RADIAL_MIN_PX) return -1;
-    const n = this.radialItems.length;
-    const winkel = Math.atan2(dx, -dy); // 0 = oben
-    const i = Math.round((winkel / (Math.PI * 2)) * n);
-    return ((i % n) + n) % n;
+    for (const it of this.radialItems) it.el.classList.remove("sel");
+    this.kranzKnopf?.classList.remove("down");
+    document.getElementById("touch")?.classList.remove("kranz-offen");
+    this.kranzKnopf?.setAttribute("aria-expanded", "false");
   }
 
   /**
@@ -759,6 +831,11 @@ export class TouchControls {
     return this.fahrenAn;
   }
 
+  /** L7-A: Ist der Funktionskranz offen? Nur lesen — für den Lehrgang-Schritt. */
+  get kranzOffen(): boolean {
+    return this.radialOpen;
+  }
+
   consumePress(code: string): boolean {
     if (!this.pressed.has(code)) return false;
     this.pressed.delete(code);
@@ -791,33 +868,11 @@ export class TouchControls {
     }
   }
 
-  update(dt = 1 / 60): void {
+  /** `_dt` brauchte nur die alte Halte-Uhr des Kranzes (bis L7-A); main.ts reicht es weiter durch. */
+  update(_dt = 1 / 60): void {
     if (!this.active) return;
     const l = this.left;
     const r = this.right;
-    // Funktionskranz: rechten Daumen stillhalten laesst ihn aufklappen
-    if (r && r.id !== null) {
-      const still = Math.hypot(r.dx, r.dy) < RADIAL_STILL;
-      if (!this.radialOpen) {
-        // Wer den Stick bewegt, will arbeiten — dann keine Uhr
-        this.radialHoldS = still ? this.radialHoldS + dt : 0;
-        if (this.radialHoldS >= RADIAL_HOLD_S) {
-          this.radialOpen = true;
-          this.openRadial(r.baseX, r.baseY);
-        }
-      } else {
-        const wahl = this.radialPick(r.dx, r.dy);
-        if (wahl !== this.radialSel) {
-          this.radialItems[this.radialSel]?.el.classList.remove("sel");
-          this.radialItems[wahl]?.el.classList.add("sel");
-          this.radialSel = wahl;
-          if (wahl >= 0) TouchControls.vibrate(9);
-        }
-      }
-    } else {
-      this.radialHoldS = 0;
-    }
-
     // Die vier Stickachsen sind frei belegbar (Steuerungsmenü). Werkseinstellung:
     // Hauptarm und Oberwagen links, Ausleger und Spinne rechts.
     this.axes.cab = 0;
@@ -832,9 +887,6 @@ export class TouchControls {
       rightX: r ? r.dx : 0,
     };
     for (const id of ["leftY", "leftX", "rightY", "rightX"] as AxisId[]) {
-      // Solange der Kranz offen ist, waehlt der rechte Stick aus, statt zu
-      // steuern — sonst faehrt beim Auswaehlen der Arm mit.
-      if (this.radialOpen && (id === "rightX" || id === "rightY")) continue;
       // Beim Fahren führt der linke Stick Gas und Lenkung (siehe unten); seine
       // beiden Belegungen ruhen so lange. Sie bleiben aber, was sie sind —
       // ausgeschaltet steuert er sofort wieder Hauptarm und Oberwagen.

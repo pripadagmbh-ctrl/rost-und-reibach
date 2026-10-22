@@ -7,8 +7,10 @@ import { EM_BREITE, FASSUNGEN, luft, seite, wert, schriftgroesse, type Fassung, 
  * Wieviel Platz der Funktionskranz braucht — und ob der naechste Eintrag noch
  * hineinpasst.
  *
- * Der Kranz klappt um den rechten Daumen auf; seine Eintraege sitzen auf einem
- * Kreis und werden durch Ziehen in ihre Richtung gewaehlt. Jeder neue Eintrag
+ * Der Kranz klappt seit L7-A (22.10.2026) per Knopf unter ☰ auf, nicht mehr
+ * um den stillgehaltenen rechten Daumen; seine Eintraege sitzen auf einem
+ * Kreis und werden angetippt. Lage und Bedienung: test/kranzknopf.test.ts.
+ * Hier bleibt die Geometrie des Rings selbst. Jeder neue Eintrag
  * rueckt alle anderen naeher zusammen: acht stehen 45 Grad auseinander, neun
  * nur noch 40, zehn nur noch 36.
  *
@@ -333,37 +335,16 @@ describe("Funktionskranz: sieben Eintraege, und was der achte bis zehnte kosten"
     ).toBeLessThan(MIN_LUFT);
   });
 
-  it("und der Kranz passt aufs Bild, wenn der Daumen mittig aufsetzt", () => {
+  it("die Halte-Bedienung ist weg (L7-A): keine Halte-Uhr, keine Zugrichtung", () => {
     /*
-     * Der Kranz erscheint dort, wo der Daumen liegt, und wird NICHT an den
-     * Bildrand gerueckt. Setzt der Daumen ganz unten auf, haengt der unterste
-     * Eintrag unter dem Bildrand — lesen kann man ihn dann nicht mehr (waehlen
-     * schon, die Richtung stimmt trotzdem).
-     *
-     * Gemessen wird deshalb das BAND in der rechten Bildhaelfte, in dem ein
-     * Daumen einen vollstaendig sichtbaren Kranz erzeugt. Es muss ein Band
-     * geben; wie breit es ist, steht in der Meldung und im Log.
+     * Bis zum 22.10.2026 klappte der Kranz um den rechten Daumen auf, wenn er
+     * 0,4 s stillhielt, und es stand hier ein Test, dass er dort aufs Bild
+     * passt. Jetzt hat er eine feste Lage am Knopf — ob die ins Bild passt,
+     * rechnet test/kranzknopf.test.ts. Hier nur: die alte Mechanik kommt nicht
+     * still zurueck.
      */
-    for (const f of FASSUNGEN) {
-      const { w, h } = sektorMass(f);
-      const s = skala(f);
-      const hoch = r + (h * s) / 2;
-      const breit = r + (w * s) / 2;
-      const bandH = f.h - f.sa.t - f.sa.b - 2 * hoch;
-      /*
-       * Die rechte Zone ist seit E-136 35 % der Bildbreite (`#touch .zone:
-       * width 35%`, davor 50 %; dazwischen liegt der Kamera-Mittelstreifen),
-       * der Daumen setzt also zwischen 0,65 w und dem rechten sicheren Rand auf.
-       * Telefon hochkant: 40 % (Regel `max-width: 500px and min-height: 431px`), ab 0,6 w.
-       * Sichtbar bleibt der Kranz, wo auch links noch Platz ist.
-       */
-      const bandB = f.w - f.sa.r - breit - Math.max(f.w * (f.h > f.w ? 0.6 : 0.65), f.sa.l + breit);
-      expect(
-        bandH,
-        `${f.name}: kein Streifen, in dem der Kranz ganz sichtbar ist ` +
-          `(Ring ${hoch.toFixed(0)} px hoch ueber/unter dem Daumen, Bild ${f.h} px)`
-      ).toBeGreaterThan(0);
-      expect(bandB, `${f.name}: der Kranz passt in keiner Daumenlage in die Breite`).toBeGreaterThan(0);
+    for (const alt of ["RADIAL_HOLD_S", "RADIAL_STILL", "RADIAL_MIN_PX", "radialHoldS", "radialPick"]) {
+      expect(touchTs, `${alt} steht wieder in touch.ts`).not.toContain(alt);
     }
   });
 });
