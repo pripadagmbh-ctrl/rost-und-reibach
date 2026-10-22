@@ -437,7 +437,31 @@ export interface GameEvents {
   "schicht:buchung": { art: "abfahrt" | "standgeld" | "fehlwurf" | "schaden"; eur: number; kg?: number; order?: string | null };
   /** Feierabend (16:00): die Bilanz. Die Tafel zeigt sie und legt den Lauf in die Bestenliste. */
   "schicht:ende": { bilanz: Schichtbilanz };
+
+  /* ---------------- WOCHE (W1, Konzept spiel-konzept.md §3) — ein Tag ist eine Schicht mit Tagesregeln -------- */
+
+  /** Ein Tag der Woche beginnt (06:00). Der Platz kommt aus dem Stand dieses Morgens. */
+  "tag:start": { tag: WochenTag };
+  /**
+   * Feierabend eines Tages (16:00). `lagerwertEur` = Wert des Schrotts auf dem Platz
+   * nach Sorte (Mo–Do), `lagerwertGesternEur` der Vortag (null am Montag);
+   * `kasseEur` nur am Freitag (Abfuhr). Sterne: ★ geschafft · ★★ ohne Standgeld · ★★★ sauber.
+   */
+  "tag:ende": {
+    tag: WochenTag;
+    geschafft: boolean;
+    sterne: 0 | 1 | 2 | 3;
+    lagerwertEur: number;
+    lagerwertGesternEur: number | null;
+    kasseEur: number | null;
+    standgeldS: number;
+    fehlwuerfe: number;
+    schaeden: number;
+  };
 }
+
+/** Die fünf Tage der Woche 1 (Konzept §3). */
+export type WochenTag = "mo" | "di" | "mi" | "do" | "fr";
 
 type Handler<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;
 
