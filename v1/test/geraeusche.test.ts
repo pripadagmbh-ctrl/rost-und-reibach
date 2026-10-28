@@ -760,6 +760,8 @@ describe("Lautstaerke je Gruppe (E-139, Wunsch 17.10.2026)", () => {
       mgr.playGlass();
       mgr.playDrop("steel");
       mgr.playCorrect();
+      mgr.playRichtig();
+      mgr.playFunk();
       mgr.playWrong();
       mgr.playTick();
       mgr.playSterne(2);
@@ -966,6 +968,9 @@ describe("Nur Aufnahmen, nichts Gerechnetes (E-153, Patrick 17.10.2026)", () => 
       () => mgr.playTear(),
       () => mgr.playSale(),
       () => mgr.playCorrect(),
+      () => mgr.playRichtig(),
+      () => mgr.playFunk(),
+      () => mgr.playFunk(true),
       () => mgr.playWrong(),
       () => mgr.playTick(),
       () => mgr.playSterne(3),
@@ -1096,5 +1101,41 @@ describe("Schichtung nach Profi-Art: Anschlag + Koerper + Untergrund (E-159)", (
     expect(klein.some((n) => n.startsWith("koerper_"))).toBe(false);
     const alu = await schicht("alu", 8, "beton");
     expect(alu.some((n) => n.startsWith("alu_"))).toBe(true);
+  });
+});
+
+// ------------------------------- P4b: ✓-Ton und Funkton (Auftrag 41f)
+
+describe("P4b: leiser ✓-Ton und Funkton aus dem Bestand (E-153)", () => {
+  it("✓ spielt eine vorhandene Aufnahme (alu_3), leiser als der Fehlton, in der Gruppe Bagger", async () => {
+    const { mgr } = await starteMitAufnahmen();
+    ctx.currentTime += 2;
+    const o0 = ctx.oszillatoren;
+    const r0 = ctx.gerechnet;
+    expect(gespielt(() => mgr.playRichtig())).toEqual(["alu_3"]);
+    expect(alleProben()).toContain("alu_3");
+    const richtig = miss(() => mgr.playRichtig()).lautester;
+    const falsch = miss(() => mgr.playWrong()).lautester;
+    expect(richtig).toBeGreaterThan(0);
+    expect(richtig, "eigene, leisere Lautstaerke").toBeLessThan(falsch);
+    expect(ctx.oszillatoren - o0).toBe(0);
+    expect(ctx.gerechnet - r0).toBe(0);
+    const gr = (mgr as unknown as { gruppen: Record<string, unknown> }).gruppen;
+    const q = ctx.alleQuellen.filter((k) => (k.buffer as { name?: string } | null)?.name === "alu_3").at(-1)!;
+    // Quelle → Gain → Gruppe Bagger
+    const ziel = (q.ziele as Array<Record<string, unknown>>)[0]!;
+    expect((ziel.ziele as unknown[])[0]).toBe(gr.bagger);
+  });
+
+  it("Funk: Sprechtaste (Kunststoff-Klick) und kurzes Rauschen aus der Ventil-Aufnahme; leise = halb so laut", async () => {
+    const { mgr } = await starteMitAufnahmen();
+    ctx.currentTime += 2;
+    const namen = gespielt(() => mgr.playFunk());
+    expect(namen).toHaveLength(2);
+    expect(namen[0]).toMatch(/^kunststoff_/);
+    expect(namen[1]).toBe("ventil");
+    const laut = miss(() => mgr.playFunk()).lautester;
+    const leise = miss(() => mgr.playFunk(true)).lautester;
+    expect(leise).toBeCloseTo(laut / 2, 6);
   });
 });

@@ -37,12 +37,14 @@ import { resolve, relative, sep } from "node:path";
  */
 const ERLAUBT: Record<string, number> = {
   /*
-   * 52: alle Meldungen der Verdrahtung. 21 davon laufen nur im Betrieb
-   * (BETRIEB = false, E-118) und sind heute tot; Zeile 1166 reicht nur den
-   * Toast an ui/radio.ts weiter. P4b ersetzt die erreichbaren durch Symbol +
-   * Ton; was bleibt, bekommt hier seinen Grund.
+   * 23 (P4b, 22.10.2026; vorher 52): 21 laufen nur im Betrieb (BETRIEB =
+   * false, E-118 — Waage, Kundschaft, Lambert, Polizei, Kasse, Fahrspur) und
+   * bleiben unberuehrt (Orchestrator 22.10.: Meldungen des abgeschalteten
+   * Betriebs unberuehrt); 2 sind „Speichern fehlgeschlagen!" (Pausenmenue und
+   * Taste K) — ein Fehlschlag bliebe sonst unbemerkt. Alles Erreichbare zeigt
+   * jetzt ein Zeichen am Ort (ui/ortszeichen.ts).
    */
-  "main.ts": 52,
+  "main.ts": 23,
   /*
    * 4: drei Notfälle, falls das Markup der Tafel `#abrechnung` fehlt
    * (Feierabend — ohnehin nur Betrieb —, Prüfung, Lektion) und „Tag n —
@@ -50,8 +52,6 @@ const ERLAUBT: Record<string, number> = {
    * `hud: { toast(msg: string): void }` zählt nicht.
    */
   "ui/abrechnung.ts": 4,
-  /* 2: Senderwahl und Radio an/aus im Pausenmenü (Radio-Feld). */
-  "ui/radio.ts": 2,
 };
 
 const wurzel = resolve(__dirname, "..");
@@ -172,10 +172,10 @@ describe("Wächter: keine neuen Textboxen (Auftrag 41, P4a)", () => {
     expect(umwege, umwege.join("\n")).toEqual([]);
   });
 
-  it("die Zählung sieht die Inventur: heute 58 Aufrufe in drei Dateien, die Definition zählt nicht", () => {
+  it("die Zählung sieht die Inventur: seit P4b 27 Aufrufe in zwei Dateien, die Definition zählt nicht", () => {
     const gezaehlt = [...quellen].map(([d, t]) => [d, zaehleToasts(t)] as const).filter(([, n]) => n > 0);
     // Steht hier eine kleinere Zahl, hat P4b geliefert — dann ERLAUBT und diese Zeile nachziehen.
-    expect(gezaehlt.reduce((a, [, n]) => a + n, 0)).toBeLessThanOrEqual(58);
+    expect(gezaehlt.reduce((a, [, n]) => a + n, 0)).toBeLessThanOrEqual(27);
     expect(zaehleToasts(quellen.get("ui/hud.ts") ?? ""), "die Definition in ui/hud.ts zählt als Aufruf").toBe(0);
   });
 
@@ -220,10 +220,10 @@ describe("Wächter: keine neuen Textboxen (Auftrag 41, P4a)", () => {
 
     it("weniger als erlaubt ist kein Fehler, nur ein Hinweis", () => {
       const weniger = new Map(quellen);
-      weniger.set("ui/radio.ts", "export const leer = 1;\n");
+      weniger.set("ui/abrechnung.ts", "export const leer = 1;\n"); // seit P4b hat radio.ts keine Toasts mehr
       const r = pruefe(weniger, ERLAUBT);
       expect(r.zuViel).toEqual([]);
-      expect(r.weniger.some((z) => z.startsWith("ui/radio.ts:"))).toBe(true);
+      expect(r.weniger.some((z) => z.startsWith("ui/abrechnung.ts:"))).toBe(true);
     });
 
     it("Umwege fallen auf: Funktionswert und direkter Griff nach #toast", () => {

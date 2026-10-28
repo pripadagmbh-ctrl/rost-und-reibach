@@ -702,6 +702,9 @@ export class ChallengeLauf {
     const d = this.daten;
     const griff = new Set(q.gegriffen().map((b) => b.handle));
     const marken: Marke[] = [];
+    // P4b: Wege laufen als Schwenkbogen um die Drehmitte (Kopie — `drehmitte()` darf ein lebender Vektor sein)
+    const dm = q.drehmitte();
+    const um = { x: dm.x, z: dm.z };
 
     // --- Teile -----------------------------------------------------------
     const lebend = this.objekte.teile.filter((t) => t.body.isValid());
@@ -734,7 +737,8 @@ export class ChallengeLauf {
       if (alt === undefined || p.y < alt) this.liegeY.set(t.id, p.y);
       if (this.pflichtIds.has(t.id) && !imZiel(t)) {
         const z = this.wegZiel.get(t.id);
-        marken.push({ x: p.x, y: p.y + this.liegeY.get(t.id)!, z: p.z, art: "teil", sorte: z ? sorteVonBehaelter(z) : null, nach: this.zielPunkt(t.id) });
+        const nach = this.zielPunkt(t.id);
+        marken.push({ x: p.x, y: p.y + this.liegeY.get(t.id)!, z: p.z, art: "teil", sorte: z ? sorteVonBehaelter(z) : null, nach, ...(nach ? { um } : {}) });
       }
     }
     const teil = gefasst ?? pflicht.find((t) => !imZiel(t)) ?? null;
@@ -804,7 +808,7 @@ export class ChallengeLauf {
       }
       this.wrackWarGefasst = wGefasst;
       const fertig = this.inKammer || this.gepresst || abgelegt || this.platt;
-      if (!wGefasst && !fertig) marken.push({ x: wp.x, y: spanne.oben, z: wp.z, art: "teil", sorte: null, nach: d.zielMarke ? { ...d.zielMarke } : null });
+      if (!wGefasst && !fertig) marken.push({ x: wp.x, y: spanne.oben, z: wp.z, art: "teil", sorte: null, nach: d.zielMarke ? { ...d.zielMarke } : null, ...(d.zielMarke ? { um } : {}) });
       if (d.zielMarke && (wGefasst || d.zielMarkeAbStart)) marken.push({ ...d.zielMarke, art: "ziel", sorte: null });
     }
 

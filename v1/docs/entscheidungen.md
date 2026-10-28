@@ -10,6 +10,8 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-222 | 22.10.2026 | Weg zur Mulde als Schwenkbogen; K und N nur im Sandkasten | gebaut | [E-221_bis_E-240.md](log/E-221_bis_E-240.md) |
+| E-221 | 22.10.2026 | Keine Textboxen mehr: Zeichen am Ort plus Ton, Fuhrpark-Zeichen über dem Laster | gebaut | [E-221_bis_E-240.md](log/E-221_bis_E-240.md) |
 | E-218 | 22.10.2026 | Nach dem Lehrgang zum Montag; Leistenwörter ohne Fachwort | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-217 | 22.10.2026 | Kranz- und Halte-Finger, elf Bildzeichen, ☰ wirklich 46/44 px | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
 | E-216 | 22.10.2026 | Lehrgang Teil 2: 15 Schritte an Prüfungs-Stationen, Lotse zeigt den Weg | gebaut | [E-201_bis_E-220.md](log/E-201_bis_E-220.md) |
@@ -222,6 +224,14 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-222 — Schwenkbogen, K/N** (Prüfung 1; Schicht am PC)
+- Prüfung 1: Läuft der gestrichelte Weg als Bogen um den Bagger zur BUNT-Box, in Schwenkrichtung?
+- Schicht: K und N drücken — kein Speichern, kein Neuladen; im Sandkasten wirken beide?
+**E-221 — Zeichen statt Textboxen** (Prüfung 1 und 6, Sandkasten, Schicht)
+- Kupfer in BUNT + VA: grünes ✓ „+1“ und leises helles Klingen, zwei hintereinander „+2“? Falsche Mulde: rotes ✕, dumpfer Schlag?
+- Zu schwer frei stehend: rotes Gewicht und Stützen-Bild an der Spinne, gehen sie beim Schwenken mit?
+- Sandkasten: Abholer per V — Zeichen über genau diesem Laster plus Funkton, keine Textbox? Bagger in der Fahrspur — Zeichen über dem wartenden Laster?
+- Eine Minute Schicht: noch irgendwo eine Textbox oben? Zu viele Zeichen, wenn der Kipper ablädt?
 **E-218 — Ende → Montag, Leistenwörter** (iPhone mini quer)
 - Lehrgang zu Ende: Knopf heißt MONTAG und startet die Montag-Schicht?
 - „Fahrersicht“, „Außensicht“, „Ausleger heben“, „Arm strecken“, „Greifer aufs Ziel“ ohne Erklärung verständlich?

@@ -75,6 +75,26 @@ const FAMILIE_STAHL = FAMILIEN.stahl!.proben;
 const EINZEL_KLICK = FAMILIEN.kunststoff!.proben;
 const GRUND_STAHL = GRUND.stahl.proben;
 /**
+ * P4b (Auftrag 41f, Patrick 22.10.2026, Antwort 1): ✓ in der richtigen Mulde
+ * mit leisem eigenem Ton — der kuerzeste helle Metallklang im Bestand
+ * (alu_3, 0,17 s, OpenGameArt rubberduck metal_hit_01), keine Synthese
+ * (E-153). Hell und kurz, damit er sich vom dumpfen Fehlton (Mulden-Wummern,
+ * `playWrong`) unterscheidet — Blindtest-Regel: richtig klingt, falsch wummert.
+ */
+const EINZEL_RICHTIG = ["alu_3"] as const;
+/** SW: 0,22 — leiser als der Fehlton (0,9) und als der Schritt-Klick (2 x 0,32), am Geraet gegen das Aufprallen in der Mulde abgleichen */
+const RICHTIG_LAUT = 0.22;
+/**
+ * P4b (Antwort 6): Funkton zu einer Fuhrpark-Meldung. Eine echte Funk-Aufnahme
+ * gibt es im Bestand nicht (E-153, offen fuer Patrick); am naechsten kommt:
+ * das Klacken der Sprechtaste (Kunststoff-Klick) und ein kurzer Zischer aus
+ * der Ventil-Aufnahme hinter einem Tiefpass — das Rauschen, wenn der Kanal
+ * aufgeht. SW: Pegel, 0,14 s Zischen, 2,2 kHz Tiefpass.
+ */
+const FUNK_KLICK_LAUT = 0.22;
+const FUNK_RAUSCH_LAUT = 0.05;
+const FUNK_RAUSCH_S = 0.14;
+/**
  * Womit der Feierabend gerufen wird (E-148): Werkssirene (läuft hoch, steht
  * kurz, läuft aus) oder elektrische Werksklingel. Patrick entscheidet nach dem
  * Hören — umstellen heißt dieses eine Wort ändern.
@@ -1052,6 +1072,22 @@ export class AudioManager {
    * am Aufprall in der Mulde.
    */
   playCorrect(): void {}
+
+  /**
+   * P4b: ✓ in der richtigen Mulde — nur fuer Wuerfe des Spielers
+   * (`ui/ortszeichen.ts` entscheidet das, nicht der Ton). Gruppe Bagger wie
+   * alle Rueckmeldungen der Bedienung; eigene Lautstaerke `RICHTIG_LAUT`.
+   */
+  playRichtig(): void {
+    this.spiele(EINZEL_RICHTIG, RICHTIG_LAUT, { bagger: true });
+  }
+
+  /** P4b: Funk zu einer Fuhrpark-Meldung — Sprechtaste + kurzes Rauschen; `leise` = halb so laut (Bewegungsmeldungen). SW */
+  playFunk(leise = false): void {
+    const k = leise ? 0.5 : 1;
+    this.spiele(EINZEL_KLICK, FUNK_KLICK_LAUT * k, { tp: 4000, bagger: true });
+    this.spiele([SCHLEIFEN.ventil], FUNK_RAUSCH_LAUT * k, { delay: 0.03, dauer: FUNK_RAUSCH_S, tp: 2200, bagger: true });
+  }
 
   /**
    * E-162: Ein Aufgabenschritt ist geschafft („Jeder Schritt klickt", Konzept

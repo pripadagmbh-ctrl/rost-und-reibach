@@ -122,7 +122,12 @@ export interface RadioTon {
 
 export interface RadioMenue {
   audio: RadioTon;
-  toast: (text: string) => void;
+  /**
+   * P4b (Auftrag 41f: keine Textboxen): wird nicht mehr gelesen — die Liste
+   * markiert den laufenden Sender, der Schalter zeigt seinen Zustand.
+   * Entfaellt, sobald main.ts es nicht mehr uebergibt.
+   */
+  toast?: (text: string) => void;
   /** Pause verlassen, bevor das Feld aufgeht — wie beim Platzausbau */
   verlassePause: () => void;
   /** Sender aus dem Spielstand; fehlt er, bleibt es beim Standard */
@@ -165,7 +170,6 @@ export function installRadio(m: RadioMenue): () => void {
           // Sofort in den vorhandenen Stand nachtragen, damit die Wahl auch
           // ohne ausdrueckliches Speichern einen Neustart uebersteht
           speichereRadio({ songId: e.id });
-          m.toast(senderAnsage(findeSender(e.id), m.audio.musicOn));
         }
         zeichne();
       });
@@ -174,7 +178,7 @@ export function installRadio(m: RadioMenue): () => void {
   };
 
   schalter.addEventListener("click", () => {
-    m.toast(m.audio.toggleMusic() ? "Musik an." : "Musik aus.");
+    m.audio.toggleMusic();
     zeichne();
   });
   zurueck.addEventListener("click", () => feld.classList.remove("open"));

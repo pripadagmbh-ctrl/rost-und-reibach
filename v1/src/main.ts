@@ -84,12 +84,14 @@ import { lehrgangEinstieg } from "./core/save";
 import { installLektionsKarte } from "./ui/lektionskarte";
 import { installZielzeile } from "./ui/zielzeile";
 import { installPausenknopf } from "./ui/pausenknopf";
+import { installOrtszeichen } from "./ui/ortszeichen";
+import { PRESS_CENTER } from "./world/press";
 import { installGeisterdaumen } from "./ui/geisterdaumen";
 import { installZielmarke } from "./ui/zielmarke";
 import { onSprache, sprache, t } from "./ui/sprache";
 import { installSandkastenRekorde } from "./core/rekorde";
 import { Fahrkunst } from "./skills/fahrkunst";
-import { NACHSCHUB_FOLGE, nachschubMeldung, profilFuer } from "./delivery/nachschub";
+import { NACHSCHUB_FOLGE, profilFuer } from "./delivery/nachschub";
 
 const FIXED_DT = 1 / 60;
 const MAX_STEPS_PER_FRAME = 5; // Spiral-of-death-Schutz
@@ -428,6 +430,11 @@ async function main(): Promise<void> {
   const debug = new DebugOverlay();
   const aimRing = new AimRing(scene);
   const audio = new AudioManager(bus);
+  /** P4b: K speichert, N loescht den Stand — nur im Sandkasten (nicht in Pruefung, Lehrgang, Schicht; die Woche setzt hier ebenfalls false) */
+  const spielstandErlaubt = !aufgabenPlatz && !schichtStufe;
+  /** P4b: PRESSE ging nicht — ✕ ueber der Kammer; 3 m ueber dem Boden (SW: ueber der Kammerkrone) */
+  const presseGesperrt = (grund: "laeuft" | "nichtInKammer" | "gesperrt"): void =>
+    bus.emit("presse:gesperrt", { grund, x: PRESS_CENTER.x, y: 3, z: PRESS_CENTER.z });
   const hud = new Hud();
   const particles = new Particles(scene);
 
@@ -446,6 +453,23 @@ async function main(): Promise<void> {
    * Arm/Pendel) — darum Rueckfall auf Neuladen, wenn er weggefahren ist oder
    * die Presse gerade arbeitet.
    */
+  /*
+   * P4b (Auftrag 41f): Zeichen am Ort des Geschehens statt Textboxen — Ueberlast an der
+   * Spinne, ✓/✕ ueber der Mulde, Presse, Fuhrpark ueber dem Laster. Haengt nur am Bus;
+   * die Orte, die ein Ereignis nicht mitbringt, liest es hier.
+   */
+  const ozQuellen = weltQuellen({ bagger: excavator, grip, containers, items, press });
+  const ortszeichen = installOrtszeichen({
+    bus,
+    scene,
+    audio,
+    greiferOrt: (out) => excavator.getSensorPosition(out),
+    behaelterOrt: (id) => {
+      const b = ozQuellen.behaelter(id);
+      return b && { x: b.x, y: b.oberkante, z: b.z };
+    },
+  });
+  onSprache(() => ortszeichen.neuBeschriften());
   let challenge: ChallengeLauf | null = null;
   if (challengeDaten) {
     let grundbestand: Grundbestand | null = null;
@@ -480,7 +504,7 @@ async function main(): Promise<void> {
     });
     bus.on("challenge:pressen", () => {
       if (!challenge?.pressenErlaubt()) return;
-      if (!press.start()) hud.toast(press.sperrgrund ?? "Presse läuft bereits …");
+      if (!press.start()) presseGesperrt(press.sperrgrund ? "gesperrt" : "laeuft");
     });
     bus.on("challenge:geschafft", (e) => merkeChallenge(e.id, e.sterne));
     /*
@@ -688,7 +712,6 @@ async function main(): Promise<void> {
     bus.emit("greifer:gewechselt", { greifer: form.id, name: form.name });
   });
   bus.on("greifer:gewechselt", (e) => {
-    hud.toast(`${e.name} angebaut.`);
     speichereGreifer(e.greifer);
   });
   document.getElementById("pause-resume")!.addEventListener("click", () => setPaused(false));
@@ -702,7 +725,7 @@ async function main(): Promise<void> {
   const pausenknopf = installPausenknopf({ bus });
   onSprache(() => pausenknopf.neuBeschriften());
   document.getElementById("pause-save")!.addEventListener("click", () => {
-    hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
+    if (!storeSave(buildSaveData())) hud.toast("Speichern fehlgeschlagen!"); // P4b: nur der Fehlschlag (bliebe sonst unbemerkt)
     setPaused(false);
   });
   // In der Challenge fuehrt derselbe Knopf ins Menue — neu geladen wird ohnehin
@@ -779,7 +802,7 @@ async function main(): Promise<void> {
           showPickup(false);
           tutAbholer = true;
           if (vehicles.requestPickup(e.order, e.aufbau) === "vorgemerkt") {
-            hud.toast("Abholer vorgemerkt — er kommt, sobald die Fuhre weg ist.");
+            bus.emit("bedienung:quittung", { code: "KeyV", zeichen: "uhr" }); // P4b: vorgemerkt
           }
         });
         pickupListEl.appendChild(b);
@@ -857,10 +880,7 @@ async function main(): Promise<void> {
   excavator.onMagnetAus = () => bus.emit("magnet:aus", {});
   // Ueberlast nach Traglasttabelle (E-152): einmal je Hebeversuch, mit Grund
   excavator.onUeberlast = (e) => bus.emit("greifer:ueberlast", e);
-  const tonnen = (kg: number): string => (kg / 1000).toFixed(1).replace(".", ",");
-  bus.on("greifer:ueberlast", (e) =>
-    hud.toast(`Zu schwer: ${tonnen(e.massKg)} t – hier hebt die Maschine ${tonnen(e.grenzeKg)} t. ${e.abgestuetzt ? "Näher am Bagger greifen." : "Abstützen (O) und näher greifen."}`) // E-162 Nachtrag: eine Last am Boden laesst sich nicht heranziehen (Messung tools/schwere-last.ts)
-  );
+  // P4b: Ueberlast zeigt das rote Gewicht an der Spinne (ui/ortszeichen.ts), Ton playWrong — keine Textbox mehr
   /*
    * Aufschlaege: Der wichtigste Klang auf dem Platz. Ob es metallisch
    * wummert oder dumpf auf Beton klatscht, haengt daran, ob das Teil auf
@@ -1043,7 +1063,8 @@ async function main(): Promise<void> {
      */
     if (it && items.brauchtWerkzeug(it)) {
       // Im Simulator gibt es keinen Lambert (E-118) — dann bleibt es beim Befund
-      hud.toast(`${it.shape?.name ?? "Das Teil"} braucht Werkzeug${BETRIEB ? " — Arbeit für Lambert" : ""}.`);
+      const w = it.body.translation();
+      bus.emit("teil:werkzeug", { name: it.shape?.name ?? "Teil", x: w.x, y: w.y, z: w.z }); // P4b: Werkzeug-Zeichen am Teil
       return false;
     }
     if (!it || (!items.isCrushable(it) && !items.istTrennbar(it))) return false;
@@ -1060,28 +1081,24 @@ async function main(): Promise<void> {
     if (teile) {
       audio.playCrash(0.8);
       particles.spawn(ort, 12, 0x9a8b74, 2.0, 1.4, 0.6);
-      const namen = teile.map((x) => getMaterial(x.materialId).name).join(" + ");
-      hud.toast(`Zerlegt: ${namen}`);
+      bus.emit("teil:zerlegt", { materialIds: teile.map((x) => x.materialId), x: p.x, y: p.y, z: p.z }); // P4b: Sortenbilder steigen auf
       return true;
     }
     if (!items.flattenItem(it)) return false;
     audio.playDrop(it.materialId);
     particles.spawn(ort, 6, 0xb0b6bb, 1.6, 1.2, 0.5);
-    hud.toast(`${getMaterial(it.materialId).name} zusammengedrückt`);
     return true;
   };
   bus.on("itemEntered", (e) => {
     audio.playDrop(e.materialId);
     if (e.correct) {
-      audio.playCorrect();
       const it = items.items.find((i) => i.id === e.itemId);
       if (it) {
         account.noteSorted(it.massKg); // Geld gibt es erst bei der Abholung
         tutSortiertKg += it.massKg;
       }
-    } else {
-      audio.playWrong();
     }
+    // P4b: ✓ und ✕ samt Ton zeigt ui/ortszeichen.ts — nur nach einem Wurf des Spielers, nicht beim Kippen
   });
   const evPos = new THREE.Vector3();
   bus.on("glassShattered", (e) => {
@@ -1107,7 +1124,6 @@ async function main(): Promise<void> {
     // Was eben losgelassen wurde, liegt jetzt — gleich schiebt der Stempel (E-125)
     fahrkunst.jetztLiegtSie();
     audio.playGrab(); // Hydraulik läuft an
-    hud.toast("Presse: Klappen schließen …"); // E-191: hiess Schere
   };
   press.onLidsClosed = () => audio.playCrash(0.6); // Eisenplatten schlagen auf
   press.onStamp = (count, pos) => {
@@ -1118,18 +1134,16 @@ async function main(): Promise<void> {
     audio.playTear();
     particles.spawn(pos, 16, 0x9a8b74, 2.5, 1.8, 0.7);
     particles.spawn(pos, 8, 0xffc060, 4, 2, 0.4);
-    hud.toast(count > 0 ? `Presse: ${count} Teil${count > 1 ? "e" : ""} zum Paket gepresst` : "Presse: Mulde war leer");
+    bus.emit("presse:gestempelt", { teile: count, x: pos.x, y: pos.y, z: pos.z }); // P4b: Paket „+n" bzw. ✕ ueber der Presse
   };
   // Fahrer fahren weder durch den Bagger noch über liegenden Schrott (Kap. 13)
   vehicles.getExcavatorPos = () => excavator.position;
   vehicles.onHonk = () => {
-    audio.playHupe();
-    hud.toast("Der Fahrer hupt — Fahrspur ist blockiert!");
+    audio.playHupe(); // P4b: die Hupe ist das Signal; das Zeichen kommt mit der Buero-Meldung (blockiertBagger/blockiertDing)
   };
   // E-177/E-178: Buero-Funk, Abholer-Zeilen und Ankunftshupe ueber den Bus
-  vehicles.onMeldung = (text) => bus.emit("fuhrpark:meldung", { text });
+  vehicles.onMeldung = (text, lage) => bus.emit("fuhrpark:meldung", { text, ...lage }); // P4b: Zeichen ueber dem Laster (ui/ortszeichen.ts)
   vehicles.onAnkunftHupe = () => bus.emit("fuhrpark:hupe", {});
-  bus.on("fuhrpark:meldung", (e) => hud.toast(t(e.text)));
   bus.on("fuhrpark:hupe", () => audio.playHupe());
   /*
    * E-191 — BAGGER-HUPE (Patrick 21.10.2026: „Bagger bekommt auch Hupe für
@@ -1148,7 +1162,7 @@ async function main(): Promise<void> {
     const wagen = vehicles.pickupTruck;
     if (challenge || !(wagen?.waitingForLoad || wagen?.setztUm)) return;
     // 1 kg wie in `abholerFaehrtRaus`: jedes Teil wiegt mehr, Null waere Fliesskomma
-    if (wagen.ladeflaecheKg() < 1) hud.toast("Der Abholer ist noch leer.");
+    if (wagen.ladeflaecheKg() < 1) bus.emit("fuhrpark:abholerLeer", { x: wagen.group.position.x, z: wagen.group.position.z }); // P4b
     else vehicles.requestPickup(); // „… fährt los." kommt über den Bus (E-177)
   });
   /** SW: Mindestabstand zweier Hupen — die Aufnahme klingt zweimal kurz, gut 1 s. */
@@ -1236,13 +1250,12 @@ async function main(): Promise<void> {
     zeigeAusbau();
   });
   document.getElementById("pause-music")!.addEventListener("click", () => {
-    hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
+    audio.toggleMusic(); // P4b: man hoert es
   });
   // Senderwahl fuers Kabinenradio. Der Ein/Aus-Schalter darueber bleibt, wie
   // er war — hier wird nur gewaehlt, was liefe.
   installRadio({
     audio,
-    toast: (t) => hud.toast(t),
     verlassePause: () => setPaused(false),
     gewaehlt: gespeichert?.radio?.songId,
   });
@@ -1567,14 +1580,13 @@ async function main(): Promise<void> {
   const holeNachschub = (): void => {
     if (aufgabenPlatz || schicht) return; // keine Fuhre mitten in Aufgabe (E-125), Lektion (E-196) oder Schicht (E-202)
     if (vehicles.activeKind !== null) {
-      hud.toast("Noch eine Fuhre auf dem Platz — Nachschub erst, wenn sie weg ist.");
+      bus.emit("bedienung:quittung", { code: "Digit1", zeichen: "nein" }); // P4b: geht gerade nicht
       return;
     }
     const profil = profilFuer(NACHSCHUB_FOLGE[nachschubNr++ % NACHSCHUB_FOLGE.length]);
     vehicles.spawnNow(profil.vehicle, profil);
     // E-126: Die Meldung kennt das Grossteil, nicht nur das Fahrzeug —
     // sonst hiesse ein einzelner Minibagger "Eine Pritsche ist unterwegs".
-    hud.toast(nachschubMeldung(profil));
   };
 
   // --- Fester Physik-Step, von Loop und Test-Handle gemeinsam genutzt ---
@@ -1741,7 +1753,6 @@ async function main(): Promise<void> {
   /** Umschalten samt Meldung. Beide Bedienwege rufen genau diese Zeile. */
   const schalteMarkierungen = (): void => {
     zeigeMarkierungen(!labelsOn);
-    hud.toast(labelsOn ? "Markierungen an" : "Markierungen aus");
   };
   // Anfangszustand steht am Knopf, bevor jemand ihn zum ersten Mal sieht
   zeigeMarkierungen(labelsOn);
@@ -1796,7 +1807,7 @@ async function main(): Promise<void> {
     if (touch.consumePress("KeyO")) excavator.toggleOutriggers();
     // I und J: liegen auf deutscher wie englischer Tastatur an derselben Stelle
     if (input.wasPressed("KeyI") || touch.consumePress("KeyI")) {
-      hud.toast(excavator.toggleBlade() ? "Schild abgesenkt — schieben." : "Schild angehoben.");
+      excavator.toggleBlade(); // P4b: das Schild bewegt sich sichtbar
     }
     // `touch.consumePress("KeyM")` bleibt stehen wie bei KeyZ und KeyU: Der
     // Span in `#menu-actions` traegt den Code, falls der Eintrag je wieder
@@ -1816,9 +1827,9 @@ async function main(): Promise<void> {
       if (wagen?.waitingForLoad || wagen?.setztUm) {
         vehicles.requestPickup(); // „… fährt los." kommt über den Bus (E-177)
       } else if (schicht) {
-        hud.toast("Der nächste Verlader kommt von selbst."); // E-202: keine Bestellung in der Schicht
+        bus.emit("bedienung:quittung", { code: "KeyV", zeichen: "nein" }); // E-202: keine Bestellung in der Schicht
       } else if (vehicles.abholungVorgemerkt) {
-        hud.toast("Die Abholung ist schon vorgemerkt und fährt als nächstes vor.");
+        bus.emit("bedienung:quittung", { code: "KeyV", zeichen: "uhr" }); // P4b: schon vorgemerkt
       } else {
         // Auch bei belegtem Platz bestellbar: Die Abholung hat Vorrang und
         // wird vorgemerkt, statt an einem laufenden Anlieferer zu scheitern.
@@ -1850,27 +1861,26 @@ async function main(): Promise<void> {
     // Zur Waage schicken: Reste auf der Flaeche zaehlen dort als Tara
     if (input.wasPressed("KeyJ") || touch.consumePress("KeyJ")) {
       const r = vehicles.zurWaage();
-      if (r === "geschickt") hud.toast("Der Fahrer faehrt zur Waage.");
-      else hud.toast("Gerade ist kein Fahrzeug auf dem Platz.");
+      if (r !== "geschickt") bus.emit("bedienung:quittung", { code: "KeyJ", zeichen: "nein" }); // P4b: geschickt sieht man fahren
     }
     if (BETRIEB && (input.wasPressed("KeyZ") || touch.consumePress("KeyZ"))) zeigeAusbau();
     if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
-      hud.toast(radioWeiter(audio));
+      radioWeiter(audio); // P4b: man hoert den Sender
     }
-    if (!aufgabenPlatz && input.wasPressed("KeyK")) {
-      hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
+    if (spielstandErlaubt && input.wasPressed("KeyK")) {
+      if (!storeSave(buildSaveData())) hud.toast("Speichern fehlgeschlagen!"); // P4b: nur der Fehlschlag
     }
     if (input.wasPressed("KeyB") || touch.consumePress("KeyB")) {
       // Challenge: erst pressen, wenn das Wrack losgelassen in der Kammer ist (E-125)
       const lauf = challenge ?? station; // L8: im Lehrgang fragt die Station
       if (lauf && !lauf.pressenErlaubt()) {
-        hud.toast("Erst das Wrack in die Kammer legen und loslassen — dann PRESSE.");
-      } else if (!press.start()) hud.toast(press.sperrgrund ?? "Presse läuft bereits …");
+        presseGesperrt("nichtInKammer");
+      } else if (!press.start()) presseGesperrt(press.sperrgrund ? "gesperrt" : "laeuft");
     }
     if (input.wasPressed("KeyL")) {
       location.reload(); // Boot lädt den letzten Stand
     }
-    if (!aufgabenPlatz && input.wasPressed("KeyN")) {
+    if (spielstandErlaubt && input.wasPressed("KeyN")) {
       clearSave();
       location.reload();
     }
@@ -2058,7 +2068,13 @@ async function main(): Promise<void> {
     if (daylight.neuerTag) {
       daylight.neuerTag = false;
       const nachgelegt = items.inventarNachtragen();
-      if (nachgelegt.length) hud.toast(`${nachgelegt.join(", ")} liegt wieder auf dem Platz`);
+      if (nachgelegt.length) {
+        // P4b: kurzer Pfeil ueber jedem Stueck statt Textbox
+        const stuecke = items.items
+          .filter((i) => !!i.shape?.inventar && nachgelegt.includes(i.shape.name ?? "") && i.body.isValid())
+          .map((i) => i.body.translation());
+        bus.emit("inventar:zurueck", { stuecke: stuecke.map((p) => ({ x: p.x, y: p.y, z: p.z })) });
+      }
     }
     floodlights.update(daylight.daylight);
     // Kleinkram zusammenfassen, bevor die Teilezahl die Bildrate drückt
@@ -2066,7 +2082,7 @@ async function main(): Promise<void> {
     if (verdichtungsTimer > 4) {
       verdichtungsTimer = 0;
       const gespart = items.consolidate();
-      if (gespart > 0) hud.toast(`${gespart} Kleinteile zu Bündeln zusammengefasst`);
+      void gespart; // P4b: technische Meldung, gestrichen (die Buendel sieht man)
     }
     lanes.update(frameDt);
     /*
@@ -2294,9 +2310,7 @@ async function main(): Promise<void> {
   lektion?.start(lehrgangEinstieg(lektionDaten?.schritte.length)); // E-196: erst jetzt — alle Zuhoerer (Karte, Geist, Wiedergabe, Tafel) haengen
   if (schicht && schichtStufe) {
     bus.emit("schicht:start", { stufe: schichtStufe, dauerS: SCHICHT_FEIERABEND_S });
-    hud.toast("Misch auf den Verlader, Sortiertes in die Boxen.");
   }
-  else if (!BETRIEB && !aufgabenPlatz) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
   requestAnimationFrame(frame);
 }
 

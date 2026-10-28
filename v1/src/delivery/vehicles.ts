@@ -323,7 +323,8 @@ import {
   type Lage,
 } from "./lenkung";
 import { BAGGER_STAND } from "../world/baggerstand";
-import { lagerMuldeFuer, CONFIGS, type ContainerConfig } from "../world/containers";
+import { lagerMuldeFuer, CONFIGS, MUELL_PLAETZE, type ContainerConfig } from "../world/containers";
+import type { FuhrparkArt } from "../core/events";
 import { zaehltZu } from "../economy/fraktionsgruppen";
 import {
   rollCustomer,
@@ -396,6 +397,24 @@ const FAHRZEUG_NAME: Record<DeliveryKind, string> = {
   pkw: "Pkw mit Anhänger",
   absetzer: "Absetzkipper",
 };
+
+/** P4b (41f): Was eine Fuhrpark-Meldung sagt und wo — das Zeichen über dem Laster hängt daran. */
+export interface FuhrparkLage {
+  art: FuhrparkArt;
+  x: number;
+  z: number;
+}
+
+/** Die Lage einer Meldung an einem Weltpunkt (Laster: `group.position`). */
+function fuhrLage(art: FuhrparkArt, p: { x: number; z: number }): FuhrparkLage {
+  return { art, x: p.x, z: p.z };
+}
+
+/** Das Tor: wo die Einfahrt die Mauerflucht (z 29, `routes.torweg`) kreuzt — dort warten die Fuhren. */
+function torOrt(): { x: number; z: number } {
+  const [x, z] = ROUTE_IN_FWD.find(([, pz]) => pz <= 29) ?? ROUTE_IN_FWD[0]!;
+  return { x, z };
+}
 
 import {
   ROUTE_IN_FWD,
@@ -1556,7 +1575,8 @@ class DeliveryVehicle {
           : `${this.fahrzeugName} fährt los.`
         : this.vollLos
           ? `${this.fahrzeugName} ist voll und fährt los.`
-          : `${this.fahrzeugName} fährt los.`
+          : `${this.fahrzeugName} fährt los.`,
+      fuhrLage("faehrtLos", this.group.position)
     );
   }
 
@@ -1742,8 +1762,8 @@ class DeliveryVehicle {
   private vollLos = false;
   /** Am Halt angekommen (einmal je Ankunft) — Hupe und Meldung haengt der Fuhrpark daran. */
   onAngekommen: (() => void) | null = null;
-  /** Eine Zeile fuers HUD (deutsch; `main.ts` uebersetzt mit `t()`). */
-  onMeldung: ((text: string) => void) | null = null;
+  /** Eine Zeile fuers HUD (deutsch; `main.ts` uebersetzt mit `t()`), mit Art und Ort fürs Zeichen (P4b). */
+  onMeldung: ((text: string, lage: FuhrparkLage) => void) | null = null;
   /** Das Ziel steht fest (Waage verlassen oder vom Warteplatz los) — fuer den Buero-Funk. */
   onZielFest: (() => void) | null = null;
 
@@ -1785,7 +1805,7 @@ class DeliveryVehicle {
     const plan = v || this.platzinventar?.muellPlatz?.() ? planeMuellwechsel(v ? v.ort : null) : null;
     if (!plan) {
       this.muellPlan = null;
-      this.onMeldung?.("Büro an Bagger: Stell den Müll-Container an seinen Platz.");
+      this.onMeldung?.("Büro an Bagger: Stell den Müll-Container an seinen Platz.", fuhrLage("muellPlatz", MUELL_PLAETZE[0]!));
       this.sendAway();
       return;
     }
@@ -2076,7 +2096,7 @@ class DeliveryVehicle {
     this.phase = "approach";
     this.phaseT = 0;
     this.routeS = 0;
-    this.onMeldung?.(`${this.fahrzeugName} fährt dir nach.`);
+    this.onMeldung?.(`${this.fahrzeugName} fährt dir nach.`, fuhrLage("faehrtNach", this.group.position));
   }
 
   /**
@@ -3802,16 +3822,17 @@ class DeliveryVehicle {
   /** Ist an (x,z) im Umkreis r der Bagger? Gesetzt vom Fuhrpark (E-192). */
   baggerNah: ((x: number, z: number, r: number) => boolean) | null = null;
 
-  /** Welches Bauwerk steckt in der Lage voraus (Name aus der Hindernisliste)? */
-  private wasStehtImWeg(): string | null {
-    let best: string | null = null;
+  /** Welches Bauwerk steckt in der Lage voraus (Name aus der Hindernisliste, Ort fürs Zeichen P4b)? */
+  private wasStehtImWeg(): { label: string; x: number; z: number } | null {
+    let best: { label: string; x: number; z: number } | null = null;
     let tief = UMRISS_TOLERANZ;
     for (const u of this.umrissCache) {
       for (const o of alleHindernisse()) {
         const d = umrissUeberlappung(u, o);
         if (d > tief) {
           tief = d;
-          best = (o as { label?: string }).label ?? null;
+          const label = (o as { label?: string }).label;
+          best = label != null ? { label, x: o.x, z: o.z } : null;
         }
       }
     }
@@ -3875,7 +3896,7 @@ class DeliveryVehicle {
          * Zulieferer bleibt stecken".
          */
         const was = this.wasStehtImWeg();
-        if (was) this.onMeldung?.(`Büro an Bagger: Der Laster kommt nicht weiter — ${was} steht im Weg.`);
+        if (was) this.onMeldung?.(`Büro an Bagger: Der Laster kommt nicht weiter — ${was.label} steht im Weg.`, fuhrLage("blockiertDing", was));
       }
       return false;
     }
@@ -3892,7 +3913,10 @@ class DeliveryVehicle {
       if (this.blockedT > HONK_AFTER_S && !this.honked) {
         this.honked = true;
         this.onHonk?.();
-        this.onMeldung?.("Büro an Bagger: Der Laster kommt nicht vorbei — Bagger aus der Fahrspur, bitte.");
+        this.onMeldung?.(
+          "Büro an Bagger: Der Laster kommt nicht vorbei — Bagger aus der Fahrspur, bitte.",
+          fuhrLage("blockiertBagger", this.group.position)
+        );
       }
       return false;
     }
@@ -4987,9 +5011,9 @@ export class VehicleManager {
    * Eine Zeile fuers HUD (E-177): Buero-Funk zu jeder Fuhre, Abholer bestellt,
    * steht bereit, faehrt nach, faehrt los. Deutsch — `main.ts` uebersetzt mit
    * `t()` und gibt es ueber den Bus weiter. Anders als `onPickupFunk` bleibt
-   * dieser Kanal im Sandkasten an.
+   * dieser Kanal im Sandkasten an. Seit P4b mit Art und Ort fürs Zeichen über dem Laster.
    */
-  onMeldung: ((text: string) => void) | null = null;
+  onMeldung: ((text: string, lage: FuhrparkLage) => void) | null = null;
   /** Ein Fahrer ist an seinem Halt angekommen und hupt (E-178, hoechstens alle `HUPE_ABSTAND_S`). */
   onAnkunftHupe: (() => void) | null = null;
   /** War die Einfahrt beim letzten Bild offen? Für die Ansage „Platz dicht" (E-192). */
@@ -5115,7 +5139,8 @@ export class VehicleManager {
     if (faehrtInsSilo(k, silo) && silo && this.baggerInGasse(silo)) {
       if (!this.nachSilo) {
         this.onMeldung?.(
-          `Büro an Bagger: Kipper mit ${getMaterial(gezogen.sortedMaterial!).name} wartet am Tor — der Bagger steht in der Silogasse.`
+          `Büro an Bagger: Kipper mit ${getMaterial(gezogen.sortedMaterial!).name} wartet am Tor — der Bagger steht in der Silogasse.`,
+          fuhrLage("siloGasse", torOrt())
         );
       }
       this.nachSilo = { k, kunde: gezogen, silo };
@@ -5166,7 +5191,8 @@ export class VehicleManager {
     this.onMeldung?.(
       this.muellRueckfahrt && bringt
         ? "Büro an Bagger: Der Abroller bringt den leeren Müll-Container."
-        : `Büro an Bagger: ${this.abholAngebot(this.pickupOrder, aufbau).fahrzeug} für ${abholWas(this.pickupOrder)} ist unterwegs.`
+        : `Büro an Bagger: ${this.abholAngebot(this.pickupOrder, aufbau).fahrzeug} für ${abholWas(this.pickupOrder)} ist unterwegs.`,
+      fuhrLage("unterwegs", wagen.group.position)
     );
     this.muellRueckfahrt = false;
     wagen.loadCargo(this.items, this.composites);
@@ -5194,7 +5220,7 @@ export class VehicleManager {
     wagen.zumBagger = this.sandkastenAbholer;
     wagen.baggerPos = this.getExcavatorPos;
     wagen.abladeplatzZu = () => this.mulde !== null;
-    wagen.onMeldung = (text) => this.onMeldung?.(text);
+    wagen.onMeldung = (text, lage) => this.onMeldung?.(text, lage);
   }
 
   /** Der nächste Müll-Abroller ist die Rückfahrt mit dem leeren (E-192). */
@@ -5311,12 +5337,12 @@ export class VehicleManager {
       const ex = this.getExcavatorPos?.();
       return !!ex && Math.hypot(ex.x - x, ex.z - z) < r;
     };
-    v.onMeldung = (text) => this.onMeldung?.(text);
+    v.onMeldung = (text, lage) => this.onMeldung?.(text, lage);
     // Der Anlieferer spricht (E-082) — hier, damit auch ein Ansteher spricht.
     if (!v.isPickup) {
       v.onAnliefererlage = (lage) => this.onPickupFunk?.(v.customer?.name ?? "Fahrer", anliefererfunk(lage));
       // Buero-Funk, sobald feststeht, wohin er faehrt (E-178)
-      v.onZielFest = () => this.onMeldung?.(bueroFunk(v));
+      v.onZielFest = () => this.onMeldung?.(bueroFunk(v), fuhrLage("kommtAn", v.group.position));
     }
     // Angekommen: hupen (E-178), und der Abholer sagt, dass er bereit steht
     v.onAngekommen = () => {
@@ -5325,9 +5351,11 @@ export class VehicleManager {
         this.onAnkunftHupe?.();
       }
       if (v.hakenlift) {
-        if (v.bringtNur) this.onMeldung?.("Abroller stellt den Müll-Container ab.");
-        else if (v.holtVollen) this.onMeldung?.("Abroller holt den vollen Müll-Container.");
-      } else if (v.isPickup) this.onMeldung?.(`${v.fahrzeugName} steht bereit — laden, dann ABHOLEN drücken (V).`);
+        if (v.bringtNur) this.onMeldung?.("Abroller stellt den Müll-Container ab.", fuhrLage("muellAb", v.group.position));
+        else if (v.holtVollen) this.onMeldung?.("Abroller holt den vollen Müll-Container.", fuhrLage("muellHolt", v.group.position));
+      } else if (v.isPickup) {
+        this.onMeldung?.(`${v.fahrzeugName} steht bereit — laden, dann ABHOLEN drücken (V).`, fuhrLage("bereit", v.group.position));
+      }
     };
     // Die abgesetzte Mulde geht an den Fuhrpark (E-141)
     v.onMuldeAbgesetzt = (m) => (this.mulde = m);
@@ -5421,7 +5449,7 @@ export class VehicleManager {
       const m = this.platzinventar?.muellWanne?.() ?? null;
       const platz = !!this.platzinventar?.muellPlatz?.();
       if (!platz || !planeMuellwechsel(m ? { x: m.x, z: m.z, gier: m.gier } : null)) {
-        this.onMeldung?.("Büro an Bagger: Stell den Müll-Container an seinen Platz.");
+        this.onMeldung?.("Büro an Bagger: Stell den Müll-Container an seinen Platz.", fuhrLage("muellPlatz", MUELL_PLAETZE[0]!));
         return "unmoeglich";
       }
     }
@@ -6083,7 +6111,8 @@ export class VehicleManager {
     v.onAngekommen = () => {
       angekommen?.();
       this.onMeldung?.(
-        `Büro an Bagger: ${v.fahrzeugName} mit ${getMaterial(sorte).name} wartet am ${lager} — fahr hin und lad ab.`
+        `Büro an Bagger: ${v.fahrzeugName} mit ${getMaterial(sorte).name} wartet am ${lager} — fahr hin und lad ab.`,
+        fuhrLage("wartetLager", { x: v.festerPlatz!.halt[0], z: v.festerPlatz!.halt[1] })
       );
     };
     this.onCustomerArrived?.(kunde);
@@ -6133,7 +6162,7 @@ export class VehicleManager {
       if (box === MISCH || !v.ladungBereit) return;
       v.requestRelease();
       const name = (BOX_ORDERS as readonly string[]).includes(box) ? boxFuer(box as BoxOrder).label : abholWas(box);
-      this.onMeldung?.(`Büro an Bagger: Abholer für ${name} kommt — der Verlader fährt vor.`);
+      this.onMeldung?.(`Büro an Bagger: Abholer für ${name} kommt — der Verlader fährt vor.`, fuhrLage("abholerKommt", v.group.position));
       return;
     }
     const leer = v.ladeflaecheKg() < 1 && !haken.boxVoll(v.bestellung ?? MISCH);
@@ -6155,7 +6184,8 @@ export class VehicleManager {
       this.onMeldung?.(
         this.acceptDeliveries
           ? "Büro an Bagger: Platz wieder frei — die nächste Fuhre kommt."
-          : "Büro an Bagger: Der Platz ist voll — neue Fuhren warten am Tor, bis aufgeräumt ist."
+          : "Büro an Bagger: Der Platz ist voll — neue Fuhren warten am Tor, bis aufgeräumt ist.",
+        fuhrLage(this.acceptDeliveries ? "platzFrei" : "platzVoll", torOrt())
       );
     }
     // Wer am Tor wartet, wartet auf Kosten des Platzes
@@ -6205,7 +6235,8 @@ export class VehicleManager {
       this.nachruecker = null;
       this.pickupOrder = n.bestellung;
       this.onMeldung?.(
-        `Büro an Bagger: ${this.abholAngebot(n.bestellung, n.kind === "absetzer" ? "absetzer" : "abroller").fahrzeug} für ${(BOX_ORDERS as readonly string[]).includes(n.bestellung ?? "") ? boxFuer(n.bestellung as BoxOrder).label : abholWas(n.bestellung)} ist unterwegs.`
+        `Büro an Bagger: ${this.abholAngebot(n.bestellung, n.kind === "absetzer" ? "absetzer" : "abroller").fahrzeug} für ${(BOX_ORDERS as readonly string[]).includes(n.bestellung ?? "") ? boxFuer(n.bestellung as BoxOrder).label : abholWas(n.bestellung)} ist unterwegs.`,
+        fuhrLage("unterwegs", n.group.position)
       );
     }
 
@@ -6260,7 +6291,8 @@ export class VehicleManager {
       this.onMeldung?.(
         this.acceptDeliveries
           ? "Büro an Bagger: Platz wieder frei — die nächste Fuhre kommt."
-          : "Büro an Bagger: Der Platz ist voll — neue Fuhren warten am Tor, bis aufgeräumt ist."
+          : "Büro an Bagger: Der Platz ist voll — neue Fuhren warten am Tor, bis aufgeräumt ist.",
+        fuhrLage(this.acceptDeliveries ? "platzFrei" : "platzVoll", torOrt())
       );
     }
     // Wartende Fahrzeuge weiterlaufen lassen: Pause, dann Ausfahrt

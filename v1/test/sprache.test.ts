@@ -203,7 +203,8 @@ describe("Wächter: Meldungen und Menüs aus dem Spiel", () => {
       "kommt",
       "schon unterwegs",
     ]);
-    expect(saetze.length).toBeGreaterThan(20);
+    // P4b (22.10.2026): die erreichbaren Textboxen sind Zeichen geworden — es bleiben die Betrieb-Meldungen und „Speichern fehlgeschlagen!"
+    expect(saetze.length).toBeGreaterThan(8);
     mussUebersetztSein(saetze.filter((s) => !nurBetrieb.has(s)), "main.ts");
   });
   it("Nachschub-Meldungen und Pressen-Sperrgrund", () => {

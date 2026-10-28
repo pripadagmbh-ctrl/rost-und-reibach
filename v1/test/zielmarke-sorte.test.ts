@@ -237,3 +237,63 @@ describe("Zielmarke: Farben am Netz, Vorrat", () => {
     expect(z.hof().count).toBe(6);
   });
 });
+
+/*
+ * P4b (E-213 Offen 1, Patrick: „klein mit rein"): In Pruefung 1 lief der
+ * gerade Weg vom Kupfer zur Mulde unter dem Bagger durch. Mit `um` (Drehmitte)
+ * fuehrt er als Schwenkbogen herum — der Weg, den das Teil in der Spinne reist.
+ */
+describe("Weg als Schwenkbogen um die Drehmitte (P4b)", () => {
+  /** Auftrag P4b: kein Strich naeher als 3 m an der Drehmitte. SW: 3 m — Oberwagen des Mobilbaggers (Heck rund 2,5 m) plus Luft */
+  const ABSTAND_MIN_M = 3;
+  const striche = (marken: Stand["marken"]) => {
+    const scene = new THREE.Scene();
+    const bus = new EventBus();
+    installZielmarke(scene, bus);
+    bus.emit("challenge:stand", { id: "t", zeitS: 0, zaehler: null, balken01: null, pressenBereit: false, tipp: null, marken });
+    const weg = scene.children.find((n) => n instanceof THREE.InstancedMesh && n.geometry instanceof THREE.PlaneGeometry) as THREE.InstancedMesh;
+    const m = new THREE.Matrix4();
+    return Array.from({ length: weg.count }, (_, i) => {
+      weg.getMatrixAt(i, m);
+      return new THREE.Vector3().setFromMatrixPosition(m);
+    });
+  };
+
+  it("Pruefung 1: die Teil-Marke traegt die Drehmitte; der Bogen bleibt auf Reichweite, gerade schnitte er unter dem Arm durch", () => {
+    const a = erstesBild("erster-griff");
+    const t = a.marken.find((m) => m.art === "teil")!;
+    expect(t.um, "Drehmitte mitgegeben").toBeDefined();
+    const um = t.um!;
+    const r = (p: { x: number; z: number }) => Math.hypot(p.x - um.x, p.z - um.z);
+    // Gemessen 22.10.2026: Kupfer 8,1 m vor der Drehmitte, BUNT + VA 7,6 m links davon
+    const innen = Math.min(r(t), r(t.nach!));
+    const bogen = striche(a.marken);
+    expect(bogen.length).toBeGreaterThan(3);
+    for (const p of bogen) {
+      expect(r(p)).toBeGreaterThanOrEqual(ABSTAND_MIN_M);
+      expect(r(p), "nie naeher als Teil oder Ziel").toBeGreaterThanOrEqual(innen - 1e-6);
+    }
+    // Gegenprobe: derselbe Weg gerade (ohne `um`) kommt dem Bagger naeher (gemessen 5,8 m — ueber Vorderwagen und unter dem Arm)
+    const gerade = striche(a.marken.map((m) => ({ ...m, um: null })));
+    expect(Math.min(...gerade.map(r))).toBeLessThan(innen - 1);
+    // Der Bogen endet am Ziel: letzter Strich hoechstens einen Takt vor der Mulde
+    const ende = bogen.at(-1)!;
+    expect(Math.hypot(ende.x - t.nach!.x, ende.z - t.nach!.z)).toBeLessThanOrEqual(1.0 + 0.55);
+  });
+
+  it("Bogen: Halbmesser gleitet vom Teil zum Ziel, Drehsinn der kuerzere, Striche liegen tangential", () => {
+    // Teil 6 m vor der Drehmitte (+z), Ziel 10 m rechts (+x): Viertelkreis, nicht drei Viertel
+    const um = { x: 0, z: 0 };
+    const p = striche([{ x: 0, y: 1, z: 6, art: "teil", sorte: "stahl", nach: { x: 10, y: 2, z: 0 }, um }]);
+    for (const s of p) {
+      const r = Math.hypot(s.x, s.z);
+      expect(r).toBeGreaterThanOrEqual(6 - 1e-6);
+      expect(r).toBeLessThanOrEqual(10 + 1e-6);
+      expect(s.x, "kuerzerer Weg: nur im Viertel x ≥ 0, z ≥ 0").toBeGreaterThanOrEqual(-1e-6);
+      expect(s.z).toBeGreaterThanOrEqual(-1e-6);
+    }
+    // Viertelkreis mit mittlerem Halbmesser 8 m ≈ 12,6 m, ab 1,2 m alle 1 m: 11 bis 12 Striche
+    expect(p.length).toBeGreaterThanOrEqual(10);
+    expect(p.length).toBeLessThanOrEqual(12);
+  });
+});

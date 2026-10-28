@@ -1691,6 +1691,22 @@
         #controls-menu select { padding: 5px 4px; font-size: 11px; }
         #controls-menu .inv { padding: 5px 8px; font-size: 11px; }
       }
+      /* P4b (Auftrag 41f): Ortszeichen. Die Zeichen selbst stehen in der Welt
+         (ui/ortszeichen.ts); hier nur die Quittung am Kranz-Knopf (✕ = geht
+         gerade nicht, Uhr = vorgemerkt) und die unsichtbare Ansage-Zeile fuer
+         Bildschirmleser. Quittung SW: 22 px, rechts oben am Knopf. */
+      #btn-kranz .oz-quittung {
+        position: absolute; right: -6px; top: -6px; width: 22px; height: 22px;
+        border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.75);
+        display: none; pointer-events: none;
+      }
+      #btn-kranz .oz-quittung.an { display: block; }
+      /* #touch davor: die Regel fuer das Kranz-Bild (#touch #btn-kranz svg, 28 px) soll hier nicht greifen */
+      #touch #btn-kranz .oz-quittung svg, #btn-kranz .oz-quittung svg { display: block; width: 16px; height: 16px; margin: 3px; }
+      .nur-leser {
+        position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+        overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+      }
     </style>
   </head>
   <body>
@@ -2040,6 +2056,8 @@
       <div class="kopf"><button id="bl-zurueck"></button><h2 id="bl-titel"></h2></div>
       <div id="bl-inhalt"></div>
     </div>
+    <!-- P4b: was die Ortszeichen zeigen, fuer Bildschirmleser (unsichtbar; Text setzt ui/ortszeichen.ts) -->
+    <div id="ortszeichen-ansage" class="nur-leser" aria-live="polite" translate="no"></div>
     <div id="loading">Lade Physik …</div>
     <script type="module" src="/src/main.ts"></script>
   </body>

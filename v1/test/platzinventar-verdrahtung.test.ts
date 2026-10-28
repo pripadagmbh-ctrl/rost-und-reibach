@@ -141,8 +141,9 @@ describe("Platzinventar kommt am naechsten Tag wieder", () => {
      * Ein Werkzeug, das ueber Nacht zurueckkommt, ohne dass es jemand sagt,
      * sucht man am naechsten Morgen an der falschen Stelle.
      */
+    // P4b (Auftrag 41f): statt Textbox ein Pfeil ueber jedem Stueck (ui/ortszeichen.ts)
     const block = main.slice(main.indexOf("if (daylight.neuerTag)"));
-    expect(block.slice(0, block.indexOf("}") + 200)).toContain("hud.toast");
+    expect(block.slice(0, block.indexOf("}") + 400)).toContain('bus.emit("inventar:zurueck"');
   });
 
   it("und die Abrechnung der Abholung haengt am HUD — in BEIDEN Zweigen", () => {

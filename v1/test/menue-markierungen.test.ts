@@ -44,7 +44,8 @@ describe("Zonenmarkierungen sitzen im Pausenmenue und sind dort bedienbar", () =
      * Meldung, suchte man zwei Dinge statt eines.
      */
     expect(text, `Knopftext "${text}" nennt die Markierungen nicht`).toMatch(/[Mm]arkierungen/);
-    expect(main, "die Meldung im Spiel spricht von etwas anderem").toContain('"Markierungen an"');
+    // P4b (Auftrag 41f): keine Meldung mehr — der Knopf zeigt den Zustand (Balken `.an`), die Schilder verschwinden sichtbar
+    expect(main, "der Knopf zeigt seinen Zustand nicht mehr").toContain('markKnopf.classList.toggle("an", an)');
     /*
      * Lesbar bleiben: Im Querformat des iPhone mini steht das Pausenfeld
      * zweispaltig, und die Spaltenbreite richtet sich nach dem laengsten Knopf

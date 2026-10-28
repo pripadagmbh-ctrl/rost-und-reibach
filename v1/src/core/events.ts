@@ -8,6 +8,29 @@ import type { Schichtbilanz, Schichtstufe } from "../economy/kasse";
 import type { SorteId } from "../materials/sorten";
 
 /**
+ * P4b: Was eine Fuhrpark-Meldung sagt — das Zeichen ueber dem Laster haengt daran.
+ * faehrtLos/faehrtNach/unterwegs/kommtAn: Bewegung; bereit: Abholer laden; wartetLager: Pritsche wartet am Lager;
+ * blockiertBagger/blockiertDing: Fahrweg zu; siloGasse: Kipper wartet am Tor; muellPlatz: Muell-Container an seinen Platz;
+ * platzVoll/platzFrei: Annahme voll/frei; muellAb/muellHolt: Abroller stellt ab/holt; abholerKommt: Box voll, Abholer kommt.
+ */
+export type FuhrparkArt =
+  | "faehrtLos"
+  | "faehrtNach"
+  | "unterwegs"
+  | "kommtAn"
+  | "bereit"
+  | "wartetLager"
+  | "blockiertBagger"
+  | "blockiertDing"
+  | "siloGasse"
+  | "muellPlatz"
+  | "platzVoll"
+  | "platzFrei"
+  | "muellAb"
+  | "muellHolt"
+  | "abholerKommt";
+
+/**
  * Auftrag 41: ein Bild der Zielzeile — eine Sorte (Farbe + Bild aus
  * `materials/sorten.ts`) oder ein Ding ohne Sorte.
  */
@@ -25,7 +48,34 @@ export interface GameEvents {
    * bestellt, steht bereit, faehrt nach, faehrt los. `text` ist deutsch; das HUD
    * zeigt `t(text)`.
    */
-  "fuhrpark:meldung": { text: string };
+  "fuhrpark:meldung": {
+    text: string;
+    /**
+     * P4b (Auftrag 41f, Patrick 22.10.2026: keine Textboxen; Antwort 6: Zeichen ueber dem Laster plus Funkton):
+     * was gemeldet wird und wo (Weltpunkt des Lasters bzw. des Orts). Das HUD zeigt keinen Text mehr,
+     * sondern ein Zeichen an (x, z) (`ui/ortszeichen.ts`); `text` bleibt fuer Bildschirmleser und Protokoll.
+     */
+    art?: FuhrparkArt;
+    x?: number;
+    z?: number;
+  };
+  /** P4b: Ein Teil braucht Werkzeug (Spinne beisst ab) — Zeichen am Teil. */
+  "teil:werkzeug": { name: string; x: number; y: number; z: number };
+  /** P4b: Ein Teil wurde zerlegt — die Sorten der Bruchstuecke steigen am Ort auf. */
+  "teil:zerlegt": { materialIds: string[]; x: number; y: number; z: number };
+  /** P4b: PRESSE gedrueckt, aber sie startet nicht — ✕ ueber der Presse. */
+  "presse:gesperrt": { grund: "laeuft" | "nichtInKammer" | "gesperrt"; x: number; y: number; z: number };
+  /** P4b: Die Presse hat gestempelt (`teile` 0 = Kammer war leer). */
+  "presse:gestempelt": { teile: number; x: number; y: number; z: number };
+  /** P4b: Am neuen Tag liegen Platzstuecke wieder an ihrem Platz (Besen …) — kurze Marke darueber. */
+  "inventar:zurueck": { stuecke: Array<{ x: number; y: number; z: number }> };
+  /** P4b: Gehupt, aber der Abholer ist noch leer — Zeichen ueber dem Abholer. */
+  "fuhrpark:abholerLeer": { x: number; z: number };
+  /**
+   * P4b: Antwort auf einen Knopf (Kranz-Eintrag, Taste) ohne eigenen Weltort — Zeichen am Kranz-Knopf.
+   * `code` = Tastencode des Eintrags (KeyV, Digit1, KeyJ …): "nein" = geht gerade nicht, "uhr" = vorgemerkt.
+   */
+  "bedienung:quittung": { code: string; zeichen: "nein" | "uhr" };
   /** Ein Fahrer ist an seinem Halt angekommen und hupt (hoechstens alle 30 s, E-178). */
   "fuhrpark:hupe": Record<string, never>;
   /**
@@ -224,6 +274,11 @@ export interface GameEvents {
       sorte?: SorteId | null;
       /** Auftrag 41, nur bei "teil": wohin es gehoert (Punkt auf dem Ziel) — Ende des gestrichelten Wegs */
       nach?: { x: number; y: number; z: number } | null;
+      /**
+       * P4b (E-213 Offen 1, Patrick: „klein mit rein"): Drehmitte des Oberwagens. Ist sie da, fuehrt der
+       * Weg als Schwenkbogen um sie herum statt gerade unter dem Bagger durch (`ui/zielmarke.ts`).
+       */
+      um?: { x: number; z: number } | null;
     }>;
   };
   /** E-162: Knopf PRESSEN auf der Karte — main.ts startet die Presse wie der Kranz. */

@@ -110,7 +110,7 @@ describe("Aufgabe 2: Marken mit Attrappen", () => {
     const l = new ChallengeLauf(A2, 2, q, bus, { teile: [], wracks: [{ body: koerper }] });
     l.start();
     l.takt(1);
-    expect(staende.at(-1)!.marken).toEqual([{ x: WRACK.x, y: 1.41, z: WRACK.z, art: "teil", sorte: null, nach: A2.zielMarke }]); // Auftrag 41: Weg zur Kammer
+    expect(staende.at(-1)!.marken).toEqual([{ x: WRACK.x, y: 1.41, z: WRACK.z, art: "teil", sorte: null, nach: A2.zielMarke, um: expect.objectContaining({ x: expect.any(Number), z: expect.any(Number) }) }]); // Auftrag 41: Weg zur Kammer; P4b: als Bogen um die Drehmitte
     st.gegriffen = true;
     l.takt(1);
     expect(staende.at(-1)!.marken).toEqual([{ ...A2.zielMarke!, art: "ziel", sorte: null }]);

@@ -34,6 +34,13 @@
  *    `depthTest` — sie liegen am Boden und verschwinden hinter Bagger und
  *    Muldenwand, statt durch sie hindurch zu schweben; nur der Pfeil ist
  *    hinter Waenden sichtbar (er sagt „dort", der Weg „hier entlang").
+ *
+ * P4b (E-213 Offen 1, Patrick: „klein mit rein"): Traegt die Marke `um`
+ * (Drehmitte des Oberwagens), laeuft der Weg als SCHWENKBOGEN um sie herum —
+ * so, wie das Teil wirklich reist: Der Bagger hebt und schwenkt, er schiebt
+ * es nicht unter sich durch. Halbmesser gleitet vom Teil zum Ziel, Drehsinn
+ * der kuerzere (der, den der Spieler schwenken muss). Dieselben Striche,
+ * derselbe Vorrat; ohne `um` gerade wie bisher.
  */
 import * as THREE from "three";
 import type { EventBus } from "../core/events";
@@ -78,6 +85,8 @@ const WEG_AB_M = HOF_AUSSEN_M;
  */
 const HOF_MAX = 16;
 const STRICH_MAX = 256; // ponytail: laengere Wege werden am Ziel abgeschnitten — dann die Zahl erhoehen
+/** P4b: Teilstuecke des Bogens. SW: 48 — bei 20 m Weg rund 0,4 m je Stueck, kuerzer als ein Strich */
+const BOGEN_N = 48;
 
 export interface Zielmarke {
   /** Alle Marken weg (auch von aussen, z. B. vor einem Neuaufbau). */
@@ -150,6 +159,36 @@ export function installZielmarke(scene: THREE.Scene, bus: EventBus): Zielmarke {
   }
   const mx = new THREE.Matrix4();
   const dreh = new THREE.Matrix4();
+  // Weg als Linienzug (gerade: 2 Punkte, Bogen: BOGEN_N + 1), einmal angelegt; `wl` = Weglaenge bis Punkt i
+  const wx = new Float64Array(BOGEN_N + 1);
+  const wz = new Float64Array(BOGEN_N + 1);
+  const wl = new Float64Array(BOGEN_N + 1);
+  /** Linienzug von a nach b legen, mit `um` als Bogen um die Drehmitte. Liefert die Zahl der Stuecke. */
+  const legeWeg = (ax: number, az: number, bx: number, bz: number, um: { x: number; z: number } | null | undefined): number => {
+    let n = 1;
+    wx[0] = ax;
+    wz[0] = az;
+    if (!um) {
+      wx[1] = bx;
+      wz[1] = bz;
+    } else {
+      n = BOGEN_N;
+      const r0 = Math.hypot(ax - um.x, az - um.z);
+      const r1 = Math.hypot(bx - um.x, bz - um.z);
+      const w0 = Math.atan2(ax - um.x, az - um.z);
+      let dw = Math.atan2(bx - um.x, bz - um.z) - w0;
+      dw -= 2 * Math.PI * Math.round(dw / (2 * Math.PI)); // kuerzerer Drehsinn
+      for (let i = 1; i <= n; i++) {
+        const u = i / n;
+        const r = r0 + u * (r1 - r0);
+        wx[i] = um.x + r * Math.sin(w0 + u * dw);
+        wz[i] = um.z + r * Math.cos(w0 + u * dw);
+      }
+    }
+    wl[0] = 0;
+    for (let i = 1; i <= n; i++) wl[i] = wl[i - 1]! + Math.hypot(wx[i]! - wx[i - 1]!, wz[i]! - wz[i - 1]!);
+    return n;
+  };
   const bodenAus = (): void => {
     hof.count = weg.count = 0;
     hof.visible = weg.visible = false;
@@ -207,13 +246,17 @@ export function installZielmarke(scene: THREE.Scene, bus: EventBus): Zielmarke {
           hof.setColorAt(nHof++, farbe.setHex(hex));
         }
         if (p.nach) {
-          const dx = p.nach.x - p.x;
-          const dz = p.nach.z - p.z;
-          const lang = Math.hypot(dx, dz);
-          dreh.makeRotationY(Math.atan2(dx, dz));
+          const nw = legeWeg(p.x, p.z, p.nach.x, p.nach.z, p.um);
+          const lang = wl[nw]!;
           // Striche vom Hofrand bis zum Ziel; `lauf` schiebt sie jedes Bild ein Stueck weiter hin
+          let j = 0;
           for (let s = WEG_AB_M + lauf; s + STRICH_LANG_M / 2 <= lang && nStrich < STRICH_MAX; s += STRICH_TAKT_M) {
-            mx.copy(dreh).setPosition(p.x + (dx * s) / lang, BODEN_UEBER_M, p.z + (dz * s) / lang);
+            while (j < nw - 1 && wl[j + 1]! < s) j++;
+            const dx = wx[j + 1]! - wx[j]!;
+            const dz = wz[j + 1]! - wz[j]!;
+            const k = (s - wl[j]!) / Math.max(1e-9, wl[j + 1]! - wl[j]!);
+            dreh.makeRotationY(Math.atan2(dx, dz));
+            mx.copy(dreh).setPosition(wx[j]! + dx * k, BODEN_UEBER_M, wz[j]! + dz * k);
             weg.setMatrixAt(nStrich, mx);
             weg.setColorAt(nStrich++, farbe.setHex(hex));
           }
