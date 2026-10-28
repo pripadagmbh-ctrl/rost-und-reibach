@@ -290,7 +290,8 @@ describe("E-202 — der Verlader vorn", () => {
     expect(p.protokoll.abfahrten[0]?.order).toBe("mixed");
     bis(p, 60, () => !!p.vehicles.schichtVerlader?.waitingForLoad);
     expect(p.vehicles.schichtVerlader?.bestellung, "der Nachrücker ist nicht für Stahl").toBe("steel");
-    expect(p.protokoll.meldungen.some((m) => /für Stahlschrott ist unterwegs/.test(m))).toBe(true);
+    // W0c: der Funk nennt das Box-Schild (wie „Abholer für … kommt", E-211)
+    expect(p.protokoll.meldungen.some((m) => /für STAHLSCHROTT ist unterwegs/.test(m))).toBe(true);
     // Gegenprobe: Box wieder leer → der übernächste ist wieder Misch
     box.steel = 0;
     for (let i = 0; i < 30; i++) p.takt();
