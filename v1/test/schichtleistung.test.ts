@@ -37,6 +37,8 @@ describe("S5 — Freitag, volle Welle, Saat 1", () => {
     // jede Obergrenze — er bliebe hier beim Startwert und bei 0 wach stehen.
     expect(b.koerperMax - b.koerperStart, "Körperzahl wächst nicht mit den Fuhren").toBeGreaterThanOrEqual(40); // gemessen +91
     expect(b.wachMax, "wach-Zähler sieht keine Bewegung").toBeGreaterThanOrEqual(4 * LEISTUNGS_SCHRANKEN.wachNachRuhe); // gemessen 40
-    expect(b.fuhren).toBeGreaterThanOrEqual(6);
+    // W0c (Nachtrag E-210): Fuhren wieder schwerer (Mittel 4,85 statt 3,35 t), die Annahme
+    // schliesst bei 10 t (`ANNAHME_ZU_KG`) frueher — gemessen 5 Fuhren in Saat 1 (vorher 6)
+    expect(b.fuhren).toBeGreaterThanOrEqual(5);
   });
 });

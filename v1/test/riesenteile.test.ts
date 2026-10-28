@@ -92,3 +92,31 @@ describe("Eine Kipperfuhre ist eine Fuhre, kein Einzelteil", () => {
     expect(mitMisch, `${mitMisch} von ${cs.length} mit Mischschrott`).toBe(cs.length);
   }, 120000);
 });
+
+/**
+ * W0c — WIEDER MEHR AUF DER FLÄCHE (Patrick 22.10.2026: „mehr Teile je Fuhre,
+ * bis wieder etwa 6–8 t drauf sind"; Nachtrag W0c zu E-210). Der Kunde lädt je
+ * Sorte das Schwere (`vehicles.SCHWER_WAHL`). Gemessen 200 Montags-Kipper
+ * (`tools/riesenteile.ts`): Mittel 3,35 → 4,85 t, Misch-Anteil der Masse
+ * (Median) 39 → 53 %. Die Schranken liegen unter dem Gemessenen (SW: Rand für
+ * den Würfel) und über dem Stand vor W0c — fällt die Wahl weg, reißen beide.
+ */
+const KIPPER_MITTEL_MIN_KG = 4_200;
+const KIPPER_MISCH_MIN = 0.45;
+
+describe("W0c — der Montags-Kipper bringt wieder Gewicht, und Misch trägt es mit", () => {
+  it(`im Mittel ≥ ${KIPPER_MITTEL_MIN_KG} kg je Fuhre, Misch ≥ ${KIPPER_MISCH_MIN * 100} % der Masse`, () => {
+    let kg = 0;
+    let misch = 0;
+    const cs = kunden(40, "schicht");
+    cs.forEach((c, i) => {
+      for (const t of beladeFuhre(c, 500 + i)) {
+        kg += t.massKg;
+        if (t.materialId === "mixed") misch += t.massKg;
+      }
+    });
+    console.log(`[W0c] 40 Montags-Kipper: Mittel ${(kg / cs.length).toFixed(0)} kg, Misch ${((misch / kg) * 100).toFixed(1)} % der Masse`);
+    expect(kg / cs.length).toBeGreaterThanOrEqual(KIPPER_MITTEL_MIN_KG);
+    expect(misch / kg).toBeGreaterThanOrEqual(KIPPER_MISCH_MIN);
+  }, 120000);
+});

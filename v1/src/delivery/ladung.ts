@@ -75,7 +75,7 @@ const RASTER = 0.2;
  * ruhende Lage rutscht rechnerisch gar nicht. Steilerer Kippwinkel oder
  * weniger Reibung ist ein eigenes Paket (`docs/offene-punkte.md`).
  */
-const LUFT = 0.12;
+export const LUFT = 0.12;
 
 export interface LadeStueck {
   /** Kantenlänge quer zur Fahrtrichtung (m), ungedreht */

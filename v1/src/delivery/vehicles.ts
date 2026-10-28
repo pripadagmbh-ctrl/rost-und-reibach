@@ -12,7 +12,7 @@ import { WEIGH_Z, KAFFEE_THEKE } from "../world/yard";
 import { baueKundenfigur, baueHund, type Kundenfigur } from "../world/kundenfigur";
 import { AUSSEHEN_NEUTRAL } from "./aussehen";
 import type { Box } from "../world/boxen";
-import { packeLadung, stueckMass, deckelVolumen } from "./ladung";
+import { packeLadung, stueckMass, deckelVolumen, LUFT } from "./ladung";
 import { spaeneCargo, spaeneDrehung, spaeneSchuettung } from "../world/spaene";
 
 /**
@@ -261,6 +261,47 @@ const FUELL_MAX = 0.9;
  * Teil, 3 mit einem Teil ueber 60 % der Masse; mit 0,5 keine (`tools/riesenteile.ts`).
  */
 const STUECK_ANTEIL_MAX = 0.5;
+/**
+ * DER KUNDE LÄDT DAS SCHWERE (W0c, Patrick 22.10.2026: „mehr Teile je Fuhre,
+ * bis wieder etwa 6–8 t drauf sind"). Je Teil, das er auflädt, zieht er so
+ * viele Teile DERSELBEN Sorte und nimmt das, das am meisten Gewicht auf den
+ * Platz bringt (`kgJePlatz`). Wer nach Gewicht bezahlt wird, lädt keinen
+ * Kühlschrank, wenn daneben ein Motorblock liegt.
+ *
+ * SW, gemessen `tools/riesenteile.ts` (200 Montags-Kipper, Nachtrag W0c zu
+ * E-210): 1 (= bis E-210) 3,35 t, Misch 39 %, 15 Teile · 3: 4,55 t, 50 %, 18 ·
+ * 4: 4,85 t, 52 %, 20 · 5: 4,96 t, 53 %, 21. Ab 4 bringt jedes weitere kaum
+ * noch Masse, aber Teile (Körper). Die Sortenmischung bleibt, weil je Sorte
+ * gewählt wird — dichter Misch (Motorblock, Blechtafel, Raupenunterwagen) ist
+ * gegenüber dem leichten Misch viel dichter als Stahl gegenüber leichtem
+ * Stahl, deshalb STEIGT der Misch-Anteil der Masse.
+ */
+const SCHWER_WAHL = 4;
+/**
+ * Gewicht je m³ Platz, das ein Teil höchstens auf die Fläche bringt (Deckel
+ * `teilDeckelKg`). Platz = Packmaß plus `LUFT` je Kante, wie `packeLadung` es
+ * belegt — ohne die Luft gewännen kleine Teile (gemessen 22 statt 20 Teile je
+ * Kipper bei 4,55 statt 4,85 t: mehr Körper für weniger Masse).
+ */
+function kgJePlatz(sp: { massKg: number; shape: ScrapShape }): number {
+  const m = stueckMass(sp.shape.kind, sp.shape.dims);
+  return teilDeckelKg(sp.shape, sp.massKg) / ((m.breite + LUFT) * (m.laenge + LUFT) * (m.hoehe + LUFT));
+}
+/** Wie `randomCargo`, aber je Teil das schwerste von `SCHWER_WAHL` derselben Sorte (s. o.). */
+function schwererWurf(
+  n: number,
+  gross: number,
+  riesig: number,
+  sorte: string | undefined
+): ReturnType<typeof randomCargo> {
+  return randomCargo(n, gross, riesig, sorte).map((sp) => {
+    let best = sp;
+    for (const alt of randomCargo(SCHWER_WAHL - 1, gross, riesig, sp.materialId)) {
+      if (kgJePlatz(alt) > kgJePlatz(best)) best = alt;
+    }
+    return best;
+  });
+}
 /** Gehtempo des Fahrers (m/s) */
 const FAHRER_TEMPO = 1.5;
 import { alleHindernisse } from "../world/obstacles";
@@ -2917,7 +2958,8 @@ class DeliveryVehicle {
        * bekam.
        */
       const brocken = Math.max(2, Math.round((klein ? 4 : 8) * zielFuellung));
-      const nachschub = randomCargo(
+      // W0c: je Teil das schwerste von `SCHWER_WAHL` derselben Sorte
+      const nachschub = schwererWurf(
         erste ? brocken : Math.max(2, Math.round(6 * zielFuellung)),
         erste ? 0.5 : 0.08,
         erste && schwer ? 0.55 : 0,
@@ -3050,7 +3092,10 @@ class DeliveryVehicle {
         const vorher = liegend();
         // Brocken wie in der ersten Runde (halb Großteile), damit die Masse mit
         // wenigen Körpern kommt; keine Schwergewichte.
-        for (const sp of randomCargo(6, 0.5, 0, this.sortedMaterial ?? undefined)) {
+        // W0c: auch beim Nachlegen das Schwere (`SCHWER_WAHL`). Füllgrenze, „nur am
+        // Boden" und `STUECK_MAX` bleiben: gelockert brachten sie gemessen nur
+        // 0,1–0,4 t mehr, und „nur am Boden" hält den Kipper ruhig (E-210).
+        for (const sp of schwererWurf(6, 0.5, 0, this.sortedMaterial ?? undefined)) {
           if (liegend() >= STUECK_MAX || kann() >= c.massKg) break;
           if (raum > 0 && fuellung + deckelVolumen(sp.shape.kind, sp.shape.dims) / raum > fuellGrenze) continue;
           const probe = [...specs, sp];
@@ -6160,7 +6205,7 @@ export class VehicleManager {
       this.nachruecker = null;
       this.pickupOrder = n.bestellung;
       this.onMeldung?.(
-        `Büro an Bagger: ${this.abholAngebot(n.bestellung, n.kind === "absetzer" ? "absetzer" : "abroller").fahrzeug} für ${abholWas(n.bestellung)} ist unterwegs.`
+        `Büro an Bagger: ${this.abholAngebot(n.bestellung, n.kind === "absetzer" ? "absetzer" : "abroller").fahrzeug} für ${(BOX_ORDERS as readonly string[]).includes(n.bestellung ?? "") ? boxFuer(n.bestellung as BoxOrder).label : abholWas(n.bestellung)} ist unterwegs.`
       );
     }
 
